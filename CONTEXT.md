@@ -59,5 +59,13 @@ An unintended loss of a Character's established personality or voice, as opposed
 _Avoid_: Character development, inconsistency
 
 **Snapshot**:
-An AI-generated image of the moment a Chat is currently at, made on the user's request.
+An AI-generated image of the moment of a Chat's latest Message, seen through the user's eyes and made only on the user's request; it is kept in the Story's Gallery even after editing or resetting the Chat takes its moment away.
 _Avoid_: Illustration, picture, render
+
+**Gallery**:
+The collection of every Snapshot taken in any of a Story's Chats.
+_Avoid_: Album, library
+
+**Reference image**:
+A hidden image of a Character, chosen by the author, that keeps the Character looking the same in every Snapshot; unlike an avatar it is never shown during play.
+_Avoid_: Avatar, portrait, profile picture
