@@ -5,7 +5,7 @@ A personal app for roleplaying with AI-driven characters inside stories.
 ## Stories
 
 **Story**:
-A Setting plus the cast of Characters fixed when the Story is created, in which the user takes part.
+A Setting plus a cast of Characters and a Role for the user, drafted with AI and edited by its author; only the author changes the cast, never the AI during play.
 _Avoid_: Plot, world, scenario
 
 **Setting**:
@@ -13,8 +13,12 @@ The place, situation and premise a Story takes place in; every Story has one.
 _Avoid_: Scene, world, background
 
 **Scene**:
-An optional, author-defined stage of a Story that the plot moves through in order; between and without Scenes, the story unfolds freely.
+An optional, author-defined stage of a Story that the plot moves through in order, each ending when its plain-language move-on condition is met; a Scene steers the story but never limits what the user or the Characters can do.
 _Avoid_: Chapter, act, stage
+
+**Opening**:
+The author-written passage that begins every Chat of a Story.
+_Avoid_: Intro, greeting, first message
 
 **Character**:
 An AI-played figure with its own personality and voice, belonging to one Story's cast.
@@ -25,7 +29,7 @@ The AI voice that describes the Setting and action and decides which Characters 
 _Avoid_: Game master, GM, system
 
 **Role**:
-The part a Story defines for the user to play.
+The part a Story defines for the user to play; every Story has one.
 _Avoid_: Player character, protagonist
 
 **Persona**:
