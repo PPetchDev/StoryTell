@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>One AI Turn — prototype</title>
+<style>
+  :root { --bg:#faf9f7; --panel:#fff; --ink:#1d1b19; --muted:#6b665f; --line:#e6e2dc; --accent:#7a4fd6; --warn:#b4461f; --ok:#2f7d4f; }
+  * { box-sizing: border-box; }
+  body { margin:0; font: 15px/1.55 system-ui, sans-serif; background:var(--bg); color:var(--ink); }
+  header { padding:16px 20px; border-bottom:1px solid var(--line); background:var(--panel); }
+  header h1 { margin:0 0 4px; font-size:18px; }
+  header p { margin:0; color:var(--muted); max-width:980px; font-size:13.5px; }
+  .badge { display:inline-block; font-size:12px; padding:1px 8px; border-radius:10px; background:#fde8e1; color:var(--warn); margin-left:6px; }
+  .badge.ok { background:#e2f3e8; color:var(--ok); }
+  .controls { display:flex; flex-wrap:wrap; gap:14px; padding:10px 20px; border-bottom:1px solid var(--line); background:var(--panel); align-items:center; font-size:13.5px; }
+  .controls label { color:var(--muted); }
+  select, button, input[type=text], textarea { font:inherit; }
+  select { padding:3px 6px; }
+  main { display:grid; grid-template-columns: minmax(0,1fr) 380px; gap:0; height: calc(100vh - 128px); }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; height:auto; } }
+  #chat { overflow:auto; padding:18px 22px; }
+  #side { overflow:auto; border-left:1px solid var(--line); background:var(--panel); padding:14px 16px; font-size:13.5px; }
+  .msg { margin:0 0 18px; max-width:760px; }
+  .msg.user { background:#efeaff; border-radius:10px; padding:8px 12px; margin-left:auto; max-width:620px; }
+  .msg.user .who { color:var(--accent); font-weight:600; font-size:12px; }
+  .narr { color:#3d3a36; font-style:italic; margin:6px 0; white-space:pre-wrap; }
+  .speech { margin:6px 0; white-space:pre-wrap; }
+  .speech b { color:var(--accent); }
+  .meta { font-size:12px; color:var(--muted); margin-top:4px; }
+  .flags { color:var(--warn); font-size:12.5px; }
+  .verdict { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; align-items:center; }
+  .chip { font-size:12px; border:1px solid var(--line); background:#fff; border-radius:12px; padding:1px 9px; cursor:pointer; }
+  .chip.on { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .verdict input { font-size:12px; padding:2px 6px; border:1px solid var(--line); border-radius:6px; width:220px; }
+  .scene-break { text-align:center; color:var(--accent); font-size:12.5px; margin:14px 0; letter-spacing:.04em; }
+  .cands { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:18px; }
+  @media (max-width: 900px) { .cands { grid-template-columns:1fr; } }
+  .cand { border:1px solid var(--line); border-radius:10px; padding:10px 12px; background:var(--panel); }
+  .cand h4 { margin:0 0 6px; font-size:13px; }
+  #compose { display:flex; gap:8px; padding:10px 22px 16px; position:sticky; bottom:0; background:var(--bg); }
+  #compose textarea { flex:1; min-height:58px; padding:8px 10px; border:1px solid var(--line); border-radius:8px; resize:vertical; }
+  button { cursor:pointer; border:1px solid var(--line); background:#fff; border-radius:8px; padding:5px 12px; }
+  button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  button:disabled { opacity:.5; cursor:default; }
+  h3 { font-size:13px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin:16px 0 6px; }
+  h3:first-child { margin-top:0; }
+  .bond { padding:5px 0; border-bottom:1px dashed var(--line); }
+  .bond .lbl { font-weight:600; }
+  .changed { background:#fff6d6; }
+  .small { font-size:12px; color:var(--muted); }
+  details { margin:4px 0; } details pre { white-space:pre-wrap; font-size:11.5px; background:#f4f2ee; padding:8px; border-radius:6px; max-height:360px; overflow:auto; }
+  .judge-item { margin:3px 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>How one AI turn behaves <span class="small">— throwaway prototype for ticket 07</span> <span id="keyBadge" class="badge">checking key…</span></h1>
+  <p>Play turns of a sample Story and react. Questions: which model (GLM-5.3 on DeepInfra vs DeepSeek V4 Pro on GMICloud) writes adult content willingly and plays several Characters better; how the Narrator's choice of speakers feels; whether it avoids acting for you; whether V4 Flash judges Bond and Arc sensibly (gradual Bond, rare Arc with a cited cause); and whether Scenes move on at the right moment. Mark each turn with the chips — they're logged for the write-up.</p>
+</header>
+<div class="controls">
+  <span><label>Model </label><select id="model"><option value="glm">GLM-5.3 (DeepInfra)</option><option value="v4pro">DeepSeek V4 Pro (GMICloud)</option><option value="vrp">Venice Uncensored Role-Play (Venice)</option><option value="vglm">GLM 5.3 (Venice)</option><option value="both">Compare both — pick one</option></select></span>
+  <span><label>Turn shape </label><select id="shape"><option value="split">Narrator, then each speaker separately</option><option value="single">One call writes the whole turn</option></select></span>
+  <span><label>Feelings each Character sees </label><select id="bondsMode"><option value="all">All Bonds (+ "you don't know others' feelings")</option><option value="own">Only its own Bonds</option></select></span>
+  <span><label><input type="checkbox" id="showPrompts" /> show prompts</label></span>
+  <button id="undo">Undo last turn</button>
+  <button id="reset">Reset Chat</button>
+  <span class="small" id="spend"></span>
+</div>
+<main>
+  <div style="display:flex;flex-direction:column;min-height:0">
+    <div id="chat"></div>
+    <div id="compose">
+      <textarea id="input" placeholder="What does Ash say or do? (Ctrl+Enter to send)"></textarea>
+      <button id="send" class="primary">Send</button>
+    </div>
+  </div>
+  <aside id="side"></aside>
+</main>
+<script type="module">
+import * as T from '/turn.mjs';
+
+const story = await fetch('/story.json').then((r) => r.json());
+const $ = (id) => document.getElementById(id);
+let state = T.initialState(story);
+let undoStack = [];
+let turn = 0;
+let spend = 0;
+let busy = '';
+let candidates = null; // compare mode
+let lastApplied = null;
+const verdicts = {}; // turn -> {chips:Set, note}
+
+const CHIPS = ['Refused / softened', 'Acted for me', 'Feelings leaked', 'Voices blended', 'Wrong speakers', 'Too many speakers', 'Scene timing off', 'Great turn'];
+
+fetch('/api/status').then((r) => r.json()).then((s) => {
+  $('keyBadge').textContent = s.keySet ? 'key found' : 'OPENROUTER_API_KEY missing — see README';
+  $('keyBadge').className = 'badge' + (s.keySet ? ' ok' : '');
+});
+
+const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const fmt = (s) => esc(s).replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
+
+function renderParts(parts) {
+  return parts.map((p) => p.kind === 'speech'
+    ? `<div class="speech"><b>${esc(p.name)}</b> — ${fmt(p.text)}</div>`
+    : `<div class="narr">${fmt(p.text)}</div>`).join('');
+}
+
+function renderMeta(r) {
+  const calls = r.calls.map((c) => `${c.purpose}${c.error ? ' ✗' : ''} ${(c.latencyMs / 1000).toFixed(1)}s`).join(' · ');
+  const prompts = $('showPrompts').checked
+    ? r.calls.map((c) => `<details><summary>${esc(c.purpose)} — prompt & raw reply</summary><pre>${esc(c.request.map((m) => `[${m.role}]\n${m.content}`).join('\n\n'))}\n\n[raw reply — finish: ${c.finish ?? c.error}]\n${esc(c.text || '')}</pre></details>`).join('')
+    : '';
+  return `<div class="meta">${esc(T.MODELS[r.modelKey].label)} · ${r.shape === 'split' ? 'Narrator + speakers' : 'one call'} · $${r.cost.toFixed(5)} · ${calls}</div>
+    ${r.flags.length ? `<div class="flags">⚠ ${r.flags.map(esc).join(' · ')}</div>` : ''}${prompts}`;
+}
+
+function renderVerdict(t) {
+  const v = verdicts[t] || { chips: new Set(), note: '' };
+  return `<div class="verdict" data-turn="${t}">${CHIPS.map((c) => `<span class="chip${v.chips.has(c) ? ' on' : ''}" data-chip="${esc(c)}">${esc(c)}</span>`).join('')}
+    <input type="text" placeholder="note on this turn…" value="${esc(v.note)}" /></div>`;
+}
+
+function render() {
+  const chat = state.messages.map((m) => {
+    if (m.role === 'user') return `<div class="msg user"><div class="who">${esc(story.role.name)}</div>${fmt(m.text)}</div>`;
+    if (m.role === 'scene') return `<div class="scene-break">— ${esc(m.text)} —</div>`;
+    return `<div class="msg">${renderParts(m.parts)}${m.result ? renderMeta(m.result) + renderVerdict(m.turn) : ''}</div>`;
+  }).join('');
+  const cands = candidates
+    ? `<div class="cands">${candidates.map((r, i) => `<div class="cand"><h4>${esc(T.MODELS[r.modelKey].label)}</h4>${renderParts(r.parts) || '<div class="flags">(nothing written)</div>'}${renderMeta(r)}<button class="primary" data-keep="${i}" style="margin-top:6px">Keep this one</button></div>`).join('')}</div>`
+    : '';
+  $('chat').innerHTML = chat + cands + (busy ? `<div class="small">${esc(busy)}</div>` : '');
+  $('chat').scrollTop = $('chat').scrollHeight;
+  $('send').disabled = !!busy || !!candidates;
+  $('undo').disabled = !!busy || !undoStack.length;
+  $('spend').textContent = `Spent this session: $${spend.toFixed(4)}`;
+  renderSide();
+}
+
+function renderSide() {
+  const scene = story.scenes[state.sceneIndex];
+  const changedKeys = new Set((lastApplied?.bonds || []).map((b) => b.key));
+  const bonds = Object.entries(state.bonds).map(([k, b]) => `<div class="bond${changedKeys.has(k) ? ' changed' : ''}">
+      ${esc(b.from)} → ${esc(b.to === 'user' ? story.role.name + ' (you)' : b.to)}: <span class="lbl">${esc(b.label)}</span><br>${esc(b.description)}
+      <div class="small">cause (turn ${b.turn}): ${esc(b.cause || '')}</div></div>`).join('') || '<div class="small">none</div>';
+  const arcs = story.characters.map((c) => `<div><b>${esc(c.name)}</b>: ${state.arcs[c.name].length ? state.arcs[c.name].map((s) => `${esc(s.step)} <span class="small">(turn ${s.turn}: ${esc(s.cause)})</span>`).join(' → ') : '<span class="small">no steps</span>'}</div>`).join('');
+  const jl = state.judgeLog.slice().reverse().map((j) => {
+    const a = j.applied;
+    const items = [
+      ...a.bonds.map((b) => `Bond ${esc(b.key.replace('->', ' → '))}: ${esc(b.before)} ⇒ <b>${esc(b.after)}</b> — ${esc(b.cause)}`),
+      ...a.arcs.map((s) => `Arc ${esc(s.character)}: <b>${esc(s.step)}</b> — ${esc(s.cause)}`),
+      `Scene: ${a.sceneMoved ? '<b>moves on</b>' : 'stays'} — ${esc(j.judgement.scene?.reason || '')}`,
+      ...a.rejected.map((r) => `<span class="flags">rejected: ${esc(r)}</span>`),
+      ...(j.judgement.error ? [`<span class="flags">${esc(j.judgement.error)}</span>`] : []),
+    ];
+    return `<div style="margin-bottom:8px"><div class="small">Turn ${j.turn}${j.cost != null ? ` · $${j.cost.toFixed(5)} · ${(j.latencyMs / 1000).toFixed(1)}s` : ''}</div>${items.map((i) => `<div class="judge-item">${i}</div>`).join('')}</div>`;
+  }).join('') || '<div class="small">No judgements yet.</div>';
+  $('side').innerHTML = `
+    <h3>Scene</h3>${scene ? `<b>${state.sceneIndex + 1}. ${esc(scene.name)}</b><div class="small">moves on once: ${esc(scene.moveOn)}</div>` : '<span class="small">After the last Scene — free play</span>'}
+    <h3>Bonds <span class="small" style="text-transform:none">(hidden in the real app; yellow = just changed)</span></h3>${bonds}
+    <h3>Arc steps</h3>${arcs}
+    <h3>V4 Flash judgements (newest first)</h3>${jl}`;
+}
+
+async function post(url, body) {
+  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || r.status);
+  return j;
+}
+
+let pendingUser = '';
+async function send() {
+  const userText = $('input').value.trim();
+  if (!userText || busy) return;
+  pendingUser = userText;
+  const which = $('model').value;
+  const base = { story, state, userText, shape: $('shape').value, ownBondsOnly: $('bondsMode').value === 'own', turn: turn + 1 };
+  busy = which === 'both' ? 'Both models are writing…' : 'Writing…';
+  render();
+  try {
+    if (which === 'both') {
+      candidates = await Promise.all(['glm', 'v4pro'].map((k) => post('/api/turn', { ...base, modelKey: k })));
+      candidates.forEach((r) => (spend += r.cost));
+      busy = '';
+      render();
+    } else {
+      const r = await post('/api/turn', { ...base, modelKey: which });
+      spend += r.cost;
+      await commit(r);
+    }
+  } catch (e) {
+    busy = '';
+    alert('Turn failed: ' + e.message);
+    render();
+  }
+}
+
+async function commit(r) {
+  candidates = null;
+  const userText = pendingUser;
+  $('input').value = '';
+  const prev = state;
+  undoStack.push({ state: prev, turn, input: userText });
+  turn += 1;
+  const t = turn;
+  state = { ...prev, messages: [...prev.messages, { role: 'user', text: userText }, { role: 'ai', text: r.text, parts: r.parts, result: r, turn: t }] };
+  if (!r.parts.length) { busy = ''; render(); return; }
+  busy = 'V4 Flash is judging Bond / Arc / Scene…';
+  render();
+  try {
+    const j = await post('/api/judge', { story, state: prev, userText, aiText: r.text, turn: t });
+    spend += j.call.cost || 0;
+    const out = T.applyJudge(story, state, j.judgement, t);
+    const last = out.state.judgeLog[out.state.judgeLog.length - 1];
+    last.cost = j.call.cost; last.latencyMs = j.call.latencyMs;
+    state = out.state;
+    lastApplied = out.applied;
+    if (out.applied.sceneMoved) {
+      const next = story.scenes[state.sceneIndex];
+      state = { ...state, messages: [...state.messages, { role: 'scene', text: next ? `Scene ${state.sceneIndex + 1}: ${next.name}` : 'Last Scene done — free play' }] };
+    }
+  } catch (e) {
+    alert('Judge failed: ' + e.message);
+  }
+  busy = '';
+  render();
+}
+
+function saveVerdict(t) {
+  const v = verdicts[t];
+  const m = state.messages.find((x) => x.turn === t);
+  post('/api/note', { turn: t, chips: [...v.chips], note: v.note, model: m?.result?.modelKey, shape: m?.result?.shape }).catch(() => {});
+}
+
+$('chat').addEventListener('click', (e) => {
+  const keep = e.target.closest('[data-keep]');
+  if (keep) {
+    const r = candidates[Number(keep.dataset.keep)];
+    post('/api/note', { turn: turn + 1, compareKept: r.modelKey, rejected: candidates.find((c) => c !== r).modelKey }).catch(() => {});
+    commit(r);
+    return;
+  }
+  const chip = e.target.closest('.chip');
+  if (chip) {
+    const t = Number(chip.parentElement.dataset.turn);
+    const v = (verdicts[t] ||= { chips: new Set(), note: '' });
+    v.chips.has(chip.dataset.chip) ? v.chips.delete(chip.dataset.chip) : v.chips.add(chip.dataset.chip);
+    chip.classList.toggle('on');
+    saveVerdict(t);
+  }
+});
+$('chat').addEventListener('change', (e) => {
+  if (e.target.matches('.verdict input')) {
+    const t = Number(e.target.parentElement.dataset.turn);
+    (verdicts[t] ||= { chips: new Set(), note: '' }).note = e.target.value;
+    saveVerdict(t);
+  }
+});
+$('send').onclick = send;
+$('input').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) send(); });
+$('undo').onclick = () => {
+  const u = undoStack.pop();
+  if (!u) return;
+  state = u.state; turn = u.turn; $('input').value = u.input; candidates = null; lastApplied = null;
+  post('/api/note', { type: 'undo', turn: turn + 1 }).catch(() => {});
+  render();
+};
+$('reset').onclick = () => {
+  if (!confirm('Reset this Chat to the start?')) return;
+  state = T.initialState(story); undoStack = []; turn = 0; candidates = null; lastApplied = null;
+  post('/api/note', { type: 'reset' }).catch(() => {});
+  render();
+};
+$('showPrompts').onchange = render;
+render();
+</script>
+</body>
+</html>
