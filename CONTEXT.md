@@ -42,6 +42,10 @@ _Avoid_: Profile, avatar, user character
 One playthrough of a Story with its own message history; a Story can have many Chats, and a Chat can be reset to its start.
 _Avoid_: Session, playthrough, conversation, thread
 
+**Message**:
+One entry in a Chat's history: either what the user wrote, shown under the Role or Persona they wore at the time, or the AI's reply, which is narration and Characters' speech in order. A Chat begins with the Opening as its first Message. Editing a Message discards every Message after it.
+_Avoid_: Post, reply, bubble, entry
+
 **Memory**:
 A fact established during one Chat — an event that happened, a detail of the world, something learned about the user, or an open promise or plan — that the Chat carries forward; it is known only to the Characters who witnessed or learned of it, never records feelings (a Bond) or a change of personality (an Arc), and the user can see, add, edit and delete it. A Chat starts with no Memories.
 _Avoid_: Note, lorebook entry, context, summary

@@ -33,11 +33,20 @@ A buildable MVP spec for Storytell AI, ready to hand to `/to-spec`: a single-use
 - [How one AI turn behaves](issues/07-one-ai-turn-prototype.md) — one call writes narration plus `@Name:` lines and picks the speakers (per-speaker calls were ~3× cost, slower and no cleaner), so all cards share one prompt; GLM-5.3 stays primary (both models wrote adult content willingly) but needs minimal reasoning on DeepInfra, and GMICloud has no stop strings; V4 Flash needs strict rules for gradual Bond and rare Arc; all Bonds sent, no leaks seen; ~$5/month at moderate use.
 - [Memory design](issues/08-memory-design.md) — a capped (~2k-token), always-sent list of short facts (events, world details, things learned about the user, open promises), never feelings or personality; a separate V4 Flash call adds/updates/deletes after each turn, each change tied to its message; each Memory tagged Known by; user-written or edited Memories are locked from the AI; over the cap facts merge or go to Archived; editing rolls back AI-made changes but keeps user-written ones; reset empties it; no summary layer; an editable drawer with "Memory added" toasts, apart from the Bond/Arc dashboard.
 - [Choose the image model and how a Snapshot behaves](issues/06-choose-image-model-and-snapshot-behaviour.md) — Runware + Seedream 4 (~$0.03, provisional until an adult/consistency test; Venice the fallback); $30 cap split into text and image prepaid credits, out of image credit stops only Snapshots; a hidden per-Character Reference image (never an avatar) plus a per-Story Image style; camera button snapshots the latest AI Message from the user's POV, ≤3 Characters, optional hint, V4 Flash writes the prompt; inline in the timeline and in a per-Story Gallery that keeps Snapshots through edit, reset and Chat deletion.
+- [Data model](issues/11-data-model.md) — the logical model is in [the sketch](assets/11-data-model.md):
+  - Messages store the identity the user wore and stamped speaker names.
+  - The Opening is copied in as Message 1.
+  - Every AI change to Memory, Bond, Arc or Scene is recorded with its before and after values and the Message that caused it, and is undone newest-first.
+  - Editing an AI Message re-judges it and waits for the user.
+  - Reset keeps the title and the identity worn.
+  - Personas belong to the app and have no appearance.
+  - Snapshots outlive their Chat in the Gallery.
+  - Usage is logged per call in text and image credit pools.
+  - Export graduated to [ticket 16](issues/16-export-of-stories-and-chats.md).
 
 ## Not yet specified
 
 - Whether the PWA needs any offline behaviour.
-- Export / backup of Stories and Chats.
 
 ## Out of scope
 
