@@ -1,0 +1,20 @@
+{
+    "data": {
+        "label": "storytell",
+        "limit": 22,
+        "limit_reset": "monthly",
+        "limit_remaining": 18.25,
+        "include_byok_in_limit": true,
+        "budgets": [],
+        "effective_budget": null,
+        "usage": 3.75,
+        "usage_daily": 0.5,
+        "usage_weekly": 1.5,
+        "usage_monthly": 3.75,
+        "byok_usage": 0,
+        "byok_usage_daily": 0,
+        "byok_usage_weekly": 0,
+        "byok_usage_monthly": 0,
+        "is_free_tier": false
+    }
+}

@@ -28,7 +28,27 @@ export type TextCallKind =
 
 export type ImageCallKind = 'snapshot_image' | 'reference_image';
 
+export type CallKind = TextCallKind | ImageCallKind;
+
 export const MAX_REFERENCE_IMAGES = 3;
+
+/**
+ * The app's own model names. Settings store them, AI Messages record them for the Drift
+ * notice, and UsageRecords carry them. The provider ids and hosts behind each one live in
+ * the real gateway's model table.
+ */
+export const PLAY_MODELS = ['glm-5.3', 'deepseek-v4-pro'] as const;
+export type PlayModel = (typeof PLAY_MODELS)[number];
+export const BACKGROUND_MODEL = 'deepseek-v4-flash';
+export type TextModel = PlayModel | typeof BACKGROUND_MODEL;
+
+export const SNAPSHOT_MODELS = ['seedream-v4-edit', 'qwen-edit-uncensored'] as const;
+export type SnapshotModel = (typeof SNAPSHOT_MODELS)[number];
+export const REFERENCE_IMAGE_MODEL = 'qwen-image-3';
+export type ImageModel = SnapshotModel | typeof REFERENCE_IMAGE_MODEL;
+
+export const DEFAULT_PLAY_MODEL: PlayModel = 'glm-5.3';
+export const DEFAULT_SNAPSHOT_MODEL: SnapshotModel = 'seedream-v4-edit';
 
 export interface PromptMessage {
     role: 'system' | 'user' | 'assistant';
@@ -80,7 +100,8 @@ export interface ImageGenerationResult {
 }
 
 export interface CreditBalance {
-    remainingUsd: number;
+    /** Null when the provider can't report it (Venice without an Admin key). */
+    remainingUsd: number | null;
     /** The pool's cap, when the provider reports one. */
     limitUsd: number | null;
 }

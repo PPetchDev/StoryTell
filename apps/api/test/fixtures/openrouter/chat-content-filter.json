@@ -1,0 +1,17 @@
+{
+    "id": "gen-synthetic-0003",
+    "provider": "DeepInfra",
+    "model": "z-ai/glm-5.3",
+    "object": "chat.completion",
+    "created": 1762300002,
+    "choices": [
+        {
+            "logprobs": null,
+            "finish_reason": "content_filter",
+            "native_finish_reason": "content_filter",
+            "index": 0,
+            "message": { "role": "assistant", "content": "", "refusal": null, "reasoning": null }
+        }
+    ],
+    "usage": { "prompt_tokens": 1000, "completion_tokens": 0, "total_tokens": 1000, "cost": 0.0003 }
+}

@@ -1,0 +1,12 @@
+{
+    "error": {
+        "code": 403,
+        "message": "Your input was flagged for moderation.",
+        "metadata": {
+            "reasons": ["synthetic-reason"],
+            "flagged_input": "synthetic flagged input...",
+            "provider_name": "DeepInfra",
+            "model_slug": "z-ai/glm-5.3"
+        }
+    }
+}

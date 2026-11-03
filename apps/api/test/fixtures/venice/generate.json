@@ -1,0 +1,6 @@
+{
+    "id": "synthetic-generate-0001",
+    "images": ["iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="],
+    "request": { "model": "qwen-image-3", "aspect_ratio": "2:3" },
+    "timing": { "inferenceDuration": 4321, "total": 4567 }
+}

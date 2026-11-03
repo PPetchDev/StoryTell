@@ -1,0 +1,28 @@
+{
+    "id": "gen-synthetic-0002",
+    "provider": "DeepInfra",
+    "model": "deepseek/deepseek-v4-flash",
+    "object": "chat.completion",
+    "created": 1762300001,
+    "choices": [
+        {
+            "logprobs": null,
+            "finish_reason": "stop",
+            "native_finish_reason": "stop",
+            "index": 0,
+            "message": {
+                "role": "assistant",
+                "content": "{\"bond_changes\":[],\"arc_steps\":[],\"scene\":{\"move_on\":false}}",
+                "refusal": null,
+                "reasoning": null
+            }
+        }
+    ],
+    "usage": {
+        "prompt_tokens": 800,
+        "completion_tokens": 20,
+        "total_tokens": 820,
+        "cost": 0.000112,
+        "is_byok": false
+    }
+}

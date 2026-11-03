@@ -1,0 +1,39 @@
+{
+    "object": "list",
+    "type": "all",
+    "data": [
+        {
+            "id": "qwen-edit-uncensored",
+            "type": "inpaint",
+            "object": "model",
+            "created": 1762000000,
+            "owned_by": "venice.ai",
+            "model_spec": {
+                "constraints": { "aspectRatios": ["auto", "2:3"], "promptCharacterLimit": 1500, "combineImages": true },
+                "pricing": { "inpaint": { "usd": 0.04, "diem": 0.04 } }
+            }
+        },
+        {
+            "id": "seedream-v4-edit",
+            "type": "inpaint",
+            "object": "model",
+            "created": 1762000000,
+            "owned_by": "venice.ai",
+            "model_spec": {
+                "constraints": { "aspectRatios": ["auto", "2:3"], "promptCharacterLimit": 10000, "combineImages": true, "maxInputImages": 6 },
+                "pricing": { "inpaint": { "usd": 0.05, "diem": 0.05 } }
+            }
+        },
+        {
+            "id": "qwen-image-3",
+            "type": "image",
+            "object": "model",
+            "created": 1762000000,
+            "owned_by": "venice.ai",
+            "model_spec": {
+                "constraints": { "aspectRatios": ["1:1", "2:3"], "promptCharacterLimit": 10000, "steps": { "default": 20, "max": 50 }, "widthHeightDivisor": 1 },
+                "pricing": { "resolutions": { "1K": { "usd": 0.04, "diem": 0.04 } } }
+            }
+        }
+    ]
+}

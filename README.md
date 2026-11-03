@@ -64,12 +64,49 @@ The API reads its environment only through `apps/api/src/config/app-config.ts`:
 | `DATABASE_URL` | yes | PostgreSQL connection URL |
 | `IMAGE_DIR` | yes | Image folder. The database stores image paths relative to it. |
 | `MODEL_GATEWAY` | no | `real` (default) or `fake`. `fake` is for tests only. |
-| `OPENROUTER_API_KEY`, `RUNWARE_API_KEY` | no | Provider keys, used from ticket 20 on |
+| `OPENROUTER_API_KEY` | for `real` | OpenRouter key: every text call, and the text credit balance |
+| `VENICE_API_KEY` (or `VENICE_INFERENCE_KEY`) | for `real` | Venice inference key: Snapshots and Reference images |
+| `VENICE_ADMIN_KEY` | no | Venice Admin key, only to read the image credit balance. Without it the Usage view shows image spend but no remaining credit. |
 | `ENV_FILE` | no | Load the variables above from this file at startup |
 
 The frontend reads `API_ORIGIN` (where to proxy `/api`, needed at both `next build` and
 `next start`) and `INSTANCE_LABEL` (added to the app name, so an installed dev PWA reads
 "Storytell AI (dev)").
+
+### Model Gateway
+
+`apps/api/src/service/model-gateway/` is the only code that talks to a model provider
+(spec: "Model Gateway"). Callers pass a call kind, never a model; the gateway picks the model
+from the kind and Settings, and writes one `usage_record` row per answered call.
+
+| Kind | Model | Host | Request settings |
+|---|---|---|---|
+| turn, story_draft, field_rewrite, story_assistant | play model from Settings: GLM-5.3 (default) or DeepSeek V4 Pro | DeepInfra / GMICloud via OpenRouter | `provider.only` + `allow_fallbacks: false`; GLM `reasoning: {effort: "minimal"}` with stop strings; V4 Pro `reasoning: {enabled: false}`, stop strings never sent |
+| judge, memory_extraction, snapshot_prompt | DeepSeek V4 Flash | DeepInfra via OpenRouter | `reasoning: {enabled: false}`, `response_format: json_object` when asked |
+| snapshot_image | Snapshot model from Settings: `seedream-v4-edit` (default, $0.05) or `qwen-edit-uncensored` ($0.04) | Venice `POST /image/multi-edit` | up to 3 reference images, `aspect_ratio: "2:3"`, `safe_mode: false` |
+| reference_image | `qwen-image-3` ($0.04) | Venice `POST /image/generate` | `aspect_ratio: "2:3"`, `safe_mode: false` |
+
+- The gateway never switches model or host. A 429 or 503 is retried up to 3 times on the same
+  host with backoff (`Retry-After` honoured); anything else fails with a typed error.
+- Error mapping: OpenRouter 402 or "would exceed your available credits" → out of text credit;
+  moderation flags and `content_filter` → refusal; Venice 402 → out of image credit; Venice 422,
+  `x-venice-is-blurred` or `x-venice-is-content-violation` → refusal.
+- Venice reports no per-image cost, so image records carry the list price. Image prompt
+  limits are read from Venice's `GET /models` (1500 characters for `qwen-edit-uncensored`) and a
+  longer prompt is cut to fit.
+- Remaining credit: OpenRouter from `GET /credits` (falling back to `GET /key`), Venice from
+  `GET /billing/balance` only when `VENICE_ADMIN_KEY` is set.
+- The contract tests in `apps/api/test/gateway/` run the real gateway against recorded,
+  synthetic responses in `apps/api/test/fixtures/`.
+
+### Settings and usage
+
+`GET/PUT /api/settings` holds the one Settings row: play model, Snapshot model, and per pool
+the low-credit threshold (percent, default 20) and the credit cap it is a percent of (default
+$22 text, $8 image, the spec's split of the $30 cap). `GET /api/usage` returns this month's
+spend per pool from the usage records, the remaining credit read from the providers, and
+whether each pool is low. The frontend shows a banner on every page while a pool is low, and
+a Drift warning on the Settings page when the play model is changed.
 
 ### Migrations
 
