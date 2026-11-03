@@ -15,6 +15,7 @@ as "the API can't be reached" and shows the can't-connect screen (`apps/web/lib/
 | 000 | General (validation, unknown errors) |
 | 001 | Model Gateway |
 | 002 | Images |
+| 003 | Story authoring |
 
 ## Codes
 
@@ -29,3 +30,11 @@ as "the API can't be reached" and shows the can't-connect screen (`apps/web/lib/
 | `502.001.005` | `UnparseableOutputError` | The model's output could not be read. Show with Retry. |
 | `404.002.001` | `ImageNotFoundError` | No image file at that path. |
 | `400.002.002` | `InvalidImagePathError` | The path is absolute or leaves the image folder. |
+| `404.003.001` | `StoryNotFoundError` | No Story with that id. |
+| `404.003.002` | `CharacterNotFoundError` | No Character with that id in this Story. |
+| `404.003.003` | `SceneNotFoundError` | No Scene with that id in this Story. |
+| `404.003.004` | `StartingBondNotFoundError` | No StartingBond with that id in this Story. |
+| `422.003.005` | `CastFullError` | The Story already has 6 Characters. |
+| `409.003.006` | `DuplicateStartingBondError` | That Character already has a StartingBond in that direction. |
+| `422.003.007` | `SelfStartingBondError` | A StartingBond from a Character toward itself. |
+| `422.003.008` | `InvalidOrderError` | A reorder that does not list every Character (or Scene) of the Story exactly once. |

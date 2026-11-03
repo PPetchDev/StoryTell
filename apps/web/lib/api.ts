@@ -45,6 +45,7 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
         throw new ApiUnreachableError();
     }
 
+    if (response.status === 204) return undefined as T;
     const body: unknown = await response.json().catch(() => undefined);
     if (response.ok && body !== undefined) return body as T;
     if (isErrorBody(body)) {
@@ -53,4 +54,13 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     // The API always answers in JSON, and its errors always carry a code. Anything else came
     // from the proxy in front of it, which means the API itself was not there.
     throw new ApiUnreachableError();
+}
+
+/** A JSON write. `body` is sent as the request body; a 204 answer resolves to `undefined`. */
+export function apiSend<T>(method: 'POST' | 'PATCH' | 'PUT' | 'DELETE', path: string, body?: object): Promise<T> {
+    return apiFetch<T>(path, {
+        method,
+        headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
+        body: body === undefined ? undefined : JSON.stringify(body),
+    });
 }

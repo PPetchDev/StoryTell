@@ -1,0 +1,138 @@
+import { apiSend } from './api';
+
+// Mirrors the API's Story response DTOs (apps/api/src/api/story/dto/story.response.dto.ts).
+
+export type Pov = 'first' | 'second' | 'third';
+export type Tense = 'past' | 'present';
+export type ReplyLength = 'short' | 'medium' | 'long';
+
+export interface StorySummary {
+    id: number;
+    title: string;
+    playable: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface Style {
+    pov: Pov;
+    tense: Tense;
+    replyLength: ReplyLength;
+    imageStyle: string;
+}
+
+export interface Role {
+    id: number;
+    name: string;
+    description: string;
+}
+
+export interface Character {
+    id: number;
+    name: string;
+    appearance: string;
+    personality: string;
+    voice: string;
+    exampleLines: string[];
+    background: string;
+    secrets: string;
+    arcDirections: string;
+}
+
+export interface StartingBond {
+    id: number;
+    fromCharacterId: number;
+    /** null means toward the Role. */
+    toCharacterId: number | null;
+    label: string;
+    description: string;
+}
+
+export interface Scene {
+    id: number;
+    name: string;
+    situation: string;
+    moveOnCondition: string;
+}
+
+export interface MissingField {
+    field: string;
+    label: string;
+}
+
+export interface Story {
+    id: number;
+    title: string;
+    setting: string;
+    opening: string;
+    style: Style;
+    role: Role;
+    characters: Character[];
+    startingBonds: StartingBond[];
+    scenes: Scene[];
+    playable: boolean;
+    missing: MissingField[];
+    createdAt: string;
+    updatedAt: string;
+}
+
+export type StoryFields = Partial<Pick<Story, 'title' | 'setting' | 'opening'> & Style>;
+export type CharacterFields = Partial<Omit<Character, 'id'>>;
+export type SceneFields = Partial<Omit<Scene, 'id'>>;
+export type StartingBondFields = Partial<Pick<StartingBond, 'label' | 'description'>>;
+
+export const POV_LABELS: Record<Pov, string> = {
+    first: '1st person',
+    second: '2nd person',
+    third: '3rd person',
+};
+export const TENSE_LABELS: Record<Tense, string> = { past: 'Past', present: 'Present' };
+export const REPLY_LENGTH_LABELS: Record<ReplyLength, string> = {
+    short: 'Short',
+    medium: 'Medium',
+    long: 'Long',
+};
+
+export const MAX_CHARACTERS = 6;
+
+export function storyTitle(story: { title: string }): string {
+    return story.title.trim() === '' ? 'Untitled Story' : story.title;
+}
+
+/** Every write answers with the whole Story, playable status included. */
+export const storyApi = {
+    create: (fields: StoryFields = {}) => apiSend<Story>('POST', '/stories', fields),
+    update: (storyId: number, fields: StoryFields) =>
+        apiSend<Story>('PATCH', `/stories/${storyId}`, fields),
+    remove: (storyId: number) => apiSend<void>('DELETE', `/stories/${storyId}`),
+
+    updateRole: (storyId: number, fields: Partial<Omit<Role, 'id'>>) =>
+        apiSend<Story>('PATCH', `/stories/${storyId}/role`, fields),
+
+    addCharacter: (storyId: number, fields: CharacterFields = {}) =>
+        apiSend<Story>('POST', `/stories/${storyId}/characters`, fields),
+    updateCharacter: (storyId: number, characterId: number, fields: CharacterFields) =>
+        apiSend<Story>('PATCH', `/stories/${storyId}/characters/${characterId}`, fields),
+    removeCharacter: (storyId: number, characterId: number) =>
+        apiSend<Story>('DELETE', `/stories/${storyId}/characters/${characterId}`),
+    reorderCharacters: (storyId: number, characterIds: number[]) =>
+        apiSend<Story>('PUT', `/stories/${storyId}/characters/order`, { characterIds }),
+
+    addStartingBond: (
+        storyId: number,
+        bond: { fromCharacterId: number; toCharacterId: number | null } & StartingBondFields,
+    ) => apiSend<Story>('POST', `/stories/${storyId}/starting-bonds`, bond),
+    updateStartingBond: (storyId: number, bondId: number, fields: StartingBondFields) =>
+        apiSend<Story>('PATCH', `/stories/${storyId}/starting-bonds/${bondId}`, fields),
+    removeStartingBond: (storyId: number, bondId: number) =>
+        apiSend<Story>('DELETE', `/stories/${storyId}/starting-bonds/${bondId}`),
+
+    addScene: (storyId: number, fields: SceneFields = {}) =>
+        apiSend<Story>('POST', `/stories/${storyId}/scenes`, fields),
+    updateScene: (storyId: number, sceneId: number, fields: SceneFields) =>
+        apiSend<Story>('PATCH', `/stories/${storyId}/scenes/${sceneId}`, fields),
+    removeScene: (storyId: number, sceneId: number) =>
+        apiSend<Story>('DELETE', `/stories/${storyId}/scenes/${sceneId}`),
+    reorderScenes: (storyId: number, sceneIds: number[]) =>
+        apiSend<Story>('PUT', `/stories/${storyId}/scenes/order`, { sceneIds }),
+};

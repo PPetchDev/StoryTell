@@ -1,20 +1,42 @@
 'use client';
 
-import { useApiQuery } from '@/components/connection';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 
-interface StorySummary {
-    id: number;
-    title: string;
-    createdAt: string;
-    updatedAt: string;
-}
+import { useApiQuery, useConnection } from '@/components/connection';
+import { ApiUnreachableError } from '@/lib/api';
+import { storyApi, StorySummary, storyTitle } from '@/lib/story';
 
 export default function HomePage() {
+    const router = useRouter();
+    const { reportUnreachable } = useConnection();
     const stories = useApiQuery<{ stories: StorySummary[] }>('/stories');
+    const [creating, setCreating] = useState(false);
+    const [createError, setCreateError] = useState<string | null>(null);
+
+    const createStory = async () => {
+        setCreating(true);
+        setCreateError(null);
+        try {
+            const story = await storyApi.create();
+            router.push(`/stories/${story.id}`);
+        } catch (error) {
+            if (error instanceof ApiUnreachableError) reportUnreachable();
+            else setCreateError(error instanceof Error ? error.message : 'Could not create the Story.');
+            setCreating(false);
+        }
+    };
 
     return (
         <main>
-            <h1>Stories</h1>
+            <div className="page-header">
+                <h1>Stories</h1>
+                <button type="button" className="button" onClick={createStory} disabled={creating}>
+                    {creating ? 'Creating…' : 'New Story'}
+                </button>
+            </div>
+            {createError && <p role="alert">{createError}</p>}
             {stories.status === 'loading' && <p className="muted">Loading…</p>}
             {stories.status === 'error' && <p role="alert">{stories.error.message}</p>}
             {stories.status === 'ready' &&
@@ -23,7 +45,14 @@ export default function HomePage() {
                 ) : (
                     <ul className="story-list" aria-label="Stories">
                         {stories.data.stories.map((story) => (
-                            <li key={story.id}>{story.title}</li>
+                            <li key={story.id}>
+                                <Link href={`/stories/${story.id}`} className="story-link">
+                                    <span className="story-title">{storyTitle(story)}</span>
+                                    <span className={story.playable ? 'pill pill-ok' : 'pill'}>
+                                        {story.playable ? 'Playable' : 'Not playable yet'}
+                                    </span>
+                                </Link>
+                            </li>
                         ))}
                     </ul>
                 ))}

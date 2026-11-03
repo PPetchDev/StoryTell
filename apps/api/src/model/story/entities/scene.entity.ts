@@ -1,0 +1,54 @@
+import {
+    Column,
+    Entity,
+    Index,
+    JoinColumn,
+    ManyToOne,
+    PrimaryGeneratedColumn,
+} from 'typeorm';
+import type { Relation } from 'typeorm';
+
+import type { StoryEntity } from './story.entity.js';
+
+export interface SceneResponse {
+    id: number;
+    name: string;
+    situation: string;
+    moveOnCondition: string;
+}
+
+/** A stage the plot moves through. Ordered by `position` within the Story. */
+@Entity('scene')
+export class SceneEntity {
+    @PrimaryGeneratedColumn()
+    id: number;
+
+    @Index()
+    @Column({ name: 'story_id', type: 'integer' })
+    storyId: number;
+
+    @ManyToOne('StoryEntity', 'scenes', { onDelete: 'CASCADE' })
+    @JoinColumn({ name: 'story_id' })
+    story: Relation<StoryEntity>;
+
+    @Column({ type: 'integer' })
+    position: number;
+
+    @Column({ type: 'text', default: '' })
+    name: string;
+
+    @Column({ type: 'text', default: '' })
+    situation: string;
+
+    @Column({ name: 'move_on_condition', type: 'text', default: '' })
+    moveOnCondition: string;
+
+    toResponse(): SceneResponse {
+        return {
+            id: this.id,
+            name: this.name,
+            situation: this.situation,
+            moveOnCondition: this.moveOnCondition,
+        };
+    }
+}
