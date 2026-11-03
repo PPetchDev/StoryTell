@@ -43,8 +43,8 @@ One playthrough of a Story with its own message history; a Story can have many C
 _Avoid_: Session, playthrough, conversation, thread
 
 **Memory**:
-A fact a Chat carries forward, visible to and editable by the user.
-_Avoid_: Note, lorebook entry, context
+A fact established during one Chat — an event that happened, a detail of the world, something learned about the user, or an open promise or plan — that the Chat carries forward; it is known only to the Characters who witnessed or learned of it, never records feelings (a Bond) or a change of personality (an Arc), and the user can see, add, edit and delete it. A Chat starts with no Memories.
+_Avoid_: Note, lorebook entry, context, summary
 
 **Bond**:
 A Character's feelings toward the user or toward another Character within one Chat, which change as the story unfolds; in play they show only through how the Character behaves, and the user can look at them but never edit them.
