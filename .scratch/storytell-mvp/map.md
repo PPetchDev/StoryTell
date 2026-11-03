@@ -28,6 +28,7 @@ A buildable MVP spec for Storytell AI, ready to hand to `/to-spec`: a single-use
 - [When a Persona replaces a Role](issues/14-persona-replacing-a-role.md) — switchable any time, even mid-Chat; Characters see the same person with new details, Bond and Memory carry over.
 - [What editing an earlier message does](issues/15-editing-an-earlier-message.md) — editing any message discards everything after it and the AI replies afresh; Memory, Bond and Arc from the discarded messages roll back.
 - [Choose the text LLM](issues/05-choose-text-llm.md) — OpenRouter with pinned hosts; GLM-5.3 primary, DeepSeek V4 Pro as a manual fallback, V4 Flash for background calls; thinking off; $30 prepaid hard cap; switching model mid-Chat warns of Drift (provisional until the turn prototype).
+- [How Bond and Arc change](issues/13-how-bond-and-arc-change.md) — the AI judges every change in a background call after each turn, each change tied to its causing message and event; Bond is directional (toward the user and between Characters), a label plus a short description, no numbers; author may set starting Bonds and Arc directions; Arc is a separate step list, never rewriting the core; a read-only dashboard shows both, the Chat screen never does; Scene conditions are plain language, no endings.
 
 ## Not yet specified
 

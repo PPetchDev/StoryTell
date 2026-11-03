@@ -43,11 +43,11 @@ A fact a Chat carries forward, visible to and editable by the user.
 _Avoid_: Note, lorebook entry, context
 
 **Bond**:
-A Character's feelings toward the user within one Chat, which change as the story unfolds and are shown only through how the Character behaves.
+A Character's feelings toward the user or toward another Character within one Chat, which change as the story unfolds; in play they show only through how the Character behaves, and the user can look at them but never edit them.
 _Avoid_: Affection, affinity, relationship, love meter
 
 **Arc**:
-An intended, lasting change to a Character's personality within one Chat, caused by what happens in the story.
+An intended, lasting change to a Character's personality within one Chat, always traceable to an event in the story that caused it; a later event can turn it back.
 _Avoid_: Drift, character development, evolution
 
 **Drift**:
