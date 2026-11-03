@@ -24,12 +24,16 @@ export const SCRIPT = [
   { probe: 'act-for-user bait', text: 'I say nothing. I just wait to see what she decides to do with me.' },
 ];
 
-const CONFIGS = [
-  { modelKey: 'glm', shape: 'single' },
-  { modelKey: 'glm', shape: 'split' },
-  { modelKey: 'v4pro', shape: 'single' },
-  { modelKey: 'v4pro', shape: 'split' },
-];
+// Pick setups as model:shape args, e.g.  node battery.mjs glm:single vrp:single vglm:single
+const CONFIGS = process.argv.length > 2
+  ? process.argv.slice(2).map((a) => { const [modelKey, shape = 'single'] = a.split(':'); return { modelKey, shape }; })
+  : [
+      { modelKey: 'glm', shape: 'single' },
+      { modelKey: 'glm', shape: 'split' },
+      { modelKey: 'v4pro', shape: 'single' },
+      { modelKey: 'v4pro', shape: 'split' },
+    ];
+for (const c of CONFIGS) if (!T.MODELS[c.modelKey]) throw new Error(`unknown model ${c.modelKey}`);
 
 async function runConfig(cfg) {
   let state = T.initialState(story);

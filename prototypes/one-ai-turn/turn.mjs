@@ -6,6 +6,10 @@ export const MODELS = {
   // DeepInfra rejects reasoning:{enabled:false} for GLM-5.3 ("mandatory"); minimal reports 0 reasoning tokens.
   glm: { id: 'z-ai/glm-5.3', host: 'deepinfra', label: 'GLM-5.3 (DeepInfra)', stop: true, reasoning: { effort: 'minimal' } },
   v4pro: { id: 'deepseek/deepseek-v4-pro', host: 'gmicloud', label: 'DeepSeek V4 Pro (GMICloud)', stop: false },
+  // Venice transport (direct, not OpenRouter). The role-play model has no reasoning; Venice's GLM 5.3
+  // takes effort "minimal" (0 reasoning tokens) — venice_parameters.disable_thinking leaked thinking into content.
+  vrp: { id: 'venice-uncensored-role-play', transport: 'venice', host: 'venice', label: 'Venice Uncensored Role-Play (Venice)', stop: true },
+  vglm: { id: 'z-ai-glm-5-3', transport: 'venice', host: 'venice', label: 'GLM 5.3 (Venice)', stop: true, reasoning: { effort: 'minimal' } },
 };
 export const JUDGE_MODEL = { id: 'deepseek/deepseek-v4-flash', host: 'deepinfra', label: 'DeepSeek V4 Flash (DeepInfra)', stop: true };
 

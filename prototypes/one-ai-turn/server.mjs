@@ -14,44 +14,64 @@ fs.mkdirSync(runsDir, { recursive: true });
 const logFile = path.join(runsDir, `${new Date().toISOString().slice(0, 10)}.jsonl`);
 const log = (rec) => fs.appendFileSync(logFile, JSON.stringify({ at: new Date().toISOString(), ...rec }) + '\n');
 
-async function callModel(model, req, purpose) {
+const VENICE_KEY = process.env.VENICE_API_KEY || process.env.VENICE_INFERENCE_KEY;
+
+// Two transports, same OpenAI-compatible shape. Venice fields are checked against
+// https://docs.venice.ai/swagger.yaml (ChatCompletionRequest): stop ≤4 strings, reasoning.effort,
+// venice_parameters.include_venice_system_prompt (defaults to true — would add Venice's own system prompt).
+function transport(model, req, purpose) {
   const body = {
     model: model.id,
     messages: req.messages,
     max_tokens: req.max_tokens,
     temperature: purpose === 'judge' ? 0.2 : 0.85,
-    provider: { only: [model.host], allow_fallbacks: false },
-    reasoning: model.reasoning || { enabled: false },
-    usage: { include: true },
   };
   if (req.stop?.length) body.stop = req.stop;
   if (req.response_format) body.response_format = req.response_format;
+  if (model.transport === 'venice') {
+    if (model.reasoning) body.reasoning = model.reasoning;
+    body.venice_parameters = { include_venice_system_prompt: false };
+    return { url: 'https://api.venice.ai/api/v1/chat/completions', key: VENICE_KEY, body };
+  }
+  body.provider = { only: [model.host], allow_fallbacks: false };
+  body.reasoning = model.reasoning || { enabled: false };
+  body.usage = { include: true };
+  return { url: 'https://openrouter.ai/api/v1/chat/completions', key: process.env.OPENROUTER_API_KEY, body, headers: { 'X-Title': 'Storytell AI turn prototype' } };
+}
+
+async function callModel(model, req, purpose) {
+  const t = transport(model, req, purpose);
   const t0 = Date.now();
-  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-      'Content-Type': 'application/json',
-      'X-Title': 'Storytell AI turn prototype',
-    },
-    body: JSON.stringify(body),
-  });
-  const json = await res.json().catch(() => ({}));
+  let res, json, retries = 0;
+  // DeepInfra's shared V4 Flash pool answers 429 engine_overloaded in bursts; retry a few times.
+  for (;;) {
+    res = await fetch(t.url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${t.key}`, 'Content-Type': 'application/json', ...t.headers },
+      body: JSON.stringify(t.body),
+    });
+    json = await res.json().catch(() => ({}));
+    const limited = res.status === 429 || json.error?.code === 429;
+    if (!limited || retries >= 4) break;
+    retries++;
+    await new Promise((ok) => setTimeout(ok, 4000 * retries));
+  }
   const latencyMs = Date.now() - t0;
   if (!res.ok || json.error) {
-    const msg = json.error?.message || `HTTP ${res.status}`;
-    return { purpose, model: model.label, latencyMs, error: msg, request: req.messages };
+    const msg = json.error?.message || (typeof json.error === 'string' && json.error) || `HTTP ${res.status}`;
+    return { purpose, model: model.label, latencyMs, retries, error: msg, request: req.messages };
   }
   const ch = json.choices?.[0] || {};
   return {
     purpose,
     model: model.label,
-    servedBy: json.provider,
+    servedBy: json.provider || (model.transport === 'venice' ? 'venice' : undefined),
     latencyMs,
     finish: ch.finish_reason,
     nativeFinish: ch.native_finish_reason,
     usage: json.usage,
-    cost: json.usage?.cost ?? 0,
+    retries,
+    cost: json.usage?.cost ?? json.cost?.usd ?? 0, // OpenRouter: usage.cost; Venice: cost.usd
     text: ch.message?.content ?? '',
     request: req.messages,
   };
@@ -133,6 +153,7 @@ http
       const body = await readBody(req);
       if (req.url === '/api/note') { log({ type: 'note', ...body }); return send(res, 200, { ok: true }); }
       if (!process.env.OPENROUTER_API_KEY) return send(res, 400, { error: 'OPENROUTER_API_KEY is not set' });
+      if (T.MODELS[body.modelKey]?.transport === 'venice' && !VENICE_KEY) return send(res, 400, { error: 'VENICE_API_KEY is not set' });
       if (req.url === '/api/turn') {
         const out = await playTurn(body);
         log({ type: 'turn', turn: body.turn, userText: body.userText, ownBondsOnly: body.ownBondsOnly, ...out });
@@ -148,4 +169,4 @@ http
       send(res, 500, { error: String(e?.stack || e) });
     }
   })
-  .listen(PORT, () => console.log(`Turn prototype on http://localhost:${PORT}  (key ${process.env.OPENROUTER_API_KEY ? 'found' : 'MISSING'})`));
+  .listen(PORT, () => console.log(`Turn prototype on http://localhost:${PORT}  (OpenRouter key ${process.env.OPENROUTER_API_KEY ? 'found' : 'MISSING'}, Venice key ${VENICE_KEY ? 'found' : 'MISSING'})`));
