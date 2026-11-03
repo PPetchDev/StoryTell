@@ -1,0 +1,26 @@
+{
+    "name": "storytell-ai",
+    "private": true,
+    "type": "module",
+    "workspaces": [
+        "apps/api",
+        "apps/web"
+    ],
+    "engines": {
+        "node": ">=24.11"
+    },
+    "scripts": {
+        "dev": "node scripts/dev.mjs",
+        "build": "npm run build -w apps/api && npm run build -w apps/web",
+        "test:api": "npm test -w apps/api",
+        "test:e2e": "npm run test:e2e -w apps/web",
+        "typecheck": "npm run typecheck -w apps/api && npm run typecheck -w apps/web"
+    },
+    "devDependencies": {
+        "embedded-postgres": "^18.6.0-beta.19"
+    },
+    "allowScripts": {
+        "@embedded-postgres/windows-x64@18.6.0-beta.19": true,
+        "@scarf/scarf": false
+    }
+}
