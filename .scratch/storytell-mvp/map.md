@@ -43,7 +43,7 @@ A buildable MVP spec for Storytell AI, ready to hand to `/to-spec`: a single-use
   - Personas belong to the app and have no appearance.
   - Snapshots outlive their Chat in the Gallery.
   - Usage is logged per call in text and image credit pools.
-  - Export graduated to [ticket 16](issues/16-export-of-stories-and-chats.md).
+  - Export graduated to [Export of Stories and Chats](issues/16-export-of-stories-and-chats.md), later ruled out of scope.
 
 ## Not yet specified
 
@@ -61,3 +61,4 @@ A buildable MVP spec for Storytell AI, ready to hand to `/to-spec`: a single-use
 - Native mobile apps.
 - Separate world notes / lore entries, Story tags and genre or pacing presets (the Setting holds these in plain language).
 - Skipping or rewinding Scenes by hand (editing a message is the only undo).
+- [Export of Stories and Chats](issues/16-export-of-stories-and-chats.md) — no in-app export, import, Trash, Chat-as-text download, Tavern cards or Duplicate Story. The daily disaster backup from Hosting and access covers recovery and moving PCs, and a delete costs at most a whole-app restore to last night. The spec still writes down the restore steps, and they get tried once.
