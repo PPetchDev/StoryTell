@@ -20,6 +20,12 @@ A buildable MVP spec for Storytell AI, ready to hand to `/to-spec`: a single-use
 
 <!-- one line per closed ticket: [title](link) — gist -->
 
+- [How long roleplay Chats keep their memory](issues/04-long-chat-memory-techniques.md) — layered prompt (fixed block → lore → summary → recent messages); an extracted, capped fact list suits an editable Memory best; summaries are lossy; order layers for prompt caching.
+- [Techniques that keep Characters in character](issues/12-keeping-characters-in-character.md) — fixed core definitions on top + short notes near the end; per-Character knowledge must be separated structurally, not by prompt; send only the speaking Character's card; Bond/Arc live as explicit per-Chat state apart from the core.
+- [Image models for Snapshots](issues/03-image-model-for-snapshots.md) — Venice, Runware and Replicate clearly permit adult images (xAI/BFL uncertain); ~$0.01–0.02/image fits budget; real Character consistency needs a stored reference image per Character.
+- [Text LLMs that allow adult fiction for adult users](issues/02-text-llm-for-adult-roleplay.md) — OpenAI, Gemini and first-party DeepSeek/Z.ai/Together are out; shortlist: DeepSeek V4 on a pinned third-party host, GLM-5.3 on a third-party host, or Mistral first-party; DeepSeek V4 Flash and Mistral Small 4 fit the budget comfortably.
+- [How Zeta runs a Story](issues/01-zeta-how-a-story-runs.md) — no separate Narrator, model picks speakers with `@Name:` turns, no ordered Scenes (AI-triggered goals/quests instead), weak hidden memory, visible relationship meters, Stories drafted by a creation form plus a conversational assistant.
+
 ## Not yet specified
 
 - What happens to later messages when the user edits an earlier one in a Chat.
