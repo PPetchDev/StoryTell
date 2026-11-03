@@ -27,6 +27,7 @@ A buildable MVP spec for Storytell AI, ready to hand to `/to-spec`: a single-use
 - [How Zeta runs a Story](issues/01-zeta-how-a-story-runs.md) — no separate Narrator, model picks speakers with `@Name:` turns, no ordered Scenes (AI-triggered goals/quests instead), weak hidden memory, visible relationship meters, Stories drafted by a creation form plus a conversational assistant.
 - [When a Persona replaces a Role](issues/14-persona-replacing-a-role.md) — switchable any time, even mid-Chat; Characters see the same person with new details, Bond and Memory carry over.
 - [What editing an earlier message does](issues/15-editing-an-earlier-message.md) — editing any message discards everything after it and the AI replies afresh; Memory, Bond and Arc from the discarded messages roll back.
+- [Choose the text LLM](issues/05-choose-text-llm.md) — OpenRouter with pinned hosts; GLM-5.3 primary, DeepSeek V4 Pro as a manual fallback, V4 Flash for background calls; thinking off; $30 prepaid hard cap; switching model mid-Chat warns of Drift (provisional until the turn prototype).
 
 ## Not yet specified
 

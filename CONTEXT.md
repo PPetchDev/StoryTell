@@ -50,6 +50,10 @@ _Avoid_: Affection, affinity, relationship, love meter
 An intended, lasting change to a Character's personality within one Chat, caused by what happens in the story.
 _Avoid_: Drift, character development, evolution
 
+**Drift**:
+An unintended loss of a Character's established personality or voice, as opposed to an Arc.
+_Avoid_: Character development, inconsistency
+
 **Snapshot**:
 An AI-generated image of the moment a Chat is currently at, made on the user's request.
 _Avoid_: Illustration, picture, render
