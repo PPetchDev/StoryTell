@@ -27,3 +27,8 @@ Grilled 2026-11-03. Provisional — **How one AI turn behaves** confirms or swap
 ## Comments
 
 - 2026-11-03: Considered uncensored Hugging Face models (roleplay fine-tunes, abliterated weights), either self-hosted or as a third prototype contender. Kept GLM-5.3 and DeepSeek V4 Pro only. Reasons: such models fix refusals but are much weaker at keeping long stories coherent, which means more Drift. Dedicated or self-hosted GPUs also cost far over $30/month, unless a home GPU is used. Revisit if both models refuse in the prototype.
+- 2026-11-03: [How one AI turn behaves](07-one-ai-turn-prototype.md) confirmed the order: GLM-5.3 primary, V4 Pro fallback. Neither model refused adult content. Two corrections:
+  - "Thinking off" isn't possible for GLM-5.3 on DeepInfra; the endpoint rejects it as mandatory. Send `reasoning: {effort: "minimal"}` there (0–120 reasoning tokens per call) and `enabled: false` for the DeepSeek models.
+  - GMICloud's V4 Pro endpoint has no `stop` support, so the backend output check must stop the model from writing for the user.
+
+  OpenRouter credit is account-wide and reserved per in-flight request, so the $30 cap needs a dedicated account or a per-key limit.

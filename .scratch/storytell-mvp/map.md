@@ -30,12 +30,12 @@ A buildable MVP spec for Storytell AI, ready to hand to `/to-spec`: a single-use
 - [Choose the text LLM](issues/05-choose-text-llm.md) — OpenRouter with pinned hosts; GLM-5.3 primary, DeepSeek V4 Pro as a manual fallback, V4 Flash for background calls; thinking off; $30 prepaid hard cap; switching model mid-Chat warns of Drift (provisional until the turn prototype).
 - [How Bond and Arc change](issues/13-how-bond-and-arc-change.md) — the AI judges every change in a background call after each turn, each change tied to its causing message and event; Bond is directional (toward the user and between Characters), a label plus a short description, no numbers; author may set starting Bonds and Arc directions; Arc is a separate step list, never rewriting the core; a read-only dashboard shows both, the Chat screen never does; Scene conditions are plain language, no endings.
 - [Writing a Story with AI](issues/09-writing-a-story-with-ai.md) — Story = Title, Setting, Opening, 3 Style fields, required Role, 1–6 Characters (Appearance, Personality, Voice, Background, starting Secrets/Bonds/Arc directions), optional ordered Scenes that steer but never lock play; GLM-5.3 drafts the required fields from an idea, then edit by hand, per-field rewrite or a stateless assistant chat with Undo; edits reach existing Chats; only the author changes the cast; knowledge learned in play is Memory tagged with who knows it.
+- [How one AI turn behaves](issues/07-one-ai-turn-prototype.md) — one call writes narration plus `@Name:` lines and picks the speakers (per-speaker calls were ~3× cost, slower and no cleaner), so all cards share one prompt; GLM-5.3 stays primary (both models wrote adult content willingly) but needs minimal reasoning on DeepInfra, and GMICloud has no stop strings; V4 Flash needs strict rules for gradual Bond and rare Arc; all Bonds sent, no leaks seen; ~$5/month at moderate use.
 
 ## Not yet specified
 
 - Whether the PWA needs any offline behaviour.
 - Export / backup of Stories and Chats.
-- Model-specific techniques for keeping Characters in character, once the text model and turn shape are known (follows from 05, 07, 12).
 
 ## Out of scope
 
