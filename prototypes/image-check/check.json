@@ -1,0 +1,26 @@
+{
+  "imageStyle": "photorealistic, cinematic lighting, shallow depth of field",
+  "character": {
+    "name": "Mira",
+    "appearance": "a fictional woman in her mid-thirties, clearly an adult, with sharp cheekbones, grey-green eyes, a thin scar through her left eyebrow, shoulder-length black hair tied back, a lean athletic build and olive skin"
+  },
+  "referencePrompt": "Full-body portrait of {appearance}. Neutral standing pose, facing the camera, plain light-grey studio background, plain dark clothing. {imageStyle}.",
+  "scenes": [
+    {
+      "id": "tavern",
+      "prompt": "First-person view across a low-beamed dockside tavern bar at night. {name}, {appearance}, leans on the counter in a worn leather coat, pouring a drink and looking straight at the viewer with a guarded half-smile. Rain on the windows, gaslight. {imageStyle}."
+    },
+    {
+      "id": "close-up",
+      "prompt": "First-person close-up of the face of {name}, {appearance}, in candlelight, eyes meeting the viewer, a strand of hair loose. {imageStyle}."
+    },
+    {
+      "id": "intimate",
+      "prompt": "First-person view in a dim upstairs room. {name}, {appearance}, sits on the edge of a bed, nude, looking at the viewer with a soft, unguarded expression. Warm lamplight. {imageStyle}."
+    },
+    {
+      "id": "explicit",
+      "prompt": "First-person view. {name}, {appearance}, lies nude on rumpled sheets, reaching toward the viewer, explicit adult intimacy between consenting adults. Only the viewer's hands are visible. {imageStyle}."
+    }
+  ]
+}
