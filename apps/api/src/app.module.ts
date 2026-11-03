@@ -15,7 +15,7 @@ export class AppModule {
             imports: [
                 ConfigModule.forRoot(config),
                 DbModule,
-                ModelGatewayModule.forRoot(config.modelGateway),
+                ModelGatewayModule.forRoot(),
                 ApiModule,
             ],
             controllers: config.modelGateway === 'fake' ? [FakeGatewayControlController] : [],

@@ -11,8 +11,11 @@ import { inject } from 'vitest';
 
 import { AppModule } from '../../src/app.module.js';
 import { configureApp } from '../../src/app.setup.js';
+import { ProviderKeys } from '../../src/config/app-config.js';
 import { FakeModelGateway } from '../../src/service/model-gateway/fake-model-gateway.js';
+import { GATEWAY_FETCH } from '../../src/service/model-gateway/model-gateway.module.js';
 import { ModelGateway } from '../../src/service/model-gateway/model-gateway.js';
+import { FetchLike } from '../../src/service/model-gateway/real/http.js';
 
 export interface TestApp {
     app: INestApplication;
@@ -25,6 +28,16 @@ export interface TestApp {
     /** Connection URL of this app's own database. */
     databaseUrl: string;
     close(): Promise<void>;
+}
+
+export interface TestAppOptions {
+    /**
+     * `real` runs the real gateway against `fetch`, which must then replay provider
+     * responses; `gateway` is not a FakeModelGateway in that case. Default: the fake.
+     */
+    modelGateway?: 'fake' | 'real';
+    fetch?: FetchLike;
+    providerKeys?: Partial<ProviderKeys>;
 }
 
 async function admin(sql: string): Promise<void> {
@@ -42,23 +55,34 @@ async function admin(sql: string): Promise<void> {
  * folder, with only the Model Gateway faked. Call it in `beforeAll` or `beforeEach`, and
  * `close()` it afterwards.
  */
-export async function startTestApp(): Promise<TestApp> {
+export async function startTestApp(options: TestAppOptions = {}): Promise<TestApp> {
     const database = `test_${randomBytes(6).toString('hex')}`;
     await admin(`CREATE DATABASE "${database}" TEMPLATE "${inject('templateDatabase')}"`);
     const databaseUrl = inject('postgresAdminUrl').replace(/\/postgres$/, `/${database}`);
     const imageDir = await mkdtemp(path.join(os.tmpdir(), 'storytell-images-'));
 
+    const noNetwork: FetchLike = async (url) => {
+        throw new Error(`Test app has no network, but the gateway tried ${url}`);
+    };
     const moduleRef = await Test.createTestingModule({
         imports: [
             AppModule.forRoot({
                 port: 0,
                 databaseUrl,
                 imageDir,
-                modelGateway: 'fake',
-                providerKeys: { openRouter: undefined, runware: undefined },
+                modelGateway: options.modelGateway ?? 'fake',
+                providerKeys: {
+                    openRouter: undefined,
+                    venice: undefined,
+                    veniceAdmin: undefined,
+                    ...options.providerKeys,
+                },
             }),
         ],
-    }).compile();
+    })
+        .overrideProvider(GATEWAY_FETCH)
+        .useValue(options.fetch ?? noNetwork)
+        .compile();
     const app = configureApp(moduleRef.createNestApplication({ logger: false }));
     await app.init();
 

@@ -1,0 +1,7 @@
+{
+    "error": {
+        "code": 402,
+        "message": "This request would exceed your available credits. Add credits or lower max_tokens.",
+        "metadata": { "limit_source": "openrouter_in_flight_budget" }
+    }
+}

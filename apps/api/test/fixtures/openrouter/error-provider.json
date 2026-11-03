@@ -1,0 +1,7 @@
+{
+    "error": {
+        "code": 502,
+        "message": "Provider returned error",
+        "metadata": { "error_type": "provider_unavailable", "provider_name": "DeepInfra", "raw": "upstream connect error" }
+    }
+}

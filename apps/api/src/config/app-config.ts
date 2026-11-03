@@ -13,10 +13,16 @@ export abstract class AppConfig {
     abstract readonly imageDir: string;
     /** `fake` is for tests and E2E runs only; it also mounts the fake's control routes. */
     abstract readonly modelGateway: ModelGatewayMode;
-    abstract readonly providerKeys: {
-        readonly openRouter: string | undefined;
-        readonly runware: string | undefined;
-    };
+    abstract readonly providerKeys: ProviderKeys;
+}
+
+export interface ProviderKeys {
+    /** OpenRouter API key: text calls and the text credit balance. */
+    readonly openRouter: string | undefined;
+    /** Venice inference key: image calls. */
+    readonly venice: string | undefined;
+    /** Venice Admin key, optional: reading the image credit balance needs one. */
+    readonly veniceAdmin: string | undefined;
 }
 
 export class ConfigError extends Error {}
@@ -44,7 +50,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
         modelGateway,
         providerKeys: {
             openRouter: env.OPENROUTER_API_KEY || undefined,
-            runware: env.RUNWARE_API_KEY || undefined,
+            // The Venice dashboard calls it an inference key; either name works.
+            venice: env.VENICE_API_KEY || env.VENICE_INFERENCE_KEY || undefined,
+            veniceAdmin: env.VENICE_ADMIN_KEY || undefined,
         },
     };
 }
