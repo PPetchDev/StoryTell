@@ -368,3 +368,143 @@ a {
 .danger-zone {
     margin-top: 2rem;
 }
+
+/* --- Chats --- */
+.chat-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.5rem;
+}
+
+.chat-list li {
+    background: var(--surface);
+    border-radius: 0.75rem;
+    padding: 0.5rem 1rem 0.75rem;
+}
+
+.chat-link {
+    display: grid;
+    gap: 0.125rem;
+    padding: 0.375rem 0 0.5rem;
+    color: inherit;
+    text-decoration: none;
+}
+
+.chat-times {
+    font-size: 0.8125rem;
+}
+
+.rename {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+    padding: 0.375rem 0 0.5rem;
+}
+
+.rename input {
+    font: inherit;
+    flex: 1 1 10rem;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid #3a3150;
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.625rem;
+    min-width: 0;
+}
+
+.notice {
+    background: #2d2742;
+    border: 1px solid #4a4068;
+    border-radius: 0.5rem;
+    padding: 0.625rem 0.75rem;
+    margin: 0 0 0.75rem;
+    font-size: 0.9375rem;
+}
+
+.notice .button {
+    margin-left: 0.5rem;
+}
+
+.chat h1 {
+    font-size: 1.25rem;
+}
+
+.messages {
+    display: grid;
+    gap: 0.75rem;
+    margin: 0 0 1rem;
+}
+
+.message {
+    background: var(--surface);
+    border-radius: 0.75rem;
+    padding: 0.75rem 1rem;
+}
+
+.message-user {
+    background: #2c2448;
+    margin-left: 2rem;
+}
+
+.message-text {
+    margin: 0;
+    white-space: pre-wrap;
+}
+
+.narration + .narration,
+.narration + .speech,
+.speech + .narration,
+.speech + .speech {
+    margin-top: 0.75rem;
+}
+
+.speaker {
+    margin: 0 0 0.125rem;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.message-user .speaker {
+    color: var(--muted);
+}
+
+.writing {
+    margin: 0;
+    padding: 0 1rem;
+    font-style: italic;
+}
+
+.turn-error {
+    color: #f3b26b;
+}
+
+.composer {
+    display: grid;
+    gap: 0.5rem;
+    position: sticky;
+    bottom: 0;
+    padding: 0.75rem 0 max(0.75rem, env(safe-area-inset-bottom));
+    background: var(--bg);
+}
+
+.composer textarea {
+    font: inherit;
+    width: 100%;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid #3a3150;
+    border-radius: 0.75rem;
+    padding: 0.625rem 0.75rem;
+    resize: vertical;
+    min-width: 0;
+}
+
+.composer .button {
+    justify-self: end;
+}
