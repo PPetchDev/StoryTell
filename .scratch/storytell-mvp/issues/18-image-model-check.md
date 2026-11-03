@@ -1,7 +1,7 @@
 # Check the image model before building Snapshots
 
 Type: task
-Status: ready-for-human
+Status: resolved
 Blocked by: 17
 Part of: [Spec: Storytell AI MVP](../spec.md)
 
@@ -28,10 +28,10 @@ Rerun with `--ref <file>` to keep the same reference image, or add `--edit-model
 
 ## Acceptance criteria
 
-- [ ] Venice returns explicit fictional-adult images that are not blocked, blurred or flagged.
-- [ ] The Character's face and build hold across the scenes from one Reference image.
-- [ ] Cost per image is recorded (expected ~$0.04).
-- [ ] The verdict is appended under `## Comments`. If it fails, rerun the same check on Venice (Seedream V5 Pro Edit or `qwen-edit-uncensored`) and record which becomes the default image model.
+- [x] Venice returns explicit fictional-adult images that are not blocked, blurred or flagged.
+- [x] The Character's face and build hold across the scenes from one Reference image.
+- [x] Cost per image is recorded (expected ~$0.04).
+- [x] The verdict is appended under `## Comments`. If it fails, rerun the same check on Venice (Seedream V5 Pro Edit or `qwen-edit-uncensored`) and record which becomes the default image model.
 
 ## User stories covered
 
@@ -51,3 +51,43 @@ Rerun with `--ref <file>` to keep the same reference image, or add `--edit-model
     - OpenRouter image models: they are served first-party by ByteDance or Alibaba, whose adult terms are unclear.
     - fal.ai: its acceptable-use policy bans sexually explicit content.
     - Replicate: it has no hard spend cap any more.
+- 2026-11-03: **First Venice run** (`qwen-image-3` for the reference, then `qwen-edit-uncensored` multi-edit, `safe_mode: false`):
+  - **Blocking:** all 5 images came back; none was blurred, flagged or blocked. That includes the nude and explicit scenes, so the API side of adult content works.
+  - **Time:** about 6 s for the reference and about 34 s per scene. The 4 scenes ran in parallel.
+  - **Cost:** about $0.20 at list price ($0.04 per image). Exact spend couldn't be read (see below).
+  - **Face consistency,** checked by the agent on the three non-nude images (reference, tavern, close-up): the same person in each. Same black tied-back hair, grey-green eyes, the eyebrow scar in the same place, and a similar face shape and build, even in dark and candlelit scenes.
+  - **Small issues:**
+    - The scar is drawn as a fresh red cut. Reword it to "faint old scar".
+    - The close-up kept the reference image's tank top. An edit model carries clothing over from the base image, so the Snapshot prompt writer should name clothing explicitly.
+    - The tavern window shows snow instead of rain.
+  - **Still to do:** the user judges the intimate and explicit images (face match and whether they're explicit enough) and records the verdict here.
+  - **Balance:** `GET /billing/balance` returns `401 Admin API key required` with an inference key, so the app can't read Venice's remaining credit with the key it plays with. This is noted on ticket 20.
+- 2026-11-03: **Anime run** (`--style anime`; same models and prompts, only the style text changed):
+  - **Blocking:** all 5 images came back; none was blurred, flagged or blocked. About 6 s for the reference and about 30 s per scene, $0.20 at list price.
+  - **Consistency is weaker than the photo run** (agent's check of the three non-nude images):
+    - Identity holds roughly: the same black tied-back hair, the scar on the same side through the eyebrow, and a lean build.
+    - **Eye colour drifted** from grey in the reference to amber-brown in both scenes.
+    - **The art style drifted too:** the reference is flat, soft line art, while the scenes are glossy TV-anime cel shading. That makes the Character look like a slightly different person.
+  - **Likely cause:** with Venice, the scene prompts say "same face, same scar" but don't restate the Appearance, so the edit model gets eye colour only from the base image.
+  - **Fixes to try:**
+    - Put the Appearance's key traits (eye colour, scar, hair) into every Snapshot prompt; spec ticket 31 already says the prompt writer reads Appearance.
+    - Compare `seedream-v4-edit`.
+  - **Also seen:** rain was right this time, and the tank top carried over to the close-up again. In the tavern, the viewer's hands pour the drink instead of Mira.
+- 2026-11-03: **Anime rerun with the Appearance traits in every scene prompt** (eye colour, faint old scar, hair, build, "same art style"). Both runs reuse the same anime reference image.
+  - **Blocking:** all 8 scenes came back; none was blurred, flagged or blocked, for either model.
+  - **`qwen-edit-uncensored`** ($0.04, about 35 s per scene):
+    - **Fixed:** eye colour is right now (grey-green).
+    - **Unchanged:** the scar is right and so is the hair. The scenes are still glossier cel shading than the reference's flat line art. The close-up still keeps the reference's tank top.
+  - **`seedream-v4-edit`** ($0.05, about 14–24 s per scene, output 1640×2456):
+    - **Best consistency of every run.** It has green eyes and reproduces the reference's distinctive scar, which runs from brow to cheek through the eye. Its line art is the closest to the reference.
+    - **It follows the scene better.** In the tavern, Mira pours the drink while the viewer's hand holds the glass, a correct first-person view. The close-up drops the reference's clothing.
+  - **Agent's recommendation:** use `seedream-v4-edit` as the default Snapshot model, with `qwen-edit-uncensored` as the manual alternative. Always restate the Appearance's key traits in the Snapshot prompt.
+  - **Still to do:** the user judges the intimate and explicit images of both runs, then records the verdict and closes this ticket.
+- 2026-11-03: **Verdict (user): Seedream passes**, including the intimate and explicit images. The image model is decided:
+  - Provider: **Venice**.
+  - Snapshots: **`seedream-v4-edit`** through `POST /image/multi-edit` ($0.05).
+  - Reference images: `qwen-image-3` through `POST /image/generate`, the model this check used ($0.04).
+  - Manual alternative: `qwen-edit-uncensored`.
+  - The Snapshot prompt must restate the Appearance's key traits.
+
+  Venice credit used by the check: about $0.76 at list price.

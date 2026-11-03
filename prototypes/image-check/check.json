@@ -3,13 +3,16 @@
     "reference": "qwen-image-3",
     "edit": "qwen-edit-uncensored"
   },
-  "imageStyle": "photorealistic, cinematic lighting, shallow depth of field",
+  "styles": {
+    "photo": "photorealistic, cinematic lighting, shallow depth of field",
+    "anime": "anime style, clean cel shading, crisp line art, soft colours, detailed anime illustration"
+  },
   "character": {
     "name": "Mira",
     "appearance": "a fictional woman in her mid-thirties, clearly an adult, with sharp cheekbones, grey-green eyes, a thin scar through her left eyebrow, shoulder-length black hair tied back, a lean athletic build and olive skin"
   },
   "referencePrompt": "Full-body portrait of {appearance}. Neutral standing pose, facing the camera, plain light-grey studio background, plain dark clothing. {imageStyle}.",
-  "editPrefix": "Keep the woman in the image exactly the same person: same face, same scar, same hair, same build. Place her in a new scene:",
+  "editPrefix": "Keep the woman in the image exactly the same person and the same art style: same face, grey-green eyes, a faint old scar through her left eyebrow, shoulder-length black hair tied back, lean athletic build, olive skin. Place her in a new scene:",
   "scenes": [
     {
       "id": "tavern",

@@ -16,7 +16,7 @@ const dir = path.dirname(fileURLToPath(import.meta.url));
 for (const f of [path.join(dir, '.env'), path.join(dir, '../../.env')]) try { process.loadEnvFile(f); } catch {}
 
 const API = process.env.VENICE_API_URL || 'https://api.venice.ai/api/v1'; // override only to test against a mock
-const KEY = process.env.VENICE_API_KEY;
+const KEY = process.env.VENICE_API_KEY || process.env.VENICE_INFERENCE_KEY;
 // List prices per image from https://docs.venice.ai/overview/pricing; the API reports no per-image cost.
 const LIST_PRICE = { 'qwen-image': 0.03, 'qwen-image-3': 0.04, 'seedream-v4': 0.05, 'qwen-edit-uncensored': 0.04, 'seedream-v4-edit': 0.05 };
 
@@ -28,8 +28,14 @@ const refArg = flag('--ref');
 const check = JSON.parse(fs.readFileSync(path.join(dir, 'check.json'), 'utf8'));
 const REF_MODEL = check.models.reference;
 const EDIT_MODEL = flag('--edit-model') || check.models.edit;
+const STYLE = flag('--style') || 'photo';
+const imageStyle = check.styles[STYLE];
+if (!imageStyle) {
+  console.error(`Unknown --style "${STYLE}". check.json has: ${Object.keys(check.styles).join(', ')}`);
+  process.exit(1);
+}
 const fill = (t) =>
-  t.replaceAll('{name}', check.character.name).replaceAll('{appearance}', check.character.appearance).replaceAll('{imageStyle}', check.imageStyle);
+  t.replaceAll('{name}', check.character.name).replaceAll('{appearance}', check.character.appearance).replaceAll('{imageStyle}', imageStyle);
 
 if (!dryRun && !KEY) {
   console.error('VENICE_API_KEY is not set. Put it in prototypes/image-check/.env (gitignored) or the environment.');
@@ -114,7 +120,7 @@ if (dryRun) {
   process.exit(0);
 }
 
-const outDir = path.join(dir, 'out', new Date().toISOString().replace(/[:.]/g, '-'));
+const outDir = path.join(dir, 'out', `${new Date().toISOString().replace(/[:.]/g, '-')}-${STYLE}-${EDIT_MODEL}`);
 fs.mkdirSync(outDir, { recursive: true });
 const rows = [];
 const before = await balance();
@@ -164,7 +170,7 @@ console.log(`Balance after: ${after.text}`);
 const spent = before.usd !== undefined && after.usd !== undefined ? +(before.usd - after.usd).toFixed(4) : null;
 const listTotal = +rows.reduce((t, r) => t + (r.listPrice || 0), 0).toFixed(4);
 const summary = spent !== null ? `spent $${spent} by balance (list price $${listTotal})` : `list price $${listTotal}`;
-fs.writeFileSync(path.join(outDir, 'results.json'), JSON.stringify({ referenceModel: REF_MODEL, editModel: EDIT_MODEL, spent, listTotal, rows }, null, 2));
+fs.writeFileSync(path.join(outDir, 'results.json'), JSON.stringify({ style: STYLE, referenceModel: REF_MODEL, editModel: EDIT_MODEL, spent, listTotal, rows }, null, 2));
 
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const marks = (r) => [r.blurred && 'BLURRED', r.violation && 'CONTENT VIOLATION'].filter(Boolean).join(' · ');
@@ -173,7 +179,7 @@ fs.writeFileSync(
   `<!doctype html><meta charset="utf-8"><title>Image check</title>
 <style>body{font:14px system-ui;margin:16px;background:#111;color:#eee}main{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}
 figure{margin:0}img{width:100%;border-radius:6px}figcaption{opacity:.8;margin-top:4px}.err{color:#f88}</style>
-<h1>${esc(REF_MODEL)} → ${esc(EDIT_MODEL)} — ${esc(summary)}</h1><main>${rows
+<h1>${esc(STYLE)}: ${esc(REF_MODEL)} → ${esc(EDIT_MODEL)} — ${esc(summary)}</h1><main>${rows
     .map(
       (r) => `<figure>${r.file ? `<img src="${esc(r.file)}">` : `<p class="err">${esc(r.error)}</p>`}<figcaption><b>${esc(r.id)}</b>
  <span class="err">${esc(marks(r))}</span> · ${r.seconds ? `${r.seconds.toFixed(0)} s` : ''}<br>${esc(r.prompt || r.note)}</figcaption></figure>`,

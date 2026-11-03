@@ -235,13 +235,19 @@ Model table (from [Choose the text LLM](issues/05-choose-text-llm.md), corrected
 | Play (Story turns), Story drafting, field rewrite, Story assistant | GLM-5.3 (default) | DeepInfra | Reasoning can't be turned off: send `reasoning: {effort: "minimal"}`. Stop strings supported. Served at fp4. |
 | Play fallback (manual only) | DeepSeek V4 Pro | GMICloud | `reasoning: {enabled: false}`. No `stop` support, so the backend cut is the only guard. |
 | Background calls (Bond/Arc/Scene judge, Memory extraction, Snapshot prompt) | DeepSeek V4 Flash | DeepInfra | `reasoning: {enabled: false}`, JSON mode. |
-| Snapshots and Reference images | Seedream 4 (default) | Runware | Multi-reference input. Safety check off (opt-in). Venice (Seedream V5 Pro Edit or `qwen-edit-uncensored`) is the manual fallback. |
+| Snapshots | `seedream-v4-edit` (default) | Venice | `POST /image/multi-edit` with up to 3 Reference images, `safe_mode: false`, $0.05. `qwen-edit-uncensored` ($0.04) is the manual alternative. Decided by the check in ticket 18; Runware was dropped because of its $20 minimum top-up. |
+| Reference images | `qwen-image-3` | Venice | `POST /image/generate`, `aspect_ratio: "2:3"`, `safe_mode: false`, $0.04. |
 
 Further gateway rules:
 
 - First-party DeepSeek and Z.ai, and Together, are never used. Prefer Zero Data Retention endpoints where available. Record each host's retention policy in the README.
 - **Credit cap.** OpenRouter credit is account-wide and reserved per in-flight request. The text cap therefore uses a dedicated OpenRouter account, or a key with its own credit limit. A "would exceed your available credits" failure maps to the out-of-credit error.
 - The image provider has its own prepaid credit. Out of image credit blocks only Snapshot and Reference image generation.
+- **Venice specifics:**
+  - A blurred or content-violation result (`x-venice-is-blurred`, `x-venice-is-content-violation`) or a 422 is a refusal.
+  - A 402 means out of image credit.
+  - Venice reports no per-image cost, so UsageRecords use list price.
+  - Reading the balance needs a separate Admin API key.
 - The gateway is the only thing faked in tests (see Testing Decisions).
 
 ### Settings, usage and credit
@@ -463,7 +469,7 @@ Further gateway rules:
 
 ### Snapshots, Reference images and the Gallery
 
-- **Before building, check the image model** (under $1): confirm that Seedream 4 on Runware returns explicit fictional-adult images and keeps a face from a reference image. If it fails, switch the default to Venice before building this module.
+- **The image model is checked** (ticket 18): on Venice, `seedream-v4-edit` returned explicit fictional-adult images and kept a Character's face from its Reference image in both photo and anime styles. The Snapshot prompt must restate the Appearance's key traits, such as eye colour, scars and hair. Without them, eye colour drifted in the anime style.
 - **Reference image:**
   - Made from the Character page. One request returns 4 candidates of the Character, full-body, neutral pose, plain background, in the Story's Image style, drawn from Appearance. The author picks one, and the file is stored.
   - A new one replaces the old one, and the old file is deleted.
@@ -592,7 +598,7 @@ Further gateway rules:
 - **Drift vs Bond/Arc.** Anything touching Characters' behaviour must say which it means. A Bond or Arc change always names what changed and the event that caused it. Unexplained change against the core definition is Drift. The core Character definition is never rewritten by play.
 - **Untested assumptions to check in the first build:** Memory extraction quality and the ~2k-token cap; the recent-Message prompt budget; the evidence on feelings and Secrets leakage, which is thin (one probe per setup). If leakage hurts play, the fallback is to send only the speaking Character's own Bonds, which needs per-speaker calls the prototype rejected on cost and speed. Revisit then.
 - **Decisions this spec fills in that the tickets left open:** blocking the next send when a background call failed, polling instead of websockets, no streaming, the ~16k prompt budget for recent Messages, and the assistant's removal warning. Each is a reasonable default; change any of them in play without reopening the map.
-- **Cost estimate:** a turn costs about $0.0025 and the judge about $0.0002, so ~60 turns/day comes to roughly $5/month at the prototype's prompt sizes. Longer Chats, extraction calls and Snapshots (~$0.03 each) add to it within the $30 cap. A suggested credit split is about $22 text and $8 image.
+- **Cost estimate:** a turn costs about $0.0025 and the judge about $0.0002, so ~60 turns/day comes to roughly $5/month at the prototype's prompt sizes. Longer Chats, extraction calls and Snapshots (~$0.05 each) add to it within the $30 cap. A suggested credit split is about $22 text and $8 image.
 - **Hosts and backup services** all ban images that look like real people. Snapshots and Reference images must depict only fictional adult Characters.
 - **Source decisions:** [map](map.md), [data model sketch](assets/11-data-model.md), and the resolved tickets 05–15 under `issues/`. The turn prototype lives on branch `prototype/one-ai-turn`.
 
@@ -601,7 +607,7 @@ Further gateway rules:
 | # | Ticket | Status | Blocked by |
 |---|---|---|---|
 | 17 | [Set up provider accounts, credit caps and the tailnet](issues/17-provider-accounts-and-tailnet.md) | ready-for-human | — |
-| 18 | [Check Seedream 4 on Runware before building Snapshots](issues/18-image-model-check.md) | ready-for-human | 17 |
+| 18 | [Check the image model before building Snapshots](issues/18-image-model-check.md) | resolved | 17 |
 | 19 | [App skeleton, PWA shell and test harness](issues/19-app-skeleton-and-test-harness.md) | ready-for-agent | — |
 | 20 | [Real Model Gateway, Settings and the usage view](issues/20-model-gateway-settings-and-usage.md) | ready-for-agent | 19 |
 | 21 | [Write a Story by hand](issues/21-write-a-story-by-hand.md) | ready-for-agent | 19 |

@@ -37,3 +37,14 @@ Grilled 2026-11-03. The model choice is provisional until a hands-on check (belo
   - Snapshots never roll back with Memory, Bond, Arc or Scene, and are never sent to the text model.
   - Deleting a Chat keeps its Snapshots in the Gallery, unlinked. Deleting a Snapshot removes it from both places. Deleting the Story deletes its Gallery and reference images.
 - Glossary: sharpened **Snapshot**; added **Reference image** and **Gallery** to `CONTEXT.md`.
+
+## Comments
+
+- 2026-11-03 ([Check the image model before building Snapshots](18-image-model-check.md)): the model choice is settled, and it differs from the provisional answer above.
+  - **Runware was dropped** before it was tested: its minimum top-up is $20.
+  - **Venice is the provider:**
+    - Snapshots use `seedream-v4-edit` through multi-edit, $0.05.
+    - Reference images use `qwen-image-3`, $0.04.
+    - `qwen-edit-uncensored` is the manual alternative.
+  - **The check passed** in photo and anime styles, including explicit images, as judged by the user.
+  - **New requirement:** the Snapshot prompt must restate the Appearance's key traits.
