@@ -595,3 +595,26 @@ Further gateway rules:
 - **Cost estimate:** a turn costs about $0.0025 and the judge about $0.0002, so ~60 turns/day comes to roughly $5/month at the prototype's prompt sizes. Longer Chats, extraction calls and Snapshots (~$0.03 each) add to it within the $30 cap. A suggested credit split is about $22 text and $8 image.
 - **Hosts and backup services** all ban images that look like real people. Snapshots and Reference images must depict only fictional adult Characters.
 - **Source decisions:** [map](map.md), [data model sketch](assets/11-data-model.md), and the resolved tickets 05–15 under `issues/`. The turn prototype lives on branch `prototype/one-ai-turn`.
+
+## Implementation tickets
+
+| # | Ticket | Status | Blocked by |
+|---|---|---|---|
+| 17 | [Set up provider accounts, credit caps and the tailnet](issues/17-provider-accounts-and-tailnet.md) | ready-for-human | — |
+| 18 | [Check Seedream 4 on Runware before building Snapshots](issues/18-image-model-check.md) | ready-for-human | 17 |
+| 19 | [App skeleton, PWA shell and test harness](issues/19-app-skeleton-and-test-harness.md) | ready-for-agent | — |
+| 20 | [Real Model Gateway, Settings and the usage view](issues/20-model-gateway-settings-and-usage.md) | ready-for-agent | 19 |
+| 21 | [Write a Story by hand](issues/21-write-a-story-by-hand.md) | ready-for-agent | 19 |
+| 22 | [Draft a Story from an idea, and rewrite a field](issues/22-draft-a-story-from-an-idea.md) | ready-for-agent | 20, 21 |
+| 23 | [Story assistant with Undo](issues/23-story-assistant.md) | ready-for-agent | 22 |
+| 24 | [Play a Chat: one turn end to end](issues/24-play-a-chat.md) | ready-for-agent | 20, 21 |
+| 25 | [Edit an earlier Message and reset a Chat](issues/25-edit-and-reset.md) | ready-for-agent | 24 |
+| 26 | [Personas and swapping identity mid-Chat](issues/26-personas-and-identity-swap.md) | ready-for-agent | 24 |
+| 27 | [Bond, Arc and Scene judge, the change ledger, and the dashboard](issues/27-bond-arc-scene-judge-and-dashboard.md) | ready-for-agent | 25 |
+| 28 | [Memory: extraction, the drawer and rollback](issues/28-memory-extraction-and-drawer.md) | ready-for-agent | 27 |
+| 29 | [Cast and Scene changes reaching existing Chats](issues/29-cast-and-scene-changes-in-existing-chats.md) | ready-for-agent | 27, 28 |
+| 30 | [Reference images for Characters](issues/30-reference-images.md) | ready-for-agent | 18, 20, 21 |
+| 31 | [Snapshots and the Gallery](issues/31-snapshots-and-gallery.md) | ready-for-agent | 25, 28, 30 |
+| 32 | [Run the live instance on the home PC](issues/32-live-instance-on-windows.md) | ready-for-human | 17, 19 |
+| 33 | [Daily backup to a second disk and encrypted Google Drive](issues/33-daily-backup.md) | ready-for-agent | 32 |
+| 34 | [Write the restore steps and try them once](issues/34-restore-drill.md) | ready-for-human | 33 |
