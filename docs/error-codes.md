@@ -16,6 +16,7 @@ as "the API can't be reached" and shows the can't-connect screen (`apps/web/lib/
 | 001 | Model Gateway |
 | 002 | Images |
 | 003 | Story authoring |
+| 005 | Story drafting |
 
 ## Codes
 
@@ -38,3 +39,7 @@ as "the API can't be reached" and shows the can't-connect screen (`apps/web/lib/
 | `409.003.006` | `DuplicateStartingBondError` | That Character already has a StartingBond in that direction. |
 | `422.003.007` | `SelfStartingBondError` | A StartingBond from a Character toward itself. |
 | `422.003.008` | `InvalidOrderError` | A reorder that does not list every Character (or Scene) of the Story exactly once. |
+| `502.005.001` | `UnreadableDraftError` | The model's draft or rewrite could not be read (no JSON object, or no text). Nothing saved. Show with Retry. |
+| `502.005.002` | `InvalidDraftError` | The draft does not fit a Story (0 or 7 Characters, a Style value outside its set, a required field empty, a bad StartingBond). Nothing saved. Show with Retry. |
+| `422.005.003` | `EmptyIdeaError` | A draft was asked for with a blank idea. |
+| `422.005.004` | `NotRewritableError` | A rewrite named a field that is not a text field of that part of the Story. |

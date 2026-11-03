@@ -368,3 +368,32 @@ a {
 .danger-zone {
     margin-top: 2rem;
 }
+
+/* --- Story drafting (ticket 22): the New Story panel and the Rewrite button on text fields --- */
+.new-story {
+    margin-bottom: 1.25rem;
+}
+
+.new-story .actions {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+}
+
+.field-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.button-small {
+    padding: 0.125rem 0.625rem;
+    font-size: 0.8125rem;
+}
+
+.field-error {
+    margin: 0.25rem 0 0;
+    font-size: 0.875rem;
+    color: #f3b26b;
+}

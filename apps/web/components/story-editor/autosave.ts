@@ -20,6 +20,7 @@ export const SAVE_LABELS: Record<SaveState['kind'], string> = {
 };
 
 type Run = () => Promise<Story>;
+type OnError = (message: string) => void;
 
 interface Pending {
     timer: ReturnType<typeof setTimeout>;
@@ -57,7 +58,7 @@ export function useAutosave() {
     }, []);
 
     const enqueue = useCallback(
-        (run: Run, apply: (story: Story) => void): Promise<Story | undefined> => {
+        (run: Run, apply: (story: Story) => void, onError?: OnError): Promise<Story | undefined> => {
             inFlight.current += 1;
             setState({ kind: 'saving' });
             const result = chain.current.then(run).then(
@@ -71,10 +72,14 @@ export function useAutosave() {
                     inFlight.current -= 1;
                     if (error instanceof ApiUnreachableError) {
                         reportUnreachable();
-                    } else if (error instanceof ApiError) {
-                        settle({ kind: 'error', message: error.message });
+                        return undefined;
+                    }
+                    const message = error instanceof ApiError ? error.message : 'Something went wrong.';
+                    if (onError && !unmounted.current) {
+                        onError(message);
+                        settle(null);
                     } else {
-                        settle({ kind: 'error', message: 'Something went wrong.' });
+                        settle({ kind: 'error', message });
                     }
                     return undefined;
                 },
@@ -110,11 +115,14 @@ export function useAutosave() {
         await chain.current;
     }, [enqueue]);
 
-    /** A structural change: runs after pending field edits, and applies its answer whole. */
+    /**
+     * A structural change: runs after pending field edits, and applies its answer whole. With
+     * `onError`, a failure is reported there (shown at the field) instead of in the save state.
+     */
     const commit = useCallback(
-        async (run: Run, apply: (story: Story) => void): Promise<Story | undefined> => {
+        async (run: Run, apply: (story: Story) => void, onError?: OnError): Promise<Story | undefined> => {
             await flush();
-            return enqueue(run, apply);
+            return enqueue(run, apply, onError);
         },
         [enqueue, flush],
     );

@@ -1,0 +1,31 @@
+{
+    "id": "gen-synthetic-0003",
+    "provider": "DeepInfra",
+    "model": "z-ai/glm-5.3",
+    "object": "chat.completion",
+    "created": 1762300002,
+    "choices": [
+        {
+            "logprobs": null,
+            "finish_reason": "stop",
+            "native_finish_reason": "stop",
+            "index": 0,
+            "message": {
+                "role": "assistant",
+                "content": "{\"title\":\"The Lighthouse\",\"setting\":\"A lighthouse on a storm-cut island, 1890s.\",\"opening\":\"The lamp went out an hour ago.\",\"style\":{\"pov\":\"second\",\"tense\":\"past\",\"replyLength\":\"medium\",\"imageStyle\":\"\"},\"role\":{\"name\":\"The new keeper\",\"description\":\"Arrived this morning.\"},\"characters\":[{\"name\":\"Mira\",\"appearance\":\"Tall, grey eyes.\",\"personality\":\"Guarded and dry.\",\"voice\":\"Short sentences.\",\"exampleLines\":[],\"background\":\"\",\"secrets\":\"\",\"arcDirections\":\"\"}],\"startingBonds\":[],\"scenes\":[]}",
+                "refusal": null,
+                "reasoning": null
+            }
+        }
+    ],
+    "usage": {
+        "prompt_tokens": 1500,
+        "completion_tokens": 400,
+        "total_tokens": 1900,
+        "cost": 0.000321,
+        "is_byok": false,
+        "prompt_tokens_details": { "cached_tokens": 0 },
+        "cost_details": { "upstream_inference_cost": null },
+        "completion_tokens_details": { "reasoning_tokens": 0 }
+    }
+}

@@ -108,6 +108,18 @@ spend per pool from the usage records, the remaining credit read from the provid
 whether each pool is low. The frontend shows a banner on every page while a pool is low, and
 a Drift warning on the Settings page when the play model is changed.
 
+### Story drafting
+
+`POST /api/stories/draft` with `{ idea }` makes one `story_draft` call to the play model in
+JSON mode and saves the answer as a whole Story, playable when the model filled every required
+field. `apps/api/src/manager/story-drafting/draft-schema.ts` checks the shape first (1–6
+Characters, Style values in their sets, StartingBonds by Character name, at most one per
+direction); a draft that fails answers `502.005.002` and leaves nothing behind, unreadable
+output `502.005.001`. `POST /api/stories/:id/rewrite` with `{ target, id?, field }` makes one
+`field_rewrite` call with the whole Story as context and changes that one text field. The
+prompt text is in `prompts.ts` beside the schema. In the app, "New Story" opens a panel with
+the idea (or "Start blank"), and every text field of the editor has a Rewrite button.
+
 ### Migrations
 
 Migrations live in `apps/api/src/migration/` and are listed by hand in
