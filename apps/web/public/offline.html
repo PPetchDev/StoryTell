@@ -1,0 +1,77 @@
+<!doctype html>
+<!--
+  The "can't connect" screen, served by sw.js when the app itself can't be loaded (the PC is
+  off, or no network). components/cant-connect.tsx is the same screen inside the running app.
+  Keep the two in step. Self-contained: no scripts or styles from the Next.js build.
+-->
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="theme-color" content="#16131f" />
+        <title>Can't connect · Storytell AI</title>
+        <style>
+            :root {
+                --bg: #16131f;
+                --surface: #221d30;
+                --text: #ece8f6;
+                --muted: #a59cbd;
+                --accent: #8f73ff;
+                --accent-text: #ffffff;
+                color-scheme: dark;
+            }
+            * {
+                box-sizing: border-box;
+            }
+            html,
+            body {
+                margin: 0;
+                min-height: 100%;
+                background: var(--bg);
+                color: var(--text);
+                font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+                line-height: 1.5;
+            }
+            .page {
+                max-width: 40rem;
+                margin: 0 auto;
+                padding: max(1.5rem, env(safe-area-inset-top)) 1rem 2rem;
+            }
+            h1 {
+                font-size: 1.75rem;
+                margin: 0 0 1rem;
+            }
+            .muted {
+                color: var(--muted);
+            }
+            .checklist {
+                background: var(--surface);
+                border-radius: 0.75rem;
+                padding: 1rem 1rem 1rem 2.25rem;
+                margin: 0 0 1.5rem;
+            }
+            .button {
+                font: inherit;
+                font-weight: 600;
+                background: var(--accent);
+                color: var(--accent-text);
+                border: 0;
+                border-radius: 999px;
+                padding: 0.625rem 1.5rem;
+                cursor: pointer;
+            }
+        </style>
+    </head>
+    <body>
+        <main class="page">
+            <h1>Can't connect</h1>
+            <p>Storytell AI runs on your home PC. Check that:</p>
+            <ul class="checklist">
+                <li>this device is connected to the internet</li>
+                <li>the PC is on</li>
+                <li>Tailscale is connected on this device</li>
+            </ul>
+            <button type="button" class="button" onclick="location.reload()">Retry</button>
+        </main>
+    </body>
+</html>

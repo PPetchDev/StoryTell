@@ -1,2 +1,17 @@
 .claude/worktrees/
+node_modules/
+dist/
+.next/
+.next-e2e/
+*.tsbuildinfo
+next-env.d.ts
+
+# Local config and data. Commit only the *.example files.
 .env
+.env.*
+!.env.example
+.data/
+
+# Test output
+test-results/
+playwright-report/

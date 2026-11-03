@@ -1,0 +1,25 @@
+{
+    "name": "@storytell/web",
+    "version": "0.0.1",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "dev": "next dev",
+        "build": "next build",
+        "start": "next start",
+        "typecheck": "tsc --noEmit",
+        "test:e2e": "playwright test"
+    },
+    "devDependencies": {
+        "@playwright/test": "^1.64.1",
+        "@types/node": "^24.19.2",
+        "@types/react": "^19.3.0",
+        "@types/react-dom": "^19.3.0",
+        "typescript": "^6.0.3"
+    },
+    "dependencies": {
+        "next": "^16.4.4",
+        "react": "^19.3.1",
+        "react-dom": "^19.3.1"
+    }
+}
