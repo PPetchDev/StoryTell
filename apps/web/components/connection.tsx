@@ -38,6 +38,11 @@ export function ConnectionBoundary({ children }: { children: ReactNode }) {
     );
 }
 
+/** For components that call the API themselves: report an unreachable API to the boundary. */
+export function useConnection(): ConnectionContextValue {
+    return useContext(ConnectionContext);
+}
+
 export type QueryState<T> =
     | { status: 'loading' }
     | { status: 'ready'; data: T }
