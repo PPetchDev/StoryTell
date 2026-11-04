@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, EntityManager, MoreThan, Repository } from 'typeorm';
 
 import { ChatEntity } from './entities/chat.entity.js';
 import { MessagePartEntity, MessagePartKind } from './entities/message-part.entity.js';
@@ -80,19 +80,53 @@ export class ChatModelService {
             const message = await manager.save(
                 manager.create(MessageEntity, { chatId, position, kind: MessageKind.Ai, model }),
             );
-            message.parts = await manager.save(
-                parts.map((part, index) =>
-                    manager.create(MessagePartEntity, {
-                        messageId: message.id,
-                        position: index,
-                        kind: part.kind === 'speech' ? MessagePartKind.Speech : MessagePartKind.Narration,
-                        characterId: part.kind === 'speech' ? part.characterId : null,
-                        speakerName: part.kind === 'speech' ? part.speakerName : null,
-                        text: part.text,
-                    }),
-                ),
-            );
+            message.parts = await manager.save(partEntities(manager, message.id, parts));
             return message;
         });
     }
+
+    /**
+     * Overwrites a User Message's text and deletes every Message after it, in one transaction.
+     * Nothing is kept of the old text or the deleted Messages.
+     */
+    rewriteUserMessage(message: MessageEntity, text: string): Promise<void> {
+        return this.dataSource.transaction(async (manager) => {
+            await deleteAfter(manager, message);
+            await manager.update(MessageEntity, { id: message.id }, { text });
+        });
+    }
+
+    /**
+     * Replaces an AI Message's parts and deletes every Message after it, in one transaction.
+     * The Message keeps its id, model and time.
+     */
+    rewriteAiMessage(message: MessageEntity, parts: NewMessagePart[]): Promise<void> {
+        return this.dataSource.transaction(async (manager) => {
+            await deleteAfter(manager, message);
+            await manager.delete(MessagePartEntity, { messageId: message.id });
+            await manager.save(partEntities(manager, message.id, parts));
+        });
+    }
+
+    /** Deletes every Message of the Chat; their parts go through ON DELETE CASCADE. */
+    async clearMessages(chatId: number): Promise<void> {
+        await this.messages.delete({ chatId });
+    }
+}
+
+function deleteAfter(manager: EntityManager, message: MessageEntity): Promise<unknown> {
+    return manager.delete(MessageEntity, { chatId: message.chatId, position: MoreThan(message.position) });
+}
+
+function partEntities(manager: EntityManager, messageId: number, parts: NewMessagePart[]): MessagePartEntity[] {
+    return parts.map((part, index) =>
+        manager.create(MessagePartEntity, {
+            messageId,
+            position: index,
+            kind: part.kind === 'speech' ? MessagePartKind.Speech : MessagePartKind.Narration,
+            characterId: part.kind === 'speech' ? part.characterId : null,
+            speakerName: part.kind === 'speech' ? part.speakerName : null,
+            text: part.text,
+        }),
+    );
 }

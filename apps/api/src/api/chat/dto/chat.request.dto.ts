@@ -18,3 +18,13 @@ export class SendMessageRequestBodyDTO {
     @MaxLength(TEXT_MAX)
     text: string;
 }
+
+export class EditMessageRequestBodyDTO {
+    @ApiProperty({
+        description:
+            'The new text. For an AI Message, narration paragraphs and `@Name:` speech lines, as the parser reads them.',
+    })
+    @IsString()
+    @MaxLength(TEXT_MAX)
+    text: string;
+}

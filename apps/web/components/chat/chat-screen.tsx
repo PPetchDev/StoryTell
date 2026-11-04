@@ -4,31 +4,123 @@ import Link from 'next/link';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 
 import { useConnection } from '@/components/connection';
+import { ConfirmButton } from '@/components/story-editor/fields';
 import { ApiError, apiFetch, ApiUnreachableError } from '@/lib/api';
-import { Chat, chatApi, Message, modelLabel } from '@/lib/chat';
+import { Chat, chatApi, Message, messageText, modelLabel } from '@/lib/chat';
 
-function MessageView({ message }: { message: Message }) {
+function messageLabel(message: Message): string {
+    if (message.kind === 'user') return `${message.identityName} said`;
+    return message.model === 'author' ? 'Opening' : 'AI reply';
+}
+
+function MessageBody({ message }: { message: Message }) {
     if (message.kind === 'user') {
         return (
-            <article className="message message-user" aria-label={`${message.identityName} said`}>
+            <>
                 <p className="speaker">{message.identityName}</p>
                 <p className="message-text">{message.text}</p>
-            </article>
+            </>
         );
     }
+    return message.parts.map((part, index) =>
+        part.kind === 'narration' ? (
+            <p key={index} className="narration message-text">
+                {part.text}
+            </p>
+        ) : (
+            <div key={index} className="speech">
+                <p className="speaker">{part.speakerName}</p>
+                <p className="message-text">{part.text}</p>
+            </div>
+        ),
+    );
+}
+
+interface EditFormProps {
+    message: Message;
+    /** How many Messages come after this one; they are discarded on save, after confirming. */
+    later: number;
+    onSave(text: string): void;
+    onCancel(): void;
+}
+
+/**
+ * The in-place edit box. A User Message is edited as plain text; an AI Message as narration
+ * paragraphs and `@Name:` speech lines, which the API re-splits. Saving with later Messages
+ * asks first, since they go for good.
+ */
+function EditForm({ message, later, onSave, onCancel }: EditFormProps) {
+    const [value, setValue] = useState(() => messageText(message));
+    const empty = value.trim() === '';
+    const what = message.kind === 'user' ? 'and the AI replies afresh' : 'and the Chat waits for you';
     return (
-        <article className="message message-ai" aria-label={message.model === 'author' ? 'Opening' : 'AI reply'}>
-            {message.parts.map((part, index) =>
-                part.kind === 'narration' ? (
-                    <p key={index} className="narration message-text">
-                        {part.text}
-                    </p>
+        <form
+            className="message-edit"
+            aria-label={`Edit ${messageLabel(message)}`}
+            onSubmit={(event) => {
+                event.preventDefault();
+                if (!empty && later === 0) onSave(value);
+            }}
+        >
+            <textarea
+                aria-label="Message text"
+                value={value}
+                rows={Math.min(12, Math.max(3, value.split('\n').length + 1))}
+                autoFocus
+                onChange={(event) => setValue(event.target.value)}
+            />
+            {message.kind === 'ai' && (
+                <p className="muted edit-hint">Speech goes on `@Name:` lines; a blank line starts narration.</p>
+            )}
+            <div className="toolbar">
+                {later === 0 ? (
+                    <button type="submit" className="button" disabled={empty}>
+                        Save
+                    </button>
                 ) : (
-                    <div key={index} className="speech">
-                        <p className="speaker">{part.speakerName}</p>
-                        <p className="message-text">{part.text}</p>
-                    </div>
-                ),
+                    <ConfirmButton
+                        label="Save"
+                        question={`This discards the ${later === 1 ? 'Message' : `${later} Messages`} after it ${what}.`}
+                        confirmLabel="Save and rewind"
+                        onConfirm={() => onSave(value)}
+                        disabled={empty}
+                    />
+                )}
+                <button type="button" className="button button-quiet" onClick={onCancel}>
+                    Cancel
+                </button>
+            </div>
+        </form>
+    );
+}
+
+interface MessageViewProps {
+    message: Message;
+    later: number;
+    editing: boolean;
+    /** Edit is hidden while a turn is written or another Message is being edited. */
+    canEdit: boolean;
+    onEdit(): void;
+    onSave(text: string): void;
+    onCancel(): void;
+}
+
+function MessageView({ message, later, editing, canEdit, onEdit, onSave, onCancel }: MessageViewProps) {
+    return (
+        <article className={message.kind === 'user' ? 'message message-user' : 'message message-ai'} aria-label={messageLabel(message)}>
+            {editing ? (
+                <EditForm message={message} later={later} onSave={onSave} onCancel={onCancel} />
+            ) : (
+                <>
+                    <MessageBody message={message} />
+                    {canEdit && (
+                        <div className="message-tools">
+                            <button type="button" className="button button-quiet button-small" onClick={onEdit}>
+                                Edit
+                            </button>
+                        </div>
+                    )}
+                </>
             )}
         </article>
     );
@@ -63,13 +155,16 @@ function Notices({ chat }: { chat: Chat }) {
 /**
  * The Chat screen (spec: "Chat screen"): narration and named speech in order, a composer,
  * and the notice line. No streaming: a "writing" indicator shows while the turn is written,
- * and a failed turn leaves the User Message with Retry.
+ * and a failed turn leaves the User Message with Retry. Any Message can be edited in place,
+ * which discards the Messages after it; Reset starts the Chat over from the Opening.
  */
 export function ChatScreen({ initial }: { initial: Chat }) {
     const { reportUnreachable } = useConnection();
     const [chat, setChat] = useState(initial);
     const [draft, setDraft] = useState('');
     const [writing, setWriting] = useState(false);
+    const [busy, setBusy] = useState(false);
+    const [editing, setEditing] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
     const endRef = useRef<HTMLDivElement>(null);
 
@@ -102,10 +197,32 @@ export function ChatScreen({ initial }: { initial: Chat }) {
         }
     };
 
+    /** A write that runs no turn: an AI Message edit, or Reset. */
+    const runWrite = async (write: () => Promise<Chat>) => {
+        setBusy(true);
+        setError(null);
+        try {
+            setChat(await write());
+        } catch (caught) {
+            if (caught instanceof ApiUnreachableError) reportUnreachable();
+            else setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+        } finally {
+            setBusy(false);
+        }
+    };
+
     const send = (event: FormEvent) => {
         event.preventDefault();
         if (draft.trim() === '' || writing || blocked) return;
         void runTurn(() => chatApi.send(chat.storyId, chat.id, draft));
+    };
+
+    const saveEdit = (message: Message, text: string) => {
+        setEditing(null);
+        const edit = () => chatApi.edit(chat.storyId, chat.id, message.id, text);
+        // An edited User Message gets a fresh reply, so it runs as a turn; an AI Message does not.
+        if (message.kind === 'user') void runTurn(edit);
+        else void runWrite(edit);
     };
 
     return (
@@ -116,11 +233,29 @@ export function ChatScreen({ initial }: { initial: Chat }) {
                     {chat.currentScene ? `Scene: ${chat.currentScene.name}` : 'Free play'}
                 </span>
             </nav>
-            <h1>{chat.title}</h1>
+            <div className="chat-head">
+                <h1>{chat.title}</h1>
+                <ConfirmButton
+                    label="Reset"
+                    question="Clear every Message and start this Chat over from the Opening?"
+                    confirmLabel="Reset"
+                    onConfirm={() => void runWrite(() => chatApi.reset(chat.storyId, chat.id))}
+                    disabled={writing || busy || editing !== null || !chat.playable}
+                />
+            </div>
 
             <section className="messages" aria-label="Messages">
-                {chat.messages.map((message) => (
-                    <MessageView key={message.id} message={message} />
+                {chat.messages.map((message, index) => (
+                    <MessageView
+                        key={message.id}
+                        message={message}
+                        later={chat.messages.length - index - 1}
+                        editing={editing === message.id}
+                        canEdit={!writing && !busy && editing === null && (message.kind === 'ai' || !blocked)}
+                        onEdit={() => setEditing(message.id)}
+                        onSave={(text) => saveEdit(message, text)}
+                        onCancel={() => setEditing(null)}
+                    />
                 ))}
                 {writing && (
                     <p className="writing muted" role="status">

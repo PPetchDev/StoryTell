@@ -3,6 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import {
     ChatNotFoundError,
     EmptyMessageError,
+    MessageNotFoundError,
     NoTurnToRetryError,
     StoryNotPlayableError,
     TurnInProgressError,
@@ -76,10 +77,66 @@ export class ChatManagerService {
                 currentSceneId: story.scenes[0]?.id ?? null,
             }),
         );
+        await this.copyOpening(story, chat.id);
+        return this.getChat(storyId, chat.id);
+    }
+
+    /**
+     * Spec: "Reset Chat". The title and the worn identity stay; every Message goes, the
+     * Opening as it is now comes in again as Message 1, and the Chat returns to the first
+     * Scene or free play. Like starting a Chat, it needs a playable Story.
+     */
+    async resetChat(storyId: number, chatId: number): Promise<ChatDetail> {
+        const { story, chat } = await this.load(storyId, chatId);
+        this.requirePlayable(story);
+        if (this.inFlight.has(chat.id)) throw new TurnInProgressError();
+
+        chat.currentSceneId = story.scenes[0]?.id ?? null;
+        await this.chatModel.saveChat(chat);
+        await this.chatModel.clearMessages(chat.id);
+        await this.copyOpening(story, chat.id);
+        return this.getChat(storyId, chatId);
+    }
+
+    /**
+     * Spec: "Edit User Message N" and "Edit AI Message N". Every Message after it is deleted
+     * for good. An edited User Message gets a fresh reply through the same turn as a send,
+     * so a failed one leaves it with Retry. An edited AI Message is re-split into parts from
+     * its `@Name:` text, and the Chat then waits for the user: no turn.
+     */
+    async editMessage(storyId: number, chatId: number, messageId: number, text: string): Promise<ChatDetail> {
+        if (text.trim() === '') throw new EmptyMessageError();
+        const { story, chat } = await this.load(storyId, chatId);
+        const index = chat.messages.findIndex((message) => message.id === messageId);
+        if (index < 0) throw new MessageNotFoundError();
+        const message = chat.messages[index];
+
+        if (message.kind === MessageKind.User) {
+            await this.requireSendable(story, chat);
+            return this.writingTurn(chat.id, async () => {
+                await this.chatModel.rewriteUserMessage(message, text);
+                message.text = text;
+                chat.messages = chat.messages.slice(0, index + 1);
+                await this.writeTurn(story, chat);
+                return this.getChat(storyId, chatId);
+            });
+        }
+
+        if (this.inFlight.has(chat.id)) throw new TurnInProgressError();
+        // The user wrote this text, like the author wrote the Opening: the guard is off.
+        const reply = parseReply(text, story.characters, story.role.name, { guard: false });
+        for (const name of reply.unknownSpeakers) {
+            this.logger.warn(`Chat ${chat.id}: unknown speaker "${name}" in the edited Message; kept by name with no Character link`);
+        }
+        await this.chatModel.rewriteAiMessage(message, reply.parts);
+        return this.getChat(storyId, chatId);
+    }
+
+    /** The Opening becomes Message 1 with model "author", split by the same parser as replies. */
+    private async copyOpening(story: StoryEntity, chatId: number): Promise<void> {
         // The author wrote the Opening, so the guard that cuts lines written as the Role is off.
         const opening = parseReply(story.opening, story.characters, story.role.name, { guard: false });
-        await this.chatModel.addAiMessage(chat.id, 0, AUTHOR_MODEL, opening.parts);
-        return this.getChat(storyId, chat.id);
+        await this.chatModel.addAiMessage(chatId, 0, AUTHOR_MODEL, opening.parts);
     }
 
     async getChat(storyId: number, chatId: number): Promise<ChatDetail> {

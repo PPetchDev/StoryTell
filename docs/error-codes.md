@@ -43,8 +43,9 @@ as "the API can't be reached" and shows the can't-connect screen (`apps/web/lib/
 | `404.004.001` | `ChatNotFoundError` | No Chat with that id in this Story. |
 | `422.004.002` | `StoryNotPlayableError` | The Story has a required field empty. The message names the missing fields. Blocks starting a Chat and sending. |
 | `409.004.003` | `NoTurnToRetryError` | Retry when the Chat is not waiting for a reply to a User Message. |
-| `409.004.004` | `TurnInProgressError` | A send while this Chat's turn is still being written. |
-| `422.004.005` | `EmptyMessageError` | A send with nothing but whitespace. |
+| `409.004.004` | `TurnInProgressError` | A send, a Message edit or a reset while this Chat's turn is still being written. |
+| `422.004.005` | `EmptyMessageError` | A send or a Message edit with nothing but whitespace. |
+| `404.004.006` | `MessageNotFoundError` | No Message with that id in this Chat. |
 | `502.005.001` | `UnreadableDraftError` | The model's draft or rewrite could not be read (no JSON object, or no text). Nothing saved. Show with Retry. |
 | `502.005.002` | `InvalidDraftError` | The draft does not fit a Story (0 or 7 Characters, a Style value outside its set, a required field empty, a bad StartingBond). Nothing saved. Show with Retry. |
 | `422.005.003` | `EmptyIdeaError` | A draft was asked for with a blank idea. |

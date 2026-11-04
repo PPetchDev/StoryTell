@@ -32,8 +32,15 @@ export class TurnInProgressError extends AppError {
     }
 }
 
+/** A send or a Message edit with nothing but whitespace. */
 export class EmptyMessageError extends AppError {
     constructor() {
         super('422.004.005', 'Write something to send.');
+    }
+}
+
+export class MessageNotFoundError extends AppError {
+    constructor() {
+        super('404.004.006', 'Message not found.');
     }
 }
