@@ -127,6 +127,8 @@ describe('OpenRouter contract', () => {
         it.each([
             ['openrouter/error-credits.json', 402],
             ['openrouter/error-credits-reservation.json', 402],
+            // A key with its own credit limit (spec: Credit cap) is refused with a 403 budget block.
+            ['openrouter/error-key-limit.json', 403],
         ])('maps a credit failure (%s) to out of text credit', async (name, status) => {
             const net = recordedFetch([{ status, fixture: name }]);
             const { gateway, records } = gatewayUnderTest(net.fetch);
@@ -174,7 +176,7 @@ describe('OpenRouter contract', () => {
 
             await expect(gateway.completeText({ kind: 'turn', messages })).rejects.toMatchObject({
                 code: '502.001.001',
-                message: 'OpenRouter: Provider returned error',
+                message: 'OpenRouter: Provider returned error (DeepInfra: upstream connect error)',
             });
         });
 
@@ -222,6 +224,72 @@ describe('OpenRouter contract', () => {
             }
             expect(sleeps).toEqual([1000, 3000]);
             expect(records).toHaveLength(1);
+        });
+
+        it('plays on after a relayed host overload that clears on retry', async () => {
+            const net = recordedFetch([
+                { status: 429, fixture: 'openrouter/error-overloaded-relayed.json' },
+                { fixture: 'openrouter/chat-success.json' },
+            ]);
+            const { gateway, sleeps, records } = gatewayUnderTest(net.fetch);
+
+            const result = await gateway.completeText({ kind: 'turn', messages });
+
+            expect(result.text).toBe(
+                'The lighthouse keeper nods once and goes back to polishing the lens.',
+            );
+            expect(net.requests).toHaveLength(2);
+            expect(sleeps).toEqual([1000]);
+            expect(records).toHaveLength(1);
+        });
+
+        // Seen for real on 2026-11-04 (ticket 28): DeepInfra's engine_overloaded, relayed by
+        // OpenRouter as a 429 whose metadata carries a `limit_source`, outlasted the retries and
+        // was reported as out of credit, which blocked sending as if the key were empty. A 429
+        // is a rate limit whatever its metadata says; only a 402 or a budget 403 means credit.
+        it.each([
+            [
+                'openrouter/error-overloaded-relayed.json',
+                'OpenRouter: Provider returned error (DeepInfra: engine_overloaded)',
+            ],
+            [
+                'openrouter/error-overloaded.json',
+                'OpenRouter: Rate limit exceeded (DeepInfra: engine_overloaded)',
+            ],
+        ])(
+            'reports a 429 that outlasts the retries (%s) as an outage, never as credit',
+            async (name, message) => {
+                const net = recordedFetch(
+                    Array.from({ length: MAX_RETRIES + 1 }, () => ({ status: 429, fixture: name })),
+                );
+                const { gateway, sleeps, records } = gatewayUnderTest(net.fetch);
+
+                const failure = gateway.completeText({ kind: 'turn', messages });
+
+                await expect(failure).rejects.toBeInstanceOf(ProviderOutageError);
+                await expect(failure).rejects.not.toBeInstanceOf(OutOfCreditError);
+                await expect(failure).rejects.toMatchObject({ code: '502.001.001', message });
+                expect(net.requests).toHaveLength(MAX_RETRIES + 1);
+                expect(sleeps).toHaveLength(MAX_RETRIES);
+                expect(records).toEqual([]);
+            },
+        );
+
+        it('still reports a 402 credit refusal as out of credit, without retrying it', async () => {
+            const net = recordedFetch([
+                {
+                    status: 402,
+                    headers: { 'retry-after': '5' },
+                    fixture: 'openrouter/error-credits-reservation.json',
+                },
+            ]);
+            const { gateway, sleeps } = gatewayUnderTest(net.fetch);
+
+            await expect(gateway.completeText({ kind: 'turn', messages })).rejects.toMatchObject({
+                code: '402.001.003',
+            });
+            expect(net.requests).toHaveLength(1);
+            expect(sleeps).toEqual([]);
         });
 
         it('gives up after the retries and reports an outage', async () => {

@@ -1,0 +1,14 @@
+{
+    "error": {
+        "code": 429,
+        "message": "Provider returned error",
+        "metadata": {
+            "error_type": "rate_limit_exceeded",
+            "provider_name": "DeepInfra",
+            "provider_code": "engine_overloaded",
+            "raw": "{\"error\":{\"message\":\"engine_overloaded\",\"type\":\"rate_limit_exceeded\"}}",
+            "limit_source": "synthetic_relayed_limit"
+        }
+    },
+    "user_id": "user_synthetic"
+}

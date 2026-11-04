@@ -25,9 +25,9 @@ as "the API can't be reached" and shows the can't-connect screen (`apps/web/lib/
 |---|---|---|
 | `XXX.000.000` | (any `HttpException`) | Framework error with that HTTP status, e.g. `400.000.000` for a failed validation. |
 | `500.000.000` | (unhandled) | Unexpected server error. |
-| `502.001.001` | `ProviderOutageError` | The model provider failed or is down. Show with Retry. |
+| `502.001.001` | `ProviderOutageError` | The model provider failed or is down, including a rate limit or host overload (OpenRouter 429 or 503) that outlasted the gateway's same-host retries. The message carries the host's own code, e.g. `(DeepInfra: engine_overloaded)`. Show with Retry. |
 | `422.001.002` | `ModelRefusalError` | The model refused, or the host stopped the output for content. Show with Retry. |
-| `402.001.003` | `OutOfCreditError` (text) | Text credit is used up. Blocks play. |
+| `402.001.003` | `OutOfCreditError` (text) | Text credit is used up: OpenRouter answered 402 (balance, key limit or the per-request credit reservation) or a 403 budget block, the only answers that carry a `limit_source`. Never raised for a 429, whatever its metadata says. Blocks play. |
 | `402.001.004` | `OutOfCreditError` (image) | Image credit is used up. Blocks only Snapshots and Reference images. |
 | `502.001.005` | `UnparseableOutputError` | The model's output could not be read. Show with Retry. |
 | `404.002.001` | `ImageNotFoundError` | No image file at that path. |
