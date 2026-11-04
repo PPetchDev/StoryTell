@@ -7,7 +7,7 @@ import { use, useState } from 'react';
 import { ChatList } from '@/components/chat/chat-list';
 import { useApiQuery, useConnection } from '@/components/connection';
 import { ApiError, ApiUnreachableError } from '@/lib/api';
-import { chatApi, ChatSummary } from '@/lib/chat';
+import { chatApi, ChatListItem } from '@/lib/chat';
 import { Story, storyTitle } from '@/lib/story';
 
 /** A Story's Chats (spec: user stories 49–51, 78). */
@@ -17,7 +17,7 @@ export default function ChatsPage({ params }: { params: Promise<{ id: string }> 
     const router = useRouter();
     const { reportUnreachable } = useConnection();
     const story = useApiQuery<Story>(`/stories/${id}`);
-    const chats = useApiQuery<{ chats: ChatSummary[] }>(`/stories/${id}/chats`);
+    const chats = useApiQuery<{ chats: ChatListItem[] }>(`/stories/${id}/chats`);
     const [starting, setStarting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 

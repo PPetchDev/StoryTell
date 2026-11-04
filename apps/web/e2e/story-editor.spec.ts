@@ -79,11 +79,12 @@ test('writes a Story by hand, sees it become playable, and the edits survive a r
     await expect(page.getByRole('region', { name: 'Scene 2' }).getByLabel('Name')).toHaveValue('The lamp');
     await expect(page.getByRole('region', { name: 'Playable status' })).toContainText('Playable');
 
-    // The home screen lists it as playable.
+    // Home shows its card without the Draft badge, and the card's sheet opens the editor.
     await page.goto('/');
-    const listed = page.getByRole('list', { name: 'Stories' }).getByRole('link', { name: /The Lighthouse/ });
-    await expect(listed).toContainText('Playable');
-    await listed.click();
+    const card = page.getByRole('list', { name: 'Stories' }).getByRole('button', { name: /The Lighthouse/ });
+    await expect(card).not.toContainText('Draft');
+    await card.click();
+    await page.getByRole('dialog', { name: 'The Lighthouse' }).getByRole('link', { name: 'Edit Story' }).click();
     await expect(page).toHaveURL(storyUrl);
 
     // Delete after confirming, so the suite leaves the database as it found it.

@@ -77,6 +77,17 @@ export class SnapshotModelService {
         return this.snapshots.find({ where, relations: { characters: true }, order: { createdAt: 'DESC', id: 'DESC' } });
     }
 
+    /** Each Story's newest Snapshot, one per Story that has any. */
+    findNewestPerStory(): Promise<SnapshotEntity[]> {
+        return this.snapshots
+            .createQueryBuilder('snapshot')
+            .distinctOn(['snapshot.story_id'])
+            .orderBy('snapshot.story_id')
+            .addOrderBy('snapshot.created_at', 'DESC')
+            .addOrderBy('snapshot.id', 'DESC')
+            .getMany();
+    }
+
     /** The Snapshots still under a Message of the Chat, oldest first, as the timeline shows them. */
     findLinkedByChat(chatId: number, messageIds: number[]): Promise<SnapshotEntity[]> {
         if (messageIds.length === 0) return Promise.resolve([]);

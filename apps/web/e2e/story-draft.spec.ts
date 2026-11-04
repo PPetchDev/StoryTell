@@ -102,13 +102,13 @@ test('drafts a playable Story from an idea after one failed try, then rewrites a
     await expect(mira.getByLabel('Voice')).toHaveValue('Short sentences. Never says please.');
     await expect(page.getByRole('status').filter({ hasText: /Saved|Saving/ })).toHaveText('Saved');
 
-    // The rewrite is saved: it survives a reload, and the Story is listed as playable.
+    // The rewrite is saved: it survives a reload, and Home shows the Story without the Draft badge.
     await page.reload();
     await expect(page.getByRole('region', { name: 'Story' }).getByLabel('Setting')).toHaveValue(/drowned causeway/);
     await page.goto('/');
-    await expect(page.getByRole('list', { name: 'Stories' }).getByRole('link', { name: /The Lighthouse/ })).toContainText(
-        'Playable',
-    );
+    const card = page.getByRole('list', { name: 'Stories' }).getByRole('button', { name: /The Lighthouse/ });
+    await expect(card).toBeVisible();
+    await expect(card).not.toContainText('Draft');
 
     // Leave the shared database as it was found.
     await page.goto(storyUrl);

@@ -6,12 +6,22 @@ export type Pov = 'first' | 'second' | 'third';
 export type Tense = 'past' | 'present';
 export type ReplyLength = 'short' | 'medium' | 'long';
 
+/** A Story as Home's cards read it (mirrors StorySummaryDTO). */
 export interface StorySummary {
     id: number;
     title: string;
     playable: boolean;
+    missing: MissingField[];
     createdAt: string;
     updatedAt: string;
+    /** When its most recently played Chat was last played; null when it has no Chats. */
+    lastPlayedAt: string | null;
+    /** That Chat, with the Scene it is on (null for free play); null when it has no Chats. */
+    latestChat: { id: number; sceneName: string | null } | null;
+    /** The newest Snapshot's image, relative to the image folder; null when it has none. */
+    coverImagePath: string | null;
+    /** The Setting's first sentence, cut to about 120 characters. */
+    hook: string;
 }
 
 export interface Style {

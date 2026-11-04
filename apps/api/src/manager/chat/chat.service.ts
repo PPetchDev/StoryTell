@@ -38,12 +38,21 @@ import { SettingsModelService } from '../../model/settings/settings.service.js';
 import { StoryEntity } from '../../model/story/entities/story.entity.js';
 import { StoryModelService } from '../../model/story/story.service.js';
 import { ModelGateway } from '../../service/model-gateway/model-gateway.js';
+import { latestLine } from '../excerpt.js';
 import { MissingField, playableStatus } from '../story/playable.js';
 import { WornIdentity, wornIdentity } from './identity.js';
 import { currentBonds, JudgeManagerService, latestJudged, SettledBackground } from './judge/judge.service.js';
 import { latestExtracted, MemoryExtractionManagerService } from './memory/extraction.service.js';
 import { buildTurnPrompt, PromptArc, PromptBond, PromptHistoryMessage, PromptMemory } from './turn/prompt.js';
 import { parseReply, partsToText, ReplyPart } from './turn/reply-parser.js';
+
+/** A Chat as a Story's Chat list shows it (spec: "Lists and Home"). */
+export interface ChatListItem extends ChatSummary {
+    /** The Scene the Chat is on; null means free play. */
+    sceneName: string | null;
+    /** The latest Message as one plain line of about 100 characters. */
+    latestLine: string;
+}
 
 /** A Chat as the Chat screen reads it: its Messages plus everything the notice line needs. */
 export interface ChatDetail extends ChatSummary {
@@ -144,10 +153,16 @@ export class ChatManagerService {
         private readonly gateway: ModelGateway,
     ) {}
 
-    async listChats(storyId: number): Promise<ChatSummary[]> {
-        await this.loadStory(storyId);
+    async listChats(storyId: number): Promise<ChatListItem[]> {
+        const story = await this.loadStory(storyId);
         const chats = await this.chatModel.findByStory(storyId);
-        return chats.map((chat) => chat.toSummary());
+        const latest = await this.chatModel.findLatestMessages(chats.map((chat) => chat.id));
+        const latestOf = new Map(latest.map((message) => [message.chatId, message]));
+        return chats.map((chat) => ({
+            ...chat.toSummary(),
+            sceneName: story.scenes.find((scene) => scene.id === chat.currentSceneId)?.name ?? null,
+            latestLine: latestLine(latestOf.get(chat.id)),
+        }));
     }
 
     /**

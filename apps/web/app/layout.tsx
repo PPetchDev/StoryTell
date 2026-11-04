@@ -1,9 +1,9 @@
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 
+import { BottomNav } from '@/components/bottom-nav/bottom-nav';
 import { ConnectionBoundary } from '@/components/connection';
 import { LowCreditBanner } from '@/components/low-credit-banner';
-import { Nav } from '@/components/nav';
 import { ServiceWorkerRegistration } from '@/components/service-worker';
 import { appName } from '@/lib/instance';
 import './globals.css';
@@ -26,9 +26,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <body>
                 <ServiceWorkerRegistration />
                 <ConnectionBoundary>
-                    <Nav />
                     <LowCreditBanner />
                     {children}
+                    <BottomNav />
                 </ConnectionBoundary>
             </body>
         </html>

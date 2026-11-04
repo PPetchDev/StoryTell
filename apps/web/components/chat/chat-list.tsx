@@ -6,7 +6,9 @@ import { useState } from 'react';
 import { useConnection } from '@/components/connection';
 import { ConfirmButton } from '@/components/story-editor/fields';
 import { ApiError, ApiUnreachableError } from '@/lib/api';
-import { chatApi, ChatSummary, formatWhen } from '@/lib/chat';
+import { chatApi, ChatListItem, formatWhen } from '@/lib/chat';
+
+import styles from './chat-list.module.css';
 
 function RenameForm({ title, onSave, onCancel }: { title: string; onSave(title: string): void; onCancel(): void }) {
     const [value, setValue] = useState(title);
@@ -30,7 +32,7 @@ function RenameForm({ title, onSave, onCancel }: { title: string; onSave(title: 
 }
 
 /** The Chats of one Story: open, rename, or delete after confirming. */
-export function ChatList({ storyId, initial }: { storyId: number; initial: ChatSummary[] }) {
+export function ChatList({ storyId, initial }: { storyId: number; initial: ChatListItem[] }) {
     const { reportUnreachable } = useConnection();
     const [chats, setChats] = useState(initial);
     const [renaming, setRenaming] = useState<number | null>(null);
@@ -72,6 +74,8 @@ export function ChatList({ storyId, initial }: { storyId: number; initial: ChatS
                         ) : (
                             <Link href={`/stories/${storyId}/chats/${chat.id}`} className="chat-link">
                                 <span className="story-title">{chat.title}</span>
+                                <span className={styles.scene}>{chat.sceneName ?? 'Free play'}</span>
+                                {chat.latestLine && <span className={styles.line}>{chat.latestLine}</span>}
                                 <span className="muted chat-times">
                                     Started {formatWhen(chat.createdAt)} · Last played {formatWhen(chat.lastPlayedAt)}
                                 </span>

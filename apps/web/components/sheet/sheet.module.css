@@ -1,0 +1,71 @@
+.backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    background: rgba(5, 3, 12, 0.6);
+}
+
+.panel {
+    width: 100%;
+    max-width: 40rem;
+    max-height: 85dvh;
+    overflow-y: auto;
+    background: var(--surface);
+    border-radius: 1.25rem 1.25rem 0 0;
+    padding: 0.25rem 1rem calc(1rem + env(safe-area-inset-bottom));
+    animation: rise 0.18s ease-out;
+}
+
+.panel:focus {
+    outline: none;
+}
+
+@keyframes rise {
+    from {
+        transform: translateY(30%);
+        opacity: 0.4;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .panel {
+        animation: none;
+    }
+}
+
+.top {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    min-height: 2.5rem;
+    align-items: center;
+}
+
+.grip {
+    width: 40px;
+    height: 4px;
+    border-radius: 4px;
+    background: var(--line);
+}
+
+.close {
+    position: absolute;
+    right: -0.5rem;
+    top: 0;
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+}
+
+.close:focus-visible {
+    outline: 2px solid var(--accent);
+}

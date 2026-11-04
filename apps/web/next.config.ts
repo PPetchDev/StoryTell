@@ -18,6 +18,9 @@ const nextConfig: NextConfig = {
     distDir: process.env.NEXT_DIST_DIR ?? '.next',
     turbopack: { root: repoRoot },
     poweredByHeader: false,
+    // The dev-only route badge sits in a bottom corner, over the bottom nav's first tab.
+    // Compile and runtime errors still show without it.
+    devIndicators: false,
     async rewrites() {
         return [{ source: '/api/:path*', destination: `${apiOrigin}/api/:path*` }];
     },
