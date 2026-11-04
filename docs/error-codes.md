@@ -48,6 +48,9 @@ as "the API can't be reached" and shows the can't-connect screen (`apps/web/lib/
 | `409.004.004` | `TurnInProgressError` | A send, a Message edit or a reset while this Chat's turn is still being written. |
 | `422.004.005` | `EmptyMessageError` | A send or a Message edit with nothing but whitespace. |
 | `404.004.006` | `MessageNotFoundError` | No Message with that id in this Chat. |
+| `409.004.007` | `BackgroundStillSavingError` | A send, Retry, Message edit or reset while the previous AI Message's background judge was still pending past the short wait. Try again in a moment. |
+| `409.004.008` | `BackgroundFailedError` | A send or Retry while the previous AI Message's background judge has failed. Retry the judge (on the Chat screen or the dashboard) first. |
+| `409.004.009` | `NoFailedJudgeError` | A judge retry on a Message whose judge did not fail, or that is not the latest AI Message. |
 | `502.005.001` | `UnreadableDraftError` | The model's draft or rewrite could not be read (no JSON object, or no text). Nothing saved. Show with Retry. |
 | `502.005.002` | `InvalidDraftError` | The draft does not fit a Story (0 or 7 Characters, a Style value outside its set, a required field empty, a bad StartingBond). Nothing saved. Show with Retry. |
 | `422.005.003` | `EmptyIdeaError` | A draft was asked for with a blank idea. |

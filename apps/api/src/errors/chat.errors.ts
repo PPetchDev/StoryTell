@@ -44,3 +44,24 @@ export class MessageNotFoundError extends AppError {
         super('404.004.006', 'Message not found.');
     }
 }
+
+/** The previous AI Message's background judge was still pending past the wait (spec: story 68). */
+export class BackgroundStillSavingError extends AppError {
+    constructor() {
+        super('409.004.007', 'The previous turn is still saving its Bonds, Arcs and Scene. Try again in a moment.');
+    }
+}
+
+/** The previous AI Message's background judge failed; it must be retried before the next turn. */
+export class BackgroundFailedError extends AppError {
+    constructor() {
+        super('409.004.008', "The previous turn's Bond, Arc and Scene judge failed. Retry it before sending.");
+    }
+}
+
+/** A judge retry on a Message whose judge did not fail, or that is not the latest AI Message. */
+export class NoFailedJudgeError extends AppError {
+    constructor() {
+        super('409.004.009', 'There is no failed judge call to retry on that Message.');
+    }
+}

@@ -38,6 +38,8 @@ export interface TestAppOptions {
     modelGateway?: 'fake' | 'real';
     fetch?: FetchLike;
     providerKeys?: Partial<ProviderKeys>;
+    /** How long a send waits for a pending background call. Default 1.5 s. */
+    backgroundWaitMs?: number;
 }
 
 async function admin(sql: string): Promise<void> {
@@ -71,6 +73,8 @@ export async function startTestApp(options: TestAppOptions = {}): Promise<TestAp
                 databaseUrl,
                 imageDir,
                 modelGateway: options.modelGateway ?? 'fake',
+                // Short, so a test of the "still saving" path does not sit through the real wait.
+                backgroundWaitMs: options.backgroundWaitMs ?? 1_500,
                 providerKeys: {
                     openRouter: undefined,
                     venice: undefined,

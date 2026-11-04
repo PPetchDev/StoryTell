@@ -22,6 +22,7 @@ interface Message {
     identityName?: string;
     model?: string;
     parts?: Part[];
+    judge?: { status: 'pending' | 'done' | 'failed'; error: string | null } | null;
 }
 
 interface Chat {
@@ -75,6 +76,22 @@ function countSql(fromTable: string, where: string) {
     return `SELECT count(*)::int AS n FROM "${fromTable}" WHERE ${where}`;
 }
 
+/** A judgement that changes nothing, for turns whose Bonds, Arcs and Scene are not under test. */
+const NO_CHANGE = '{"bond_changes":[],"arc_steps":[],"scene":{"move_on":false,"reason":"nothing yet"}}';
+
+/** The judge runs in the background after a turn; this returns once the last reply's judge has settled. */
+async function awaitJudge(http: TestApp['http'], storyId: number, chatId: number): Promise<Chat> {
+    const deadline = Date.now() + 5_000;
+    for (;;) {
+        const { body } = await http.get(`/api/stories/${storyId}/chats/${chatId}`).expect(200);
+        const chat = body as Chat;
+        const last = [...chat.messages].reverse().find((message) => message.kind === 'ai' && message.judge);
+        if (!last || last.judge?.status !== 'pending') return chat;
+        if (Date.now() > deadline) throw new Error('The judge did not settle in time');
+        await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+}
+
 describe('Chats', () => {
     let t: TestApp;
 
@@ -123,9 +140,12 @@ describe('Chats', () => {
         return body as Chat;
     }
 
+    /** Sends a turn whose judge changes nothing, and waits for that judge to settle. */
     async function send(storyId: number, chatId: number, text: string, reply: string | object): Promise<Chat> {
         t.gateway.scriptText('turn', reply as string);
+        t.gateway.scriptText('judge', NO_CHANGE);
         const { body } = await t.http.post(`/api/stories/${storyId}/chats/${chatId}/messages`).send({ text }).expect(201);
+        await awaitJudge(t.http, storyId, chatId);
         return body as Chat;
     }
 
@@ -401,11 +421,13 @@ Nobody moves to help.`;
                 PROMPT_LAYERS.style,
                 PROMPT_LAYERS.cast,
                 PROMPT_LAYERS.scene,
+                PROMPT_LAYERS.feelings,
+                PROMPT_LAYERS.arcs,
             ].map((heading) => system.content.indexOf(heading));
             expect(order.every((index) => index >= 0)).toBe(true);
             expect([...order].sort((a, b) => a - b)).toEqual(order);
-            // Nothing from the Feelings, Arcs and Memory layers yet (tickets 27 and 28).
-            expect(system.content).not.toContain(PROMPT_LAYERS.feelings);
+            // Nothing from the Memory layer yet (ticket 28).
+            expect(system.content).not.toContain(PROMPT_LAYERS.memory);
 
             expect(system.content).toContain('A lighthouse on a storm-cut island, 1890s.');
             expect(system.content).toContain('Ash: The new keeper, arrived this morning.');
@@ -638,9 +660,12 @@ Nobody moves to help.`;
             const [opening, firstUser] = played.messages;
             t.gateway.scriptText('turn', { text: 'Rain drips from your hat.\n\n@Mira: Took you long enough.', model: 'glm-5.3' });
 
-            const { body } = await edit(story.id, played.id, firstUser.id, 'I shake the rain off my coat.').expect(200);
-            const chat = body as Chat;
+            t.gateway.scriptText('judge', NO_CHANGE);
 
+            const { body } = await edit(story.id, played.id, firstUser.id, 'I shake the rain off my coat.').expect(200);
+            const { rolledBack, ...chat } = body as Chat & { rolledBack: object };
+
+            expect(rolledBack).toEqual({ bondChanges: 0, arcSteps: 0, sceneAdvances: 0 });
             expect(chat.awaitingReply).toBe(false);
             expect(chat.messages.map((message) => message.id).slice(0, 2)).toEqual([opening.id, firstUser.id]);
             expect(chat.messages).toHaveLength(3);
@@ -664,7 +689,13 @@ Nobody moves to help.`;
                     [chat.id],
                 ),
             ).toBe(5);
-            expect(await getChat(story.id, chat.id)).toEqual(chat);
+            // The same Chat once the new reply's judge has settled.
+            expect(await awaitJudge(t.http, story.id, chat.id)).toEqual({
+                ...chat,
+                messages: chat.messages.map((message) =>
+                    message.judge ? { ...message, judge: { status: 'done', error: null } } : message,
+                ),
+            });
         });
 
         it('a failed turn after a User Message edit keeps the edited text with Retry', async () => {
@@ -690,6 +721,8 @@ Nobody moves to help.`;
             const story = await createStory();
             const played = await playTwoTurns(story.id);
             const firstReply = played.messages[2];
+            // The edited reply is judged again (twice here: two edits), but no turn is written.
+            t.gateway.scriptText('judge', NO_CHANGE, NO_CHANGE);
 
             const { body } = await edit(
                 story.id,
@@ -708,8 +741,9 @@ Nobody moves to help.`;
                 { kind: 'speech', characterId: story.characters[1].id, speakerName: "Kai O'Rourke", text: 'Easy, friend.' },
                 { kind: 'speech', characterId: null, speakerName: 'Ghost', text: 'Boo.' },
             ]);
-            expect(t.gateway.textCalls()).toHaveLength(0);
+            expect(t.gateway.textCalls('turn')).toHaveLength(0);
             expect(chat.drift).toBeNull();
+            await awaitJudge(t.http, story.id, played.id);
 
             // A line written as the Role is kept: the user wrote it, so the guard is off.
             const kept = await edit(story.id, played.id, firstReply.id, '@Mira: Well?\n\nAsh: I say nothing.').expect(200);
@@ -717,7 +751,8 @@ Nobody moves to help.`;
                 { kind: 'speech', characterId: story.characters[0].id, speakerName: 'Mira', text: 'Well?' },
                 { kind: 'narration', text: 'Ash: I say nothing.' },
             ]);
-            expect(t.gateway.textCalls()).toHaveLength(0);
+            expect(t.gateway.textCalls('turn')).toHaveLength(0);
+            await awaitJudge(t.http, story.id, played.id);
         });
 
         it('edits the Opening copy like any AI Message, keeping model "author"', async () => {
@@ -760,9 +795,11 @@ Nobody moves to help.`;
             expect(blocked.body.error.code).toBe('402.001.003');
             expect((await getChat(story.id, played.id)).messages).toHaveLength(5);
 
+            t.gateway.scriptText('judge', NO_CHANGE);
             const { body } = await edit(story.id, played.id, played.messages[4].id, 'Mira says nothing.').expect(200);
             expect(body.messages).toHaveLength(5);
             expect(body.messages[4].parts).toEqual([{ kind: 'narration', text: 'Mira says nothing.' }]);
+            await awaitJudge(t.http, story.id, played.id);
         });
     });
 
@@ -802,7 +839,7 @@ Nobody moves to help.`;
                 { kind: 'speech', characterId: story.characters[0].id, speakerName: 'Mira', text: 'Boots off, keeper.' },
             ]);
             expect(await countRows(countSql('message', 'chat_id = $1'), [chat.id])).toBe(1);
-            expect(t.gateway.textCalls()).toHaveLength(1);
+            expect(t.gateway.textCalls('turn')).toHaveLength(1);
             expect(await getChat(story.id, chat.id)).toEqual(chat);
         });
 
@@ -859,7 +896,9 @@ describe('Chats through the real gateway', () => {
                 ? fixture('openrouter/credits.json')
                 : url.endsWith('/billing/balance')
                   ? fixture('venice/balance.json')
-                  : fixture('openrouter/chat-success.json');
+                  : request.body?.model === 'deepseek/deepseek-v4-flash'
+                    ? fixture('openrouter/chat-judge.json')
+                    : fixture('openrouter/chat-success.json');
             return new Response(JSON.stringify(json), { status: 200, headers: { 'content-type': 'application/json' } });
         };
         t = await startTestApp({ modelGateway: 'real', fetch: routed, providerKeys: TEST_KEYS });
@@ -883,7 +922,7 @@ describe('Chats through the real gateway', () => {
         return requests.filter((request) => request.url.endsWith('/chat/completions'));
     }
 
-    it('sends stop strings on the Role name for GLM-5.3 and records the model and a UsageRecord', async () => {
+    it('sends stop strings on the Role name for GLM-5.3, judges in JSON mode on V4 Flash, and records both as UsageRecords', async () => {
         const { storyId, chatId } = await playableChat();
         await t.http.put('/api/settings').send({ playModel: 'glm-5.3' }).expect(200);
 
@@ -896,14 +935,29 @@ describe('Chats through the real gateway', () => {
             stop: ['\nAsh:', '\n@Ash:', '\nYou:'],
             max_tokens: 900,
         });
-        expect(body.messages[2]).toMatchObject({ kind: 'ai', model: 'glm-5.3' });
+        expect(body.messages[2]).toMatchObject({ kind: 'ai', model: 'glm-5.3', judge: { status: 'pending', error: null } });
         expect(body.messages[2].parts).toEqual([
             { kind: 'narration', text: 'The lighthouse keeper nods once and goes back to polishing the lens.' },
         ]);
         expect(body.drift).toBeNull();
 
+        // The judge ran in the background on the pinned background model, in JSON mode.
+        const judged = await awaitJudge(t.http, storyId, chatId);
+        expect(judged.messages[2].judge).toEqual({ status: 'done', error: null });
+        const judgeRequest = turnRequests()[1];
+        expect(judgeRequest.body).toMatchObject({
+            model: 'deepseek/deepseek-v4-flash',
+            provider: { only: ['deepinfra'], allow_fallbacks: false },
+            reasoning: { enabled: false },
+            response_format: { type: 'json_object' },
+            max_tokens: 700,
+        });
+        expect(judgeRequest.body).not.toHaveProperty('stop');
+        const dashboard = await t.http.get(`/api/stories/${storyId}/chats/${chatId}/dashboard`).expect(200);
+        expect(dashboard.body.characters[0].bonds).toMatchObject([{ toward: { characterId: null, name: 'Ash' }, label: 'Curious' }]);
+
         const usage = await t.http.get('/api/usage').expect(200);
-        expect(usage.body.pools.text).toMatchObject({ calls: 1, spentUsd: 0.000987 });
+        expect(usage.body.pools.text).toMatchObject({ calls: 2, spentUsd: 0.00111 });
     });
 
     it('sends no stop strings for DeepSeek V4 Pro', async () => {
@@ -920,6 +974,7 @@ describe('Chats through the real gateway', () => {
         });
         expect(request.body).not.toHaveProperty('stop');
         expect(body.messages[2]).toMatchObject({ kind: 'ai', model: 'deepseek-v4-pro' });
+        await awaitJudge(t.http, storyId, chatId);
 
         await t.http.put('/api/settings').send({ playModel: 'glm-5.3' }).expect(200);
     });

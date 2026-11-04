@@ -1,6 +1,10 @@
 import { ChatEntity } from '../../model/chat/entities/chat.entity.js';
 import { MessagePartEntity } from '../../model/chat/entities/message-part.entity.js';
 import { MessageEntity } from '../../model/chat/entities/message.entity.js';
+import { ArcStepEntity } from '../../model/ledger/entities/arc-step.entity.js';
+import { BondChangeEntity } from '../../model/ledger/entities/bond-change.entity.js';
+import { ChatArcDirectionEntity } from '../../model/ledger/entities/chat-arc-direction.entity.js';
+import { SceneAdvanceEntity } from '../../model/ledger/entities/scene-advance.entity.js';
 import { SettingsEntity } from '../../model/settings/entities/settings.entity.js';
 import { CharacterEntity } from '../../model/story/entities/character.entity.js';
 import { RoleEntity } from '../../model/story/entities/role.entity.js';
@@ -21,4 +25,8 @@ export const entities = [
     ChatEntity,
     MessageEntity,
     MessagePartEntity,
+    BondChangeEntity,
+    ArcStepEntity,
+    SceneAdvanceEntity,
+    ChatArcDirectionEntity,
 ];

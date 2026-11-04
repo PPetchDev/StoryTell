@@ -6,7 +6,7 @@ import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useConnection } from '@/components/connection';
 import { ConfirmButton } from '@/components/story-editor/fields';
 import { ApiError, apiFetch, ApiUnreachableError } from '@/lib/api';
-import { Chat, chatApi, Message, messageText, modelLabel } from '@/lib/chat';
+import { Chat, chatApi, EditedChat, Message, messageText, modelLabel, rollbackNotice } from '@/lib/chat';
 
 function messageLabel(message: Message): string {
     if (message.kind === 'user') return `${message.identityName} said`;
@@ -107,7 +107,11 @@ interface MessageViewProps {
 
 function MessageView({ message, later, editing, canEdit, onEdit, onSave, onCancel }: MessageViewProps) {
     return (
-        <article className={message.kind === 'user' ? 'message message-user' : 'message message-ai'} aria-label={messageLabel(message)}>
+        <article
+            id={`message-${message.id}`}
+            className={message.kind === 'user' ? 'message message-user' : 'message message-ai'}
+            aria-label={messageLabel(message)}
+        >
             {editing ? (
                 <EditForm message={message} later={later} onSave={onSave} onCancel={onCancel} />
             ) : (
@@ -126,10 +130,28 @@ function MessageView({ message, later, editing, canEdit, onEdit, onSave, onCance
     );
 }
 
+/** The latest AI Message a model wrote, whose judge may still be pending or have failed. */
+function latestJudged(chat: Chat) {
+    for (let i = chat.messages.length - 1; i >= 0; i--) {
+        const message = chat.messages[i];
+        if (message.kind === 'ai' && message.judge) return { id: message.id, judge: message.judge };
+    }
+    return null;
+}
+
 /** What stands between the user and the next turn, if anything. */
-function Notices({ chat }: { chat: Chat }) {
+function Notices({ chat, onRetryJudge, retryingJudge }: { chat: Chat; onRetryJudge(messageId: number): void; retryingJudge: boolean }) {
+    const judged = latestJudged(chat);
     return (
         <>
+            {judged?.judge.status === 'failed' && (
+                <p className="notice" role="status">
+                    Sending is blocked: the last reply&apos;s Bond, Arc and Scene judge failed ({judged.judge.error}).{' '}
+                    <button type="button" className="button button-quiet" disabled={retryingJudge} onClick={() => onRetryJudge(judged.id)}>
+                        {retryingJudge ? 'Retrying…' : 'Retry'}
+                    </button>
+                </p>
+            )}
             {!chat.playable && (
                 <p className="notice" role="status">
                     Sending is blocked: the Story has empty fields. Still to fill in:{' '}
@@ -156,7 +178,9 @@ function Notices({ chat }: { chat: Chat }) {
  * The Chat screen (spec: "Chat screen"): narration and named speech in order, a composer,
  * and the notice line. No streaming: a "writing" indicator shows while the turn is written,
  * and a failed turn leaves the User Message with Retry. Any Message can be edited in place,
- * which discards the Messages after it; Reset starts the Chat over from the Opening.
+ * which discards the Messages after it and rolls back their changes, with a short notice of
+ * what went; Reset starts the Chat over from the Opening. Bonds and Arcs never show here:
+ * the dashboard link leads to them.
  */
 export function ChatScreen({ initial }: { initial: Chat }) {
     const { reportUnreachable } = useConnection();
@@ -166,17 +190,34 @@ export function ChatScreen({ initial }: { initial: Chat }) {
     const [busy, setBusy] = useState(false);
     const [editing, setEditing] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [rollback, setRollback] = useState<string | null>(null);
     const endRef = useRef<HTMLDivElement>(null);
+    const jumpedRef = useRef(false);
 
     useEffect(() => {
+        // A dashboard link lands on its Message once; after that, follow the newest Message.
+        const target = jumpedRef.current ? null : document.getElementById(window.location.hash.slice(1) || '');
+        jumpedRef.current = true;
+        if (target) {
+            target.scrollIntoView({ block: 'center' });
+            target.classList.add('message-target');
+            return;
+        }
         endRef.current?.scrollIntoView({ block: 'end' });
     }, [chat.messages.length, writing]);
 
     const blocked = !chat.playable || chat.textCreditOut;
 
+    /** The edited Chat, after noting what its rewind rolled back. */
+    const noteRollback = (edited: EditedChat): Chat => {
+        setRollback(rollbackNotice(edited.rolledBack));
+        return edited;
+    };
+
     const runTurn = async (turn: () => Promise<Chat>) => {
         setWriting(true);
         setError(null);
+        setRollback(null);
         try {
             setChat(await turn());
             setDraft('');
@@ -197,10 +238,11 @@ export function ChatScreen({ initial }: { initial: Chat }) {
         }
     };
 
-    /** A write that runs no turn: an AI Message edit, or Reset. */
+    /** A write that runs no turn: an AI Message edit, Reset, or a judge retry. */
     const runWrite = async (write: () => Promise<Chat>) => {
         setBusy(true);
         setError(null);
+        setRollback(null);
         try {
             setChat(await write());
         } catch (caught) {
@@ -219,11 +261,18 @@ export function ChatScreen({ initial }: { initial: Chat }) {
 
     const saveEdit = (message: Message, text: string) => {
         setEditing(null);
-        const edit = () => chatApi.edit(chat.storyId, chat.id, message.id, text);
+        const edit = async () => noteRollback(await chatApi.edit(chat.storyId, chat.id, message.id, text));
         // An edited User Message gets a fresh reply, so it runs as a turn; an AI Message does not.
         if (message.kind === 'user') void runTurn(edit);
         else void runWrite(edit);
     };
+
+    /** Runs only the failed judge again, then re-reads the Chat so the notice clears. */
+    const retryJudge = (messageId: number) =>
+        void runWrite(async () => {
+            await chatApi.retryJudge(chat.storyId, chat.id, messageId);
+            return apiFetch<Chat>(`/stories/${chat.storyId}/chats/${chat.id}`);
+        });
 
     return (
         <main className="chat">
@@ -232,6 +281,7 @@ export function ChatScreen({ initial }: { initial: Chat }) {
                 <span className="muted">
                     {chat.currentScene ? `Scene: ${chat.currentScene.name}` : 'Free play'}
                 </span>
+                <Link href={`/stories/${chat.storyId}/chats/${chat.id}/dashboard`}>Dashboard →</Link>
             </nav>
             <div className="chat-head">
                 <h1>{chat.title}</h1>
@@ -265,7 +315,12 @@ export function ChatScreen({ initial }: { initial: Chat }) {
                 <div ref={endRef} />
             </section>
 
-            <Notices chat={chat} />
+            {rollback && (
+                <p className="notice rollback-notice" role="status">
+                    {rollback}
+                </p>
+            )}
+            <Notices chat={chat} onRetryJudge={retryJudge} retryingJudge={busy} />
             {error && (
                 <p role="alert" className="turn-error">
                     {error}

@@ -21,6 +21,19 @@ export enum MessageKind {
 /** The model recorded on the Opening, which no model wrote. */
 export const AUTHOR_MODEL = 'author';
 
+/** The state of one of an AI Message's background calls (spec: "BackgroundStatus"). */
+export enum BackgroundStatus {
+    Pending = 'pending',
+    Done = 'done',
+    Failed = 'failed',
+}
+
+export interface BackgroundCallResponse {
+    status: BackgroundStatus;
+    /** Why the call failed; null otherwise. */
+    error: string | null;
+}
+
 export interface UserMessageResponse {
     id: number;
     kind: 'user';
@@ -36,6 +49,8 @@ export interface AiMessageResponse {
     /** The model that wrote it, or "author" for the Opening. */
     model: string;
     parts: MessagePartResponse[];
+    /** The Bond, Arc and Scene judge's status; null for the Opening, which is never judged. */
+    judge: BackgroundCallResponse | null;
     createdAt: string;
 }
 
@@ -43,8 +58,8 @@ export type MessageResponse = UserMessageResponse | AiMessageResponse;
 
 /**
  * One entry in a Chat's history (spec: "Message"): what the user wrote, or the AI's reply
- * as ordered parts. An AI Message exists only once its turn completed. The status of the
- * two background calls is added by tickets 27 and 28.
+ * as ordered parts. An AI Message exists only once its turn completed, and then records the
+ * status of its background judge (ticket 27); Memory extraction's status is ticket 28's.
  */
 @Entity('message')
 export class MessageEntity {
@@ -74,6 +89,19 @@ export class MessageEntity {
     @Column({ type: 'text', nullable: true })
     model: string | null;
 
+    // The judge's status on an AI Message a model wrote; NULL on User Messages and the Opening.
+    @Column({
+        name: 'judge_status',
+        type: 'enum',
+        enum: BackgroundStatus,
+        enumName: 'background_status_enum',
+        nullable: true,
+    })
+    judgeStatus: BackgroundStatus | null;
+
+    @Column({ name: 'judge_error', type: 'text', nullable: true })
+    judgeError: string | null;
+
     @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
     createdAt: Date;
 
@@ -96,6 +124,7 @@ export class MessageEntity {
             kind: 'ai',
             model: this.model ?? AUTHOR_MODEL,
             parts: this.parts.map((part) => part.toResponse()),
+            judge: this.judgeStatus === null ? null : { status: this.judgeStatus, error: this.judgeError },
             createdAt: this.createdAt.toISOString(),
         };
     }

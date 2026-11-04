@@ -4,7 +4,7 @@ import { DataSource, EntityManager, MoreThan, Repository } from 'typeorm';
 
 import { ChatEntity } from './entities/chat.entity.js';
 import { MessagePartEntity, MessagePartKind } from './entities/message-part.entity.js';
-import { MessageEntity, MessageKind } from './entities/message.entity.js';
+import { BackgroundStatus, MessageEntity, MessageKind } from './entities/message.entity.js';
 
 /** A part of an AI Message as the parser produces it, before it is stored. */
 export type NewMessagePart =
@@ -69,20 +69,39 @@ export class ChatModelService {
         );
     }
 
-    /** Stores an AI Message with its parts in one transaction, so a partial one never exists. */
+    /**
+     * Stores an AI Message with its parts in one transaction, so a partial one never exists.
+     * `judgeStatus` is pending for a reply the judge will look at, null for the Opening.
+     */
     addAiMessage(
         chatId: number,
         position: number,
         model: string,
         parts: NewMessagePart[],
+        judgeStatus: BackgroundStatus | null,
     ): Promise<MessageEntity> {
         return this.dataSource.transaction(async (manager) => {
             const message = await manager.save(
-                manager.create(MessageEntity, { chatId, position, kind: MessageKind.Ai, model }),
+                manager.create(MessageEntity, {
+                    chatId,
+                    position,
+                    kind: MessageKind.Ai,
+                    model,
+                    judgeStatus,
+                    judgeError: null,
+                }),
             );
             message.parts = await manager.save(partEntities(manager, message.id, parts));
             return message;
         });
+    }
+
+    findMessage(messageId: number): Promise<MessageEntity | null> {
+        return this.messages.findOne({ where: { id: messageId }, relations: { parts: true } });
+    }
+
+    async setJudgeStatus(messageId: number, status: BackgroundStatus, error: string | null = null): Promise<void> {
+        await this.messages.update({ id: messageId }, { judgeStatus: status, judgeError: error });
     }
 
     /**

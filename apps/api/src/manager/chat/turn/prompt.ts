@@ -8,11 +8,12 @@ import { PromptMessage } from '../../../service/model-gateway/model-gateway.js';
  * Layers, most stable first so prompt caching holds:
  *  1. Narrator rules      5. Cast cards              9. Memory (ticket 28)
  *  2. Setting             6. current Scene          10. recent Messages
- *  3. Role                7. Feelings (ticket 27)   11. the user's message
- *  4. Style               8. Arcs (ticket 27)       12. the final instruction
+ *  3. Role                7. Feelings (Bonds)       11. the user's message
+ *  4. Style               8. Arcs                   12. the final instruction
  *
  * Layers 1–9 form one system message with a `# Heading` per layer; 10–11 are chat turns;
- * 12 is a trailing system message, as in the prototype.
+ * 12 is a trailing system message, as in the prototype. Each layer is its own function, so
+ * ticket 26 can swap the identity layer for a worn Persona and ticket 28 can add Memory.
  */
 
 export interface PromptCharacter {
@@ -50,10 +51,30 @@ export interface PromptHistoryMessage {
     text: string;
 }
 
+/** A Bond's current value, as the Feelings layer states it. */
+export interface PromptBond {
+    fromName: string;
+    /** null means toward the user. */
+    toName: string | null;
+    label: string;
+    description: string;
+}
+
+/** A Character's Arc so far and the author's Arc direction, as the Arcs layer states them. */
+export interface PromptArc {
+    name: string;
+    steps: string[];
+    direction: string;
+}
+
 export interface TurnPromptInput {
     story: PromptStory;
     identity: PromptIdentity;
     scene: PromptScene | null;
+    /** Every Bond in the Chat (spec: "Feelings"). */
+    bonds: PromptBond[];
+    /** One per Character, in cast order (spec: "Arcs"). */
+    arcs: PromptArc[];
     /** Every Message of the Chat before the new one, oldest first. */
     history: PromptHistoryMessage[];
     userText: string;
@@ -151,6 +172,35 @@ function sceneLayer(scene: PromptScene | null): string {
     return `${PROMPT_LAYERS.scene}: ${scene.name}\n${scene.situation}${moveOn}`;
 }
 
+/**
+ * Spec: "Feelings (every Bond in the Chat, with 'each Character knows only its own
+ * feelings')". Bonds are hidden state: the Narrator shows them only through behaviour.
+ */
+function feelingsLayer(bonds: PromptBond[], identity: string): string {
+    const lines =
+        bonds.length === 0
+            ? ['No feelings have formed yet — everyone is a stranger unless the story says otherwise.']
+            : bonds.map(
+                  (bond) =>
+                      `- ${bond.fromName} → ${bond.toName ?? `the user (${identity})`}: "${bond.label}" — ${bond.description}`,
+              );
+    return `${PROMPT_LAYERS.feelings} (hidden from the user; show them only through behaviour)
+${lines.join('\n')}
+Each Character knows only its OWN feelings. Other Characters' feelings are unknown to them unless shown openly in the story.`;
+}
+
+/** Spec: "Arcs ('Arc so far' plus the author's Arc direction for each Character)". */
+function arcsLayer(arcs: PromptArc[]): string {
+    const lines = arcs.map((arc) => {
+        const soFar = arc.steps.length > 0 ? `Arc so far: ${arc.steps.join(' → ')}` : 'Arc so far: unchanged from the core definition.';
+        const direction = arc.direction.trim()
+            ? ` Possible direction (author's intent, not yet happened): ${arc.direction.trim()}`
+            : '';
+        return `- ${arc.name}: ${soFar}${direction}`;
+    });
+    return `${PROMPT_LAYERS.arcs}\n${lines.join('\n')}`;
+}
+
 /** Stop strings on the worn identity (spec); the gateway drops them for hosts without support. */
 export function stopStrings(identityName: string): string[] {
     return [`\n${identityName}:`, `\n@${identityName}:`, '\nYou:'];
@@ -166,7 +216,9 @@ export function buildTurnPrompt(input: TurnPromptInput): TurnPrompt {
         styleLayer(input.story, identity),
         `${PROMPT_LAYERS.cast}\n${input.story.characters.map(castCard).join('\n\n')}`,
         sceneLayer(input.scene),
-        // Feelings (Bonds), Arcs and Memory go here, in that order: tickets 27 and 28.
+        feelingsLayer(input.bonds, identity),
+        arcsLayer(input.arcs),
+        // The Memory layer goes here (ticket 28).
     ].join('\n\n');
     const finalInstruction = `Write the next turn now. Do not write anything ${identity} says, thinks or does. Use @Name: lines for Character speech.`;
 
