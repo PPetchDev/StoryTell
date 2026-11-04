@@ -140,13 +140,16 @@ describe('Chats', () => {
         return body as Chat;
     }
 
-    /** Sends a turn whose judge changes nothing, and waits for that judge to settle. */
+    /**
+     * Sends a turn whose judge changes nothing, and waits for that judge to settle. Answers the
+     * Chat as read after the judge, so the reply's judge status is `done`, not the `pending` the
+     * send itself answered with.
+     */
     async function send(storyId: number, chatId: number, text: string, reply: string | object): Promise<Chat> {
         t.gateway.scriptText('turn', reply as string);
         t.gateway.scriptText('judge', NO_CHANGE);
-        const { body } = await t.http.post(`/api/stories/${storyId}/chats/${chatId}/messages`).send({ text }).expect(201);
-        await awaitJudge(t.http, storyId, chatId);
-        return body as Chat;
+        await t.http.post(`/api/stories/${storyId}/chats/${chatId}/messages`).send({ text }).expect(201);
+        return awaitJudge(t.http, storyId, chatId);
     }
 
     function lastAi(chat: Chat): Message {
