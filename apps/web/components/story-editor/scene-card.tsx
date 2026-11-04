@@ -15,14 +15,17 @@ interface SceneCardProps {
     onText(field: TextKey, value: string): void;
     onMove(direction: -1 | 1): void;
     onRemove(): void;
+    /** Fields the assistant changed, by their rewrite key (ticket 23). */
+    highlights?: ReadonlySet<string>;
 }
 
-export function SceneCard({ scene, index, count, rewrites, onRewrite, onText, onMove, onRemove }: SceneCardProps) {
+export function SceneCard({ scene, index, count, rewrites, onRewrite, onText, onMove, onRemove, highlights }: SceneCardProps) {
     const heading = scene.name.trim() === '' ? `Scene ${index + 1}` : scene.name;
     const last = index === count - 1;
     const rewritable = (field: TextKey) => {
         const request: RewriteRequest = { target: 'scene', id: scene.id, field };
-        return { rewrite: rewrites[rewriteKey(request)], onRewrite: () => onRewrite(request) };
+        const key = rewriteKey(request);
+        return { rewrite: rewrites[key], onRewrite: () => onRewrite(request), highlighted: highlights?.has(key) };
     };
     return (
         <section className="card" aria-label={`Scene ${index + 1}`}>

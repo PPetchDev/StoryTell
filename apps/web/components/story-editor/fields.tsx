@@ -15,16 +15,35 @@ interface TextFieldProps {
     /** With this, the field gets a Rewrite button that regenerates just this field (ticket 22). */
     onRewrite?(): void;
     rewrite?: RewriteState;
+    /** The assistant changed this field and the change has not been undone (ticket 23). */
+    highlighted?: boolean;
 }
 
-export function TextField({ label, value, onChange, multiline, rows, hint, placeholder, onRewrite, rewrite }: TextFieldProps) {
+/** The mark on a field the assistant changed. Text, so it reads without colour. */
+function ChangedMark() {
+    return <span className="changed-mark">changed by the assistant</span>;
+}
+
+export function TextField({
+    label,
+    value,
+    onChange,
+    multiline,
+    rows,
+    hint,
+    placeholder,
+    onRewrite,
+    rewrite,
+    highlighted,
+}: TextFieldProps) {
     const id = useId();
     const hintId = `${id}-hint`;
     const busy = rewrite?.kind === 'busy';
     return (
-        <div className="field">
+        <div className={highlighted ? 'field field-changed' : 'field'}>
             <div className="field-head">
                 <label htmlFor={id}>{label}</label>
+                {highlighted && <ChangedMark />}
                 {onRewrite && (
                     // Named by `title`, not aria-label, so the field's own label stays unique.
                     <button
@@ -79,13 +98,17 @@ interface SelectFieldProps<T extends string> {
     value: T;
     options: Record<T, string>;
     onChange(value: T): void;
+    highlighted?: boolean;
 }
 
-export function SelectField<T extends string>({ label, value, options, onChange }: SelectFieldProps<T>) {
+export function SelectField<T extends string>({ label, value, options, onChange, highlighted }: SelectFieldProps<T>) {
     const id = useId();
     return (
-        <div className="field">
-            <label htmlFor={id}>{label}</label>
+        <div className={highlighted ? 'field field-changed' : 'field'}>
+            <div className="field-head">
+                <label htmlFor={id}>{label}</label>
+                {highlighted && <ChangedMark />}
+            </div>
             <select id={id} value={value} onChange={(event) => onChange(event.target.value as T)}>
                 {(Object.keys(options) as T[]).map((key) => (
                     <option key={key} value={key}>

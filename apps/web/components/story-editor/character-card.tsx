@@ -31,6 +31,8 @@ interface CharacterCardProps {
     /** For the Reference image: send pending edits, and run a whole-Story write after them. */
     flush(): Promise<void>;
     commit(run: () => Promise<Story>, onError: (message: string) => void): Promise<Story | undefined>;
+    /** Fields the assistant changed, by their rewrite key (ticket 23). */
+    highlights?: ReadonlySet<string>;
 }
 
 const ROLE_TARGET = 'role';
@@ -58,6 +60,7 @@ export function CharacterCard(props: CharacterCardProps) {
     const rewritable = (request: RewriteRequest) => ({
         rewrite: rewrites[rewriteKey(request)],
         onRewrite: () => props.onRewrite(request),
+        highlighted: props.highlights?.has(rewriteKey(request)),
     });
     const ofCharacter = (field: TextKey) => rewritable({ target: 'character', id: character.id, field });
 

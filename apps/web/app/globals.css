@@ -620,3 +620,118 @@ a {
     display: grid;
     gap: 0.375rem;
 }
+
+/* --- Story assistant (ticket 23): the panel beside the form, and the mark on changed fields --- */
+.assistant {
+    display: grid;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+/* Wide screens: the panel sits to the right of the 40rem page column, scrolling on its own. */
+@media (min-width: 88rem) {
+    .assistant {
+        position: fixed;
+        top: 4.5rem;
+        right: calc(50% - 43rem);
+        width: 22rem;
+        max-height: calc(100vh - 6rem);
+        overflow-y: auto;
+        align-content: start;
+    }
+}
+
+.assistant-transcript {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.75rem;
+}
+
+.assistant-entry {
+    border-top: 1px solid #3a3150;
+    padding-top: 0.5rem;
+}
+
+.assistant-entry .speaker {
+    margin: 0 0 0.125rem;
+}
+
+.assistant-you .speaker {
+    color: var(--muted);
+}
+
+.assistant-text {
+    margin: 0;
+    white-space: pre-wrap;
+}
+
+.assistant-changes {
+    list-style: none;
+    margin: 0.5rem 0 0;
+    padding: 0;
+    display: grid;
+    gap: 0.375rem;
+}
+
+.assistant-changes li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    font-size: 0.9375rem;
+}
+
+.assistant-change-label {
+    font-weight: 600;
+}
+
+.confirm-removals {
+    background: #4a2a12;
+    border: 1px solid #b8742a;
+    border-radius: 0.5rem;
+    padding: 0.625rem 0.75rem;
+    margin-top: 0.5rem;
+}
+
+.confirm-removals p {
+    margin: 0 0 0.5rem;
+}
+
+.assistant-composer {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.assistant-composer textarea {
+    font: inherit;
+    width: 100%;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid #3a3150;
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.625rem;
+    resize: vertical;
+    min-width: 0;
+}
+
+.assistant-composer .button {
+    justify-self: end;
+}
+
+.field-changed input,
+.field-changed textarea,
+.field-changed select {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(143, 115, 255, 0.35);
+}
+
+.changed-mark {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}

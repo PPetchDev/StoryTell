@@ -43,26 +43,30 @@ export interface DraftScene {
     moveOnCondition: string;
 }
 
-type Json = Record<string, unknown>;
+export type Json = Record<string, unknown>;
 
 /**
- * Reads the model's text as one JSON object. A code fence or a sentence around the object
- * is tolerated; anything that is not an object underneath is unreadable.
+ * Reads a model's text as one JSON object. A code fence or a sentence around the object
+ * is tolerated; anything that is not an object underneath is unreadable, and `unreadable`
+ * makes the error for the caller's domain.
  */
-export function parseDraftJson(text: string): Json {
+export function readJsonObject(text: string, unreadable: () => Error): Json {
     const start = text.indexOf('{');
     const end = text.lastIndexOf('}');
-    if (start < 0 || end < start) throw new UnreadableDraftError();
+    if (start < 0 || end < start) throw unreadable();
     let parsed: unknown;
     try {
         parsed = JSON.parse(text.slice(start, end + 1));
     } catch {
-        throw new UnreadableDraftError();
+        throw unreadable();
     }
-    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-        throw new UnreadableDraftError();
-    }
-    return unwrapped(parsed as Json);
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) throw unreadable();
+    return parsed as Json;
+}
+
+/** The model's text as a draft Story: one JSON object, with one wrapping key dropped. */
+export function parseDraftJson(text: string): Json {
+    return unwrapped(readJsonObject(text, () => new UnreadableDraftError()));
 }
 
 /** A model may wrap the Story in one outer key (`{"story": {...}}`); that wrapper is dropped. */
@@ -73,7 +77,7 @@ function unwrapped(json: Json): Json {
     return isObject(inner) && 'title' in inner ? inner : json;
 }
 
-function isObject(value: unknown): value is Json {
+export function isObject(value: unknown): value is Json {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
@@ -140,24 +144,7 @@ export function validateDraft(json: Json): DraftStory {
             `a Story has 1 to ${MAX_CHARACTERS} Characters, the draft has ${castJson.length}.`,
         );
     }
-    const characters = castJson.map((item, index): DraftCharacter => {
-        if (!isObject(item)) throw new InvalidDraftError(`Character ${index + 1} is not an object.`);
-        const name = requiredText(item, 'name', `Character ${index + 1}`);
-        const lines = optionalList(item, 'exampleLines', name);
-        if (!lines.every((line) => typeof line === 'string')) {
-            throw new InvalidDraftError(`${name}: exampleLines must be a list of text.`);
-        }
-        return {
-            name,
-            appearance: requiredText(item, 'appearance', name),
-            personality: requiredText(item, 'personality', name),
-            voice: requiredText(item, 'voice', name),
-            exampleLines: (lines as string[]).map((line) => line.trim()).filter((line) => line !== ''),
-            background: optionalText(item, 'background', name),
-            secrets: optionalText(item, 'secrets', name),
-            arcDirections: optionalText(item, 'arcDirections', name),
-        };
-    });
+    const characters = castJson.map((item, index) => validateDraftCharacter(item, `Character ${index + 1}`));
     const names = characters.map((character) => character.name.toLowerCase());
     if (new Set(names).size !== names.length) {
         throw new InvalidDraftError('two Characters share a name.');
@@ -199,15 +186,39 @@ export function validateDraft(json: Json): DraftStory {
         },
     );
 
-    const scenes = optionalList(json, 'scenes', 'the Story').map((item, index): DraftScene => {
-        const where = `Scene ${index + 1}`;
-        if (!isObject(item)) throw new InvalidDraftError(`${where} is not an object.`);
-        return {
-            name: requiredText(item, 'name', where),
-            situation: requiredText(item, 'situation', where),
-            moveOnCondition: optionalText(item, 'moveOnCondition', where),
-        };
-    });
+    const scenes = optionalList(json, 'scenes', 'the Story').map((item, index) =>
+        validateDraftScene(item, `Scene ${index + 1}`),
+    );
 
     return { title, setting, opening, style, role, characters, startingBonds, scenes };
+}
+
+/** One Character as a model writes it: name, appearance, personality and voice required. */
+export function validateDraftCharacter(item: unknown, where: string): DraftCharacter {
+    if (!isObject(item)) throw new InvalidDraftError(`${where} is not an object.`);
+    const name = requiredText(item, 'name', where);
+    const lines = optionalList(item, 'exampleLines', name);
+    if (!lines.every((line) => typeof line === 'string')) {
+        throw new InvalidDraftError(`${name}: exampleLines must be a list of text.`);
+    }
+    return {
+        name,
+        appearance: requiredText(item, 'appearance', name),
+        personality: requiredText(item, 'personality', name),
+        voice: requiredText(item, 'voice', name),
+        exampleLines: (lines as string[]).map((line) => line.trim()).filter((line) => line !== ''),
+        background: optionalText(item, 'background', name),
+        secrets: optionalText(item, 'secrets', name),
+        arcDirections: optionalText(item, 'arcDirections', name),
+    };
+}
+
+/** One Scene as a model writes it: name and situation required, the condition optional. */
+export function validateDraftScene(item: unknown, where: string): DraftScene {
+    if (!isObject(item)) throw new InvalidDraftError(`${where} is not an object.`);
+    return {
+        name: requiredText(item, 'name', where),
+        situation: requiredText(item, 'situation', where),
+        moveOnCondition: optionalText(item, 'moveOnCondition', where),
+    };
 }

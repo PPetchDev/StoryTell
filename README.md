@@ -120,6 +120,21 @@ output `502.005.001`. `POST /api/stories/:id/rewrite` with `{ target, id?, field
 prompt text is in `prompts.ts` beside the schema. In the app, "New Story" opens a panel with
 the idea (or "Start blank"), and every text field of the editor has a Rewrite button.
 
+### Story assistant
+
+`POST /api/stories/:id/assistant` with `{ instruction, confirmRemovals? }` makes one stateless
+`story_assistant` call (the whole Story plus the instruction, in JSON mode) and applies the
+answered change set straight to the Story through the authoring rules: field sets, added
+Characters, Scenes and StartingBonds, removals. `apps/api/src/manager/story-assistant/
+change-set-schema.ts` validates the whole set first (unknown names, bad fields, Style values,
+the 6-Character limit, Bond rules), so an unusable answer saves nothing (`502.005.005` or
+`502.005.006`). A set that removes a Character or Scene is answered as `pending`, unapplied,
+unless the request confirmed removals; the client confirms through
+`POST /api/stories/:id/assistant/apply` with the same `changes` and `confirmRemovals: true`,
+without another model call. The answer carries each applied change with its old value, which
+is all the Undo in the editor's Assistant panel needs: nothing about the conversation or the
+Undos is persisted, and the panel opens empty every time.
+
 ### Migrations
 
 Migrations live in `apps/api/src/migration/` and are listed by hand in
