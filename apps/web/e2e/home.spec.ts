@@ -48,24 +48,29 @@ test('the home screen lists no Stories on a fresh install, and offers nothing to
 });
 
 test('the Continue row opens the newest-played Chat, and the Chat screen has no bottom nav', async ({ page, request }) => {
-    const older = await createPlayableStory(request, 'The Lighthouse');
-    const newer = await createPlayableStory(request, 'Night Market', ['The lantern stalls']);
-    await startChat(request, older);
-    const newerChat = await startChat(request, newer);
+    // Night Market is saved last, so it heads the Story list; The Lighthouse's Chat is played last.
+    const lighthouse = await createPlayableStory(request, 'The Lighthouse', ['The lamp room']);
+    const market = await createPlayableStory(request, 'Night Market');
+    await startChat(request, market);
+    const newestChat = await startChat(request, lighthouse);
+    // A Draft's Chat is never offered, even when it was played last.
+    const draft = await createPlayableStory(request, 'Saltwind');
+    await startChat(request, draft);
+    await request.patch(`/api/stories/${draft}`, { data: { opening: '' } });
 
     try {
         await page.goto('/');
         const row = page.getByRole('link', { name: /Continue where you left off/ });
-        await expect(row).toContainText('Night Market');
-        await expect(row).toContainText('The lantern stalls');
+        await expect(row).toContainText('The Lighthouse');
+        await expect(row).toContainText('The lamp room');
 
         await row.click();
 
-        await expect(page).toHaveURL(`/stories/${newer}/chats/${newerChat}`);
+        await expect(page).toHaveURL(`/stories/${lighthouse}/chats/${newestChat}`);
         await expect(page.getByRole('article', { name: 'Opening' })).toContainText('The lamp went out an hour ago.');
         await expect(page.getByRole('navigation', { name: 'Main' })).toHaveCount(0);
     } finally {
-        await removeStories(request, [older, newer]);
+        await removeStories(request, [lighthouse, market, draft]);
     }
 });
 
@@ -97,6 +102,11 @@ test('Stories show as cards; a card opens a sheet to continue, start a new Chat 
         await expect(sheet).toContainText(/\d+ things to fill in before you can play/);
         await expect(sheet.getByRole('button', { name: 'New Chat' })).toHaveCount(0);
         await expect(sheet.getByRole('link', { name: /^Continue/ })).toHaveCount(0);
+        // Keyboard focus stays in the sheet while it is open.
+        for (let i = 0; i < 4; i++) {
+            await page.keyboard.press('Tab');
+            expect(await sheet.evaluate((dialog) => dialog.contains(document.activeElement))).toBe(true);
+        }
         await sheet.getByRole('button', { name: 'Close' }).click();
         await expect(sheet).toHaveCount(0);
 
@@ -145,12 +155,19 @@ test('the bottom nav reaches Stories, Personas, Usage and Settings, and marks wh
         await expect(page.getByRole('heading', { name: heading, level: 1 })).toBeVisible();
         await expect(nav.getByRole('link', { name: label })).toHaveAttribute('aria-current', 'page');
 
-        // It sits at the bottom of the screen, and the page can scroll clear of it.
+        // It sits at the bottom of the screen.
         const box = (await nav.boundingBox())!;
         expect(Math.round(box.y + box.height)).toBe(844);
-        await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-        const main = (await page.getByRole('main').boundingBox())!;
-        const navTop = (await nav.boundingBox())!.y;
-        expect(main.y + main.height).toBeLessThanOrEqual(navTop);
     }
+
+    // A page taller than the screen scrolls its end clear of the bar.
+    await page.getByRole('main').evaluate((main) => {
+        const filler = document.createElement('div');
+        filler.style.height = '2000px';
+        main.append(filler);
+    });
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    const main = (await page.getByRole('main').boundingBox())!;
+    const navTop = (await page.getByRole('navigation', { name: 'Main' }).boundingBox())!.y;
+    expect(main.y + main.height).toBeLessThanOrEqual(navTop);
 });

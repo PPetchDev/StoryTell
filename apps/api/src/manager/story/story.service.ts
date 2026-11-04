@@ -33,12 +33,19 @@ import { MAX_CHARACTERS, playableStatus, PlayableStatus } from './playable.js';
 
 /** A Story as the editor and the list read it: its fields plus the derived playable status. */
 export type StoryDetail = StoryResponse & PlayableStatus;
+/** A Story's most recently played Chat, as Home's Continue row and card sheet open it. */
+export interface LatestChat {
+    id: number;
+    /** The Scene the Chat is on; null means free play. */
+    sceneName: string | null;
+}
+
 /** A Story as Home's cards read it (spec: "Lists and Home"). */
 export interface StoryListItem extends StorySummary, PlayableStatus {
     /** When its most recently played Chat was last played; null when it has no Chats. */
     lastPlayedAt: string | null;
-    /** That Chat, with the Scene it is on (null for free play); null when it has no Chats. */
-    latestChat: { id: number; sceneName: string | null } | null;
+    /** That Chat; null when it has no Chats. */
+    latestChat: LatestChat | null;
     /** The newest Snapshot's image, relative to the image folder; null when it has none. */
     coverImagePath: string | null;
     /** The Setting's first sentence, cut to about 120 characters. */

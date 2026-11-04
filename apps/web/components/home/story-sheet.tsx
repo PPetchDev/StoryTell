@@ -8,7 +8,7 @@ import { useConnection } from '@/components/connection';
 import { Sheet } from '@/components/sheet/sheet';
 import { ApiError, ApiUnreachableError } from '@/lib/api';
 import { chatApi } from '@/lib/chat';
-import { coverBackground, missingCount } from '@/lib/home';
+import { coverBackground, stillToFillIn } from '@/lib/home';
 import { StorySummary, storyTitle } from '@/lib/story';
 
 import styles from './story-sheet.module.css';
@@ -66,7 +66,7 @@ export function StorySheet({ story, onClose }: { story: StorySummary; onClose():
                         )}
                     </>
                 ) : (
-                    <p className={styles.missing}>{missingCount(story.missing.length)}</p>
+                    <p className={styles.missing}>{stillToFillIn(story.missing.length)}</p>
                 )}
                 {story.latestChat && (
                     <Link href={`/stories/${story.id}/chats`} className={styles.quiet}>

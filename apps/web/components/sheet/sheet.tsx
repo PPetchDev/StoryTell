@@ -4,6 +4,24 @@ import { ReactNode, useEffect, useRef } from 'react';
 
 import styles from './sheet.module.css';
 
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled])';
+
+/** Tab and Shift+Tab wrap around inside the panel, so focus never reaches the page behind it. */
+function keepFocusIn(panel: HTMLElement, event: KeyboardEvent) {
+    const focusable = [...panel.querySelectorAll<HTMLElement>(FOCUSABLE)];
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    const active = document.activeElement;
+    if (event.shiftKey && (active === first || active === panel)) {
+        event.preventDefault();
+        last.focus();
+    } else if (!event.shiftKey && (active === last || !panel.contains(active))) {
+        event.preventDefault();
+        first.focus();
+    }
+}
+
 /**
  * A panel that slides up from the bottom of the screen over a dimmed page. Tapping the dimmed
  * page, the Close button or Escape closes it; focus moves into it on open and back on close.
@@ -21,6 +39,7 @@ export function Sheet({ label, onClose, children }: { label: string; onClose(): 
         panel.current?.focus();
         const onKey = (event: KeyboardEvent) => {
             if (event.key === 'Escape') close.current();
+            if (event.key === 'Tab' && panel.current) keepFocusIn(panel.current, event);
         };
         document.addEventListener('keydown', onKey);
         return () => {

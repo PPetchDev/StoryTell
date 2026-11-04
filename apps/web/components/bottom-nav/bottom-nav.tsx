@@ -54,7 +54,7 @@ const LINKS = [
 /** The Chat screen is the one route without the bar: it gives the story the whole screen. */
 const CHAT_SCREEN = /^\/stories\/[^/]+\/chats\/[^/]+\/?$/;
 
-export function showsBottomNav(pathname: string): boolean {
+function showsBottomNav(pathname: string): boolean {
     return !CHAT_SCREEN.test(pathname);
 }
 

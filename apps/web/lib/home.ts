@@ -1,4 +1,4 @@
-import { StorySummary } from './story';
+import { LatestChat, StorySummary } from './story';
 
 /** Hue pairs that sit well on the dark purple theme; a Story's id picks one, so it never changes. */
 const GRADIENTS: Array<[string, string]> = [
@@ -45,17 +45,18 @@ export function playedAgo(iso: string, now: Date = new Date()): string {
     return 'just now';
 }
 
-/** A Story that has a Chat to go back to. */
+/** A playable Story that has a Chat to go back to. */
 export type ContinuableStory = StorySummary & {
-    latestChat: NonNullable<StorySummary['latestChat']>;
+    latestChat: LatestChat;
     lastPlayedAt: string;
 };
 
 function continuable(story: StorySummary): story is ContinuableStory {
-    return story.latestChat !== null && story.lastPlayedAt !== null;
+    // A Draft's sheet offers no play, so the row doesn't either.
+    return story.playable && story.latestChat !== null && story.lastPlayedAt !== null;
 }
 
-/** The Story whose Chat was played most recently, for the "Continue where you left off" row. */
+/** The playable Story whose Chat was played most recently, for the "Continue where you left off" row. */
 export function newestPlayed(stories: StorySummary[]): ContinuableStory | null {
     let newest: ContinuableStory | null = null;
     for (const story of stories) {
@@ -65,7 +66,7 @@ export function newestPlayed(stories: StorySummary[]): ContinuableStory | null {
     return newest;
 }
 
-/** "1 thing" or "3 things" to fill in before a Draft can be played. */
-export function missingCount(count: number): string {
+/** What a Draft's sheet says instead of the play buttons: "3 things to fill in before you can play." */
+export function stillToFillIn(count: number): string {
     return `${count} ${count === 1 ? 'thing' : 'things'} to fill in before you can play.`;
 }

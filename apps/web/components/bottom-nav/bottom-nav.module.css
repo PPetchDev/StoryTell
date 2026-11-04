@@ -1,5 +1,9 @@
-.bar {
+.bar,
+.spacer {
     --bar-height: 3.5rem;
+}
+
+.bar {
     position: fixed;
     left: 0;
     right: 0;
@@ -47,5 +51,5 @@
 
 /* As tall as the bar, so the end of every page scrolls clear of it. */
 .spacer {
-    height: calc(3.5rem + 1px + env(safe-area-inset-bottom));
+    height: calc(var(--bar-height) + 1px + env(safe-area-inset-bottom));
 }

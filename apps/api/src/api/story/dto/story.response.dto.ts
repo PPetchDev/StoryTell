@@ -1,14 +1,14 @@
 import { ApiProperty } from '@nestjs/swagger';
 
 import { MissingField } from '../../../manager/story/playable.js';
-import { StoryDetail, StoryListItem } from '../../../manager/story/story.service.js';
+import { LatestChat, StoryDetail, StoryListItem } from '../../../manager/story/story.service.js';
 import { CharacterResponse } from '../../../model/story/entities/character.entity.js';
 import { RoleResponse } from '../../../model/story/entities/role.entity.js';
 import { SceneResponse } from '../../../model/story/entities/scene.entity.js';
 import { StartingBondResponse } from '../../../model/story/entities/starting-bond.entity.js';
 import { Pov, ReplyLength, Tense } from '../../../model/story/entities/story.entity.js';
 
-export class LatestChatDTO {
+export class LatestChatDTO implements LatestChat {
     @ApiProperty({ description: 'Chat id.' })
     id: number;
 

@@ -152,6 +152,13 @@ describe('The Story and Chat lists', () => {
             expect(hook.length).toBeLessThanOrEqual(120);
         });
 
+        it('does not end the hook at a title such as Mr. or Dr.', async () => {
+            const setting = 'Mr. Hale and Dr. Okafor share the last lighthouse on the coast. Neither will leave.';
+            const { body } = await t.http.post('/api/stories').send({ setting }).expect(201);
+
+            expect((await listed(body.id)).hook).toBe('Mr. Hale and Dr. Okafor share the last lighthouse on the coast.');
+        });
+
         it('names the most recently played Chat and its Scene, and has no cover while there are no Snapshots', async () => {
             const storyId = await createPlayableStory({ scenes: ['The flooded archive', 'The lamp room'] });
             const first = await createChat(storyId);
