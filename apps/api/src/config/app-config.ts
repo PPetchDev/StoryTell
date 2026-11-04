@@ -14,7 +14,14 @@ export abstract class AppConfig {
     /** `fake` is for tests and E2E runs only; it also mounts the fake's control routes. */
     abstract readonly modelGateway: ModelGatewayMode;
     abstract readonly providerKeys: ProviderKeys;
+    /**
+     * How long a send waits for the previous turn's background calls before telling the user
+     * they are still saving (spec: "Send flow", step 2). Tests shorten it.
+     */
+    abstract readonly backgroundWaitMs: number;
 }
+
+export const DEFAULT_BACKGROUND_WAIT_MS = 8_000;
 
 export interface ProviderKeys {
     /** OpenRouter API key: text calls and the text credit balance. */
@@ -43,11 +50,17 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
         throw new ConfigError(`MODEL_GATEWAY must be "real" or "fake", got "${modelGateway}"`);
     }
 
+    const backgroundWaitMs = env.BACKGROUND_WAIT_MS ? Number(env.BACKGROUND_WAIT_MS) : DEFAULT_BACKGROUND_WAIT_MS;
+    if (!Number.isInteger(backgroundWaitMs) || backgroundWaitMs < 0) {
+        throw new ConfigError(`BACKGROUND_WAIT_MS must be a non-negative integer, got "${env.BACKGROUND_WAIT_MS}"`);
+    }
+
     return {
         port,
         databaseUrl: env.DATABASE_URL!,
         imageDir: path.resolve(env.IMAGE_DIR!),
         modelGateway,
+        backgroundWaitMs,
         providerKeys: {
             openRouter: env.OPENROUTER_API_KEY || undefined,
             // The Venice dashboard calls it an inference key; either name works.

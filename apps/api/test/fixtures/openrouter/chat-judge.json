@@ -1,0 +1,31 @@
+{
+    "id": "gen-synthetic-0003",
+    "provider": "DeepInfra",
+    "model": "deepseek/deepseek-v4-flash",
+    "object": "chat.completion",
+    "created": 1762300000,
+    "choices": [
+        {
+            "logprobs": null,
+            "finish_reason": "stop",
+            "native_finish_reason": "stop",
+            "index": 0,
+            "message": {
+                "role": "assistant",
+                "content": "{\"bond_changes\":[{\"from\":\"Mira\",\"to\":\"user\",\"label\":\"Curious\",\"description\":\"She wonders why the new keeper came.\",\"cause\":\"The keeper arrived in the storm.\"}],\"arc_steps\":[],\"scene\":{\"move_on\":false,\"reason\":\"Nothing has happened yet.\"}}",
+                "refusal": null,
+                "reasoning": null
+            }
+        }
+    ],
+    "usage": {
+        "prompt_tokens": 900,
+        "completion_tokens": 80,
+        "total_tokens": 980,
+        "cost": 0.000123,
+        "is_byok": false,
+        "prompt_tokens_details": { "cached_tokens": 0 },
+        "cost_details": { "upstream_inference_cost": null },
+        "completion_tokens_details": { "reasoning_tokens": 0 }
+    }
+}
