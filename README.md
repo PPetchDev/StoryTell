@@ -164,9 +164,11 @@ LIVE_HOME/            C:\StorytellLive by default; keep it outside this checkout
   current             names the release that runs
   previous            names the one before it, kept for live:rollback
   live-run.mjs        the supervisor the startup task runs (copied by each deploy)
+  backup.mjs          the daily backup job (copied by each deploy)
+  backup/             status.json (what the app's banner reads), last-run, staging
   live.env            a copy of .env.live, made by each deploy
   images/             Reference images and Snapshots (LIVE_IMAGE_DIR moves it)
-  logs/               live.log (the supervisor), api.log, web.log
+  logs/               live.log (the supervisor), api.log, web.log, backup.log
 ```
 
 ### One-time setup (your steps)
@@ -240,6 +242,40 @@ migrations, so it only helps while the older code still works with the newer sch
 
 `npm run live:status`, `npm run live:stop` and `npm run live:start` do what they say. With the
 startup task registered, stop and start go through Task Scheduler.
+
+### Daily backup
+
+Live backs itself up: the supervisor runs `LIVE_HOME\backup.mjs` when it starts and every hour,
+and the job makes at most one backup a day (a `LIVE_HOME\backup\last-run` stamp), so the hourly
+runs only retry a day whose database dump failed. `npm run live:backup` makes one now.
+
+A backup is one folder, `storytell-YYYYMMDD-HHMMSS`, holding `storytell.dump` (`pg_dump`, custom
+format), `images\` (the whole image folder, relative paths intact) and `manifest.json`. It goes to:
+
+- **the second disk**, `BACKUP_DISK_DIR` (e.g. `D:/StorytellBackups`), and
+- **Google Drive, encrypted on the PC first**, through an rclone crypt remote, `BACKUP_REMOTE`.
+
+Each keeps the newest `BACKUP_KEEP` backups (default 14). If one target fails the other still
+completes, the failure goes to `LIVE_HOME\logs\backup.log`, and the Usage and Settings pages show
+a banner until a later run succeeds. A failed backup never blocks play.
+
+Setting up the Drive copy (your steps, once):
+
+1. Install rclone: `winget install Rclone.Rclone`.
+2. `rclone config` → new remote `gdrive`, type `drive`, scope `drive.file` (rclone can only see
+   what it created), and sign in in the browser.
+3. `rclone config` → new remote `storytell-backup`, type `crypt`, remote `gdrive:Storytell`,
+   filename encryption `standard`, directory name encryption `true`, and a long passphrase plus
+   a salt (password2). **Save both in your password manager**: without them the Drive copy can't
+   be read, by anyone, you included. rclone keeps them obscured in its config in your profile.
+4. Check: `rclone mkdir storytell-backup:` then `rclone lsf gdrive:Storytell` shows only
+   scrambled names.
+5. In `.env.live` set `BACKUP_DISK_DIR`, `BACKUP_REMOTE=storytell-backup:` and, unless the EDB
+   installer put PostgreSQL in `C:\Program Files\PostgreSQL\<version>`, `PG_BIN` (the folder
+   holding `pg_dump.exe`). Deploy once so `LIVE_HOME` gets the new settings, then run
+   `npm run live:backup` and look for the backup in both places.
+
+Restoring is in ticket 34's steps.
 
 ### Where your text and images go
 

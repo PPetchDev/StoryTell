@@ -5,6 +5,9 @@ import { AppConfig } from '../../config/app-config.js';
 
 export type BackupTarget = 'disk' | 'drive';
 
+/** How old the last run may be before the banner says backups have stopped. */
+export const STALE_AFTER_MS = 3 * 24 * 3600_000;
+
 export interface BackupTargetStatus {
     target: BackupTarget;
     ok: boolean;
@@ -59,13 +62,16 @@ export class BackupManagerService {
                     error: typeof entry.error === 'string' ? entry.error : null,
                 };
             });
+            // The job tries every hour, so a last run days ago means it has stopped running.
+            const attemptedAt = parsed.attemptedAt ?? null;
+            const stale = attemptedAt !== null && Date.now() - Date.parse(attemptedAt) > STALE_AFTER_MS;
             return {
                 configured: true,
-                attemptedAt: parsed.attemptedAt ?? null,
+                attemptedAt,
                 backup: parsed.backup ?? null,
                 targets,
-                error: null,
-                failed: targets.some((target) => !target.ok),
+                error: stale ? `No backup has run since ${attemptedAt}.` : null,
+                failed: stale || targets.some((target) => !target.ok),
             };
         } catch {
             return { configured: true, ...none, error: 'The backup status file is not valid JSON.', failed: true };

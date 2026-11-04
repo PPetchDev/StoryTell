@@ -20,6 +20,7 @@ import {
     renameSync,
     rmSync,
     statSync,
+    utimesSync,
     writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
@@ -27,6 +28,7 @@ import { fileURLToPath } from 'node:url';
 import { parseEnv } from 'node:util';
 
 const NAME = /^storytell-\d{8}-\d{6}$/;
+const PARTIAL = /^storytell-\d{8}-\d{6}\.partial$/;
 const args = process.argv.slice(2);
 const force = args.includes('--force');
 const homeArg = args.indexOf('--home');
@@ -49,18 +51,38 @@ if (!existsSync(envFile)) {
 }
 const env = parseEnv(readFileSync(envFile, 'utf8'));
 const imageDir = path.resolve(env.LIVE_IMAGE_DIR ?? path.join(home, 'images'));
-const keep = Math.max(1, Number(env.BACKUP_KEEP ?? 14) || 14);
+const keep = env.BACKUP_KEEP === undefined ? 14 : Number(env.BACKUP_KEEP);
 const diskDir = env.BACKUP_DISK_DIR ? path.resolve(env.BACKUP_DISK_DIR) : undefined;
 const remote = env.BACKUP_REMOTE?.trim() || undefined;
 const rclone = env.RCLONE || 'rclone';
 
-if (!env.DATABASE_URL) {
-    log(`DATABASE_URL is not set in ${envFile}`);
-    process.exit(1);
+/** Is `child` the folder `parent` or inside it? Case-insensitive on Windows, like the file system. */
+function inside(child, parent) {
+    const rel = path.relative(parent, child);
+    return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
 }
+
+// Settings that would make a backup wrong or destructive stop the run, and the banner says why.
+const problems = [];
+if (!env.DATABASE_URL) problems.push(`DATABASE_URL is not set in ${envFile}`);
+if (!Number.isInteger(keep) || keep < 1) problems.push(`BACKUP_KEEP must be a whole number of at least 1, got "${env.BACKUP_KEEP}"`);
+// A disk folder inside the images would back itself up; one inside LIVE_HOME could be swept away.
+if (diskDir && (inside(diskDir, imageDir) || inside(diskDir, home))) {
+    problems.push(`BACKUP_DISK_DIR (${diskDir}) must be outside LIVE_HOME and the image folder`);
+}
+// Without a colon rclone reads the remote as a local folder; the banner would say "saved" wrongly.
+if (remote && !remote.includes(':')) problems.push(`BACKUP_REMOTE must be an rclone remote such as "storytell-backup:", got "${remote}"`);
 if (!diskDir && !remote) {
     log('no backup targets: set BACKUP_DISK_DIR and/or BACKUP_REMOTE in .env.live');
     process.exit(0);
+}
+if (problems.length > 0) {
+    const at = new Date().toISOString();
+    const error = `backup settings: ${problems.join('; ')}`;
+    const targets = Object.fromEntries([diskDir && 'disk', remote && 'drive'].filter(Boolean).map((target) => [target, { ok: false, at, error }]));
+    writeFileSync(path.join(backupDir, 'status.json'), JSON.stringify({ attemptedAt: at, backup: null, targets }, null, 2));
+    log(error);
+    process.exit(1);
 }
 
 const localDate = (date) =>
@@ -71,23 +93,44 @@ if (!force && existsSync(stampFile) && readFileSync(stampFile, 'utf8').trim() ==
     process.exit(0);
 }
 
-// One backup at a time: the hourly run and a manual one could meet. A lock older than three
-// hours belongs to a run that was killed.
+// One backup at a time: the hourly run and a manual one could meet. A running backup touches its
+// lock every minute, so a lock untouched for 15 minutes belongs to a run that was killed.
 const lockFile = path.join(backupDir, 'lock');
+const lockAge = () => {
+    try {
+        return Date.now() - statSync(lockFile).mtimeMs;
+    } catch {
+        return Infinity;
+    }
+};
 try {
     writeFileSync(lockFile, String(process.pid), { flag: 'wx' });
 } catch {
-    if (Date.now() - statSync(lockFile).mtimeMs < 3 * 3600_000) {
+    if (lockAge() < 15 * 60_000) {
         log('another backup is running; skipping');
-        process.exit(0);
+        // 2, not 0, so `npm run live:backup` can say no backup was made.
+        process.exit(2);
     }
     writeFileSync(lockFile, String(process.pid));
 }
+const keepLock = setInterval(() => {
+    try {
+        utimesSync(lockFile, new Date(), new Date());
+    } catch {
+        // Gone: the next write below recreates it.
+    }
+}, 60_000);
 
 try {
     process.exitCode = await backUp();
 } finally {
-    rmSync(lockFile, { force: true });
+    clearInterval(keepLock);
+    // Only our own lock: a run that took over a stale one owns it now.
+    try {
+        if (readFileSync(lockFile, 'utf8').trim() === String(process.pid)) rmSync(lockFile, { force: true });
+    } catch {
+        // Already gone.
+    }
 }
 
 function findPgBin() {
@@ -106,7 +149,26 @@ function findPgBin() {
 
 function message(error) {
     const stderr = error?.stderr?.toString().trim();
-    return (stderr || error?.message || String(error)).split('\n').slice(-3).join(' ').slice(0, 500);
+    return (stderr || error?.message || String(error))
+        .split('\n')
+        .slice(-3)
+        // rclone prefixes its lines with a timestamp and a level; the banner only needs the reason.
+        .map((line) => line.replace(/^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2} [A-Z]+\s*:\s*/, '').trim())
+        .join(' ')
+        .slice(0, 500);
+}
+
+/** Antivirus and the search indexer briefly hold fresh files, so a folder rename can fail with EPERM. */
+async function renameWithRetries(from, to) {
+    for (let attempt = 1; ; attempt++) {
+        try {
+            renameSync(from, to);
+            return;
+        } catch (error) {
+            if (attempt >= 5 || !['EPERM', 'EBUSY', 'EACCES'].includes(error.code)) throw error;
+            await new Promise((resolve) => setTimeout(resolve, 1_000 * attempt));
+        }
+    }
 }
 
 function folderStats(dir) {
@@ -137,8 +199,9 @@ async function backUp() {
         const pgDump = pgBin ? path.join(pgBin, process.platform === 'win32' ? 'pg_dump.exe' : 'pg_dump') : 'pg_dump';
         // The password goes in the environment, not the command line other processes can read.
         const url = new URL(env.DATABASE_URL);
-        const password = decodeURIComponent(url.password);
+        const password = decodeURIComponent(url.password) || url.searchParams.get('password') || '';
         url.password = '';
+        url.searchParams.delete('password');
         execFileSync(pgDump, ['--format=custom', '--no-owner', '--file', path.join(staging, 'storytell.dump'), '--dbname', url.toString()], {
             stdio: ['ignore', 'ignore', 'pipe'],
             env: { ...process.env, PGPASSWORD: password },
@@ -175,10 +238,13 @@ async function backUp() {
     if (diskDir) {
         try {
             mkdirSync(diskDir, { recursive: true });
+            // Copies a stopped or failed run left half-done. We hold the lock, so none is in use.
+            for (const entry of readdirSync(diskDir).filter((entry) => PARTIAL.test(entry))) {
+                rmSync(path.join(diskDir, entry), { recursive: true, force: true });
+            }
             const partial = path.join(diskDir, `${name}.partial`);
-            rmSync(partial, { recursive: true, force: true });
             cpSync(staging, partial, { recursive: true });
-            renameSync(partial, path.join(diskDir, name));
+            await renameWithRetries(partial, path.join(diskDir, name));
             const backups = readdirSync(diskDir).filter((entry) => NAME.test(entry)).sort().reverse();
             for (const old of backups.slice(keep)) rmSync(path.join(diskDir, old), { recursive: true, force: true });
             status.targets.disk = { ok: true, at: new Date().toISOString(), error: null };
@@ -194,21 +260,30 @@ async function backUp() {
         // RCLONE_* settings in .env.live, such as RCLONE_CONFIG, override that.
         const rcEnv = { ...process.env, ...Object.fromEntries(Object.entries(env).filter(([key]) => key.startsWith('RCLONE_'))) };
         const rc = (...rcArgs) => execFileSync(rclone, rcArgs, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], env: rcEnv });
+        // Pruned backups skip Drive's trash, which would otherwise keep counting against the quota.
+        const purge = (folder) => rc('purge', '--drive-use-trash=false', at(folder));
         try {
-            rc('purge', at(`${name}.partial`));
-        } catch {
-            // Nothing left over from an earlier run.
-        }
-        try {
+            // Only ciphertext may leave the PC: the remote must be a crypt remote.
+            const remoteName = remote.slice(0, remote.indexOf(':'));
+            const type = rc('listremotes', '--long')
+                .split(/\r?\n/)
+                .map((line) => line.match(/^(.+?):\s+(\S+)/))
+                .find((match) => match?.[1] === remoteName)?.[2];
+            if (type !== 'crypt') {
+                throw new Error(`BACKUP_REMOTE "${remoteName}:" is ${type ? `a ${type} remote` : 'not in the rclone config'}; it must be a crypt remote, so only encrypted files leave the PC`);
+            }
+            const listed = () =>
+                rc('lsf', '--dirs-only', remote)
+                    .split(/\r?\n/)
+                    .map((entry) => entry.replace(/\/$/, ''));
+            for (const leftover of listed().filter((entry) => PARTIAL.test(entry))) purge(leftover);
             rc('copy', staging, at(`${name}.partial`));
             rc('moveto', at(`${name}.partial`), at(name));
-            const backups = rc('lsf', '--dirs-only', remote)
-                .split(/\r?\n/)
-                .map((entry) => entry.replace(/\/$/, ''))
+            const backups = listed()
                 .filter((entry) => NAME.test(entry))
                 .sort()
                 .reverse();
-            for (const old of backups.slice(keep)) rc('purge', at(old));
+            for (const old of backups.slice(keep)) purge(old);
             status.targets.drive = { ok: true, at: new Date().toISOString(), error: null };
             log(`drive: saved to ${at(name)}; keeping ${Math.min(backups.length, keep)}`);
         } catch (error) {
@@ -217,9 +292,9 @@ async function backUp() {
         }
     }
 
-    // A backup was made today, even if a target failed: the banner says so, and tomorrow's run
-    // tries every target again.
-    writeFileSync(stampFile, localDate(now));
+    // A backup that reached at least one target counts for today: the banner shows a failed one,
+    // and tomorrow's run tries every target again. If none got it, the next hourly run retries.
+    if (Object.values(status.targets).some((target) => target.ok)) writeFileSync(stampFile, localDate(now));
     writeStatus();
     rmSync(path.join(backupDir, 'staging'), { recursive: true, force: true });
     const failed = Object.values(status.targets).some((target) => !target.ok);

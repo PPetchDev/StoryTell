@@ -91,6 +91,11 @@ function checkSettings() {
     if (inside(imageDir, root)) fail(`LIVE_IMAGE_DIR (${imageDir}) must be outside this checkout (${root}).`);
     // Releases are deleted on later deploys; images kept there would go with them.
     if (inside(imageDir, releasesDir)) fail(`LIVE_IMAGE_DIR (${imageDir}) must not be inside ${releasesDir}.`);
+    // A backup folder inside the images would back itself up; inside LIVE_HOME it could be swept away.
+    const diskDir = live.BACKUP_DISK_DIR ? path.resolve(live.BACKUP_DISK_DIR) : undefined;
+    if (diskDir && (inside(diskDir, imageDir) || inside(diskDir, home) || inside(diskDir, root))) {
+        fail(`BACKUP_DISK_DIR (${diskDir}) must be outside LIVE_HOME, the image folder and this checkout.`);
+    }
 }
 
 function git(...args) {
@@ -213,7 +218,8 @@ function backupNow() {
     if (!existsSync(path.join(home, 'backup.mjs'))) fail(`No backup job in ${home}. Run npm run live:deploy first.`);
     try {
         run(process.execPath, [path.join(home, 'backup.mjs'), '--force'], home);
-    } catch {
+    } catch (error) {
+        if (error.status === 2) fail('Another backup is running right now; no new one was made. Try again when it finishes.');
         fail(`The backup finished with a failure. See ${path.join(home, 'logs', 'backup.log')}.`);
     }
 }
