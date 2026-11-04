@@ -575,12 +575,12 @@ Further gateway rules:
 - Monetization.
 - Thai or any non-English language.
 - Users under 18.
-- Regenerate, Swipe, Continue and Branch on Messages. Editing is the only way to change history.
+- Swipe and Branch on Messages. Editing and Regenerate are the only ways to change history. (Regenerate and Continue were brought in by [Spec: Friendly UI](../friendly-ui/spec.md).)
 - Character avatar images.
 - User-directed speaker choice (e.g. @mentions). The Narrator decides who speaks.
 - Native mobile apps.
 - Separate world notes or lore entries, Story tags, and genre or pacing presets. The Setting holds these in plain language.
-- Skipping or rewinding Scenes by hand. Editing a Message is the only undo.
+- Skipping or rewinding Scenes by hand. Editing or regenerating a Message is the only undo.
 - System-defined Story endings.
 - Export and import of Stories and Chats, Trash, Chat-as-text download, Tavern cards and Duplicate Story. The daily disaster backup covers recovery and moving PCs.
 - Offline play, cached Chats or queued messages.

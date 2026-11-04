@@ -46,6 +46,18 @@ _Avoid_: Session, playthrough, conversation, thread
 One entry in a Chat's history: either what the user wrote, shown under the Role or Persona they wore at the time, or the AI's reply, which is narration and Characters' speech in order. A Chat begins with the Opening as its first Message. Editing a Message discards every Message after it.
 _Avoid_: Post, reply, bubble, entry
 
+**Continue**:
+Asking the Narrator to write the next part of the Chat without a Message from the user; the result is an ordinary AI Message, and it never speaks or acts for the user.
+_Avoid_: Skip, auto-play, next
+
+**Regenerate**:
+Replacing the Chat's newest AI Message with a freshly written one, undoing everything the old one changed; the old one is not kept.
+_Avoid_: Reroll, swipe, retry, redo
+
+**Suggested reply**:
+One of three things the user might write next, offered on request in the voice of the Role or Persona they wear; it only fills the composer and is never part of the Chat's history.
+_Avoid_: Smart reply, quick reply, hint
+
 **Memory**:
 A fact established during one Chat — an event that happened, a detail of the world, something learned about the user, or an open promise or plan — that the Chat carries forward; it is known only to the Characters who witnessed or learned of it, never records feelings (a Bond) or a change of personality (an Arc), and the user can see, add, edit and delete it. A Chat starts with no Memories.
 _Avoid_: Note, lorebook entry, context, summary
