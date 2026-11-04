@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, MaxLength } from 'class-validator';
+import { IsInt, IsString, MaxLength, ValidateIf } from 'class-validator';
 
 const TITLE_MAX = 200;
 // Long enough for any turn the user writes, short enough to refuse a runaway client.
@@ -27,4 +27,15 @@ export class EditMessageRequestBodyDTO {
     @IsString()
     @MaxLength(TEXT_MAX)
     text: string;
+}
+
+export class SwapIdentityRequestBodyDTO {
+    @ApiProperty({
+        type: Number,
+        nullable: true,
+        description: "The Persona to wear from now on, or null for the Story's Role.",
+    })
+    @ValidateIf((body: SwapIdentityRequestBodyDTO) => body.personaId !== null)
+    @IsInt()
+    personaId: number | null;
 }

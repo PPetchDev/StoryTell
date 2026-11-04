@@ -9,6 +9,7 @@ import { BondChangeEntity } from '../../../model/ledger/entities/bond-change.ent
 import { LedgerModelService } from '../../../model/ledger/ledger.service.js';
 import { StoryEntity } from '../../../model/story/entities/story.entity.js';
 import { ModelGateway } from '../../../service/model-gateway/model-gateway.js';
+import { exchangeIdentityName } from '../identity.js';
 import { partsToText } from '../turn/reply-parser.js';
 import { applyJudgement } from './apply-judgement.js';
 import { buildJudgePrompt, JUDGE_CONTEXT_MESSAGES, parseJudgement } from './judge-prompt.js';
@@ -103,7 +104,7 @@ export class JudgeManagerService {
             const before = chat.messages.slice(0, index);
             const userMessage = before[before.length - 1]?.kind === MessageKind.User ? before[before.length - 1] : null;
             const context = (userMessage ? before.slice(0, -1) : before).slice(-JUDGE_CONTEXT_MESSAGES);
-            const identityName = story.role.name;
+            const identityName = exchangeIdentityName(story, chat, index);
             const nameOf = (characterId: number | null): string | null =>
                 characterId === null ? null : (story.characters.find((c) => c.id === characterId)?.name ?? null);
 

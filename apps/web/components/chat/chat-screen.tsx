@@ -4,11 +4,12 @@ import Link from 'next/link';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 
 import { MemoryDrawer } from '@/components/chat/memory-drawer';
-import { useConnection } from '@/components/connection';
+import { useApiQuery, useConnection } from '@/components/connection';
 import { ConfirmButton } from '@/components/story-editor/fields';
 import { ApiError, apiFetch, ApiUnreachableError } from '@/lib/api';
 import { backgroundPending, Chat, chatApi, EditedChat, latestReply, Message, messageText, modelLabel, rollbackNotice } from '@/lib/chat';
 import { Memory, memoryApi, renderUser } from '@/lib/memory';
+import { PersonaList } from '@/lib/persona';
 
 function messageLabel(message: Message): string {
     if (message.kind === 'user') return `${message.identityName} said`;
@@ -182,6 +183,36 @@ function Notices({ chat, onRetryJudge, onRetryExtraction, retrying }: NoticesPro
     );
 }
 
+/**
+ * The worn identity (spec: stories 44–45): the Story's Role or any Persona, swappable at any
+ * time. The next User Message is written as it; earlier ones keep the name they were sent under.
+ */
+function IdentitySwap({ chat, disabled, onSwap }: { chat: Chat; disabled: boolean; onSwap(personaId: number | null): void }) {
+    const personas = useApiQuery<PersonaList>('/personas');
+    const options = personas.status === 'ready' ? personas.data.personas.map(({ id, name }) => ({ id, name })) : [];
+    // The worn Persona stays selectable while the list loads.
+    if (chat.personaId !== null && !options.some((option) => option.id === chat.personaId)) {
+        options.unshift({ id: chat.personaId, name: chat.identityName });
+    }
+    return (
+        <label className="identity-swap">
+            <span className="muted">Playing as</span>
+            <select
+                value={chat.personaId ?? ''}
+                disabled={disabled}
+                onChange={(event) => onSwap(event.target.value === '' ? null : Number(event.target.value))}
+            >
+                <option value="">{chat.roleName} (Role)</option>
+                {options.map((option) => (
+                    <option key={option.id} value={option.id}>
+                        {option.name}
+                    </option>
+                ))}
+            </select>
+        </label>
+    );
+}
+
 /** A "Memory added" toast (spec: story 83): one per Memory the AI added in the latest turn. */
 interface Toast {
     memoryId: number;
@@ -344,6 +375,14 @@ export function ChatScreen({ initial }: { initial: Chat }) {
         else void runWrite(edit);
     };
 
+    /** Swaps the worn identity; the drawer re-reads, since it renders {user} as the worn name. */
+    const swapIdentity = (personaId: number | null) =>
+        void runWrite(async () => {
+            const swapped = await chatApi.swapIdentity(chat.storyId, chat.id, personaId);
+            setDrawer((current) => ({ ...current, version: current.version + 1 }));
+            return swapped;
+        });
+
     /** Runs only the failed judge again, then re-reads the Chat so the notice clears. */
     const retryJudge = (messageId: number) =>
         void runWrite(async () => {
@@ -370,6 +409,7 @@ export function ChatScreen({ initial }: { initial: Chat }) {
             </nav>
             <div className="chat-head">
                 <h1>{chat.title}</h1>
+                <IdentitySwap chat={chat} disabled={writing || busy || editing !== null} onSwap={swapIdentity} />
                 <button type="button" className="button button-quiet" onClick={() => openMemory()}>
                     Memory
                 </button>

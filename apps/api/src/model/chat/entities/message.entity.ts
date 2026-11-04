@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import type { Relation } from 'typeorm';
 
+import type { PersonaEntity } from '../../persona/entities/persona.entity.js';
 import type { ChatEntity } from './chat.entity.js';
 import type { MessagePartEntity, MessagePartResponse } from './message-part.entity.js';
 
@@ -38,8 +39,10 @@ export interface UserMessageResponse {
     id: number;
     kind: 'user';
     text: string;
-    /** The identity the user wore when writing it, stamped. */
+    /** The identity the user wore when writing it, stamped: kept after a rename or delete. */
     identityName: string;
+    /** The Persona worn when writing it; null for the Role and once that Persona is deleted. */
+    personaId: number | null;
     createdAt: string;
 }
 
@@ -88,6 +91,14 @@ export class MessageEntity {
     @Column({ name: 'identity_name', type: 'text', nullable: true })
     identityName: string | null;
 
+    // The Persona a User Message was written as; the stamped name above outlives it.
+    @Column({ name: 'persona_id', type: 'integer', nullable: true })
+    personaId: number | null;
+
+    @ManyToOne('PersonaEntity', { onDelete: 'SET NULL', nullable: true })
+    @JoinColumn({ name: 'persona_id' })
+    persona: Relation<PersonaEntity> | null;
+
     @Column({ type: 'text', nullable: true })
     model: string | null;
 
@@ -131,6 +142,7 @@ export class MessageEntity {
                 kind: 'user',
                 text: this.text ?? '',
                 identityName: this.identityName ?? '',
+                personaId: this.personaId,
                 createdAt: this.createdAt.toISOString(),
             };
         }

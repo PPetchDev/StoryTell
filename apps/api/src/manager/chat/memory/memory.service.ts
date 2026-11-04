@@ -9,6 +9,7 @@ import { MemoryAuthor, MemoryEntity, MemoryResponse } from '../../../model/memor
 import { MemoryModelService } from '../../../model/memory/memory.service.js';
 import { StoryEntity } from '../../../model/story/entities/story.entity.js';
 import { StoryModelService } from '../../../model/story/story.service.js';
+import { wornIdentity } from '../identity.js';
 import { presentCharacters } from './present.js';
 
 /** The Memory drawer's data: every Memory, plus what it needs to render and add one. */
@@ -100,7 +101,7 @@ export class MemoryManagerService {
         return {
             chatId: chat.id,
             storyId: story.id,
-            identityName: story.role.name,
+            identityName: wornIdentity(story, chat).name,
             cast: story.characters.map((character) => ({ id: character.id, name: character.name })),
             present: present(story, chat),
             memories: memories.map((memory) => memory.toResponse(castOrder(story))),
