@@ -2,6 +2,7 @@ import { APIRequestContext, expect, test } from '@playwright/test';
 
 const OPENING = 'The lamp went out an hour ago.\n\n@Mira: Boots off, keeper.';
 const NO_CHANGE = '{"bond_changes":[],"arc_steps":[],"scene":{"move_on":false}}';
+const NO_OPS = '{"operations":[]}';
 
 /** A playable Story with a Chat two turns in, all through the API, so the browser covers only the edit. */
 async function createPlayedChat(request: APIRequestContext): Promise<{ storyId: number; chatId: number }> {
@@ -28,10 +29,11 @@ async function createPlayedChat(request: APIRequestContext): Promise<{ storyId: 
             ],
         },
     });
-    // Each turn's background judge (ticket 27) changes nothing here: two turns now, one after the edit.
+    // Each turn's background calls change nothing here: two turns now, one after the edit.
     await request.post('/api/testing/fake-gateway/text', {
         data: { kind: 'judge', replies: [NO_CHANGE, NO_CHANGE, NO_CHANGE] },
     });
+    await request.post('/api/testing/fake-gateway/text', { data: { kind: 'memory_extraction', replies: [NO_OPS, NO_OPS, NO_OPS] } });
     const chat = await request.post(`/api/stories/${storyId}/chats`);
     expect(chat.ok()).toBe(true);
     const chatId = (await chat.json()).id as number;

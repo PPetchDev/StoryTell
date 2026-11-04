@@ -38,6 +38,8 @@ export interface AiMessage {
     parts: MessagePart[];
     /** The Bond, Arc and Scene judge; null on the Opening, which is never judged. */
     judge: BackgroundCall | null;
+    /** Memory extraction; null on the Opening and on replies from before it existed. */
+    memory: BackgroundCall | null;
     createdAt: string;
 }
 
@@ -57,6 +59,7 @@ export interface Chat extends ChatSummary {
 }
 
 export interface RollbackCounts {
+    memoryChanges: number;
     bondChanges: number;
     arcSteps: number;
     sceneAdvances: number;
@@ -119,6 +122,7 @@ export interface DashboardBackground {
     messageId: number;
     position: number;
     judge: BackgroundCall;
+    memory: BackgroundCall | null;
 }
 
 /** The read-only dashboard (mirrors ChatDashboardResponseBodyDTO). */
@@ -152,7 +156,25 @@ export const chatApi = {
     /** Runs the failed Bond, Arc and Scene judge of the latest AI Message again. Answers with the dashboard. */
     retryJudge: (storyId: number, chatId: number, messageId: number) =>
         apiSend<ChatDashboard>('POST', `/stories/${storyId}/chats/${chatId}/messages/${messageId}/judge`),
+    /** Runs the failed Memory extraction of the latest AI Message again. Answers with the dashboard. */
+    retryExtraction: (storyId: number, chatId: number, messageId: number) =>
+        apiSend<ChatDashboard>('POST', `/stories/${storyId}/chats/${chatId}/messages/${messageId}/memory`),
 };
+
+/** The latest AI Message a model wrote, whose background calls may still be pending or have failed. */
+export function latestReply(chat: Chat): AiMessage | null {
+    for (let i = chat.messages.length - 1; i >= 0; i--) {
+        const message = chat.messages[i];
+        if (message.kind === 'ai' && (message.judge || message.memory)) return message;
+    }
+    return null;
+}
+
+/** True while either background call of the latest reply is still running. */
+export function backgroundPending(chat: Chat): boolean {
+    const reply = latestReply(chat);
+    return reply?.judge?.status === 'pending' || reply?.memory?.status === 'pending';
+}
 
 /** Where a dashboard item's causing Message is on the Chat screen. */
 export function messageHref(storyId: number, chatId: number, messageId: number): string {
@@ -162,6 +184,7 @@ export function messageHref(storyId: number, chatId: number, messageId: number):
 /** The rollback notice (spec: story 75), or null when nothing was rolled back. */
 export function rollbackNotice(counts: RollbackCounts): string | null {
     const parts = [
+        [counts.memoryChanges, 'Memory change', 'Memory changes'],
         [counts.bondChanges, 'Bond change', 'Bond changes'],
         [counts.arcSteps, 'Arc step', 'Arc steps'],
         [counts.sceneAdvances, 'Scene advance', 'Scene advances'],

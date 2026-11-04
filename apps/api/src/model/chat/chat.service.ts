@@ -71,14 +71,15 @@ export class ChatModelService {
 
     /**
      * Stores an AI Message with its parts in one transaction, so a partial one never exists.
-     * `judgeStatus` is pending for a reply the judge will look at, null for the Opening.
+     * `background` is the status of both background calls: pending for a reply the judge and
+     * the extraction will look at, null for the Opening.
      */
     addAiMessage(
         chatId: number,
         position: number,
         model: string,
         parts: NewMessagePart[],
-        judgeStatus: BackgroundStatus | null,
+        background: BackgroundStatus | null,
     ): Promise<MessageEntity> {
         return this.dataSource.transaction(async (manager) => {
             const message = await manager.save(
@@ -87,8 +88,10 @@ export class ChatModelService {
                     position,
                     kind: MessageKind.Ai,
                     model,
-                    judgeStatus,
+                    judgeStatus: background,
                     judgeError: null,
+                    memoryStatus: background,
+                    memoryError: null,
                 }),
             );
             message.parts = await manager.save(partEntities(manager, message.id, parts));
@@ -102,6 +105,10 @@ export class ChatModelService {
 
     async setJudgeStatus(messageId: number, status: BackgroundStatus, error: string | null = null): Promise<void> {
         await this.messages.update({ id: messageId }, { judgeStatus: status, judgeError: error });
+    }
+
+    async setMemoryStatus(messageId: number, status: BackgroundStatus, error: string | null = null): Promise<void> {
+        await this.messages.update({ id: messageId }, { memoryStatus: status, memoryError: error });
     }
 
     /**

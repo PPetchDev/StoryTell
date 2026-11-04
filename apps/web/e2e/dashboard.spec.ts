@@ -2,6 +2,7 @@ import { APIRequestContext, expect, test } from '@playwright/test';
 
 const OPENING = 'The lamp went out an hour ago.\n\n@Mira: Boots off, keeper.';
 const NO_CHANGE = '{"bond_changes":[],"arc_steps":[],"scene":{"move_on":false}}';
+const NO_OPS = '{"operations":[]}';
 const BOND_CHANGE = JSON.stringify({
     bond_changes: [
         {
@@ -39,6 +40,8 @@ async function createJudgedChat(request: APIRequestContext): Promise<{ storyId: 
         data: { kind: 'turn', replies: [{ text: 'Mira looks up at last.\n\n@Mira: In this weather?', model: 'glm-5.3' }] },
     });
     await request.post('/api/testing/fake-gateway/text', { data: { kind: 'judge', replies: [BOND_CHANGE] } });
+    // Memory extraction changes nothing in this spec: the turn now, and the edited reply later.
+    await request.post('/api/testing/fake-gateway/text', { data: { kind: 'memory_extraction', replies: [NO_OPS, NO_OPS] } });
     const chat = await request.post(`/api/stories/${storyId}/chats`);
     expect(chat.ok()).toBe(true);
     const chatId = (await chat.json()).id as number;
@@ -79,7 +82,7 @@ test('shows a scripted Bond change with its event on the dashboard, and editing 
         await expect(bond).toContainText('Because: Ash climbed the cliff path in the storm.');
         await expect(mira).toContainText('Unchanged from the core definition.');
         await expect(page.getByRole('region', { name: 'Scene' })).toContainText('Free play');
-        await expect(page.getByRole('region', { name: 'Background calls' })).toContainText('Reply 2: judge Done');
+        await expect(page.getByRole('region', { name: 'Background calls' })).toContainText('Reply 2: judge Done · memory Done');
 
         // The history opens under the current value, and its link lands on the causing Message.
         await bond.locator('summary').click();

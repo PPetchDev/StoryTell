@@ -4,7 +4,10 @@ import { MessageEntity } from '../../model/chat/entities/message.entity.js';
 import { ArcStepEntity } from '../../model/ledger/entities/arc-step.entity.js';
 import { BondChangeEntity } from '../../model/ledger/entities/bond-change.entity.js';
 import { ChatArcDirectionEntity } from '../../model/ledger/entities/chat-arc-direction.entity.js';
+import { MemoryChangeEntity } from '../../model/ledger/entities/memory-change.entity.js';
 import { SceneAdvanceEntity } from '../../model/ledger/entities/scene-advance.entity.js';
+import { MemoryKnownByEntity } from '../../model/memory/entities/memory-known-by.entity.js';
+import { MemoryEntity } from '../../model/memory/entities/memory.entity.js';
 import { SettingsEntity } from '../../model/settings/entities/settings.entity.js';
 import { CharacterEntity } from '../../model/story/entities/character.entity.js';
 import { RoleEntity } from '../../model/story/entities/role.entity.js';
@@ -29,4 +32,7 @@ export const entities = [
     ArcStepEntity,
     SceneAdvanceEntity,
     ChatArcDirectionEntity,
+    MemoryEntity,
+    MemoryKnownByEntity,
+    MemoryChangeEntity,
 ];

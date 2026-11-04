@@ -38,10 +38,11 @@ test('starts a Chat, sees the Opening, sends, and sees narration plus named spee
             ],
         },
     });
-    // The turn's background judge (ticket 27) changes nothing here.
+    // The turn's background calls (the judge, Memory extraction) change nothing here.
     await request.post('/api/testing/fake-gateway/text', {
         data: { kind: 'judge', replies: ['{"bond_changes":[],"arc_steps":[],"scene":{"move_on":false}}'] },
     });
+    await request.post('/api/testing/fake-gateway/text', { data: { kind: 'memory_extraction', replies: ['{"operations":[]}'] } });
 
     try {
         await page.goto(`/stories/${storyId}/chats`);

@@ -23,6 +23,7 @@ interface Message {
     model?: string;
     parts?: Part[];
     judge?: { status: 'pending' | 'done' | 'failed'; error: string | null } | null;
+    memory?: { status: 'pending' | 'done' | 'failed'; error: string | null } | null;
 }
 
 interface Chat {
@@ -78,15 +79,17 @@ function countSql(fromTable: string, where: string) {
 
 /** A judgement that changes nothing, for turns whose Bonds, Arcs and Scene are not under test. */
 const NO_CHANGE = '{"bond_changes":[],"arc_steps":[],"scene":{"move_on":false,"reason":"nothing yet"}}';
+/** An extraction that changes nothing, for turns whose Memory is not under test. */
+const NO_OPS = '{"operations":[]}';
 
-/** The judge runs in the background after a turn; this returns once the last reply's judge has settled. */
+/** Both background calls run after a turn; this returns once the last reply's judge and extraction have settled. */
 async function awaitJudge(http: TestApp['http'], storyId: number, chatId: number): Promise<Chat> {
     const deadline = Date.now() + 5_000;
     for (;;) {
         const { body } = await http.get(`/api/stories/${storyId}/chats/${chatId}`).expect(200);
         const chat = body as Chat;
         const last = [...chat.messages].reverse().find((message) => message.kind === 'ai' && message.judge);
-        if (!last || last.judge?.status !== 'pending') return chat;
+        if (!last || (last.judge?.status !== 'pending' && last.memory?.status !== 'pending')) return chat;
         if (Date.now() > deadline) throw new Error('The judge did not settle in time');
         await new Promise((resolve) => setTimeout(resolve, 20));
     }
@@ -141,13 +144,14 @@ describe('Chats', () => {
     }
 
     /**
-     * Sends a turn whose judge changes nothing, and waits for that judge to settle. Answers the
-     * Chat as read after the judge, so the reply's judge status is `done`, not the `pending` the
-     * send itself answered with.
+     * Sends a turn whose judge and extraction change nothing, and waits for both to settle.
+     * Answers the Chat as read after them, so the reply's statuses are `done`, not the
+     * `pending` the send itself answered with.
      */
     async function send(storyId: number, chatId: number, text: string, reply: string | object): Promise<Chat> {
         t.gateway.scriptText('turn', reply as string);
         t.gateway.scriptText('judge', NO_CHANGE);
+        t.gateway.scriptText('memory_extraction', NO_OPS);
         await t.http.post(`/api/stories/${storyId}/chats/${chatId}/messages`).send({ text }).expect(201);
         return awaitJudge(t.http, storyId, chatId);
     }
@@ -426,11 +430,14 @@ Nobody moves to help.`;
                 PROMPT_LAYERS.scene,
                 PROMPT_LAYERS.feelings,
                 PROMPT_LAYERS.arcs,
+                PROMPT_LAYERS.memory,
             ].map((heading) => system.content.indexOf(heading));
             expect(order.every((index) => index >= 0)).toBe(true);
             expect([...order].sort((a, b) => a - b)).toEqual(order);
-            // Nothing from the Memory layer yet (ticket 28).
-            expect(system.content).not.toContain(PROMPT_LAYERS.memory);
+            // The Memory layer is last in the system message and empty on the first turn.
+            expect(system.content.endsWith(`${PROMPT_LAYERS.memory} (what has happened in this Chat so far)
+Nothing has been established in this Chat yet.
+A Character knows only the Memories it is tagged on and acts as if the rest never happened; the Narrator knows them all.`)).toBe(true);
 
             expect(system.content).toContain('A lighthouse on a storm-cut island, 1890s.');
             expect(system.content).toContain('Ash: The new keeper, arrived this morning.');
@@ -664,11 +671,12 @@ Nobody moves to help.`;
             t.gateway.scriptText('turn', { text: 'Rain drips from your hat.\n\n@Mira: Took you long enough.', model: 'glm-5.3' });
 
             t.gateway.scriptText('judge', NO_CHANGE);
+            t.gateway.scriptText('memory_extraction', NO_OPS);
 
             const { body } = await edit(story.id, played.id, firstUser.id, 'I shake the rain off my coat.').expect(200);
             const { rolledBack, ...chat } = body as Chat & { rolledBack: object };
 
-            expect(rolledBack).toEqual({ bondChanges: 0, arcSteps: 0, sceneAdvances: 0 });
+            expect(rolledBack).toEqual({ memoryChanges: 0, bondChanges: 0, arcSteps: 0, sceneAdvances: 0 });
             expect(chat.awaitingReply).toBe(false);
             expect(chat.messages.map((message) => message.id).slice(0, 2)).toEqual([opening.id, firstUser.id]);
             expect(chat.messages).toHaveLength(3);
@@ -696,7 +704,9 @@ Nobody moves to help.`;
             expect(await awaitJudge(t.http, story.id, chat.id)).toEqual({
                 ...chat,
                 messages: chat.messages.map((message) =>
-                    message.judge ? { ...message, judge: { status: 'done', error: null } } : message,
+                    message.judge
+                        ? { ...message, judge: { status: 'done', error: null }, memory: { status: 'done', error: null } }
+                        : message,
                 ),
             });
         });
@@ -724,8 +734,9 @@ Nobody moves to help.`;
             const story = await createStory();
             const played = await playTwoTurns(story.id);
             const firstReply = played.messages[2];
-            // The edited reply is judged again (twice here: two edits), but no turn is written.
+            // The edited reply is judged and extracted from again (twice here: two edits), but no turn is written.
             t.gateway.scriptText('judge', NO_CHANGE, NO_CHANGE);
+            t.gateway.scriptText('memory_extraction', NO_OPS, NO_OPS);
 
             const { body } = await edit(
                 story.id,
@@ -799,6 +810,7 @@ Nobody moves to help.`;
             expect((await getChat(story.id, played.id)).messages).toHaveLength(5);
 
             t.gateway.scriptText('judge', NO_CHANGE);
+            t.gateway.scriptText('memory_extraction', NO_OPS);
             const { body } = await edit(story.id, played.id, played.messages[4].id, 'Mira says nothing.').expect(200);
             expect(body.messages).toHaveLength(5);
             expect(body.messages[4].parts).toEqual([{ kind: 'narration', text: 'Mira says nothing.' }]);
@@ -899,9 +911,11 @@ describe('Chats through the real gateway', () => {
                 ? fixture('openrouter/credits.json')
                 : url.endsWith('/billing/balance')
                   ? fixture('venice/balance.json')
-                  : request.body?.model === 'deepseek/deepseek-v4-flash'
-                    ? fixture('openrouter/chat-judge.json')
-                    : fixture('openrouter/chat-success.json');
+                  : request.body?.model !== 'deepseek/deepseek-v4-flash'
+                    ? fixture('openrouter/chat-success.json')
+                    : String(request.body.messages?.[0]?.content).includes('Memory of an interactive story')
+                      ? fixture('openrouter/chat-memory.json')
+                      : fixture('openrouter/chat-judge.json');
             return new Response(JSON.stringify(json), { status: 200, headers: { 'content-type': 'application/json' } });
         };
         t = await startTestApp({ modelGateway: 'real', fetch: routed, providerKeys: TEST_KEYS });
@@ -938,16 +952,26 @@ describe('Chats through the real gateway', () => {
             stop: ['\nAsh:', '\n@Ash:', '\nYou:'],
             max_tokens: 900,
         });
-        expect(body.messages[2]).toMatchObject({ kind: 'ai', model: 'glm-5.3', judge: { status: 'pending', error: null } });
+        expect(body.messages[2]).toMatchObject({
+            kind: 'ai',
+            model: 'glm-5.3',
+            judge: { status: 'pending', error: null },
+            memory: { status: 'pending', error: null },
+        });
         expect(body.messages[2].parts).toEqual([
             { kind: 'narration', text: 'The lighthouse keeper nods once and goes back to polishing the lens.' },
         ]);
         expect(body.drift).toBeNull();
 
-        // The judge ran in the background on the pinned background model, in JSON mode.
+        // The judge and the extraction ran in the background on the pinned background model, in JSON mode.
         const judged = await awaitJudge(t.http, storyId, chatId);
         expect(judged.messages[2].judge).toEqual({ status: 'done', error: null });
-        const judgeRequest = turnRequests()[1];
+        expect(judged.messages[2].memory).toEqual({ status: 'done', error: null });
+        const background = turnRequests().slice(1);
+        expect(background).toHaveLength(2);
+        const isExtraction = (request: RecordedRequest) => String(request.body.messages[0].content).includes('Memory of an interactive story');
+        const judgeRequest = background.find((request) => !isExtraction(request))!;
+        const memoryRequest = background.find(isExtraction)!;
         expect(judgeRequest.body).toMatchObject({
             model: 'deepseek/deepseek-v4-flash',
             provider: { only: ['deepinfra'], allow_fallbacks: false },
@@ -956,11 +980,21 @@ describe('Chats through the real gateway', () => {
             max_tokens: 700,
         });
         expect(judgeRequest.body).not.toHaveProperty('stop');
+        expect(memoryRequest.body).toMatchObject({
+            model: 'deepseek/deepseek-v4-flash',
+            provider: { only: ['deepinfra'], allow_fallbacks: false },
+            reasoning: { enabled: false },
+            response_format: { type: 'json_object' },
+            max_tokens: 1200,
+        });
+        expect(memoryRequest.body).not.toHaveProperty('stop');
+        const memories = await t.http.get(`/api/stories/${storyId}/chats/${chatId}/memories`).expect(200);
+        expect(memories.body.memories).toMatchObject([{ text: '{user} arrived at the lighthouse in a storm.', writtenBy: 'ai', locked: false }]);
         const dashboard = await t.http.get(`/api/stories/${storyId}/chats/${chatId}/dashboard`).expect(200);
         expect(dashboard.body.characters[0].bonds).toMatchObject([{ toward: { characterId: null, name: 'Ash' }, label: 'Curious' }]);
 
         const usage = await t.http.get('/api/usage').expect(200);
-        expect(usage.body.pools.text).toMatchObject({ calls: 2, spentUsd: 0.00111 });
+        expect(usage.body.pools.text).toMatchObject({ calls: 3, spentUsd: 0.00121 });
     });
 
     it('sends no stop strings for DeepSeek V4 Pro', async () => {

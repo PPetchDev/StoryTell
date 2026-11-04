@@ -1,0 +1,143 @@
+import { Injectable } from '@nestjs/common';
+
+import { ChatNotFoundError, EmptyMemoryError, MemoryNotFoundError } from '../../../errors/chat.errors.js';
+import { StoryNotFoundError } from '../../../errors/story.errors.js';
+import { ChatModelService } from '../../../model/chat/chat.service.js';
+import { ChatEntity } from '../../../model/chat/entities/chat.entity.js';
+import { MessageKind } from '../../../model/chat/entities/message.entity.js';
+import { MemoryAuthor, MemoryEntity, MemoryResponse } from '../../../model/memory/entities/memory.entity.js';
+import { MemoryModelService } from '../../../model/memory/memory.service.js';
+import { StoryEntity } from '../../../model/story/entities/story.entity.js';
+import { StoryModelService } from '../../../model/story/story.service.js';
+import { presentCharacters } from './present.js';
+
+/** The Memory drawer's data: every Memory, plus what it needs to render and add one. */
+export interface MemoryList {
+    chatId: number;
+    storyId: number;
+    /** The worn identity's name, which the client renders `{user}` as. */
+    identityName: string;
+    /** The cast, in order, for Known-by chips and the add form. */
+    cast: Array<{ id: number; name: string }>;
+    /** The Characters present in the latest exchange: a hand-added Memory is known by these. */
+    present: number[];
+    /** Active and archived, oldest first. */
+    memories: MemoryResponse[];
+}
+
+/**
+ * The user's own Memory actions (spec: "User actions"), none tied to a Message and none
+ * rolled back by an edit: add (known by the Characters present), edit (which locks), delete,
+ * and restore from Archived (which locks). Extraction's changes are the ledger's business.
+ */
+@Injectable()
+export class MemoryManagerService {
+    constructor(
+        private readonly storyModel: StoryModelService,
+        private readonly chatModel: ChatModelService,
+        private readonly memoryModel: MemoryModelService,
+    ) {}
+
+    async list(storyId: number, chatId: number): Promise<MemoryList> {
+        const { story, chat } = await this.load(storyId, chatId);
+        return this.listOf(story, chat);
+    }
+
+    /** Spec: "add, known by the Characters present at the time". A hand-written Memory is locked. */
+    async add(storyId: number, chatId: number, text: string, knownBy?: number[]): Promise<MemoryResponse> {
+        if (text.trim() === '') throw new EmptyMemoryError();
+        const { story, chat } = await this.load(storyId, chatId);
+        const memory = await this.memoryModel.create({
+            chatId: chat.id,
+            text: text.trim(),
+            knownBy: knownBy ? this.castIds(story, knownBy) : present(story, chat),
+            writtenBy: MemoryAuthor.User,
+            locked: true,
+            archived: false,
+            messageId: null,
+        });
+        return memory.toResponse(castOrder(story));
+    }
+
+    /** Spec: "edit, which locks". The text and the Known-by set can both be changed; new text is the user's. */
+    async edit(storyId: number, chatId: number, memoryId: number, fields: { text?: string; knownBy?: number[] }): Promise<MemoryResponse> {
+        const { story, chat } = await this.load(storyId, chatId);
+        const memory = await this.find(chat, memoryId);
+        const text = fields.text === undefined ? memory.text : fields.text.trim();
+        if (text === '') throw new EmptyMemoryError();
+        await this.memoryModel.update(memory, {
+            text,
+            knownBy: fields.knownBy ? this.castIds(story, fields.knownBy) : memory.knownByIds(),
+            writtenBy: text === memory.text ? memory.writtenBy : MemoryAuthor.User,
+            locked: true,
+            archived: memory.archived,
+        });
+        return (await this.find(chat, memoryId)).toResponse(castOrder(story));
+    }
+
+    async remove(storyId: number, chatId: number, memoryId: number): Promise<void> {
+        const { chat } = await this.load(storyId, chatId);
+        const memory = await this.find(chat, memoryId);
+        await this.memoryModel.remove(memory.id);
+    }
+
+    /** Spec: "restore from Archived, which locks". */
+    async restore(storyId: number, chatId: number, memoryId: number): Promise<MemoryResponse> {
+        const { story, chat } = await this.load(storyId, chatId);
+        const memory = await this.find(chat, memoryId);
+        await this.memoryModel.update(memory, {
+            text: memory.text,
+            knownBy: memory.knownByIds(),
+            writtenBy: memory.writtenBy,
+            locked: true,
+            archived: false,
+        });
+        return (await this.find(chat, memoryId)).toResponse(castOrder(story));
+    }
+
+    private async listOf(story: StoryEntity, chat: ChatEntity): Promise<MemoryList> {
+        const memories = await this.memoryModel.findByChat(chat.id);
+        return {
+            chatId: chat.id,
+            storyId: story.id,
+            identityName: story.role.name,
+            cast: story.characters.map((character) => ({ id: character.id, name: character.name })),
+            present: present(story, chat),
+            memories: memories.map((memory) => memory.toResponse(castOrder(story))),
+        };
+    }
+
+    private async find(chat: ChatEntity, memoryId: number): Promise<MemoryEntity> {
+        const memory = await this.memoryModel.findOne(chat.id, memoryId);
+        if (!memory) throw new MemoryNotFoundError();
+        return memory;
+    }
+
+    /** Only ids of this Story's cast; the rest are dropped. */
+    private castIds(story: StoryEntity, ids: number[]): number[] {
+        return story.characters.filter((character) => ids.includes(character.id)).map((character) => character.id);
+    }
+
+    private async load(storyId: number, chatId: number): Promise<{ story: StoryEntity; chat: ChatEntity }> {
+        const story = await this.storyModel.findFull(storyId);
+        if (!story) throw new StoryNotFoundError();
+        const chat = await this.chatModel.findWithMessages(chatId);
+        if (!chat || chat.storyId !== storyId) throw new ChatNotFoundError();
+        return { story, chat };
+    }
+}
+
+function castOrder(story: StoryEntity): number[] {
+    return story.characters.map((character) => character.id);
+}
+
+/** The Characters present in the latest exchange: the last User Message and the reply after it, if any. */
+function present(story: StoryEntity, chat: ChatEntity): number[] {
+    const cast = story.characters.map((character) => ({ id: character.id, name: character.name }));
+    const last = chat.messages[chat.messages.length - 1];
+    if (!last) return cast.map((member) => member.id);
+    const reply = last.kind === MessageKind.Ai ? last : null;
+    const user = reply ? chat.messages[chat.messages.length - 2] : last;
+    const userText = user?.kind === MessageKind.User ? (user.text ?? '') : '';
+    return presentCharacters(cast, userText, reply ? reply.parts.map((part) => part.toResponse()) : []).map((member) => member.id);
+}

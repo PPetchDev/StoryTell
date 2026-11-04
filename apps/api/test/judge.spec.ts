@@ -19,6 +19,7 @@ interface Message {
     model?: string;
     parts?: Array<{ kind: string; text: string; speakerName?: string }>;
     judge?: { status: Status; error: string | null } | null;
+    memory?: { status: Status; error: string | null } | null;
 }
 
 interface Chat {
@@ -27,7 +28,7 @@ interface Chat {
     currentScene: { id: number; name: string } | null;
     messages: Message[];
     awaitingReply: boolean;
-    rolledBack?: { bondChanges: number; arcSteps: number; sceneAdvances: number };
+    rolledBack?: { memoryChanges: number; bondChanges: number; arcSteps: number; sceneAdvances: number };
 }
 
 interface BondChange {
@@ -61,7 +62,12 @@ interface Dashboard {
         current: { id: number; name: string } | null;
         advance: { id: number; fromSceneName: string; toSceneName: string | null; event: string; messageId: number } | null;
     };
-    background: Array<{ messageId: number; position: number; judge: { status: Status; error: string | null } }>;
+    background: Array<{
+        messageId: number;
+        position: number;
+        judge: { status: Status; error: string | null };
+        memory: { status: Status; error: string | null } | null;
+    }>;
 }
 
 interface Story {
@@ -74,6 +80,8 @@ interface Story {
 const OPENING = 'The lamp went out an hour ago.\n\n@Mira: Boots off, keeper.';
 
 const NO_CHANGE = '{"bond_changes":[],"arc_steps":[],"scene":{"move_on":false,"reason":"nothing yet"}}';
+/** An extraction that changes nothing, for turns whose Memory is not under test. */
+const NO_OPS = '{"operations":[]}';
 
 /** A judgement as the judge writes it. */
 function judgement(fields: {
@@ -162,22 +170,23 @@ describe('The Bond, Arc and Scene judge, the ledger and the dashboard', () => {
         return body as Dashboard;
     }
 
-    /** Returns once the latest reply's judge is no longer pending. */
+    /** Returns once neither of the latest reply's background calls is pending. */
     async function awaitJudge(storyId: number, chatId: number): Promise<Chat> {
         const deadline = Date.now() + 5_000;
         for (;;) {
             const chat = await getChat(storyId, chatId);
             const last = [...chat.messages].reverse().find((message) => message.kind === 'ai' && message.judge);
-            if (!last || last.judge?.status !== 'pending') return chat;
+            if (!last || (last.judge?.status !== 'pending' && last.memory?.status !== 'pending')) return chat;
             if (Date.now() > deadline) throw new Error('The judge did not settle in time');
             await new Promise((resolve) => setTimeout(resolve, 20));
         }
     }
 
-    /** A turn with the given reply and judge output, settled. */
+    /** A turn with the given reply and judge output and an extraction that changes nothing, settled. */
     async function play(storyId: number, chatId: number, text: string, reply: string, judge: string = NO_CHANGE): Promise<Chat> {
         t.gateway.scriptText('turn', { text: reply, model: 'glm-5.3' });
         t.gateway.scriptText('judge', judge);
+        t.gateway.scriptText('memory_extraction', NO_OPS);
         await t.http.post(`/api/stories/${storyId}/chats/${chatId}/messages`).send({ text }).expect(201);
         return awaitJudge(storyId, chatId);
     }
@@ -369,7 +378,9 @@ Ash: I take them off.
                     createdAt: expect.any(String),
                 },
             });
-            expect(board.background).toEqual([{ messageId: reply.id, position: 2, judge: { status: 'done', error: null } }]);
+            expect(board.background).toEqual([
+                { messageId: reply.id, position: 2, judge: { status: 'done', error: null }, memory: { status: 'done', error: null } },
+            ]);
 
             // The next prompt sees the new Scene, the new Bond and the Arc step.
             await play(story.id, chat.id, 'I climb.', 'The stairs creak.');
@@ -487,13 +498,14 @@ Ash: I take them off.
             expect(played.currentScene).toEqual({ id: story.scenes[1].id, name: 'The lamp' });
             t.gateway.scriptText('turn', 'Reply two, again.');
             t.gateway.scriptText('judge', judgement({ bonds: [{ from: 'Kai', to: 'user', label: 'Amused' }] }));
+            t.gateway.scriptText('memory_extraction', NO_OPS);
 
             const { body } = await t.http
                 .patch(`/api/stories/${story.id}/chats/${chat.id}/messages/${played.messages[3].id}`)
                 .send({ text: 'Two, differently.' })
                 .expect(200);
 
-            expect(body.rolledBack).toEqual({ bondChanges: 2, arcSteps: 1, sceneAdvances: 0 });
+            expect(body.rolledBack).toEqual({ memoryChanges: 0, bondChanges: 2, arcSteps: 1, sceneAdvances: 0 });
             expect(body.messages).toHaveLength(5);
             expect(body.currentScene).toEqual({ id: story.scenes[1].id, name: 'The lamp' });
             const settled = await awaitJudge(story.id, chat.id);
@@ -516,15 +528,18 @@ Ash: I take them off.
             const played = await playThree(story, chat.id);
             const firstReply = played.messages[2];
             t.gateway.scriptText('judge', judgement({ bonds: [{ from: 'Mira', to: 'user', label: 'Amused', cause: 'Ash slipped on the step.' }] }));
+            t.gateway.scriptText('memory_extraction', NO_OPS);
 
             const { body } = await t.http
                 .patch(`/api/stories/${story.id}/chats/${chat.id}/messages/${firstReply.id}`)
                 .send({ text: 'Mira snorts.\n\n@Mira: Mind the step.' })
                 .expect(200);
 
-            expect(body.rolledBack).toEqual({ bondChanges: 3, arcSteps: 1, sceneAdvances: 1 });
+            expect(body.rolledBack).toEqual({ memoryChanges: 0, bondChanges: 3, arcSteps: 1, sceneAdvances: 1 });
             expect(body.messages).toHaveLength(3);
-            expect(body.messages[2]).toMatchObject({ id: firstReply.id, judge: { status: 'pending', error: null } });
+            expect(body.messages[2]).toMatchObject({ id: firstReply.id, judge: { status: 'pending', error: null }, memory: { error: null } });
+            // The fake's extraction can finish before the edit answers; the judge, with more to read, cannot.
+            expect(['pending', 'done']).toContain(body.messages[2].memory.status);
             // Back on the first Scene: the advance this Message caused is undone.
             expect(body.currentScene).toEqual({ id: story.scenes[0].id, name: 'Arrival' });
             expect(t.gateway.textCalls('turn')).toHaveLength(3);
@@ -542,7 +557,7 @@ Ash: I take them off.
                 .patch(`/api/stories/${story.id}/chats/${chat.id}/messages/${played.messages[0].id}`)
                 .send({ text: '@Mira: Boots off.' })
                 .expect(200);
-            expect(opening.body.rolledBack).toEqual({ bondChanges: 1, arcSteps: 0, sceneAdvances: 0 });
+            expect(opening.body.rolledBack).toEqual({ memoryChanges: 0, bondChanges: 1, arcSteps: 0, sceneAdvances: 0 });
             expect(opening.body.messages).toHaveLength(1);
             expect(opening.body.messages[0].judge).toBeNull();
             expect(t.gateway.textCalls()).toHaveLength(0);
@@ -557,13 +572,14 @@ Ash: I take them off.
             expect(played.currentScene).toBeNull();
             t.gateway.scriptText('turn', 'Reply one, again.');
             t.gateway.scriptText('judge', NO_CHANGE);
+            t.gateway.scriptText('memory_extraction', NO_OPS);
 
             const { body } = await t.http
                 .patch(`/api/stories/${story.id}/chats/${chat.id}/messages/${played.messages[1].id}`)
                 .send({ text: 'One, differently.' })
                 .expect(200);
 
-            expect(body.rolledBack).toEqual({ bondChanges: 0, arcSteps: 0, sceneAdvances: 2 });
+            expect(body.rolledBack).toEqual({ memoryChanges: 0, bondChanges: 0, arcSteps: 0, sceneAdvances: 2 });
             expect(body.currentScene).toEqual({ id: story.scenes[0].id, name: 'Arrival' });
             await awaitJudge(story.id, chat.id);
             expect(systemPrompt(lastCall('turn'))).toContain('# Current Scene: Arrival');
@@ -634,6 +650,7 @@ Ash: I take them off.
             const judge = slowJudge();
             try {
                 t.gateway.scriptText('turn', 'Reply one.');
+                t.gateway.scriptText('memory_extraction', NO_OPS, NO_OPS);
                 const first = await t.http.post(`/api/stories/${story.id}/chats/${chat.id}/messages`).send({ text: 'One.' }).expect(201);
                 expect(lastAi(first.body as Chat).judge).toEqual({ status: 'pending', error: null });
 
@@ -665,6 +682,7 @@ Ash: I take them off.
             const judge = slowJudge();
             try {
                 t.gateway.scriptText('turn', 'Reply one.');
+                t.gateway.scriptText('memory_extraction', NO_OPS);
                 await t.http.post(`/api/stories/${story.id}/chats/${chat.id}/messages`).send({ text: 'One.' }).expect(201);
 
                 const blocked = await t.http.post(`/api/stories/${story.id}/chats/${chat.id}/messages`).send({ text: 'Two.' }).expect(409);
@@ -687,11 +705,17 @@ Ash: I take them off.
             const chat = await createChat(story.id);
             t.gateway.scriptText('turn', 'Reply one.');
             t.gateway.scriptText('judge', new ProviderOutageError('DeepInfra answered 503.'));
+            t.gateway.scriptText('memory_extraction', NO_OPS, NO_OPS);
             await t.http.post(`/api/stories/${story.id}/chats/${chat.id}/messages`).send({ text: 'One.' }).expect(201);
             const failed = await awaitJudge(story.id, chat.id);
             expect(lastAi(failed).judge).toEqual({ status: 'failed', error: 'DeepInfra answered 503.' });
             expect((await dashboard(story.id, chat.id)).background).toEqual([
-                { messageId: lastAi(failed).id, position: 2, judge: { status: 'failed', error: 'DeepInfra answered 503.' } },
+                {
+                    messageId: lastAi(failed).id,
+                    position: 2,
+                    judge: { status: 'failed', error: 'DeepInfra answered 503.' },
+                    memory: { status: 'done', error: null },
+                },
             ]);
 
             t.gateway.scriptText('turn', 'Reply two.');
@@ -703,7 +727,9 @@ Ash: I take them off.
             // Retry runs the judge alone; no turn is written.
             t.gateway.scriptText('judge', judgement({ bonds: [{ from: 'Mira', to: 'user', label: 'Curious' }] }));
             const retried = await t.http.post(`/api/stories/${story.id}/chats/${chat.id}/messages/${lastAi(failed).id}/judge`).expect(200);
-            expect(retried.body.background).toEqual([{ messageId: lastAi(failed).id, position: 2, judge: { status: 'done', error: null } }]);
+            expect(retried.body.background).toEqual([
+                { messageId: lastAi(failed).id, position: 2, judge: { status: 'done', error: null }, memory: { status: 'done', error: null } },
+            ]);
             expect(character(retried.body as Dashboard, 'Mira').bonds[0].label).toBe('Curious');
             expect(t.gateway.textCalls('turn')).toHaveLength(1);
             expect(t.gateway.textCalls('judge')).toHaveLength(2);
@@ -741,6 +767,7 @@ Ash: I take them off.
             const played = await play(story.id, chat.id, 'One.', 'Reply one.');
             t.gateway.scriptText('turn', 'Reply one, again.');
             t.gateway.scriptText('judge', new ProviderOutageError());
+            t.gateway.scriptText('memory_extraction', NO_OPS);
 
             await t.http.patch(`/api/stories/${story.id}/chats/${chat.id}/messages/${played.messages[1].id}`).send({ text: 'One, again.' }).expect(200);
 
@@ -761,8 +788,8 @@ Ash: I take them off.
             const board = await dashboard(story.id, chat.id);
 
             expect(board.background).toEqual([
-                { messageId: played.messages[4].id, position: 4, judge: { status: 'done', error: null } },
-                { messageId: played.messages[2].id, position: 2, judge: { status: 'done', error: null } },
+                { messageId: played.messages[4].id, position: 4, judge: { status: 'done', error: null }, memory: { status: 'done', error: null } },
+                { messageId: played.messages[2].id, position: 2, judge: { status: 'done', error: null }, memory: { status: 'done', error: null } },
             ]);
             expect((await t.http.get(`/api/stories/${other.id}/chats/${chat.id}/dashboard`).expect(404)).body.error.code).toBe('404.004.001');
         });
@@ -775,7 +802,7 @@ Ash: I take them off.
 
             await t.http.delete(`/api/stories/${story.id}/chats/${chat.id}`).expect(204);
 
-            for (const table of ['bond_change', 'arc_step', 'scene_advance', 'chat_arc_direction']) {
+            for (const table of ['bond_change', 'arc_step', 'scene_advance', 'chat_arc_direction', 'memory', 'memory_change']) {
                 expect(await countRows(table, chat.id)).toBe(0);
             }
         });
