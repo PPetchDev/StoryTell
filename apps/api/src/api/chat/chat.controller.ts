@@ -14,7 +14,7 @@ const Id = (name: string) => Param(name, ParseIntPipe);
 
 /**
  * Chats per Story: create, list, rename, reset, delete, send, retry, edit a Message, the
- * read-only dashboard and a judge retry (spec: "API surface").
+ * read-only dashboard and a retry of either background call (spec: "API surface").
  */
 @ApiTags('Chats')
 @Controller('stories/:storyId/chats')
@@ -108,6 +108,18 @@ export class ChatApiController {
         @Id('messageId') messageId: number,
     ): Promise<ChatDashboardResponseBodyDTO> {
         return this.chatManager.retryJudge(storyId, chatId, messageId);
+    }
+
+    /** Runs the failed Memory extraction of the latest AI Message again, and only that. */
+    @Post(':chatId/messages/:messageId/memory')
+    @HttpCode(200)
+    @ApiOkResponse({ type: ChatDashboardResponseBodyDTO })
+    retryExtraction(
+        @Id('storyId') storyId: number,
+        @Id('chatId') chatId: number,
+        @Id('messageId') messageId: number,
+    ): Promise<ChatDashboardResponseBodyDTO> {
+        return this.chatManager.retryExtraction(storyId, chatId, messageId);
     }
 
     /** Clears every Message and copies the current Opening in again; title and identity stay. */

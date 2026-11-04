@@ -175,7 +175,7 @@ function messageLine(message: MessageEntity, identityName: string): string {
 }
 
 /** Resolves to false after `ms`, for racing against work that resolves to true. */
-function sleep(ms: number): Promise<false> {
+export function sleep(ms: number): Promise<false> {
     return new Promise((resolve) => {
         const timer = setTimeout(() => resolve(false), ms);
         // A pending timer must not keep the process alive once the work it raced is done.

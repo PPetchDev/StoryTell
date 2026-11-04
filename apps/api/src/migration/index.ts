@@ -4,6 +4,7 @@ import { CreateSettingsAndUsageRecord1762700000000 } from './1762700000000-Creat
 import { ChatsAndMessages1762800000000 } from './1762800000000-ChatsAndMessages.js';
 import { CharacterReferenceImage1762900000000 } from './1762900000000-CharacterReferenceImage.js';
 import { JudgeAndLedger1763000000000 } from './1763000000000-JudgeAndLedger.js';
+import { MemoryAndExtraction1763100000000 } from './1763100000000-MemoryAndExtraction.js';
 
 // Listed by hand, oldest first, so migrations load the same way from compiled JS, the
 // TypeORM CLI and Vitest. Add every new migration here.
@@ -14,4 +15,5 @@ export const migrations = [
     ChatsAndMessages1762800000000,
     CharacterReferenceImage1762900000000,
     JudgeAndLedger1763000000000,
+    MemoryAndExtraction1763100000000,
 ];

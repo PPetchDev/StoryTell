@@ -1,0 +1,31 @@
+{
+    "id": "gen-synthetic-0004",
+    "provider": "DeepInfra",
+    "model": "deepseek/deepseek-v4-flash",
+    "object": "chat.completion",
+    "created": 1762300000,
+    "choices": [
+        {
+            "logprobs": null,
+            "finish_reason": "stop",
+            "native_finish_reason": "stop",
+            "index": 0,
+            "message": {
+                "role": "assistant",
+                "content": "{\"operations\":[{\"op\":\"add\",\"text\":\"{user} arrived at the lighthouse in a storm.\",\"known_by\":[\"Mira\"],\"cause\":\"The keeper arrived in the storm.\"}]}",
+                "refusal": null,
+                "reasoning": null
+            }
+        }
+    ],
+    "usage": {
+        "prompt_tokens": 700,
+        "completion_tokens": 60,
+        "total_tokens": 760,
+        "cost": 0.0001,
+        "is_byok": false,
+        "prompt_tokens_details": { "cached_tokens": 0 },
+        "cost_details": { "upstream_inference_cost": null },
+        "completion_tokens_details": { "reasoning_tokens": 0 }
+    }
+}

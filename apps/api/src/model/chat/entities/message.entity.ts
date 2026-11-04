@@ -51,6 +51,8 @@ export interface AiMessageResponse {
     parts: MessagePartResponse[];
     /** The Bond, Arc and Scene judge's status; null for the Opening, which is never judged. */
     judge: BackgroundCallResponse | null;
+    /** Memory extraction's status; null for the Opening, and for replies from before ticket 28. */
+    memory: BackgroundCallResponse | null;
     createdAt: string;
 }
 
@@ -59,7 +61,7 @@ export type MessageResponse = UserMessageResponse | AiMessageResponse;
 /**
  * One entry in a Chat's history (spec: "Message"): what the user wrote, or the AI's reply
  * as ordered parts. An AI Message exists only once its turn completed, and then records the
- * status of its background judge (ticket 27); Memory extraction's status is ticket 28's.
+ * status of its two background calls: the judge (ticket 27) and Memory extraction (ticket 28).
  */
 @Entity('message')
 export class MessageEntity {
@@ -102,6 +104,19 @@ export class MessageEntity {
     @Column({ name: 'judge_error', type: 'text', nullable: true })
     judgeError: string | null;
 
+    // Memory extraction's status; set together with the judge's on every reply a model wrote.
+    @Column({
+        name: 'memory_status',
+        type: 'enum',
+        enum: BackgroundStatus,
+        enumName: 'background_status_enum',
+        nullable: true,
+    })
+    memoryStatus: BackgroundStatus | null;
+
+    @Column({ name: 'memory_error', type: 'text', nullable: true })
+    memoryError: string | null;
+
     @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
     createdAt: Date;
 
@@ -125,6 +140,7 @@ export class MessageEntity {
             model: this.model ?? AUTHOR_MODEL,
             parts: this.parts.map((part) => part.toResponse()),
             judge: this.judgeStatus === null ? null : { status: this.judgeStatus, error: this.judgeError },
+            memory: this.memoryStatus === null ? null : { status: this.memoryStatus, error: this.memoryError },
             createdAt: this.createdAt.toISOString(),
         };
     }

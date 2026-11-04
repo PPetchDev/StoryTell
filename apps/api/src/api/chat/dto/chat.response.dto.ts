@@ -90,6 +90,13 @@ export class MessageDTO {
     })
     judge?: BackgroundCallDTO | null;
 
+    @ApiPropertyOptional({
+        type: BackgroundCallDTO,
+        nullable: true,
+        description: 'AI Message only: Memory extraction; null on the Opening and on replies from before it existed.',
+    })
+    memory?: BackgroundCallDTO | null;
+
     @ApiProperty()
     createdAt: string;
 }
@@ -141,6 +148,9 @@ export class ChatResponseBodyDTO extends ChatSummaryDTO implements Omit<ChatDeta
 }
 
 export class RollbackCountsDTO implements RollbackCounts {
+    @ApiProperty({ description: 'Memory changes undone by the rewind: adds removed, deletes restored, updates, archives and Known-by additions reverted.' })
+    memoryChanges: number;
+
     @ApiProperty({ description: 'Bond changes undone by the rewind.' })
     bondChanges: number;
 
@@ -290,6 +300,9 @@ export class DashboardBackgroundDTO implements DashboardBackground {
 
     @ApiProperty({ type: BackgroundCallDTO })
     judge: BackgroundCallDTO;
+
+    @ApiProperty({ type: BackgroundCallDTO, nullable: true, description: 'Memory extraction; null on replies from before it existed.' })
+    memory: BackgroundCallDTO | null;
 }
 
 /** The read-only dashboard opened from the Chat (spec: "Dashboard"). */

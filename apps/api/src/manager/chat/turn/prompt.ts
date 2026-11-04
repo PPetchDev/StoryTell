@@ -1,19 +1,21 @@
 import { Pov, ReplyLength, Tense } from '../../../model/story/entities/story.entity.js';
 import { PromptMessage } from '../../../service/model-gateway/model-gateway.js';
+import { MEMORY_CAP_TOKENS, memoryLine } from '../memory/memory-prompt.js';
+import { renderUser } from '../memory/render-user.js';
 
 /**
  * Prompt assembly for one turn (spec: "Prompt assembly"). Pure logic over plain inputs, so
  * tests can pin the layer order and the trimming without a database.
  *
  * Layers, most stable first so prompt caching holds:
- *  1. Narrator rules      5. Cast cards              9. Memory (ticket 28)
+ *  1. Narrator rules      5. Cast cards              9. Memory
  *  2. Setting             6. current Scene          10. recent Messages
  *  3. Role                7. Feelings (Bonds)       11. the user's message
  *  4. Style               8. Arcs                   12. the final instruction
  *
  * Layers 1–9 form one system message with a `# Heading` per layer; 10–11 are chat turns;
  * 12 is a trailing system message, as in the prototype. Each layer is its own function, so
- * ticket 26 can swap the identity layer for a worn Persona and ticket 28 can add Memory.
+ * ticket 26 can swap the identity layer for a worn Persona.
  */
 
 export interface PromptCharacter {
@@ -67,6 +69,14 @@ export interface PromptArc {
     direction: string;
 }
 
+/** A Memory as the Memory layer lists it: its text with `{user}`, and who knows it by name. */
+export interface PromptMemory {
+    text: string;
+    knownBy: string[];
+    /** A locked Memory is the user's and is never left out to fit the cap. */
+    locked: boolean;
+}
+
 export interface TurnPromptInput {
     story: PromptStory;
     identity: PromptIdentity;
@@ -75,11 +85,15 @@ export interface TurnPromptInput {
     bonds: PromptBond[];
     /** One per Character, in cast order (spec: "Arcs"). */
     arcs: PromptArc[];
+    /** Every non-archived Memory, in the stable order (spec: "Memory block"). */
+    memories: PromptMemory[];
     /** Every Message of the Chat before the new one, oldest first. */
     history: PromptHistoryMessage[];
     userText: string;
     /** Total prompt budget in tokens; recent Messages are trimmed from the oldest to fit. */
     tokenBudget?: number;
+    /** The Memory layer's cap in tokens (spec: "about 2k tokens"); the oldest unlocked Memories are left out past it. */
+    memoryCapTokens?: number;
 }
 
 export interface TurnPrompt {
@@ -88,6 +102,8 @@ export interface TurnPrompt {
     maxTokens: number;
     /** How many of the oldest history Messages were left out to fit the budget. */
     trimmed: number;
+    /** How many of the oldest unlocked Memories were left out to keep the Memory layer under its cap. */
+    memoriesLeftOut: number;
 }
 
 /** Spec: "about 16k tokens, tunable". */
@@ -201,6 +217,35 @@ function arcsLayer(arcs: PromptArc[]): string {
     return `${PROMPT_LAYERS.arcs}\n${lines.join('\n')}`;
 }
 
+/**
+ * Spec: "Memory block": every non-archived Memory with its Known-by tags, under the
+ * instruction that a Character knows only the Memories it is tagged on while the Narrator
+ * knows all. `{user}` is rendered as the worn identity's name. Extraction keeps the list
+ * under the cap by merging and archiving; should it fall behind, the oldest unlocked
+ * Memories are left out here so the prompt stays bounded, and the caller logs how many.
+ */
+function memoryLayer(memories: PromptMemory[], identity: string, cap: number): { text: string; leftOut: number } {
+    const fits = (kept: PromptMemory[]) => estimateTokens(kept.map((memory) => memoryLine(memory)).join('\n')) <= cap;
+    const kept = [...memories];
+    let leftOut = 0;
+    while (!fits(kept)) {
+        const oldestUnlocked = kept.findIndex((memory) => !memory.locked);
+        if (oldestUnlocked < 0) break;
+        kept.splice(oldestUnlocked, 1);
+        leftOut++;
+    }
+    const lines =
+        kept.length === 0
+            ? ['Nothing has been established in this Chat yet.']
+            : kept.map((memory) => memoryLine({ text: renderUser(memory.text, identity), knownBy: memory.knownBy }));
+    return {
+        text: `${PROMPT_LAYERS.memory} (what has happened in this Chat so far)
+${lines.join('\n')}
+A Character knows only the Memories it is tagged on and acts as if the rest never happened; the Narrator knows them all.`,
+        leftOut,
+    };
+}
+
 /** Stop strings on the worn identity (spec); the gateway drops them for hosts without support. */
 export function stopStrings(identityName: string): string[] {
     return [`\n${identityName}:`, `\n@${identityName}:`, '\nYou:'];
@@ -209,6 +254,7 @@ export function stopStrings(identityName: string): string[] {
 export function buildTurnPrompt(input: TurnPromptInput): TurnPrompt {
     const identity = input.identity.name;
     const castNames = input.story.characters.map((character) => character.name);
+    const memory = memoryLayer(input.memories, identity, input.memoryCapTokens ?? MEMORY_CAP_TOKENS);
     const system = [
         rulesLayer(identity, castNames),
         `${PROMPT_LAYERS.setting}\n${input.story.setting}`,
@@ -218,7 +264,7 @@ export function buildTurnPrompt(input: TurnPromptInput): TurnPrompt {
         sceneLayer(input.scene),
         feelingsLayer(input.bonds, identity),
         arcsLayer(input.arcs),
-        // The Memory layer goes here (ticket 28).
+        memory.text,
     ].join('\n\n');
     const finalInstruction = `Write the next turn now. Do not write anything ${identity} says, thinks or does. Use @Name: lines for Character speech.`;
 
@@ -243,5 +289,6 @@ export function buildTurnPrompt(input: TurnPromptInput): TurnPrompt {
         stop: stopStrings(identity),
         maxTokens: REPLY_LENGTH_WORDS[input.story.replyLength].maxTokens,
         trimmed: input.history.length - kept.length,
+        memoriesLeftOut: memory.leftOut,
     };
 }

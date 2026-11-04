@@ -93,11 +93,12 @@ export function Dashboard({ initial }: { initial: ChatDashboard }) {
     const [retrying, setRetrying] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
 
-    const retry = async (messageId: number) => {
+    const retry = async (messageId: number, call: 'judge' | 'memory') => {
         setRetrying(messageId);
         setError(null);
         try {
-            setDashboard(await chatApi.retryJudge(dashboard.storyId, dashboard.chatId, messageId));
+            const run = call === 'judge' ? chatApi.retryJudge : chatApi.retryExtraction;
+            setDashboard(await run(dashboard.storyId, dashboard.chatId, messageId));
         } catch (caught) {
             if (caught instanceof ApiUnreachableError) reportUnreachable();
             else setError(caught instanceof ApiError ? caught.message : 'The retry failed.');
@@ -161,10 +162,26 @@ export function Dashboard({ initial }: { initial: ChatDashboard }) {
                                         type="button"
                                         className="button button-quiet button-small"
                                         disabled={retrying !== null}
-                                        onClick={() => void retry(entry.messageId)}
+                                        onClick={() => void retry(entry.messageId, 'judge')}
                                     >
                                         {retrying === entry.messageId ? 'Retrying…' : 'Retry'}
                                     </button>
+                                )}
+                                {entry.memory && (
+                                    <>
+                                        {' · '}memory {STATUS_WORDS[entry.memory.status]}
+                                        {entry.memory.error && <span className="turn-error"> — {entry.memory.error}</span>}
+                                        {entry.memory.status === 'failed' && (
+                                            <button
+                                                type="button"
+                                                className="button button-quiet button-small"
+                                                disabled={retrying !== null}
+                                                onClick={() => void retry(entry.messageId, 'memory')}
+                                            >
+                                                {retrying === entry.messageId ? 'Retrying…' : 'Retry'}
+                                            </button>
+                                        )}
+                                    </>
                                 )}
                             </li>
                         ))}

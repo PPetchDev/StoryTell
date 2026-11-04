@@ -45,17 +45,21 @@ export class MessageNotFoundError extends AppError {
     }
 }
 
-/** The previous AI Message's background judge was still pending past the wait (spec: story 68). */
+/** A previous AI Message's background call was still pending past the wait (spec: story 68). */
 export class BackgroundStillSavingError extends AppError {
     constructor() {
-        super('409.004.007', 'The previous turn is still saving its Bonds, Arcs and Scene. Try again in a moment.');
+        super('409.004.007', 'The previous turn is still saving its Memory, Bonds, Arcs and Scene. Try again in a moment.');
     }
 }
 
-/** The previous AI Message's background judge failed; it must be retried before the next turn. */
+/** The names of the background calls, as the failed notice reads them. */
+export type BackgroundCallName = 'the Bond, Arc and Scene judge' | 'Memory extraction';
+
+/** A previous AI Message's background call failed; it must be retried before the next turn. */
 export class BackgroundFailedError extends AppError {
-    constructor() {
-        super('409.004.008', "The previous turn's Bond, Arc and Scene judge failed. Retry it before sending.");
+    constructor(failed: BackgroundCallName[] = ['the Bond, Arc and Scene judge']) {
+        const what = failed.join(' and ');
+        super('409.004.008', `The previous turn's ${what} failed. Retry ${failed.length > 1 ? 'them' : 'it'} before sending.`);
     }
 }
 
@@ -63,5 +67,25 @@ export class BackgroundFailedError extends AppError {
 export class NoFailedJudgeError extends AppError {
     constructor() {
         super('409.004.009', 'There is no failed judge call to retry on that Message.');
+    }
+}
+
+/** An extraction retry on a Message whose extraction did not fail, or that is not the latest AI Message. */
+export class NoFailedExtractionError extends AppError {
+    constructor() {
+        super('409.004.010', 'There is no failed Memory extraction to retry on that Message.');
+    }
+}
+
+export class MemoryNotFoundError extends AppError {
+    constructor() {
+        super('404.004.011', 'Memory not found.');
+    }
+}
+
+/** A Memory added or edited with nothing but whitespace. */
+export class EmptyMemoryError extends AppError {
+    constructor() {
+        super('422.004.012', 'Write what to remember.');
     }
 }

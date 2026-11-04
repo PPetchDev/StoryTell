@@ -3,10 +3,12 @@
 import Link from 'next/link';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 
+import { MemoryDrawer } from '@/components/chat/memory-drawer';
 import { useConnection } from '@/components/connection';
 import { ConfirmButton } from '@/components/story-editor/fields';
 import { ApiError, apiFetch, ApiUnreachableError } from '@/lib/api';
-import { Chat, chatApi, EditedChat, Message, messageText, modelLabel, rollbackNotice } from '@/lib/chat';
+import { backgroundPending, Chat, chatApi, EditedChat, latestReply, Message, messageText, modelLabel, rollbackNotice } from '@/lib/chat';
+import { Memory, memoryApi, renderUser } from '@/lib/memory';
 
 function messageLabel(message: Message): string {
     if (message.kind === 'user') return `${message.identityName} said`;
@@ -130,25 +132,31 @@ function MessageView({ message, later, editing, canEdit, onEdit, onSave, onCance
     );
 }
 
-/** The latest AI Message a model wrote, whose judge may still be pending or have failed. */
-function latestJudged(chat: Chat) {
-    for (let i = chat.messages.length - 1; i >= 0; i--) {
-        const message = chat.messages[i];
-        if (message.kind === 'ai' && message.judge) return { id: message.id, judge: message.judge };
-    }
-    return null;
+interface NoticesProps {
+    chat: Chat;
+    onRetryJudge(messageId: number): void;
+    onRetryExtraction(messageId: number): void;
+    retrying: boolean;
 }
 
 /** What stands between the user and the next turn, if anything. */
-function Notices({ chat, onRetryJudge, retryingJudge }: { chat: Chat; onRetryJudge(messageId: number): void; retryingJudge: boolean }) {
-    const judged = latestJudged(chat);
+function Notices({ chat, onRetryJudge, onRetryExtraction, retrying }: NoticesProps) {
+    const reply = latestReply(chat);
     return (
         <>
-            {judged?.judge.status === 'failed' && (
+            {reply?.judge?.status === 'failed' && (
                 <p className="notice" role="status">
-                    Sending is blocked: the last reply&apos;s Bond, Arc and Scene judge failed ({judged.judge.error}).{' '}
-                    <button type="button" className="button button-quiet" disabled={retryingJudge} onClick={() => onRetryJudge(judged.id)}>
-                        {retryingJudge ? 'Retrying…' : 'Retry'}
+                    Sending is blocked: the last reply&apos;s Bond, Arc and Scene judge failed ({reply.judge.error}).{' '}
+                    <button type="button" className="button button-quiet" disabled={retrying} onClick={() => onRetryJudge(reply.id)}>
+                        {retrying ? 'Retrying…' : 'Retry'}
+                    </button>
+                </p>
+            )}
+            {reply?.memory?.status === 'failed' && (
+                <p className="notice" role="status">
+                    Sending is blocked: the last reply&apos;s Memory extraction failed ({reply.memory.error}).{' '}
+                    <button type="button" className="button button-quiet" disabled={retrying} onClick={() => onRetryExtraction(reply.id)}>
+                        {retrying ? 'Retrying…' : 'Retry'}
                     </button>
                 </p>
             )}
@@ -174,13 +182,23 @@ function Notices({ chat, onRetryJudge, retryingJudge }: { chat: Chat; onRetryJud
     );
 }
 
+/** A "Memory added" toast (spec: story 83): one per Memory the AI added in the latest turn. */
+interface Toast {
+    memoryId: number;
+    text: string;
+}
+
+/** How often the Chat is re-read while the last reply's background calls run. */
+const BACKGROUND_POLL_MS = 1_000;
+
 /**
  * The Chat screen (spec: "Chat screen"): narration and named speech in order, a composer,
  * and the notice line. No streaming: a "writing" indicator shows while the turn is written,
  * and a failed turn leaves the User Message with Retry. Any Message can be edited in place,
  * which discards the Messages after it and rolls back their changes, with a short notice of
  * what went; Reset starts the Chat over from the Opening. Bonds and Arcs never show here:
- * the dashboard link leads to them.
+ * the dashboard link leads to them. Memory does: the drawer lists it, and a "Memory added"
+ * toast appears for each Memory the AI adds once a turn's extraction is done.
  */
 export function ChatScreen({ initial }: { initial: Chat }) {
     const { reportUnreachable } = useConnection();
@@ -191,8 +209,12 @@ export function ChatScreen({ initial }: { initial: Chat }) {
     const [editing, setEditing] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [rollback, setRollback] = useState<string | null>(null);
+    const [drawer, setDrawer] = useState<{ open: boolean; focus: number | null; version: number }>({ open: false, focus: null, version: 0 });
+    const [toasts, setToasts] = useState<Toast[]>([]);
     const endRef = useRef<HTMLDivElement>(null);
     const jumpedRef = useRef(false);
+    /** The reply whose finished extraction was already announced, so a re-read never toasts twice. */
+    const announcedRef = useRef<number | null>(latestReply(initial)?.id ?? null);
 
     useEffect(() => {
         // A dashboard link lands on its Message once; after that, follow the newest Message.
@@ -206,7 +228,62 @@ export function ChatScreen({ initial }: { initial: Chat }) {
         endRef.current?.scrollIntoView({ block: 'end' });
     }, [chat.messages.length, writing]);
 
+    // While the last reply's background calls run, re-read the Chat until they settle.
+    useEffect(() => {
+        if (!backgroundPending(chat)) return;
+        const timer = setTimeout(() => {
+            apiFetch<Chat>(`/stories/${chat.storyId}/chats/${chat.id}`).then(setChat, (caught: unknown) => {
+                if (caught instanceof ApiUnreachableError) reportUnreachable();
+            });
+        }, BACKGROUND_POLL_MS);
+        return () => clearTimeout(timer);
+    }, [chat, reportUnreachable]);
+
+    // Once a reply's extraction is done, announce what the AI added and let the drawer re-read.
+    useEffect(() => {
+        const reply = latestReply(chat);
+        if (!reply || reply.memory?.status !== 'done' || announcedRef.current === reply.id) return;
+        announcedRef.current = reply.id;
+        setDrawer((current) => ({ ...current, version: current.version + 1 }));
+        memoryApi.list(chat.storyId, chat.id).then(
+            (list) => {
+                const added = list.memories.filter((memory: Memory) => memory.messageId === reply.id && memory.writtenBy === 'ai');
+                setToasts(added.map((memory) => ({ memoryId: memory.id, text: renderUser(memory.text, list.identityName) })));
+            },
+            () => {
+                // The drawer shows the Memory either way; a missed toast is no loss.
+            },
+        );
+    }, [chat]);
+
     const blocked = !chat.playable || chat.textCreditOut;
+
+    const openMemory = (memoryId: number | null = null) => {
+        setDrawer((current) => ({ open: true, focus: memoryId, version: current.version }));
+        if (memoryId !== null) setToasts((current) => current.filter((toast) => toast.memoryId !== memoryId));
+    };
+
+    /** Scrolls to a Message and outlines it, from a Memory's jump link. */
+    const jumpTo = (messageId: number) => {
+        const target = document.getElementById(`message-${messageId}`);
+        if (!target) return;
+        window.history.replaceState(null, '', `#message-${messageId}`);
+        for (const marked of document.querySelectorAll('.message-target')) marked.classList.remove('message-target');
+        target.scrollIntoView({ block: 'center' });
+        target.classList.add('message-target');
+    };
+
+    /**
+     * The Chat after a write that may have changed the Memory (an edit, a reset): the drawer
+     * re-reads, old toasts go, and the reply's extraction, which runs again after an edit,
+     * is announced afresh once it is done.
+     */
+    const refreshMemory = (next: Chat): Chat => {
+        setDrawer((current) => ({ ...current, version: current.version + 1 }));
+        setToasts([]);
+        announcedRef.current = null;
+        return next;
+    };
 
     /** The edited Chat, after noting what its rewind rolled back. */
     const noteRollback = (edited: EditedChat): Chat => {
@@ -261,7 +338,7 @@ export function ChatScreen({ initial }: { initial: Chat }) {
 
     const saveEdit = (message: Message, text: string) => {
         setEditing(null);
-        const edit = async () => noteRollback(await chatApi.edit(chat.storyId, chat.id, message.id, text));
+        const edit = async () => refreshMemory(noteRollback(await chatApi.edit(chat.storyId, chat.id, message.id, text)));
         // An edited User Message gets a fresh reply, so it runs as a turn; an AI Message does not.
         if (message.kind === 'user') void runTurn(edit);
         else void runWrite(edit);
@@ -271,6 +348,14 @@ export function ChatScreen({ initial }: { initial: Chat }) {
     const retryJudge = (messageId: number) =>
         void runWrite(async () => {
             await chatApi.retryJudge(chat.storyId, chat.id, messageId);
+            return apiFetch<Chat>(`/stories/${chat.storyId}/chats/${chat.id}`);
+        });
+
+    /** The same for a failed Memory extraction; its adds are announced once the Chat reads done. */
+    const retryExtraction = (messageId: number) =>
+        void runWrite(async () => {
+            announcedRef.current = null;
+            await chatApi.retryExtraction(chat.storyId, chat.id, messageId);
             return apiFetch<Chat>(`/stories/${chat.storyId}/chats/${chat.id}`);
         });
 
@@ -285,14 +370,39 @@ export function ChatScreen({ initial }: { initial: Chat }) {
             </nav>
             <div className="chat-head">
                 <h1>{chat.title}</h1>
+                <button type="button" className="button button-quiet" onClick={() => openMemory()}>
+                    Memory
+                </button>
                 <ConfirmButton
                     label="Reset"
                     question="Clear every Message and start this Chat over from the Opening?"
                     confirmLabel="Reset"
-                    onConfirm={() => void runWrite(() => chatApi.reset(chat.storyId, chat.id))}
+                    onConfirm={() => void runWrite(async () => refreshMemory(await chatApi.reset(chat.storyId, chat.id)))}
                     disabled={writing || busy || editing !== null || !chat.playable}
                 />
             </div>
+
+            {toasts.length > 0 && (
+                <div className="toasts" aria-label="Memory added">
+                    {toasts.map((toast) => (
+                        <button key={toast.memoryId} type="button" className="toast" role="status" onClick={() => openMemory(toast.memoryId)}>
+                            <strong>Memory added</strong>
+                            <span>{toast.text}</span>
+                        </button>
+                    ))}
+                </div>
+            )}
+
+            {drawer.open && (
+                <MemoryDrawer
+                    storyId={chat.storyId}
+                    chatId={chat.id}
+                    focusMemoryId={drawer.focus}
+                    version={drawer.version}
+                    onClose={() => setDrawer((current) => ({ ...current, open: false, focus: null }))}
+                    onJump={jumpTo}
+                />
+            )}
 
             <section className="messages" aria-label="Messages">
                 {chat.messages.map((message, index) => (
@@ -320,7 +430,7 @@ export function ChatScreen({ initial }: { initial: Chat }) {
                     {rollback}
                 </p>
             )}
-            <Notices chat={chat} onRetryJudge={retryJudge} retryingJudge={busy} />
+            <Notices chat={chat} onRetryJudge={retryJudge} onRetryExtraction={retryExtraction} retrying={busy} />
             {error && (
                 <p role="alert" className="turn-error">
                     {error}

@@ -1,11 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 import {
+    BackgroundCallName,
     BackgroundFailedError,
     BackgroundStillSavingError,
     ChatNotFoundError,
     EmptyMessageError,
     MessageNotFoundError,
+    NoFailedExtractionError,
     NoFailedJudgeError,
     NoTurnToRetryError,
     StoryNotPlayableError,
@@ -27,13 +29,16 @@ import { ArcStepResponse } from '../../model/ledger/entities/arc-step.entity.js'
 import { BondChangeResponse } from '../../model/ledger/entities/bond-change.entity.js';
 import { SceneAdvanceResponse } from '../../model/ledger/entities/scene-advance.entity.js';
 import { LedgerModelService, LedgerState, RollbackCounts } from '../../model/ledger/ledger.service.js';
+import { MemoryEntity } from '../../model/memory/entities/memory.entity.js';
+import { MemoryModelService } from '../../model/memory/memory.service.js';
 import { SettingsModelService } from '../../model/settings/settings.service.js';
 import { StoryEntity } from '../../model/story/entities/story.entity.js';
 import { StoryModelService } from '../../model/story/story.service.js';
 import { ModelGateway } from '../../service/model-gateway/model-gateway.js';
 import { MissingField, playableStatus } from '../story/playable.js';
-import { currentBonds, JudgeManagerService, latestJudged } from './judge/judge.service.js';
-import { buildTurnPrompt, PromptArc, PromptBond, PromptHistoryMessage } from './turn/prompt.js';
+import { currentBonds, JudgeManagerService, latestJudged, SettledBackground } from './judge/judge.service.js';
+import { latestExtracted, MemoryExtractionManagerService } from './memory/extraction.service.js';
+import { buildTurnPrompt, PromptArc, PromptBond, PromptHistoryMessage, PromptMemory } from './turn/prompt.js';
 import { parseReply, partsToText, ReplyPart } from './turn/reply-parser.js';
 
 /** A Chat as the Chat screen reads it: its Messages plus everything the notice line needs. */
@@ -82,6 +87,8 @@ export interface DashboardBackground {
     messageId: number;
     position: number;
     judge: BackgroundCallResponse;
+    /** null on replies from before ticket 28, which were never extracted from. */
+    memory: BackgroundCallResponse | null;
 }
 
 /** The read-only dashboard (spec: "Dashboard"). */
@@ -106,7 +113,7 @@ export const DASHBOARD_BACKGROUND_MESSAGES = 10;
 /**
  * Chats and the turn engine (spec: "Chat and turn engine"). One play-model call writes the
  * whole turn; the reply is parsed and guarded, and an AI Message is stored only once it is
- * complete, after which the judge runs in the background. Memory extraction is ticket 28.
+ * complete, after which the judge and Memory extraction run in the background in parallel.
  */
 @Injectable()
 export class ChatManagerService {
@@ -119,7 +126,9 @@ export class ChatManagerService {
         private readonly storyModel: StoryModelService,
         private readonly settingsModel: SettingsModelService,
         private readonly ledger: LedgerModelService,
+        private readonly memoryModel: MemoryModelService,
         private readonly judge: JudgeManagerService,
+        private readonly extraction: MemoryExtractionManagerService,
         private readonly gateway: ModelGateway,
     ) {}
 
@@ -151,8 +160,8 @@ export class ChatManagerService {
     }
 
     /**
-     * Spec: "Reset Chat". The title and the worn identity stay; every Message, the Bond
-     * history, Arc steps, Scene advances and copied Arc directions go; the Opening as it is
+     * Spec: "Reset Chat". The title and the worn identity stay; every Message, all Memory,
+     * the Bond history, Arc steps, Scene advances and copied Arc directions go; the Opening as it is
      * now comes in again as Message 1, StartingBonds and Arc directions are re-seeded from
      * the current Story, and the Chat returns to the first Scene or free play. Like starting
      * a Chat, it needs a playable Story.
@@ -177,8 +186,8 @@ export class ChatManagerService {
      * for good, and every change those Messages caused is rolled back, newest first. An
      * edited User Message gets a fresh reply through the same turn as a send, so a failed
      * one leaves it with Retry. An edited AI Message loses its own changes too, is re-split
-     * into parts from its `@Name:` text, and is judged again in the background; the Chat
-     * then waits for the user. The Opening copy is never judged.
+     * into parts from its `@Name:` text, and both background calls run again on it; the Chat
+     * then waits for the user. The Opening copy is never judged or extracted from.
      */
     async editMessage(storyId: number, chatId: number, messageId: number, text: string): Promise<EditResult> {
         if (text.trim() === '') throw new EmptyMessageError();
@@ -209,9 +218,16 @@ export class ChatManagerService {
         await this.chatModel.rewriteAiMessage(message, reply.parts);
         if (message.model !== AUTHOR_MODEL) {
             await this.chatModel.setJudgeStatus(message.id, BackgroundStatus.Pending);
-            this.judge.start(story, chat.id, message.id);
+            await this.chatModel.setMemoryStatus(message.id, BackgroundStatus.Pending);
+            this.startBackground(story, chat.id, message.id);
         }
         return { ...(await this.getChat(storyId, chatId)), rolledBack };
+    }
+
+    /** Spec: "Start both background calls in parallel, with their status set to pending." */
+    private startBackground(story: StoryEntity, chatId: number, messageId: number): void {
+        this.judge.start(story, chatId, messageId);
+        this.extraction.start(story, chatId, messageId);
     }
 
     /** The Opening becomes Message 1 with model "author", split by the same parser as replies. */
@@ -304,6 +320,19 @@ export class ChatManagerService {
         return this.dashboard(storyId, chatId);
     }
 
+    /** The same for Memory extraction: a failed extraction on the latest extracted AI Message. */
+    async retryExtraction(storyId: number, chatId: number, messageId: number): Promise<ChatDashboard> {
+        const { story, chat } = await this.load(storyId, chatId);
+        const message = chat.messages.find((candidate) => candidate.id === messageId);
+        if (!message) throw new MessageNotFoundError();
+        if (message.memoryStatus !== BackgroundStatus.Failed || latestExtracted(chat)?.id !== message.id) {
+            throw new NoFailedExtractionError();
+        }
+        await this.chatModel.setMemoryStatus(message.id, BackgroundStatus.Pending);
+        await this.extraction.run(story, chat.id, message.id);
+        return this.dashboard(storyId, chatId);
+    }
+
     /** Spec: "Dashboard (read-only)". */
     async dashboard(storyId: number, chatId: number): Promise<ChatDashboard> {
         const { story, chat } = await this.load(storyId, chatId);
@@ -345,6 +374,7 @@ export class ChatManagerService {
                 messageId: message.id,
                 position: message.position,
                 judge: { status: message.judgeStatus!, error: message.judgeError },
+                memory: message.memoryStatus === null ? null : { status: message.memoryStatus, error: message.memoryError },
             }));
 
         return {
@@ -364,7 +394,7 @@ export class ChatManagerService {
     /**
      * One play-model call for the last User Message of the Chat. Throws the gateway's typed
      * error on failure, leaving the User Message in place with nothing stored after it. On
-     * success the judge starts in the background against the new AI Message.
+     * success both background calls start against the new AI Message.
      */
     private async writeTurn(story: StoryEntity, chat: ChatEntity): Promise<void> {
         const userMessage = chat.messages[chat.messages.length - 1];
@@ -378,17 +408,21 @@ export class ChatManagerService {
                         : partsToText(message.parts.map((part) => part.toResponse())),
             }));
         const scene = story.scenes.find((candidate) => candidate.id === chat.currentSceneId) ?? null;
-        const state = await this.ledger.state(chat.id);
+        const [state, memories] = await Promise.all([this.ledger.state(chat.id), this.memoryModel.findByChat(chat.id)]);
         const prompt = buildTurnPrompt({
             story,
             identity: story.role,
             scene,
             ...promptLayers(story, state),
+            memories: promptMemories(story, memories),
             history,
             userText: userMessage.text ?? '',
         });
         if (prompt.trimmed > 0) {
             this.logger.log(`Chat ${chat.id}: left out the ${prompt.trimmed} oldest Messages to fit the prompt budget`);
+        }
+        if (prompt.memoriesLeftOut > 0) {
+            this.logger.warn(`Chat ${chat.id}: left out the ${prompt.memoriesLeftOut} oldest unlocked Memories to keep the Memory layer under its cap`);
         }
 
         const result = await this.gateway.completeText({
@@ -416,7 +450,7 @@ export class ChatManagerService {
             BackgroundStatus.Pending,
         );
         await this.chatModel.touchPlayed(chat.id);
-        this.judge.start(story, chat.id, aiMessage.id);
+        this.startBackground(story, chat.id, aiMessage.id);
     }
 
     /** Holds the Chat's turn lock while `work` runs; a second send meanwhile is refused. */
@@ -432,25 +466,38 @@ export class ChatManagerService {
 
     /**
      * Spec: "Send flow", steps 1–2. Not playable, or text credit out, or a turn in flight,
-     * refuses; a pending judge is waited for, and past the wait the user is told it is still
-     * saving; a failed judge blocks with Retry. Returns the Chat as it is once the wait is
-     * over, since the judge may have moved it on.
+     * refuses; a pending background call is waited for, and past the wait the user is told
+     * it is still saving; a failed call blocks with Retry (either call failed blocks).
+     * Returns the Chat as it is once the wait is over, since the judge may have moved it on.
      */
     private async requireSendable(story: StoryEntity, chat: ChatEntity): Promise<ChatEntity> {
         this.requirePlayable(story);
         if (await this.textCreditOut()) throw new OutOfCreditError('text');
         if (this.inFlight.has(chat.id)) throw new TurnInProgressError();
-        const settled = await this.judge.settle(chat);
-        if (settled.status === BackgroundStatus.Pending) throw new BackgroundStillSavingError();
-        if (settled.status === BackgroundStatus.Failed) throw new BackgroundFailedError();
+        const settled = await this.settleBackground(chat);
+        if (settled.pending) throw new BackgroundStillSavingError();
+        if (settled.failed.length > 0) throw new BackgroundFailedError(settled.failed);
         return settled.waited ? this.reload(chat.id) : chat;
     }
 
-    /** A write that runs no turn (an AI Message edit, a reset) waits for a pending judge too. */
+    /** A write that runs no turn (an AI Message edit, a reset) waits for pending background calls too. */
     private async settledForWrite(chat: ChatEntity): Promise<ChatEntity> {
-        const settled = await this.judge.settle(chat);
-        if (settled.status === BackgroundStatus.Pending) throw new BackgroundStillSavingError();
+        const settled = await this.settleBackground(chat);
+        if (settled.pending) throw new BackgroundStillSavingError();
         return settled.waited ? this.reload(chat.id) : chat;
+    }
+
+    /** Both background calls settled together: the wait runs once for both. */
+    private async settleBackground(chat: ChatEntity): Promise<{ pending: boolean; failed: BackgroundCallName[]; waited: boolean }> {
+        const [judge, extraction]: SettledBackground[] = await Promise.all([this.judge.settle(chat), this.extraction.settle(chat)]);
+        const failed: BackgroundCallName[] = [];
+        if (judge.status === BackgroundStatus.Failed) failed.push('the Bond, Arc and Scene judge');
+        if (extraction.status === BackgroundStatus.Failed) failed.push('Memory extraction');
+        return {
+            pending: judge.status === BackgroundStatus.Pending || extraction.status === BackgroundStatus.Pending,
+            failed,
+            waited: judge.waited || extraction.waited,
+        };
     }
 
     private async reload(chatId: number): Promise<ChatEntity> {
@@ -520,6 +567,18 @@ function promptLayers(story: StoryEntity, state: LedgerState): { bonds: PromptBo
             direction: state.arcDirections.find((direction) => direction.characterId === character.id)?.text ?? '',
         })),
     };
+}
+
+/** The Memory layer: every non-archived Memory in the stable order, with its Known by as names. */
+function promptMemories(story: StoryEntity, memories: MemoryEntity[]): PromptMemory[] {
+    const order = story.characters.map((character) => character.id);
+    const nameOf = (characterId: number): string[] => {
+        const character = story.characters.find((candidate) => candidate.id === characterId);
+        return character ? [character.name] : [];
+    };
+    return memories
+        .filter((memory) => !memory.archived)
+        .map((memory) => ({ text: memory.text, knownBy: memory.knownByIds(order).flatMap(nameOf), locked: memory.locked }));
 }
 
 /** "Chat N" for the first title not yet taken in this Story. */
