@@ -7,6 +7,7 @@ import { MemoryApiModule } from './memory/memory.module.js';
 import { PersonaApiModule } from './persona/persona.module.js';
 import { ReferenceImageApiModule } from './reference-image/reference-image.module.js';
 import { SettingsApiModule } from './settings/settings.module.js';
+import { SnapshotApiModule } from './snapshot/snapshot.module.js';
 import { StoryAssistantApiModule } from './story-assistant/story-assistant.module.js';
 import { StoryDraftingApiModule } from './story-drafting/story-drafting.module.js';
 import { StoryApiModule } from './story/story.module.js';
@@ -24,6 +25,7 @@ import { UsageApiModule } from './usage/usage.module.js';
         UsageApiModule,
         ReferenceImageApiModule,
         PersonaApiModule,
+        SnapshotApiModule,
     ],
     controllers: [HealthApiController],
 })

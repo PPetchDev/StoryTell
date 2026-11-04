@@ -153,6 +153,9 @@ export class ChatResponseBodyDTO extends ChatSummaryDTO implements Omit<ChatDeta
     @ApiProperty({ description: 'True blocks sending.' })
     textCreditOut: boolean;
 
+    @ApiProperty({ description: 'True disables only the camera; play goes on.' })
+    imageCreditOut: boolean;
+
     @ApiProperty()
     playModel: string;
 

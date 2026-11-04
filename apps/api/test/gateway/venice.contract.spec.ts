@@ -89,6 +89,24 @@ describe('Venice contract', () => {
         expect(records[0]).toMatchObject({ kind: 'snapshot_image', pool: 'image', costUsd: 0.05, chatId: 3 });
     });
 
+    it('draws a Snapshot with no reference image from text alone with the Settings model\x27s text-to-image sibling', async () => {
+        for (const [imageModel, textOnly, price] of [
+            ['seedream-v4-edit', 'seedream-v4', 0.05],
+            ['qwen-edit-uncensored', 'qwen-image-3', 0.04],
+        ] as const) {
+            const net = recordedFetch([...modelLists, { fixture: 'venice/generate.json' }]);
+            const { gateway, records } = gatewayUnderTest(net.fetch, { settings: { imageModel } });
+
+            const result = await gateway.generateImage({ kind: 'snapshot_image', prompt: 'A synthetic scene.' });
+
+            const request = net.requests[2];
+            expect(request.url).toBe(`${BASE}/image/generate`);
+            expect(request.body).toMatchObject({ model: textOnly, aspect_ratio: '2:3', safe_mode: false });
+            expect(result).toMatchObject({ model: textOnly, costUsd: price });
+            expect(records[0]).toMatchObject({ kind: 'snapshot_image', pool: 'image', model: textOnly, costUsd: price });
+        }
+    });
+
     it('uses the Settings image model and its prompt limit from GET /models', async () => {
         const net = recordedFetch([...modelLists, edited]);
         const { gateway } = gatewayUnderTest(net.fetch, { settings: { imageModel: 'qwen-edit-uncensored' } });

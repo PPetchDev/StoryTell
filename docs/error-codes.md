@@ -29,12 +29,15 @@ as "the API can't be reached" and shows the can't-connect screen (`apps/web/lib/
 | `502.001.001` | `ProviderOutageError` | The model provider failed or is down, including a rate limit or host overload (OpenRouter 429 or 503) that outlasted the gateway's same-host retries. The message carries the host's own code, e.g. `(DeepInfra: engine_overloaded)`. Show with Retry. |
 | `422.001.002` | `ModelRefusalError` | The model refused, or the host stopped the output for content. Show with Retry. |
 | `402.001.003` | `OutOfCreditError` (text) | Text credit is used up: OpenRouter answered 402 (balance, key limit or the per-request credit reservation) or a 403 budget block, the only answers that carry a `limit_source`. Never raised for a 429, whatever its metadata says. Blocks play. |
-| `402.001.004` | `OutOfCreditError` (image) | Image credit is used up. Blocks only Snapshots and Reference images. |
+| `402.001.004` | `OutOfCreditError` (image) | Image credit is used up. Blocks only Snapshots and Reference images. A camera press answers it at once when the balance is known to be used up; a failed Snapshot job carries it as its error otherwise. |
 | `502.001.005` | `UnparseableOutputError` | The model's output could not be read. Show with Retry. |
 | `404.002.001` | `ImageNotFoundError` | No image file at that path. |
 | `400.002.002` | `InvalidImagePathError` | The path is absolute or leaves the image folder. |
 | `404.002.003` | `ReferenceCandidateNotFoundError` | No such Reference image candidate: it was picked, replaced by a newer round, expired, or never made. Generate again. |
 | `422.002.004` | `NoAppearanceError` | A Reference image was asked for while the Character's Appearance is empty. |
+| `404.002.005` | `SnapshotNotFoundError` | No Snapshot with that id in this Story. |
+| `404.002.006` | `SnapshotJobNotFoundError` | No such Snapshot job in this Chat: it succeeded, was dismissed, or the API restarted. Take the Snapshot again. |
+| `409.002.007` | `SnapshotJobNotFailedError` | A Retry or dismiss of a Snapshot job that is still running. |
 | `404.003.001` | `StoryNotFoundError` | No Story with that id. |
 | `404.003.002` | `CharacterNotFoundError` | No Character with that id in this Story. |
 | `404.003.003` | `SceneNotFoundError` | No Scene with that id in this Story. |

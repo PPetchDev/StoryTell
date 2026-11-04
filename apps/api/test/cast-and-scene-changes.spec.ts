@@ -190,6 +190,22 @@ describe('Cast and Scene changes reaching existing Chats', () => {
         }
     }
 
+    /** A Snapshot of the latest AI Message with these Characters in frame, waited for. */
+    async function snapshot(storyId: number, chatId: number, inFrame: string[]): Promise<void> {
+        t.gateway.scriptText('snapshot_prompt', JSON.stringify({ in_frame: inFrame, scene: 'By the lamp.' }));
+        t.gateway.scriptImage('snapshot_image', {});
+        await t.http.post(`/api/stories/${storyId}/chats/${chatId}/snapshots`).send({}).expect(202);
+        const deadline = Date.now() + 5_000;
+        for (;;) {
+            const { body } = await t.http.get(`/api/stories/${storyId}/chats/${chatId}/snapshots`).expect(200);
+            if (body.jobs.length === 0) return;
+            if (body.jobs.some((job: { status: string }) => job.status === 'failed') || Date.now() > deadline) {
+                throw new Error(`The Snapshot did not finish: ${JSON.stringify(body.jobs)}`);
+            }
+            await new Promise((resolve) => setTimeout(resolve, 20));
+        }
+    }
+
     async function sceneOf(storyId: number, chatId: number): Promise<string | null> {
         return (await getChat(storyId, chatId)).currentScene?.name ?? null;
     }
@@ -334,6 +350,7 @@ describe('Cast and Scene changes reaching existing Chats', () => {
                 const memoryPath = `/api/stories/${story.id}/chats/${chat.id}/memories`;
                 await t.http.post(memoryPath).send({ text: 'Kai hides a key under the step.', knownBy: [kai.id] }).expect(201);
                 await t.http.post(memoryPath).send({ text: '{user} arrived at dusk.', knownBy: [mira.id, kai.id] }).expect(201);
+                await snapshot(story.id, chat.id, ['Kai', 'Mira']);
             }
             return { story, mira, kai, chats };
         }
@@ -369,6 +386,17 @@ describe('Cast and Scene changes reaching existing Chats', () => {
             expect(await count('chat_arc_direction WHERE character_id = $1', [kai.id])).toBe(0);
             expect(await count('memory_known_by WHERE character_id = $1', [kai.id])).toBe(0);
             expect(await count('message_part WHERE character_id = $1', [kai.id])).toBe(0);
+
+            // Snapshots keep the stamped name with the Character link cleared, and stay in the Gallery.
+            const { body } = await t.http.get(`/api/stories/${storyId}/gallery`).expect(200);
+            expect(body.snapshots).toHaveLength(chatIds.length);
+            for (const item of body.snapshots) {
+                expect(item.characters).toEqual([
+                    { characterId: null, name: 'Kai' },
+                    { characterId: mira.id, name: 'Mira' },
+                ]);
+            }
+            expect(await count('snapshot_character WHERE character_id = $1', [kai.id])).toBe(0);
         }
 
         it('deletes its Bonds both ways, StartingBonds, Arc steps, Arc directions and Known-by entries in every Chat, and keeps its stamped name on old speech', async () => {

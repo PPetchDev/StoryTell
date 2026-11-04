@@ -46,3 +46,11 @@ Part of: [Spec: Storytell AI MVP](../spec.md)
 ## User stories covered
 
 109–124, 131.
+
+## Comments
+
+- 2026-11-04: **Backend done, frontend not started (session hit its usage limit).** Committed on `claude/magical-raman-30a4ee`.
+  - **Built (API):** migration `1763400000000-Snapshots` (`snapshot` with `story_id` CASCADE, `chat_id`/`message_id` SET NULL; `snapshot_character` with link SET NULL plus stamped name); `SnapshotModelService`; `SnapshotManagerService` (in-memory jobs: take → V4 Flash `snapshot_prompt` in JSON mode → image call with in-frame Reference images → file under `snapshots/story-N/` → record; failures keep the job with its typed error for Retry/dismiss, nothing stored); `manager/snapshot/prompt.ts` (hint names win, at most 3, first person from `wornIdentity`, non-archived Memory through `renderUser`, every in-frame Appearance restated server-side); routes `POST/GET stories/:id/chats/:chatId/snapshots`, `snapshot-jobs/:jobId/retry`, `DELETE snapshot-jobs/:jobId`, `GET stories/:id/gallery?chatId=`, `GET/DELETE stories/:id/snapshots/:id`, `GET .../download`; `ChatDetail.imageCreditOut`; AI Message edit clears its Snapshots' Message link (other cases via FK); Story delete removes Gallery files; error codes `404.002.005`, `404.002.006`, `409.002.007`.
+  - **Decision to review:** the edit models need a base image, so a Snapshot with no Reference image in frame goes to the Settings model's text-to-image sibling (`seedream-v4` for `seedream-v4-edit`, $0.05, read from Venice `/models`; `qwen-image-3` for `qwen-edit-uncensored`). Chosen up front, recorded as the Snapshot's image model; not a fallback on failure.
+  - **Verified:** `apps/api` typecheck clean; `test/snapshots.spec.ts` 19 passed (8 runs in a row green after fixing two order/isolation flakes); `cast-and-scene-changes.spec.ts › Remove a Character` 2 passed with the new Snapshot case; Venice contract gained a text-only Snapshot case (not run separately).
+  - **Not done:** full `npm run test:api` run; frontend (camera button + hint, placeholder/error with Retry under the Message, inline Snapshots, full screen with prompt, Gallery page, `characterRemovalWarning` extended to Snapshots); Playwright test; `npm run test:e2e`; the real Venice round; `apps/web/lib` types for the new routes.

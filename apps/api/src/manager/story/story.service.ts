@@ -13,6 +13,7 @@ import {
 } from '../../errors/story.errors.js';
 import { ChatModelService } from '../../model/chat/chat.service.js';
 import { LedgerModelService } from '../../model/ledger/ledger.service.js';
+import { SnapshotModelService } from '../../model/snapshot/snapshot.service.js';
 import { CharacterEntity } from '../../model/story/entities/character.entity.js';
 import { SceneEntity } from '../../model/story/entities/scene.entity.js';
 import { StartingBondEntity } from '../../model/story/entities/starting-bond.entity.js';
@@ -103,6 +104,7 @@ export class StoryManagerService {
         private readonly chatModel: ChatModelService,
         private readonly ledger: LedgerModelService,
         private readonly imageStore: ImageStoreService,
+        private readonly snapshotModel: SnapshotModelService,
     ) {}
 
     async listStories(): Promise<StoryListItem[]> {
@@ -138,11 +140,14 @@ export class StoryManagerService {
         return this.reload(storyId);
     }
 
-    /** Removes the Story and everything under it, Reference image files included (spec: "Delete Story"). */
+    /** Removes the Story and everything under it, Reference image and Gallery files included (spec: "Delete Story"). */
     async deleteStory(storyId: number): Promise<void> {
         const story = await this.load(storyId);
+        // Read before the delete: the Gallery's records go with the Story through CASCADE.
+        const galleryFiles = await this.snapshotModel.imagePathsByStory(storyId);
         await this.storyModel.deleteStory(storyId);
         for (const character of story.characters) await this.removeReferenceImageFile(character);
+        for (const imagePath of galleryFiles) await this.removeFile(imagePath);
     }
 
     async updateRole(storyId: number, fields: RoleFields): Promise<StoryDetail> {

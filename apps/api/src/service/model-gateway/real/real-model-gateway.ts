@@ -103,11 +103,12 @@ export class RealModelGateway extends ModelGateway {
         if (referenceCount > MAX_REFERENCE_IMAGES) {
             throw new RangeError(`At most ${MAX_REFERENCE_IMAGES} reference images, got ${referenceCount}`);
         }
-        const modelName = imageModelForKind(request.kind, (await this.deps.settings.current()).imageModel);
+        const modelName = imageModelForKind(
+            request.kind,
+            (await this.deps.settings.current()).imageModel,
+            referenceCount,
+        );
         const model = IMAGE_MODELS[modelName];
-        if (model.endpoint === 'multi-edit' && referenceCount === 0) {
-            throw new RangeError(`${modelName} edits a reference image, but none was given`);
-        }
 
         const image = await this.deps.venice.generate({
             model,
