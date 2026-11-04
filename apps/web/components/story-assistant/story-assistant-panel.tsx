@@ -79,8 +79,10 @@ function Entry({ entry, assistant }: { entry: AssistantEntry; assistant: StoryAs
                     ) : (
                         <div className="confirm-removals" role="group" aria-label="Confirm removals">
                             <p>
-                                This would remove {entry.pending.removals.join(' and ')}. Removing a Character also removes their
-                                starting Bonds. Apply these changes?
+                                This would remove {entry.pending.removals.join(' and ')}. Removing a Character deletes its
+                                starting Bonds, and in every Chat its Bonds, Arc steps, Arc directions and Known-by entries,
+                                along with its Reference image; past lines keep its name. A Chat on a removed Scene moves to
+                                the next one. Apply these changes?
                             </p>
                             <div className="toolbar">
                                 <button type="button" className="button button-danger" onClick={() => assistant.confirmPending(entry.id, entry.pending)}>

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, MoreThan, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, MoreThan, Repository } from 'typeorm';
 
 import { ChatEntity } from './entities/chat.entity.js';
 import { MessagePartEntity, MessagePartKind } from './entities/message-part.entity.js';
@@ -47,6 +47,16 @@ export class ChatModelService {
 
     saveChat(chat: ChatEntity): Promise<ChatEntity> {
         return this.chats.save(chat);
+    }
+
+    /** Moves every Chat on one Scene to another, or to free play when `toSceneId` is null. */
+    async moveOffScene(sceneId: number, toSceneId: number | null): Promise<void> {
+        await this.chats.update({ currentSceneId: sceneId }, { currentSceneId: toSceneId });
+    }
+
+    async setScene(chatIds: number[], sceneId: number): Promise<void> {
+        if (chatIds.length === 0) return;
+        await this.chats.update({ id: In(chatIds) }, { currentSceneId: sceneId });
     }
 
     async touchPlayed(chatId: number): Promise<void> {

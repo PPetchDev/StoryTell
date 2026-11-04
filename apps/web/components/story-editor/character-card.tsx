@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-import { Character, RewriteRequest, Role, StartingBond, Story } from '@/lib/story';
+import { Character, characterRemovalWarning, RewriteRequest, Role, StartingBond, Story } from '@/lib/story';
 import { ConfirmButton, OrderButtons, TextField, Toolbar } from './fields';
 import { ReferenceImage } from './reference-image';
 import { rewriteKey, RewriteStates } from './rewrite';
@@ -85,6 +85,7 @@ export function CharacterCard(props: CharacterCardProps) {
                     <ConfirmButton
                         label="Remove"
                         question={`Remove ${heading}?`}
+                        warning={characterRemovalWarning(heading)}
                         confirmLabel="Remove"
                         onConfirm={props.onRemove}
                     />
