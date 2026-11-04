@@ -26,3 +26,7 @@ The steps that need the user's own accounts, payment and devices. The agent can'
 ## User stories covered
 
 128–131 (budget), 132–134 (access).
+
+## Comments
+
+- 2026-11-04 (main session): the retention notes are written, in README "Running live → Where your text and images go" (OpenRouter, DeepInfra, GMICloud, Venice, from their policy pages). Two things worth knowing: GMICloud's terms and OpenRouter's flag for it disagree on prompt retention, and Venice's image models are "anonymized", not "private", so the upstream image provider sees prompts. The other items here are still yours.

@@ -10,7 +10,8 @@ so it has no login. Vocabulary: [CONTEXT.md](CONTEXT.md). What to build:
 ```
 apps/api    NestJS API (TypeORM + PostgreSQL), port 4001 in dev
 apps/web    Next.js PWA, port 3001 in dev; proxies /api/* to the API
-scripts/    dev.mjs, the one-command dev environment
+scripts/    dev.mjs (the one-command dev environment); live.mjs, live-run.mjs and
+            live-task.ps1 (the live instance)
 docs/       error-codes.md and agent docs
 ```
 
@@ -48,11 +49,12 @@ database, image folder and ports, so experiments can't touch real Chats:
 |---|---|---|
 | Frontend | 3001 | 3000 |
 | API | 4001 | 4000 |
-| Database | `.data/dev/postgres`, port 54321 | its own PostgreSQL database |
-| Image folder | `.data/dev/images` | its own folder |
+| Database | `.data/dev/postgres`, port 54321 | its own PostgreSQL service, port 5432 |
+| Image folder | `.data/dev/images` | `LIVE_HOME/images` |
+| Code | this checkout, rebuilt on every start | a release built into `LIVE_HOME/app` |
 | Migrations | on every `npm run dev` | only in the deploy step |
 
-The live instance, its autostart and Tailscale serve are set up in ticket 32.
+The live instance, its autostart and Tailscale serve are in [Running live](#running-live).
 
 ### Configuration
 
@@ -147,6 +149,114 @@ npm run migration:generate -w apps/api -- src/migration/AddSomething
 
 Then add the new class to `index.ts`. `npm run migrate -w apps/api` applies the pending
 migrations of the last build (`npm run build -w apps/api`) to whatever `DATABASE_URL` points at.
+
+## Running live
+
+The live instance is the one you play on: a production build of a commit of this repository,
+with its own PostgreSQL database, ports and image folder, started by Windows at boot and
+published on the tailnet by Tailscale serve. Nothing in dev touches it: `npm run dev` only ever
+migrates its own `.data/dev` database, and the deploy refuses a `.env.live` that points at dev's
+database, ports or folders.
+
+```
+LIVE_HOME/            C:\StorytellLive by default; keep it outside this checkout
+  releases/<commit>-<time>/   built releases: git worktrees of deployed commits
+  current             names the release that runs
+  previous            names the one before it, kept for live:rollback
+  live-run.mjs        the supervisor the startup task runs (copied by each deploy)
+  live.env            a copy of .env.live, made by each deploy
+  images/             Reference images and Snapshots (LIVE_IMAGE_DIR moves it)
+  logs/               live.log (the supervisor), api.log, web.log
+```
+
+### One-time setup (your steps)
+
+1. **PostgreSQL.** Install PostgreSQL 18 from the EDB installer (postgresql.org/download/windows).
+   It runs as a Windows service that starts with Windows (`Get-Service postgresql*` shows it as
+   Automatic). Then, in `psql -U postgres`, create the live database and its owner:
+
+   ```sql
+   CREATE ROLE storytell LOGIN PASSWORD '<a new password>';
+   CREATE DATABASE storytell_live OWNER storytell;
+   ```
+
+   The installer also brings `pg_dump` and `psql`, which the backup and restore steps use.
+2. **`.env.live`.** Copy the "Live instance" block of `.env.example` into `.env.live` in this
+   checkout (git-ignored), uncomment it, and fill in `DATABASE_URL` with that password and the
+   provider keys. Keep `LIVE_HOME` outside this checkout.
+3. **First deploy:** `npm run live:deploy`. Then open http://127.0.0.1:3000 on the PC.
+4. **Startup task.** From an elevated PowerShell in this checkout:
+
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File scripts\live-task.ps1
+   ```
+
+   It registers "Storytell Live", which runs `LIVE_HOME\live-run.mjs` as your account (S4U: no
+   stored password) at startup and every 5 minutes after: a supervisor that died comes back, and
+   a running one makes the new copy exit at once. The supervisor itself restarts the API or the
+   frontend if either dies. The script prints the task's time limit back: `PT0S` means none.
+   Remove the task with `-Unregister`.
+5. **Tailscale.** Install Tailscale on the PC and the phone, in one tailnet. In the admin console
+   enable MagicDNS and HTTPS certificates. Give the PC a neutral machine name first: certificate
+   names are published in public certificate-transparency logs. On the PC turn on
+   Preferences → **Run unattended** (or `tailscale set --unattended=true`), so the tailnet is up
+   before anyone logs on, and consider disabling key expiry for the PC. Then publish the app:
+
+   ```powershell
+   tailscale serve --bg 3000
+   tailscale serve status
+   ```
+
+   With `--bg` the setting persists across reboots. Never use `tailscale funnel`: Funnel puts
+   the app on the public internet, and the app has no login. `tailscale serve reset` removes
+   the setting.
+6. **Install the PWA** from `https://<machine>.<tailnet>.ts.net` on the phone (Chrome → Add to
+   Home screen) and on the desktop (Chrome or Edge → Install).
+7. **Check autostart:** reboot, don't log on, and open the PWA on the phone: it should list your
+   Stories. If it doesn't, `npm run live:status` and `LIVE_HOME\logs\live.log` say which part
+   didn't start.
+
+### Deploying a change
+
+```bash
+npm run live:deploy
+```
+
+It deploys `master` (or `npm run live:deploy -- <ref>`). Uncommitted changes are never deployed:
+commit first. The steps:
+
+1. Build the commit as a new release in `LIVE_HOME/releases` (`npm ci` and both builds) while
+   live keeps serving. If the build fails, the half-built release is removed and live was never
+   touched.
+2. Stop live (a few seconds of downtime start here) and run the pending migrations against the
+   live database with the new build.
+3. Point `LIVE_HOME/current` at the new release, start it, and wait until `/api/health` answers
+   through the frontend's proxy. Releases older than the one before are removed.
+
+If a migration fails, the running release is started again. Each migration runs in its own
+transaction, so migrations before the failing one stay applied. If the new release starts but
+misbehaves, `npm run live:rollback` switches back to the one before. Rollback never undoes
+migrations, so it only helps while the older code still works with the newer schema.
+
+`npm run live:status`, `npm run live:stop` and `npm run live:start` do what they say. With the
+startup task registered, stop and start go through Task Scheduler.
+
+### Where your text and images go
+
+Each text model is pinned to one host through OpenRouter (`provider.only`, no fallbacks), so only
+the hosts below ever see a request. What their own policy pages said on 2026-11-04:
+
+| Host | What | Prompts and outputs | Training |
+|---|---|---|---|
+| [OpenRouter](https://openrouter.ai/docs/guides/privacy/data-collection) | routes every text call | Not stored unless you opt in to logging (off by default). Metadata such as token counts is kept, no period stated. | Only if you opt in. With training opted out in account settings, it won't route to providers that train. |
+| [DeepInfra](https://docs.deepinfra.com/account/data-privacy) | GLM-5.3 (play), DeepSeek V4 Flash (background calls) | Not stored on disk; outputs deleted once returned. Only metadata (request ID, cost) is logged. | No. |
+| [GMICloud](https://www.gmicloud.ai/en/legal/console-terms-of-service) | DeepSeek V4 Pro (manual fallback) | Unclear. Its terms say inputs aren't stored without opting in to prompt logging, but OpenRouter flags it as retaining prompts, with no period. | No general-purpose training. |
+| [Venice](https://docs.venice.ai/overview/privacy) | Snapshots and Reference images | Venice says it doesn't store prompt or response content; it keeps metadata (key ID, IP, timestamps). But `seedream-v4-edit`, `seedream-v4` and `qwen-image-3` are Venice "anonymized" models, not "private" ones: the upstream image provider still sees the prompt and reference images, under terms Venice doesn't state. | Not mentioned. |
+
+Worth doing in your accounts: in OpenRouter → Settings → Privacy, keep prompt logging off and
+opt out of providers that train. Stricter options exist (OpenRouter's "ZDR only" setting, Venice
+models marked "private"), but check first that the pinned hosts and the image models qualify:
+with fallbacks off, a request to a host that doesn't qualify fails instead of rerouting.
 
 ## Tests
 
