@@ -127,10 +127,12 @@ interface ConfirmButtonProps {
     onConfirm(): void;
     danger?: boolean;
     disabled?: boolean;
+    /** What the action deletes beyond the obvious, shown under the question while it asks. */
+    warning?: string;
 }
 
 /** A destructive action that asks first, in place, without a browser dialog. */
-export function ConfirmButton({ label, question, confirmLabel, onConfirm, danger, disabled }: ConfirmButtonProps) {
+export function ConfirmButton({ label, question, confirmLabel, onConfirm, danger, disabled, warning }: ConfirmButtonProps) {
     const [asking, setAsking] = useState(false);
     if (!asking) {
         return (
@@ -147,6 +149,7 @@ export function ConfirmButton({ label, question, confirmLabel, onConfirm, danger
     return (
         <span className="confirm" role="group" aria-label={question}>
             <span>{question}</span>
+            {warning && <span className="confirm-warning">{warning}</span>}
             <button
                 type="button"
                 className="button button-danger"

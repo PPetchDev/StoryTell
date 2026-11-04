@@ -1004,3 +1004,10 @@ a {
     border-radius: 0.5rem;
     padding: 0.375rem 0.5rem;
 }
+
+.confirm-warning {
+    flex-basis: 100%;
+    order: 1;
+    color: #f0c9a0;
+    font-size: 0.875rem;
+}

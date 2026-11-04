@@ -11,6 +11,8 @@ import {
     StartingBondNotFoundError,
     StoryNotFoundError,
 } from '../../errors/story.errors.js';
+import { ChatModelService } from '../../model/chat/chat.service.js';
+import { LedgerModelService } from '../../model/ledger/ledger.service.js';
 import { CharacterEntity } from '../../model/story/entities/character.entity.js';
 import { SceneEntity } from '../../model/story/entities/scene.entity.js';
 import { StartingBondEntity } from '../../model/story/entities/starting-bond.entity.js';
@@ -89,6 +91,8 @@ function isPermutation(ids: number[], items: { id: number }[]): boolean {
 /**
  * The Story authoring module (spec: "Story authoring module"). Every write answers with the
  * whole Story and its playable status, so the editor's autosave always shows the truth.
+ * Cast and Scene changes reach the Story's existing Chats here (spec: "Cast and Scene
+ * changes"); text edits need nothing, since Chats read the Story live.
  */
 @Injectable()
 export class StoryManagerService {
@@ -96,6 +100,8 @@ export class StoryManagerService {
 
     constructor(
         private readonly storyModel: StoryModelService,
+        private readonly chatModel: ChatModelService,
+        private readonly ledger: LedgerModelService,
         private readonly imageStore: ImageStoreService,
     ) {}
 
@@ -155,7 +161,20 @@ export class StoryManagerService {
         });
         this.assignCharacter(character, fields);
         await this.storyModel.saveCharacter(character);
+        await this.joinChats(storyId, character);
         return this.saved(storyId);
+    }
+
+    /**
+     * Spec: "Add Character". The Character joins every Chat as a stranger: no Bonds are
+     * seeded, and only its Arc directions, as they are now, are copied in.
+     */
+    private async joinChats(storyId: number, character: CharacterEntity): Promise<void> {
+        const text = character.arcDirections ?? '';
+        if (text.trim() === '') return;
+        for (const chat of await this.chatModel.findByStory(storyId)) {
+            await this.ledger.seed(chat.id, [], [{ characterId: character.id, text }]);
+        }
     }
 
     async updateCharacter(
@@ -170,6 +189,12 @@ export class StoryManagerService {
         return this.saved(storyId);
     }
 
+    /**
+     * Spec: "Remove Character". In every Chat its Bonds both ways with their history, its Arc
+     * steps, its copied Arc directions and its Known-by entries go by ON DELETE CASCADE, and
+     * speech parts keep its stamped name with their Character link cleared (SET NULL).
+     * StartingBonds pointing at it cascade too; its Reference image file goes here.
+     */
     async removeCharacter(storyId: number, characterId: number): Promise<StoryDetail> {
         const story = await this.load(storyId);
         const character = this.findCharacter(story, characterId);
@@ -276,7 +301,25 @@ export class StoryManagerService {
         const scene = this.storyModel.createScene({ storyId, position: story.scenes.length });
         assignSent(scene, fields, ['name', 'situation', 'moveOnCondition']);
         await this.storyModel.saveScene(scene);
+        await this.enterAddedScene(story, scene);
         return this.saved(storyId);
+    }
+
+    /**
+     * Spec: "Add Scenes". A Chat in free play enters the new Scene when it is placed after the
+     * last Scene the Chat finished (the one its latest SceneAdvance left). A Chat that never
+     * finished a Scene, or whose last finished Scene is gone, enters it too. Chats on a Scene
+     * stay there. `story` is as it was before the Scene was added.
+     */
+    private async enterAddedScene(story: StoryEntity, added: SceneEntity): Promise<void> {
+        const entering: number[] = [];
+        for (const chat of await this.chatModel.findByStory(story.id)) {
+            if (chat.currentSceneId !== null) continue;
+            const advance = await this.ledger.lastSceneAdvance(chat.id);
+            const finished = story.scenes.find((scene) => scene.id === advance?.fromSceneId);
+            if (!finished || finished.position < added.position) entering.push(chat.id);
+        }
+        await this.chatModel.setScene(entering, added.id);
     }
 
     async updateScene(storyId: number, sceneId: number, fields: SceneFields): Promise<StoryDetail> {
@@ -287,14 +330,23 @@ export class StoryManagerService {
         return this.saved(storyId);
     }
 
+    /**
+     * Spec: "Remove Scene". A Chat on it moves to the next Scene by position, or to free play
+     * if it was the last; no SceneAdvance is recorded, since the author moved it. SceneAdvances
+     * that name the Scene keep their stamped names, their Scene link cleared (SET NULL).
+     */
     async removeScene(storyId: number, sceneId: number): Promise<StoryDetail> {
         const story = await this.load(storyId);
-        await this.storyModel.removeScene(this.findScene(story, sceneId));
+        const scene = this.findScene(story, sceneId);
+        const next = story.scenes.find((other) => other.position > scene.position);
+        await this.chatModel.moveOffScene(scene.id, next?.id ?? null);
+        await this.storyModel.removeScene(scene);
         const rest = story.scenes.filter((other) => other.id !== sceneId);
         await this.storyModel.setSceneOrder(rest.map((other) => other.id));
         return this.saved(storyId);
     }
 
+    /** Spec: "Reorder Scenes". Each Chat stays on its Scene, which Chats hold by id. */
     async reorderScenes(storyId: number, sceneIds: number[]): Promise<StoryDetail> {
         const story = await this.load(storyId);
         if (!isPermutation(sceneIds, story.scenes)) throw new InvalidOrderError('Scenes');

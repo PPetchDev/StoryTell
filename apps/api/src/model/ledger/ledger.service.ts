@@ -140,6 +140,11 @@ export class LedgerModelService {
         return { bondChanges, arcSteps, sceneAdvances, arcDirections };
     }
 
+    /** The Chat's latest SceneAdvance, or null while it has never moved on from a Scene. */
+    lastSceneAdvance(chatId: number): Promise<SceneAdvanceEntity | null> {
+        return this.sceneAdvances.findOne({ where: { chatId }, order: { id: 'DESC' } });
+    }
+
     /**
      * Records what a judgement changed against the AI Message that caused it, moves the Chat
      * to the advanced Scene, and marks the Message's judge done, all in one transaction.

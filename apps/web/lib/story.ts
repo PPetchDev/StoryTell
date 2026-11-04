@@ -133,6 +133,18 @@ export function storyTitle(story: { title: string }): string {
     return story.title.trim() === '' ? 'Untitled Story' : story.title;
 }
 
+/** Spec story 32: what removing a Character deletes in the Story's Chats, said before it happens. */
+export function characterRemovalWarning(name: string): string {
+    return (
+        `In every Chat of this Story, ${name}'s Bonds (both ways, with their history), Arc steps and Arc directions ` +
+        `are deleted, ${name} is dropped from every Memory's Known by, and the Reference image is deleted. ` +
+        `Past lines keep the name ${name}. This can't be undone.`
+    );
+}
+
+/** Spec story 34: where a Chat on a removed Scene goes. */
+export const SCENE_REMOVAL_WARNING = 'A Chat on this Scene moves to the next Scene, or to free play if this is the last.';
+
 /** Every write answers with the whole Story, playable status included. */
 export const storyApi = {
     create: (fields: StoryFields = {}) => apiSend<Story>('POST', '/stories', fields),

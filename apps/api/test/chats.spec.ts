@@ -833,9 +833,9 @@ A Character knows only the Memories it is tagged on and acts as if the rest neve
             await t.http.patch(`/api/stories/${story.id}`).send({ opening: '@Mira: Boots off, keeper.' }).expect(200);
             const before = await getChat(story.id, started.id);
             expect(before.messages[0].parts).toHaveLength(3);
-            // Removing the Scene the Chat is on drops it to free play; reset brings it back to the first.
+            // Removing the Scene the Chat is on moves it to the next one (ticket 29); reset starts on the first left.
             await t.http.delete(`/api/stories/${story.id}/scenes/${story.scenes[0].id}`).expect(200);
-            expect((await getChat(story.id, started.id)).currentScene).toBeNull();
+            expect((await getChat(story.id, started.id)).currentScene).toEqual({ id: story.scenes[1].id, name: 'The lamp' });
 
             const { body } = await t.http.post(`/api/stories/${story.id}/chats/${started.id}/reset`).expect(200);
             const chat = body as Chat;

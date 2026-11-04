@@ -1,6 +1,6 @@
 'use client';
 
-import { RewriteRequest, Scene } from '@/lib/story';
+import { RewriteRequest, Scene, SCENE_REMOVAL_WARNING } from '@/lib/story';
 import { ConfirmButton, OrderButtons, TextField, Toolbar } from './fields';
 import { rewriteKey, RewriteStates } from './rewrite';
 
@@ -38,6 +38,7 @@ export function SceneCard({ scene, index, count, rewrites, onRewrite, onText, on
                     <ConfirmButton
                         label="Remove"
                         question={`Remove ${heading}?`}
+                        warning={SCENE_REMOVAL_WARNING}
                         confirmLabel="Remove"
                         onConfirm={onRemove}
                     />
