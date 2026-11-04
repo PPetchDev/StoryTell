@@ -1,8 +1,13 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, ParseIntPipe, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, ParseIntPipe, Patch, Post, Put } from '@nestjs/common';
 import { ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 
 import { ChatManagerService } from '../../manager/chat/chat.service.js';
-import { EditMessageRequestBodyDTO, RenameChatRequestBodyDTO, SendMessageRequestBodyDTO } from './dto/chat.request.dto.js';
+import {
+    EditMessageRequestBodyDTO,
+    RenameChatRequestBodyDTO,
+    SendMessageRequestBodyDTO,
+    SwapIdentityRequestBodyDTO,
+} from './dto/chat.request.dto.js';
 import {
     ChatDashboardResponseBodyDTO,
     ChatResponseBodyDTO,
@@ -13,8 +18,8 @@ import {
 const Id = (name: string) => Param(name, ParseIntPipe);
 
 /**
- * Chats per Story: create, list, rename, reset, delete, send, retry, edit a Message, the
- * read-only dashboard and a retry of either background call (spec: "API surface").
+ * Chats per Story: create, list, rename, reset, delete, swap the worn identity, send, retry,
+ * edit a Message, the read-only dashboard and a retry of either background call (spec: "API surface").
  */
 @ApiTags('Chats')
 @Controller('stories/:storyId/chats')
@@ -47,6 +52,17 @@ export class ChatApiController {
         @Body() body: RenameChatRequestBodyDTO,
     ): Promise<ChatResponseBodyDTO> {
         return this.chatManager.renameChat(storyId, chatId, body.title);
+    }
+
+    /** Wears a Persona, or the Story's Role for null, from the next User Message on. Never rolled back. */
+    @Put(':chatId/identity')
+    @ApiOkResponse({ type: ChatResponseBodyDTO })
+    swapIdentity(
+        @Id('storyId') storyId: number,
+        @Id('chatId') chatId: number,
+        @Body() body: SwapIdentityRequestBodyDTO,
+    ): Promise<ChatResponseBodyDTO> {
+        return this.chatManager.swapIdentity(storyId, chatId, body.personaId);
     }
 
     @Delete(':chatId')

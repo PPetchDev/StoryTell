@@ -18,6 +18,7 @@ as "the API can't be reached" and shows the can't-connect screen (`apps/web/lib/
 | 003 | Story authoring |
 | 004 | Chats and turns |
 | 005 | Story drafting |
+| 006 | Personas |
 
 ## Codes
 
@@ -63,3 +64,5 @@ as "the API can't be reached" and shows the can't-connect screen (`apps/web/lib/
 | `422.005.007` | `InvalidChangeSetError` (from the client) | A change set sent to `assistant/apply` does not fit the Story as it is now. Nothing saved. |
 | `409.005.008` | `RemovalNeedsConfirmationError` | A change set sent to `assistant/apply` removes a Character or Scene without `confirmRemovals`. Nothing saved. |
 | `422.005.009` | `EmptyInstructionError` | An assistant instruction with nothing but whitespace. |
+| `404.006.001` | `PersonaNotFoundError` | No Persona with that id: read, updated or deleted, or worn through a Chat's identity swap. |
+| `422.006.002` | `EmptyPersonaNameError` | A Persona created or renamed with nothing but whitespace as its Name. |

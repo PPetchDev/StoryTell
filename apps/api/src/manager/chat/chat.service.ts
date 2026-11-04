@@ -14,6 +14,7 @@ import {
     TurnInProgressError,
 } from '../../errors/chat.errors.js';
 import { OutOfCreditError } from '../../errors/model-gateway.errors.js';
+import { PersonaNotFoundError } from '../../errors/persona.errors.js';
 import { StoryNotFoundError } from '../../errors/story.errors.js';
 import { ChatModelService } from '../../model/chat/chat.service.js';
 import { ChatEntity, ChatSummary } from '../../model/chat/entities/chat.entity.js';
@@ -31,11 +32,13 @@ import { SceneAdvanceResponse } from '../../model/ledger/entities/scene-advance.
 import { LedgerModelService, LedgerState, RollbackCounts } from '../../model/ledger/ledger.service.js';
 import { MemoryEntity } from '../../model/memory/entities/memory.entity.js';
 import { MemoryModelService } from '../../model/memory/memory.service.js';
+import { PersonaModelService } from '../../model/persona/persona.service.js';
 import { SettingsModelService } from '../../model/settings/settings.service.js';
 import { StoryEntity } from '../../model/story/entities/story.entity.js';
 import { StoryModelService } from '../../model/story/story.service.js';
 import { ModelGateway } from '../../service/model-gateway/model-gateway.js';
 import { MissingField, playableStatus } from '../story/playable.js';
+import { WornIdentity, wornIdentity } from './identity.js';
 import { currentBonds, JudgeManagerService, latestJudged, SettledBackground } from './judge/judge.service.js';
 import { latestExtracted, MemoryExtractionManagerService } from './memory/extraction.service.js';
 import { buildTurnPrompt, PromptArc, PromptBond, PromptHistoryMessage, PromptMemory } from './turn/prompt.js';
@@ -45,8 +48,12 @@ import { parseReply, partsToText, ReplyPart } from './turn/reply-parser.js';
 export interface ChatDetail extends ChatSummary {
     /** The Scene the Chat is on; null means free play. */
     currentScene: { id: number; name: string } | null;
-    /** The worn identity's name, under which User Messages show. */
+    /** The worn identity's name, under which the next User Message shows. */
     identityName: string;
+    /** The worn Persona; null while the Chat wears its Story's Role. */
+    personaId: number | null;
+    /** The Story's Role's name, which the swap offers beside the Personas. */
+    roleName: string;
     messages: MessageResponse[];
     /** True when the last Message is a User Message, so its turn failed and Retry applies. */
     awaitingReply: boolean;
@@ -127,6 +134,7 @@ export class ChatManagerService {
         private readonly settingsModel: SettingsModelService,
         private readonly ledger: LedgerModelService,
         private readonly memoryModel: MemoryModelService,
+        private readonly personaModel: PersonaModelService,
         private readonly judge: JudgeManagerService,
         private readonly extraction: MemoryExtractionManagerService,
         private readonly gateway: ModelGateway,
@@ -199,7 +207,8 @@ export class ChatManagerService {
             const chat = await this.requireSendable(story, loaded);
             return this.writingTurn(chat.id, async () => {
                 const rolledBack = await this.ledger.rollbackFrom(chat.id, found.position + 1);
-                await this.chatModel.rewriteUserMessage(found, text);
+                // The fresh reply is written to the identity worn now, so the edited text is stamped with it.
+                await this.chatModel.rewriteUserMessage(found, text, wornIdentity(story, chat));
                 // Reloaded: the rollback may have put the Chat back on an earlier Scene.
                 await this.writeTurn(story, await this.reload(chat.id));
                 return { ...(await this.getChat(storyId, chatId)), rolledBack };
@@ -210,7 +219,7 @@ export class ChatManagerService {
         const chat = await this.settledForWrite(loaded);
         const message = chat.messages.find((candidate) => candidate.id === messageId) ?? found;
         // The user wrote this text, like the author wrote the Opening: the guard is off.
-        const reply = parseReply(text, story.characters, story.role.name, { guard: false });
+        const reply = parseReply(text, story.characters, wornIdentity(story, chat).name, { guard: false });
         for (const name of reply.unknownSpeakers) {
             this.logger.warn(`Chat ${chat.id}: unknown speaker "${name}" in the edited Message; kept by name with no Character link`);
         }
@@ -267,6 +276,19 @@ export class ChatManagerService {
         return this.detail(story, chat);
     }
 
+    /**
+     * Spec: "swap worn identity". The Chat wears the Persona from now on, or its Story's Role
+     * for null. Chat state outside the ledger: an edit never rolls it back and reset keeps
+     * it. Messages already written keep the identity stamped on them; a turn already being
+     * written finishes under the identity it started with.
+     */
+    async swapIdentity(storyId: number, chatId: number, personaId: number | null): Promise<ChatDetail> {
+        const { chat } = await this.load(storyId, chatId);
+        if (personaId !== null && !(await this.personaModel.findOne(personaId))) throw new PersonaNotFoundError();
+        await this.chatModel.setPersona(chat.id, personaId);
+        return this.getChat(storyId, chatId);
+    }
+
     /** Spec: "Delete Chat". Its Messages and ledger records go with it. */
     async deleteChat(storyId: number, chatId: number): Promise<void> {
         const { chat } = await this.load(storyId, chatId);
@@ -284,7 +306,7 @@ export class ChatManagerService {
                 chat.id,
                 chat.messages.length,
                 text,
-                story.role.name,
+                wornIdentity(story, chat),
             );
             chat.messages.push(userMessage);
             await this.writeTurn(story, chat);
@@ -337,9 +359,11 @@ export class ChatManagerService {
     async dashboard(storyId: number, chatId: number): Promise<ChatDashboard> {
         const { story, chat } = await this.load(storyId, chatId);
         const state = await this.ledger.state(chat.id);
+        const identity = wornIdentity(story, chat);
+        // Bonds toward the user are the user's whichever identity is worn: they show under the worn name.
         const nameOf = (characterId: number | null): string =>
             characterId === null
-                ? story.role.name
+                ? identity.name
                 : (story.characters.find((c) => c.id === characterId)?.name ?? 'a removed Character');
 
         const characters: DashboardCharacter[] = story.characters.map((character) => ({
@@ -381,7 +405,7 @@ export class ChatManagerService {
             chatId: chat.id,
             storyId: story.id,
             title: chat.title,
-            identityName: story.role.name,
+            identityName: identity.name,
             characters,
             scene: {
                 current: scene ? { id: scene.id, name: scene.name } : null,
@@ -408,10 +432,11 @@ export class ChatManagerService {
                         : partsToText(message.parts.map((part) => part.toResponse())),
             }));
         const scene = story.scenes.find((candidate) => candidate.id === chat.currentSceneId) ?? null;
+        const identity: WornIdentity = wornIdentity(story, chat);
         const [state, memories] = await Promise.all([this.ledger.state(chat.id), this.memoryModel.findByChat(chat.id)]);
         const prompt = buildTurnPrompt({
             story,
-            identity: story.role,
+            identity,
             scene,
             ...promptLayers(story, state),
             memories: promptMemories(story, memories),
@@ -433,12 +458,12 @@ export class ChatManagerService {
             servedFor: { storyId: story.id, chatId: chat.id },
         });
 
-        const reply = parseReply(result.text, story.characters, story.role.name);
+        const reply = parseReply(result.text, story.characters, identity.name);
         for (const name of reply.unknownSpeakers) {
             this.logger.warn(`Chat ${chat.id}: unknown speaker "${name}" in the reply; kept by name with no Character link`);
         }
         if (reply.cutAtUserLine) {
-            this.logger.warn(`Chat ${chat.id}: the reply wrote a line as ${story.role.name}; cut off there`);
+            this.logger.warn(`Chat ${chat.id}: the reply wrote a line as ${identity.name}; cut off there`);
         }
 
         const parts: ReplyPart[] = reply.parts;
@@ -520,10 +545,13 @@ export class ChatManagerService {
         const [settings, textCreditOut] = await Promise.all([this.settingsModel.get(), this.textCreditOut()]);
         const scene = story.scenes.find((candidate) => candidate.id === chat.currentSceneId);
         const lastModel = lastAiModel(chat);
+        const identity = wornIdentity(story, chat);
         return {
             ...chat.toSummary(),
             currentScene: scene ? { id: scene.id, name: scene.name } : null,
-            identityName: story.role.name,
+            identityName: identity.name,
+            personaId: identity.personaId,
+            roleName: story.role.name,
             messages: chat.messages.map((message) => message.toResponse()),
             awaitingReply: awaitingReply(chat),
             ...playableStatus(story),

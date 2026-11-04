@@ -19,7 +19,10 @@ export interface UserMessage {
     id: number;
     kind: 'user';
     text: string;
+    /** The identity worn when it was written, stamped: kept after a Persona is renamed or deleted. */
     identityName: string;
+    /** The Persona worn; null for the Role and once that Persona is deleted. */
+    personaId: number | null;
     createdAt: string;
 }
 
@@ -47,7 +50,11 @@ export type Message = UserMessage | AiMessage;
 
 export interface Chat extends ChatSummary {
     currentScene: { id: number; name: string } | null;
+    /** The worn identity, under which the next User Message shows. */
     identityName: string;
+    /** The worn Persona; null while the Chat wears its Story's Role. */
+    personaId: number | null;
+    roleName: string;
     messages: Message[];
     /** The last Message is a User Message whose turn failed: show Retry. */
     awaitingReply: boolean;
@@ -151,6 +158,9 @@ export const chatApi = {
      */
     edit: (storyId: number, chatId: number, messageId: number, text: string) =>
         apiSend<EditedChat>('PATCH', `/stories/${storyId}/chats/${chatId}/messages/${messageId}`, { text }),
+    /** Wears a Persona, or the Story's Role for null, from the next User Message on. */
+    swapIdentity: (storyId: number, chatId: number, personaId: number | null) =>
+        apiSend<Chat>('PUT', `/stories/${storyId}/chats/${chatId}/identity`, { personaId }),
     /** Clears every Message and copies the current Opening in again. */
     reset: (storyId: number, chatId: number) => apiSend<Chat>('POST', `/stories/${storyId}/chats/${chatId}/reset`),
     /** Runs the failed Bond, Arc and Scene judge of the latest AI Message again. Answers with the dashboard. */

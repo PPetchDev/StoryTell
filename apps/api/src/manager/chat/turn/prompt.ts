@@ -10,12 +10,12 @@ import { renderUser } from '../memory/render-user.js';
  * Layers, most stable first so prompt caching holds:
  *  1. Narrator rules      5. Cast cards              9. Memory
  *  2. Setting             6. current Scene          10. recent Messages
- *  3. Role                7. Feelings (Bonds)       11. the user's message
+ *  3. worn identity       7. Feelings (Bonds)       11. the user's message
  *  4. Style               8. Arcs                   12. the final instruction
  *
  * Layers 1–9 form one system message with a `# Heading` per layer; 10–11 are chat turns;
- * 12 is a trailing system message, as in the prototype. Each layer is its own function, so
- * ticket 26 can swap the identity layer for a worn Persona.
+ * 12 is a trailing system message, as in the prototype. The identity is the worn one: the
+ * Story's Role or a Persona; its name also drives the stop strings and the final instruction.
  */
 
 export interface PromptCharacter {
@@ -120,7 +120,7 @@ export const REPLY_LENGTH_WORDS: Record<ReplyLength, { min: number; max: number;
 export const PROMPT_LAYERS = {
     rules: '# Rules',
     setting: '# Setting',
-    identity: "# The user's Role",
+    identity: '# The user plays',
     style: '# Style',
     cast: '# Cast',
     scene: '# Current Scene',

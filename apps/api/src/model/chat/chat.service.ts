@@ -6,6 +6,12 @@ import { ChatEntity } from './entities/chat.entity.js';
 import { MessagePartEntity, MessagePartKind } from './entities/message-part.entity.js';
 import { BackgroundStatus, MessageEntity, MessageKind } from './entities/message.entity.js';
 
+/** The worn identity as a User Message records it: the Persona (null for the Role) and the name. */
+export interface StampedIdentity {
+    personaId: number | null;
+    name: string;
+}
+
 /** A part of an AI Message as the parser produces it, before it is stored. */
 export type NewMessagePart =
     | { kind: 'narration'; text: string }
@@ -36,7 +42,7 @@ export class ChatModelService {
     async findWithMessages(chatId: number): Promise<ChatEntity | null> {
         const chat = await this.chats.findOne({
             where: { id: chatId },
-            relations: { messages: { parts: true } },
+            relations: { persona: true, messages: { parts: true } },
         });
         return chat && inOrder(chat);
     }
@@ -58,15 +64,23 @@ export class ChatModelService {
         await this.chats.delete({ id: chatId });
     }
 
-    addUserMessage(
-        chatId: number,
-        position: number,
-        text: string,
-        identityName: string,
-    ): Promise<MessageEntity> {
+    /** Stores a User Message with the worn identity as a reference and a stamped name. */
+    addUserMessage(chatId: number, position: number, text: string, identity: StampedIdentity): Promise<MessageEntity> {
         return this.messages.save(
-            this.messages.create({ chatId, position, kind: MessageKind.User, text, identityName }),
+            this.messages.create({
+                chatId,
+                position,
+                kind: MessageKind.User,
+                text,
+                identityName: identity.name,
+                personaId: identity.personaId,
+            }),
         );
+    }
+
+    /** Swaps the worn identity: a Persona's id, or null for the Story's Role. */
+    async setPersona(chatId: number, personaId: number | null): Promise<void> {
+        await this.chats.update({ id: chatId }, { personaId });
     }
 
     /**
@@ -112,13 +126,18 @@ export class ChatModelService {
     }
 
     /**
-     * Overwrites a User Message's text and deletes every Message after it, in one transaction.
-     * Nothing is kept of the old text or the deleted Messages.
+     * Overwrites a User Message's text, stamps it with the identity worn now, and deletes
+     * every Message after it, in one transaction. Nothing is kept of the old text or the
+     * deleted Messages.
      */
-    rewriteUserMessage(message: MessageEntity, text: string): Promise<void> {
+    rewriteUserMessage(message: MessageEntity, text: string, identity: StampedIdentity): Promise<void> {
         return this.dataSource.transaction(async (manager) => {
             await deleteAfter(manager, message);
-            await manager.update(MessageEntity, { id: message.id }, { text });
+            await manager.update(
+                MessageEntity,
+                { id: message.id },
+                { text, identityName: identity.name, personaId: identity.personaId },
+            );
         });
     }
 

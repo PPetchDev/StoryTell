@@ -74,8 +74,15 @@ export class MessageDTO {
     @ApiPropertyOptional({ description: 'User Message only.' })
     text?: string;
 
-    @ApiPropertyOptional({ description: 'User Message only: the identity worn, stamped.' })
+    @ApiPropertyOptional({ description: 'User Message only: the identity worn, stamped; kept after a rename or delete.' })
     identityName?: string;
+
+    @ApiPropertyOptional({
+        type: Number,
+        nullable: true,
+        description: 'User Message only: the Persona worn; null for the Role and once that Persona is deleted.',
+    })
+    personaId?: number | null;
 
     @ApiPropertyOptional({ description: 'AI Message only: the model that wrote it, or "author" for the Opening.' })
     model?: string;
@@ -122,8 +129,14 @@ export class ChatResponseBodyDTO extends ChatSummaryDTO implements Omit<ChatDeta
     @ApiProperty({ type: CurrentSceneDTO, nullable: true, description: 'null means free play.' })
     currentScene: CurrentSceneDTO | null;
 
-    @ApiProperty({ description: 'The worn identity, under which User Messages show.' })
+    @ApiProperty({ description: 'The worn identity, under which the next User Message shows.' })
     identityName: string;
+
+    @ApiProperty({ type: Number, nullable: true, description: "The worn Persona; null while the Chat wears its Story's Role." })
+    personaId: number | null;
+
+    @ApiProperty({ description: "The Story's Role's name, which the swap offers beside the Personas." })
+    roleName: string;
 
     @ApiProperty({ type: [MessageDTO], description: 'In order; the Opening is first.' })
     messages: MessageDTO[];

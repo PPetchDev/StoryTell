@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import type { Relation } from 'typeorm';
 
+import type { PersonaEntity } from '../../persona/entities/persona.entity.js';
 import type { SceneEntity } from '../../story/entities/scene.entity.js';
 import type { StoryEntity } from '../../story/entities/story.entity.js';
 import type { MessageEntity } from './message.entity.js';
@@ -24,8 +25,8 @@ export interface ChatSummary {
 }
 
 /**
- * One playthrough of a Story (spec: "Chat"). The worn identity is the Role until ticket 26
- * adds Personas; `currentSceneId` null means free play.
+ * One playthrough of a Story (spec: "Chat"). The worn identity is the Story's Role while
+ * `personaId` is null, else that Persona; `currentSceneId` null means free play.
  */
 @Entity('chat')
 export class ChatEntity {
@@ -55,6 +56,15 @@ export class ChatEntity {
     @ManyToOne('SceneEntity', { onDelete: 'SET NULL', nullable: true })
     @JoinColumn({ name: 'current_scene_id' })
     currentScene: Relation<SceneEntity> | null;
+
+    // Swapping identity is Chat state outside the ledger: never rolled back, kept by reset.
+    @Column({ name: 'persona_id', type: 'integer', nullable: true })
+    personaId: number | null;
+
+    // Loaded by ChatModelService.findWithMessages(), so the worn identity can be read off the Chat.
+    @ManyToOne('PersonaEntity', { onDelete: 'SET NULL', nullable: true })
+    @JoinColumn({ name: 'persona_id' })
+    persona: Relation<PersonaEntity> | null;
 
     // Loaded only through ChatModelService.findWithMessages(); never auto-loaded.
     @OneToMany('MessageEntity', 'chat')
