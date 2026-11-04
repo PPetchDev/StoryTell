@@ -20,6 +20,8 @@ export interface CharacterResponse {
     background: string;
     secrets: string;
     arcDirections: string;
+    /** Path of the Reference image relative to the image folder; null while there is none. */
+    referenceImagePath: string | null;
 }
 
 /** An AI-played figure in one Story's cast. Ordered by `position` within the Story. */
@@ -63,6 +65,11 @@ export class CharacterEntity {
     @Column({ name: 'arc_directions', type: 'text', default: '' })
     arcDirections: string;
 
+    // Shown only on the Character page, never in play (spec: "Reference image"). The file is
+    // written and deleted by the Reference image module and by Story and Character deletion.
+    @Column({ name: 'reference_image_path', type: 'text', nullable: true })
+    referenceImagePath: string | null;
+
     toResponse(): CharacterResponse {
         return {
             id: this.id,
@@ -74,6 +81,7 @@ export class CharacterEntity {
             background: this.background,
             secrets: this.secrets,
             arcDirections: this.arcDirections,
+            referenceImagePath: this.referenceImagePath,
         };
     }
 }

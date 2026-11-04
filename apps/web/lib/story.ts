@@ -37,6 +37,8 @@ export interface Character {
     background: string;
     secrets: string;
     arcDirections: string;
+    /** Relative path of the Reference image (ticket 30); null while there is none. Never shown in play. */
+    referenceImagePath: string | null;
 }
 
 export interface StartingBond {
@@ -77,7 +79,7 @@ export interface Story {
 }
 
 export type StoryFields = Partial<Pick<Story, 'title' | 'setting' | 'opening'> & Style>;
-export type CharacterFields = Partial<Omit<Character, 'id'>>;
+export type CharacterFields = Partial<Omit<Character, 'id' | 'referenceImagePath'>>;
 export type SceneFields = Partial<Omit<Scene, 'id'>>;
 export type StartingBondFields = Partial<Pick<StartingBond, 'label' | 'description'>>;
 
@@ -103,6 +105,28 @@ export interface RewriteRequest {
     /** The Character, starting Bond or Scene; not used for `story` and `role`. */
     id?: number;
     field: string;
+}
+
+export interface ReferenceCandidate {
+    id: string;
+}
+
+/** One round of Reference image candidates (mirrors GenerateReferenceCandidatesResponseBodyDTO). */
+export interface ReferenceCandidateRound {
+    candidates: ReferenceCandidate[];
+    /** Calls of the round that failed while at least one succeeded. */
+    failed: number;
+    failureMessage: string | null;
+}
+
+/** Where the API serves a stored image, by its path relative to the image folder. */
+export function referenceImageUrl(relativePath: string): string {
+    return `/api/images/${relativePath}`;
+}
+
+/** Where the API serves a candidate of the latest round, until it is picked or replaced. */
+export function candidateImageUrl(storyId: number, characterId: number, candidateId: string): string {
+    return `/api/stories/${storyId}/characters/${characterId}/reference-image/candidates/${candidateId}`;
 }
 
 export function storyTitle(story: { title: string }): string {
@@ -150,4 +174,13 @@ export const storyApi = {
         apiSend<Story>('DELETE', `/stories/${storyId}/scenes/${sceneId}`),
     reorderScenes: (storyId: number, sceneIds: number[]) =>
         apiSend<Story>('PUT', `/stories/${storyId}/scenes/order`, { sceneIds }),
+
+    /** Makes a round of 4 Reference image candidates; a new round discards the Character's old one (ticket 30). */
+    generateReferenceCandidates: (storyId: number, characterId: number) =>
+        apiSend<ReferenceCandidateRound>('POST', `/stories/${storyId}/characters/${characterId}/reference-image/candidates`),
+    /** Stores the picked candidate as the Character's one Reference image, replacing the old one. */
+    pickReferenceImage: (storyId: number, characterId: number, candidateId: string) =>
+        apiSend<Story>('PUT', `/stories/${storyId}/characters/${characterId}/reference-image`, { candidateId }),
+    removeReferenceImage: (storyId: number, characterId: number) =>
+        apiSend<Story>('DELETE', `/stories/${storyId}/characters/${characterId}/reference-image`),
 };

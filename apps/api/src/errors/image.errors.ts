@@ -12,3 +12,17 @@ export class InvalidImagePathError extends AppError {
         super('400.002.002', 'Invalid image path.');
     }
 }
+
+/** A candidate that is gone: picked, replaced by a newer round, expired, or never made. */
+export class ReferenceCandidateNotFoundError extends AppError {
+    constructor() {
+        super('404.002.003', 'Those candidates are gone. Generate again to pick one.');
+    }
+}
+
+/** A Reference image is drawn from Appearance, so there is nothing to draw without one. */
+export class NoAppearanceError extends AppError {
+    constructor() {
+        super('422.002.004', "Write the Character's Appearance first; the Reference image is drawn from it.");
+    }
+}

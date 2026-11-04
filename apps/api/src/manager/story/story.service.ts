@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { randomBytes } from 'node:crypto';
 
 import {
     CastFullError,
@@ -22,6 +23,8 @@ import {
     Tense,
 } from '../../model/story/entities/story.entity.js';
 import { StoryModelService } from '../../model/story/story.service.js';
+import { ImageData } from '../../service/model-gateway/model-gateway.js';
+import { ImageStoreService } from '../../store/image/image-store.service.js';
 import { MAX_CHARACTERS, playableStatus, PlayableStatus } from './playable.js';
 
 /** A Story as the editor and the list read it: its fields plus the derived playable status. */
@@ -89,7 +92,12 @@ function isPermutation(ids: number[], items: { id: number }[]): boolean {
  */
 @Injectable()
 export class StoryManagerService {
-    constructor(private readonly storyModel: StoryModelService) {}
+    private readonly logger = new Logger(StoryManagerService.name);
+
+    constructor(
+        private readonly storyModel: StoryModelService,
+        private readonly imageStore: ImageStoreService,
+    ) {}
 
     async listStories(): Promise<StoryListItem[]> {
         const stories = await this.storyModel.findAllFull();
@@ -124,10 +132,11 @@ export class StoryManagerService {
         return this.reload(storyId);
     }
 
-    /** Removes the Story and everything under it (spec: "Delete Story"). */
+    /** Removes the Story and everything under it, Reference image files included (spec: "Delete Story"). */
     async deleteStory(storyId: number): Promise<void> {
-        await this.load(storyId);
+        const story = await this.load(storyId);
         await this.storyModel.deleteStory(storyId);
+        for (const character of story.characters) await this.removeReferenceImageFile(character);
     }
 
     async updateRole(storyId: number, fields: RoleFields): Promise<StoryDetail> {
@@ -165,9 +174,54 @@ export class StoryManagerService {
         const story = await this.load(storyId);
         const character = this.findCharacter(story, characterId);
         await this.storyModel.removeCharacter(character);
+        await this.removeReferenceImageFile(character);
         const rest = story.characters.filter((other) => other.id !== characterId);
         await this.storyModel.setCharacterOrder(rest.map((other) => other.id));
         return this.saved(storyId);
+    }
+
+    /**
+     * Stores `image` as the Character's one Reference image (spec: "A new one replaces the old
+     * one, and the old file is deleted"). The new file is written and recorded before the old
+     * file goes, so a failure midway never leaves the Character pointing at nothing.
+     */
+    async replaceReferenceImage(storyId: number, characterId: number, image: ImageData): Promise<StoryDetail> {
+        const story = await this.load(storyId);
+        const character = this.findCharacter(story, characterId);
+        const extension = ImageStoreService.extensionFor(image.mimeType) ?? 'jpg';
+        const token = randomBytes(6).toString('hex');
+        // A fresh name per pick, so a browser never shows the replaced image from its cache.
+        const relativePath = `reference-images/story-${storyId}/character-${characterId}-${token}.${extension}`;
+        await this.imageStore.write(relativePath, image.bytes);
+
+        const previous = character.referenceImagePath;
+        character.referenceImagePath = relativePath;
+        await this.storyModel.saveCharacter(character);
+        if (previous) await this.removeFile(previous);
+        return this.saved(storyId);
+    }
+
+    async removeReferenceImage(storyId: number, characterId: number): Promise<StoryDetail> {
+        const story = await this.load(storyId);
+        const character = this.findCharacter(story, characterId);
+        const previous = character.referenceImagePath;
+        character.referenceImagePath = null;
+        await this.storyModel.saveCharacter(character);
+        if (previous) await this.removeFile(previous);
+        return this.saved(storyId);
+    }
+
+    private async removeReferenceImageFile(character: CharacterEntity): Promise<void> {
+        if (character.referenceImagePath) await this.removeFile(character.referenceImagePath);
+    }
+
+    /** The record is already gone or updated, so a file that can't be deleted is logged, not an error. */
+    private async removeFile(relativePath: string): Promise<void> {
+        try {
+            await this.imageStore.remove(relativePath);
+        } catch (error) {
+            this.logger.warn(`Could not delete ${relativePath}: ${error instanceof Error ? error.message : error}`);
+        }
     }
 
     async reorderCharacters(storyId: number, characterIds: number[]): Promise<StoryDetail> {

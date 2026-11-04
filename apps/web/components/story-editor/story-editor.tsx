@@ -50,7 +50,7 @@ export function StoryEditor({ initial }: { initial: Story }) {
     const router = useRouter();
     const { reportUnreachable } = useConnection();
     const [story, setStory] = useState<Story>(initial);
-    const { state, queue, commit } = useAutosave();
+    const { state, queue, commit, flush } = useAutosave();
     const [deleteError, setDeleteError] = useState<string | null>(null);
     const [rewrites, setRewrites] = useState<RewriteStates>({});
     const storyId = initial.id;
@@ -262,7 +262,11 @@ export function StoryEditor({ initial }: { initial: Story }) {
                 {story.characters.map((character, index) => (
                     <CharacterCard
                         key={character.id}
+                        storyId={storyId}
                         character={character}
+                        imageStyle={story.style.imageStyle}
+                        flush={flush}
+                        commit={(run, onError) => commit(run, applyWhole, onError)}
                         index={index}
                         count={story.characters.length}
                         cast={story.characters}
