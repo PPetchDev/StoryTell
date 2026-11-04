@@ -24,6 +24,8 @@ interface CharacterCardProps {
     onAddBond(toCharacterId: number | null): void;
     onBondText(bondId: number, field: 'label' | 'description', value: string): void;
     onRemoveBond(bondId: number): void;
+    /** Fields the assistant changed, by their rewrite key (ticket 23). */
+    highlights?: ReadonlySet<string>;
 }
 
 const ROLE_TARGET = 'role';
@@ -51,6 +53,7 @@ export function CharacterCard(props: CharacterCardProps) {
     const rewritable = (request: RewriteRequest) => ({
         rewrite: rewrites[rewriteKey(request)],
         onRewrite: () => props.onRewrite(request),
+        highlighted: props.highlights?.has(rewriteKey(request)),
     });
     const ofCharacter = (field: TextKey) => rewritable({ target: 'character', id: character.id, field });
 

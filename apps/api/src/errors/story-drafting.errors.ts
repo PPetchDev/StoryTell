@@ -26,3 +26,41 @@ export class NotRewritableError extends AppError {
         super('422.005.004', `"${field}" is not a text field of the ${target}.`);
     }
 }
+
+// --- Story assistant (ticket 23) ---
+
+/** The assistant's answer could not be read at all (no JSON object). Nothing saved. Show with Retry. */
+export class UnreadableChangeSetError extends AppError {
+    constructor(message = "The assistant's answer could not be read.") {
+        super('502.005.005', message);
+    }
+}
+
+/**
+ * A change set that does not fit the Story: an unknown Character or Scene, a field that
+ * does not exist, a value outside its set, a bad StartingBond. Nothing is saved. From the
+ * model it is a bad gateway (show with Retry); from the client it is the client's mistake.
+ */
+export class InvalidChangeSetError extends AppError {
+    constructor(reason: string, source: 'model' | 'client' = 'model') {
+        super(
+            source === 'model' ? '502.005.006' : '422.005.007',
+            source === 'model'
+                ? `The assistant's changes do not fit the Story: ${reason}`
+                : `The changes do not fit the Story: ${reason}`,
+        );
+    }
+}
+
+/** A change set removes a Character or Scene and the request did not confirm removals. */
+export class RemovalNeedsConfirmationError extends AppError {
+    constructor(removals: string[]) {
+        super('409.005.008', `These changes would remove ${removals.join(', ')}. Confirm the removals first.`);
+    }
+}
+
+export class EmptyInstructionError extends AppError {
+    constructor() {
+        super('422.005.009', 'Write an instruction first, e.g. "give Mira a sister".');
+    }
+}

@@ -7,7 +7,7 @@ import { MAX_CHARACTERS } from '../story/playable.js';
  * with the same frame: what a Story is, in the glossary's words (CONTEXT.md), and that it is
  * adult fiction between fictional adults, so the model drafts without hedging.
  */
-const FRAME = `You help an author write a Story for Storytell AI, a private roleplay app. In play, the author plays the Role while an AI Narrator plays every Character.
+export const FRAME = `You help an author write a Story for Storytell AI, a private roleplay app. In play, the author plays the Role while an AI Narrator plays every Character.
 
 A Story is adult fiction between fictional adults, written for one consenting adult reader. Every Character and the Role are adults. Explicit romance, sex, violence and dark themes are all in scope when the idea leads there; never moralise, soften or refuse.
 

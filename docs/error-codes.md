@@ -49,3 +49,8 @@ as "the API can't be reached" and shows the can't-connect screen (`apps/web/lib/
 | `502.005.002` | `InvalidDraftError` | The draft does not fit a Story (0 or 7 Characters, a Style value outside its set, a required field empty, a bad StartingBond). Nothing saved. Show with Retry. |
 | `422.005.003` | `EmptyIdeaError` | A draft was asked for with a blank idea. |
 | `422.005.004` | `NotRewritableError` | A rewrite named a field that is not a text field of that part of the Story. |
+| `502.005.005` | `UnreadableChangeSetError` | The assistant's answer could not be read (no JSON object). Nothing saved. Show with Retry. |
+| `502.005.006` | `InvalidChangeSetError` (from the model) | The assistant's change set does not fit the Story (an unknown Character or Scene, a field that does not exist, a Style value outside its set, a bad StartingBond, a blank required field on a new Character or Scene). Nothing saved. Show with Retry. |
+| `422.005.007` | `InvalidChangeSetError` (from the client) | A change set sent to `assistant/apply` does not fit the Story as it is now. Nothing saved. |
+| `409.005.008` | `RemovalNeedsConfirmationError` | A change set sent to `assistant/apply` removes a Character or Scene without `confirmRemovals`. Nothing saved. |
+| `422.005.009` | `EmptyInstructionError` | An assistant instruction with nothing but whitespace. |

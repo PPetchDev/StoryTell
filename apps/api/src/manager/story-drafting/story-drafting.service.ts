@@ -42,7 +42,7 @@ export interface RewriteRequest {
     field: string;
 }
 
-const FIELD_LABELS: Record<string, string> = {
+export const FIELD_LABELS: Record<string, string> = {
     title: 'Title',
     setting: 'Setting',
     opening: 'Opening',

@@ -58,15 +58,15 @@ export function useAutosave() {
     }, []);
 
     const enqueue = useCallback(
-        (run: Run, apply: (story: Story) => void, onError?: OnError): Promise<Story | undefined> => {
+        <T,>(run: () => Promise<T>, apply: (value: T) => void, onError?: OnError): Promise<T | undefined> => {
             inFlight.current += 1;
             setState({ kind: 'saving' });
             const result = chain.current.then(run).then(
-                (story) => {
+                (value) => {
                     inFlight.current -= 1;
-                    if (!unmounted.current) apply(story);
+                    if (!unmounted.current) apply(value);
                     settle(null);
-                    return story;
+                    return value;
                 },
                 (error: unknown) => {
                     inFlight.current -= 1;
@@ -118,9 +118,10 @@ export function useAutosave() {
     /**
      * A structural change: runs after pending field edits, and applies its answer whole. With
      * `onError`, a failure is reported there (shown at the field) instead of in the save state.
+     * The answer is usually the Story; the assistant (ticket 23) commits calls that answer more.
      */
     const commit = useCallback(
-        async (run: Run, apply: (story: Story) => void, onError?: OnError): Promise<Story | undefined> => {
+        async <T = Story,>(run: () => Promise<T>, apply: (value: T) => void, onError?: OnError): Promise<T | undefined> => {
             await flush();
             return enqueue(run, apply, onError);
         },

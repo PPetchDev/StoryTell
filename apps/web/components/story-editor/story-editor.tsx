@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
 
 import { useConnection } from '@/components/connection';
+import { StoryAssistantPanel } from '@/components/story-assistant/story-assistant-panel';
+import { useStoryAssistant } from '@/components/story-assistant/use-story-assistant';
 import { ApiUnreachableError } from '@/lib/api';
 import {
     MAX_CHARACTERS,
@@ -66,6 +68,9 @@ export function StoryEditor({ initial }: { initial: Story }) {
     }, []);
     /** A structural change: the API's Story becomes the editor's. */
     const applyWhole = useCallback((saved: Story) => setStory(saved), []);
+    /** The assistant (ticket 23): its answers land through the same chain as structural changes. */
+    const assistant = useStoryAssistant({ storyId, commit, applyWhole });
+    const highlights = assistant.highlights;
 
     const setStoryText = (field: StoryText, value: string) => {
         setStory((current) => ({ ...current, [field]: value }));
@@ -130,11 +135,13 @@ export function StoryEditor({ initial }: { initial: Story }) {
             (message) => setRewrites((current) => ({ ...current, [key]: { kind: 'error', message } })),
         );
     };
-    /** The props a text field needs to offer Rewrite. */
+    /** The props a text field needs to offer Rewrite, and to show the assistant's mark. */
     const rewritable = (request: RewriteRequest) => ({
         rewrite: rewrites[rewriteKey(request)],
         onRewrite: () => rewrite(request),
+        highlighted: highlights.has(rewriteKey(request)),
     });
+    const styleHighlighted = (field: StyleKey) => highlights.has(rewriteKey({ target: 'story', field }));
 
     const deleteStory = async () => {
         setDeleteError(null);
@@ -152,12 +159,18 @@ export function StoryEditor({ initial }: { initial: Story }) {
             <nav className="breadcrumbs">
                 <Link href="/">← Stories</Link>
                 <Link href={`/stories/${storyId}/chats`}>Play →</Link>
+                {!assistant.open && (
+                    <button type="button" className="button button-quiet button-small" onClick={assistant.openPanel}>
+                        Assistant
+                    </button>
+                )}
                 <p className="save-state" role="status" aria-live="polite">
                     {SAVE_LABELS[state.kind]}
                     {state.kind === 'error' && `: ${state.message}`}
                 </p>
             </nav>
             <h1 className="visually-hidden">{storyTitle(story)}</h1>
+            {assistant.open && <StoryAssistantPanel assistant={assistant} />}
 
             <section className="status-card" aria-label="Playable status">
                 {story.playable ? (
@@ -205,13 +218,26 @@ export function StoryEditor({ initial }: { initial: Story }) {
             <section className="card" aria-label="Style">
                 <h2>Style</h2>
                 <div className="field-row">
-                    <SelectField label="POV" value={story.style.pov} options={POV_LABELS} onChange={(v) => setStyle('pov', v)} />
-                    <SelectField label="Tense" value={story.style.tense} options={TENSE_LABELS} onChange={(v) => setStyle('tense', v)} />
+                    <SelectField
+                        label="POV"
+                        value={story.style.pov}
+                        options={POV_LABELS}
+                        onChange={(v) => setStyle('pov', v)}
+                        highlighted={styleHighlighted('pov')}
+                    />
+                    <SelectField
+                        label="Tense"
+                        value={story.style.tense}
+                        options={TENSE_LABELS}
+                        onChange={(v) => setStyle('tense', v)}
+                        highlighted={styleHighlighted('tense')}
+                    />
                     <SelectField
                         label="Reply length"
                         value={story.style.replyLength}
                         options={REPLY_LENGTH_LABELS}
                         onChange={(v) => setStyle('replyLength', v)}
+                        highlighted={styleHighlighted('replyLength')}
                     />
                 </div>
                 <TextField
@@ -269,6 +295,7 @@ export function StoryEditor({ initial }: { initial: Story }) {
                         role={story.role}
                         bonds={story.startingBonds.filter((bond) => bond.fromCharacterId === character.id)}
                         rewrites={rewrites}
+                        highlights={highlights}
                         onRewrite={rewrite}
                         onText={(field, value) => setCharacterField(character.id, field, value)}
                         onExampleLines={(lines) => setCharacterField(character.id, 'exampleLines', lines)}
@@ -312,6 +339,7 @@ export function StoryEditor({ initial }: { initial: Story }) {
                         index={index}
                         count={story.scenes.length}
                         rewrites={rewrites}
+                        highlights={highlights}
                         onRewrite={rewrite}
                         onText={(field, value) => setSceneText(scene.id, field, value)}
                         onMove={(direction) =>
