@@ -5,6 +5,7 @@ import { CSSProperties, Fragment, useLayoutEffect, useRef, useState } from 'reac
 import { MessageBody, UserLine } from '@/components/chat/message-body';
 import { MessageSnapshots } from '@/components/chat/snapshots';
 import { ConfirmButton } from '@/components/story-editor/fields';
+import { Cast } from '@/lib/character-colour';
 import { Message, messageText } from '@/lib/chat';
 import { ChatSnapshots, Snapshot, SnapshotJob } from '@/lib/snapshot';
 import { STORY_TEXT_SIZE, useTextSize } from '@/lib/text-size';
@@ -76,7 +77,7 @@ function EditForm({ message, later, onSave, onCancel }: EditFormProps) {
 
 interface MessageViewProps {
     message: Message;
-    cast: readonly number[];
+    cast: Cast;
     later: number;
     editing: boolean;
     /** Edit is hidden while a turn is written or another Message is being edited. */
@@ -171,8 +172,7 @@ export interface PendingLine {
 
 interface ChatThreadProps {
     messages: Message[];
-    /** The Story's Character ids in their authored order, which pick each Character's colour. */
-    cast: readonly number[];
+    cast: Cast;
     pending: PendingLine | null;
     /** A turn is being written: the indicator shows where the reply will appear. */
     writing: boolean;
@@ -209,7 +209,9 @@ export function ChatThread({
     onDismissSnapshot,
 }: ChatThreadProps) {
     const last = messages[messages.length - 1];
-    const { threadRef, contentRef } = useFollowEnd(`${messages.length}:${last?.id ?? ''}:${pending !== null}:${writing}`);
+    // The newest Message's text is in the key too: an edit replaces it in place, under its id.
+    const newest = last ? `${last.id}:${messageText(last)}` : '';
+    const { threadRef, contentRef } = useFollowEnd(`${messages.length}:${newest}:${pending !== null}:${writing}`);
     const storySize = { '--story-size': STORY_TEXT_SIZE[useTextSize()] } as CSSProperties;
 
     return (

@@ -9,6 +9,7 @@ import { MemoryDrawer } from '@/components/chat/memory-drawer';
 import { SnapshotViewer, useChatSnapshots } from '@/components/chat/snapshots';
 import { useConnection } from '@/components/connection';
 import { ApiError, apiFetch, ApiUnreachableError } from '@/lib/api';
+import { Cast } from '@/lib/character-colour';
 import { backgroundPending, Chat, chatApi, EditedChat, latestReply, Message, rollbackNotice } from '@/lib/chat';
 import { Memory, memoryApi, renderUser } from '@/lib/memory';
 import { Snapshot } from '@/lib/snapshot';
@@ -37,8 +38,7 @@ const BACKGROUND_POLL_MS = 1_000;
  */
 interface ChatScreenProps {
     initial: Chat;
-    /** The Story's Character ids in their authored order, which pick each Character's colour. */
-    cast: readonly number[];
+    cast: Cast;
 }
 
 export function ChatScreen({ initial, cast }: ChatScreenProps) {

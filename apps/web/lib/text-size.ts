@@ -19,25 +19,26 @@ export const STORY_TEXT_SIZE: Record<TextSize, string> = {
     L: '1.1875rem',
 };
 
-const DEFAULT: TextSize = 'M';
+const DEFAULT_TEXT_SIZE: TextSize = 'M';
 const STORAGE_KEY = 'storytell.textSize';
 
-/** The choice made in this tab when storage refuses it, so it still holds until a reload. */
+/** The choice made in this tab when storage refused to keep it, so it still holds until a reload. */
 let unsaved: TextSize | null = null;
 const listeners = new Set<() => void>();
 
 function isTextSize(value: unknown): value is TextSize {
-    return value === 'S' || value === 'M' || value === 'L';
+    return TEXT_SIZES.some((option) => option.value === value);
 }
 
 function read(): TextSize {
+    if (unsaved) return unsaved;
     try {
         const stored = window.localStorage.getItem(STORAGE_KEY);
         if (isTextSize(stored)) return stored;
     } catch {
         // Storage is blocked (private mode, a locked-down browser): fall through.
     }
-    return unsaved ?? DEFAULT;
+    return DEFAULT_TEXT_SIZE;
 }
 
 function subscribe(onChange: () => void): () => void {
@@ -51,16 +52,17 @@ function subscribe(onChange: () => void): () => void {
 }
 
 export function setTextSize(size: TextSize): void {
-    unsaved = size;
     try {
         window.localStorage.setItem(STORAGE_KEY, size);
+        unsaved = null;
     } catch {
-        // Kept for this tab only.
+        // Storage is blocked or full: kept for this tab only.
+        unsaved = size;
     }
     for (const listener of listeners) listener();
 }
 
 /** This device's text size; M while rendering on the server. */
 export function useTextSize(): TextSize {
-    return useSyncExternalStore(subscribe, read, () => DEFAULT);
+    return useSyncExternalStore(subscribe, read, () => DEFAULT_TEXT_SIZE);
 }

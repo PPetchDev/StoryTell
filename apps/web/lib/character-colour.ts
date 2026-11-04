@@ -1,9 +1,12 @@
 /**
- * Character colours (spec: "Character colour"). A fixed palette, each at least 7:1 against
- * the page background and the surface, picked by the Character's position among the Story's
- * Characters, so a Character keeps its colour in every Chat of the Story. Presentation only:
- * nothing is stored.
+ * Character colours (spec: "Character colour"). A fixed palette, each at least 7.7:1 against
+ * the page background and 6.9:1 against the surface, picked by the Character's position among
+ * the Story's Characters, so a Character keeps its colour in every Chat of the Story.
+ * Presentation only: nothing is stored.
  */
+
+/** The Story's Character ids in their authored order, which pick each Character's colour. */
+export type Cast = readonly number[];
 export const CHARACTER_COLOURS = [
     '#f2b766', // amber
     '#5fd0c5', // teal
@@ -18,8 +21,8 @@ export const CHARACTER_COLOURS = [
 /** For a speaker with no Character link: an unknown speaker, or a Character since removed. */
 export const NEUTRAL_SPEAKER_COLOUR = '#c4bdd6';
 
-/** The colour of a speaker, given the Story's Character ids in their authored order. */
-export function characterColour(characterId: number | null, castIds: readonly number[]): string {
-    const position = characterId === null ? -1 : castIds.indexOf(characterId);
+/** The colour of a speaker in a Story with this cast. */
+export function characterColour(characterId: number | null, cast: Cast): string {
+    const position = characterId === null ? -1 : cast.indexOf(characterId);
     return position < 0 ? NEUTRAL_SPEAKER_COLOUR : CHARACTER_COLOURS[position % CHARACTER_COLOURS.length];
 }

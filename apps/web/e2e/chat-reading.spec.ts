@@ -185,3 +185,30 @@ test('the text size chosen in Settings sizes the story text on this device, and 
         await request.delete(`/api/stories/${storyId}`);
     }
 });
+
+test('saving an edit to the newest reply brings the end back into view', async ({ page, request }) => {
+    const storyId = await createStory(request, LONG_OPENING);
+    await scriptTurns(request, ['She points at the stairs.']);
+    // The edit runs the reply's background calls again.
+    await request.post('/api/testing/fake-gateway/text', { data: { kind: 'judge', replies: [NO_CHANGE] } });
+    await request.post('/api/testing/fake-gateway/text', { data: { kind: 'memory_extraction', replies: [NO_OPS] } });
+    const chatId = await createChat(request, storyId);
+    const sent = await request.post(`/api/stories/${storyId}/chats/${chatId}/messages`, { data: { text: 'Where is the lamp room?' } });
+    expect(sent.ok()).toBe(true);
+
+    try {
+        await page.goto(`/stories/${storyId}/chats/${chatId}`);
+        const reply = page.getByRole('article', { name: 'AI reply' });
+        await reply.getByRole('button', { name: 'Edit' }).click();
+        await page.getByRole('textbox', { name: 'Message text' }).fill('She points at the stairs.\n\nThe last step is missing.');
+        // Read back up the Chat, then save without scrolling to the button.
+        await page.getByRole('region', { name: 'Messages' }).evaluate((thread) => (thread.scrollTop = 0));
+        await page.getByRole('button', { name: 'Save' }).evaluate((button: HTMLButtonElement) => button.click());
+
+        const edited = reply.getByText('The last step is missing.');
+        await expect(edited).toBeVisible();
+        await expectFullyAboveComposer(page, edited);
+    } finally {
+        await request.delete(`/api/stories/${storyId}`);
+    }
+});

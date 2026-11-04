@@ -1,7 +1,7 @@
 import { CSSProperties, ReactNode, useId } from 'react';
 
 import { bookFace } from '@/lib/book-face';
-import { characterColour } from '@/lib/character-colour';
+import { Cast, characterColour } from '@/lib/character-colour';
 import { Message, MessagePart } from '@/lib/chat';
 
 import styles from './message-body.module.css';
@@ -24,7 +24,7 @@ export function UserLine({ identityName, text }: { identityName: string; text: s
 }
 
 /** A Character's line: the stamped name and the text inside a bar, both in the Character's colour. */
-function Speech({ part, cast }: { part: Extract<MessagePart, { kind: 'speech' }>; cast: readonly number[] }) {
+function Speech({ part, cast }: { part: Extract<MessagePart, { kind: 'speech' }>; cast: Cast }) {
     const nameId = useId();
     const colour = { '--speaker-colour': characterColour(part.characterId, cast) } as CSSProperties;
     return (
@@ -39,8 +39,7 @@ function Speech({ part, cast }: { part: Extract<MessagePart, { kind: 'speech' }>
 
 interface MessageBodyProps {
     message: Message;
-    /** The Story's Character ids in their authored order, which pick each Character's colour. */
-    cast: readonly number[];
+    cast: Cast;
 }
 
 /**
