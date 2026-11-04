@@ -1,5 +1,5 @@
 import { execFileSync, execSync, spawn } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { openSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -57,12 +57,16 @@ export function migrate(env: Record<string, string>): void {
     });
 }
 
-/** Starts the built API with the fake Model Gateway and waits until it answers. */
+/**
+ * Starts the built API with the fake Model Gateway and waits until it answers. Its output
+ * goes to `api.log` beside the state file, so a crash mid-run can be read afterwards.
+ */
 export async function spawnApi(env: Record<string, string>): Promise<number> {
+    const log = openSync(path.join(path.dirname(stateFile()), 'api.log'), 'a');
     const child = spawn(process.execPath, ['dist/main.js'], {
         cwd: API_DIR,
         env: { ...process.env, ...env },
-        stdio: 'ignore',
+        stdio: ['ignore', log, log],
     });
     child.unref();
     await waitFor(isUp, 'the API to start');

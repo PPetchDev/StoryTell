@@ -10,6 +10,7 @@ import {
     MAX_CHARACTERS,
     POV_LABELS,
     REPLY_LENGTH_LABELS,
+    RewriteRequest,
     Story,
     storyApi,
     storyTitle,
@@ -18,6 +19,7 @@ import {
 import { SAVE_LABELS, useAutosave } from './autosave';
 import { CharacterCard } from './character-card';
 import { ConfirmButton, SelectField, TextField } from './fields';
+import { rewriteKey, RewriteStates } from './rewrite';
 import { SceneCard } from './scene-card';
 
 type StoryText = 'title' | 'setting' | 'opening';
@@ -33,9 +35,16 @@ function moved<T extends { id: number }>(items: T[], id: number, direction: -1 |
     return ids;
 }
 
+function without(states: RewriteStates, key: string): RewriteStates {
+    const { [key]: _gone, ...rest } = states;
+    return rest;
+}
+
 /**
  * The Story editor (spec: "Story authoring module"). The local Story is what the author sees;
  * every edit is saved on its own, and each answer brings the playable status up to date.
+ * Every text field has a Rewrite button (spec: "Rewrite this field"), which regenerates just
+ * that field with the whole Story as context.
  */
 export function StoryEditor({ initial }: { initial: Story }) {
     const router = useRouter();
@@ -43,6 +52,7 @@ export function StoryEditor({ initial }: { initial: Story }) {
     const [story, setStory] = useState<Story>(initial);
     const { state, queue, commit } = useAutosave();
     const [deleteError, setDeleteError] = useState<string | null>(null);
+    const [rewrites, setRewrites] = useState<RewriteStates>({});
     const storyId = initial.id;
 
     /** A field save: keep what the author typed, take the status from the API. */
@@ -104,6 +114,28 @@ export function StoryEditor({ initial }: { initial: Story }) {
         queue(`scene.${sceneId}.${field}`, () => storyApi.updateScene(storyId, sceneId, { [field]: value }), applyStatus);
     };
 
+    /**
+     * A rewrite goes after pending edits, like a structural change, and its answer replaces
+     * the Story: only the one field differs. A failure shows at that field, with Retry.
+     */
+    const rewrite = (request: RewriteRequest) => {
+        const key = rewriteKey(request);
+        setRewrites((current) => ({ ...current, [key]: { kind: 'busy' } }));
+        void commit(
+            () => storyApi.rewrite(storyId, request),
+            (saved) => {
+                applyWhole(saved);
+                setRewrites((current) => without(current, key));
+            },
+            (message) => setRewrites((current) => ({ ...current, [key]: { kind: 'error', message } })),
+        );
+    };
+    /** The props a text field needs to offer Rewrite. */
+    const rewritable = (request: RewriteRequest) => ({
+        rewrite: rewrites[rewriteKey(request)],
+        onRewrite: () => rewrite(request),
+    });
+
     const deleteStory = async () => {
         setDeleteError(null);
         try {
@@ -144,7 +176,12 @@ export function StoryEditor({ initial }: { initial: Story }) {
             </section>
 
             <section className="card" aria-label="Story">
-                <TextField label="Title" value={story.title} onChange={(v) => setStoryText('title', v)} />
+                <TextField
+                    label="Title"
+                    value={story.title}
+                    onChange={(v) => setStoryText('title', v)}
+                    {...rewritable({ target: 'story', field: 'title' })}
+                />
                 <TextField
                     label="Setting"
                     value={story.setting}
@@ -152,6 +189,7 @@ export function StoryEditor({ initial }: { initial: Story }) {
                     rows={6}
                     hint="Place, situation, premise and tone, in plain language."
                     onChange={(v) => setStoryText('setting', v)}
+                    {...rewritable({ target: 'story', field: 'setting' })}
                 />
                 <TextField
                     label="Opening"
@@ -160,6 +198,7 @@ export function StoryEditor({ initial }: { initial: Story }) {
                     rows={6}
                     hint="The passage that begins every Chat."
                     onChange={(v) => setStoryText('opening', v)}
+                    {...rewritable({ target: 'story', field: 'opening' })}
                 />
             </section>
 
@@ -181,19 +220,26 @@ export function StoryEditor({ initial }: { initial: Story }) {
                     placeholder='e.g. "anime, soft colours"'
                     hint="Optional. One look for every Snapshot and Reference image."
                     onChange={(v) => setStyle('imageStyle', v)}
+                    {...rewritable({ target: 'story', field: 'imageStyle' })}
                 />
             </section>
 
             <section className="card" aria-label="Role">
                 <h2>Role</h2>
                 <p className="hint">The part you play. The Characters always know who they are talking to.</p>
-                <TextField label="Name" value={story.role.name} onChange={(v) => setRoleText('name', v)} />
+                <TextField
+                    label="Name"
+                    value={story.role.name}
+                    onChange={(v) => setRoleText('name', v)}
+                    {...rewritable({ target: 'role', field: 'name' })}
+                />
                 <TextField
                     label="Description"
                     value={story.role.description}
                     multiline
                     rows={3}
                     onChange={(v) => setRoleText('description', v)}
+                    {...rewritable({ target: 'role', field: 'description' })}
                 />
             </section>
 
@@ -222,6 +268,8 @@ export function StoryEditor({ initial }: { initial: Story }) {
                         cast={story.characters}
                         role={story.role}
                         bonds={story.startingBonds.filter((bond) => bond.fromCharacterId === character.id)}
+                        rewrites={rewrites}
+                        onRewrite={rewrite}
                         onText={(field, value) => setCharacterField(character.id, field, value)}
                         onExampleLines={(lines) => setCharacterField(character.id, 'exampleLines', lines)}
                         onMove={(direction) =>
@@ -263,6 +311,8 @@ export function StoryEditor({ initial }: { initial: Story }) {
                         scene={scene}
                         index={index}
                         count={story.scenes.length}
+                        rewrites={rewrites}
+                        onRewrite={rewrite}
                         onText={(field, value) => setSceneText(scene.id, field, value)}
                         onMove={(direction) =>
                             void commit(() => storyApi.reorderScenes(storyId, moved(story.scenes, scene.id, direction)), applyWhole)

@@ -2,6 +2,8 @@
 
 import { ReactNode, useId, useState } from 'react';
 
+import { RewriteState } from './rewrite';
+
 interface TextFieldProps {
     label: string;
     value: string;
@@ -10,14 +12,32 @@ interface TextFieldProps {
     rows?: number;
     hint?: string;
     placeholder?: string;
+    /** With this, the field gets a Rewrite button that regenerates just this field (ticket 22). */
+    onRewrite?(): void;
+    rewrite?: RewriteState;
 }
 
-export function TextField({ label, value, onChange, multiline, rows, hint, placeholder }: TextFieldProps) {
+export function TextField({ label, value, onChange, multiline, rows, hint, placeholder, onRewrite, rewrite }: TextFieldProps) {
     const id = useId();
     const hintId = `${id}-hint`;
+    const busy = rewrite?.kind === 'busy';
     return (
         <div className="field">
-            <label htmlFor={id}>{label}</label>
+            <div className="field-head">
+                <label htmlFor={id}>{label}</label>
+                {onRewrite && (
+                    // Named by `title`, not aria-label, so the field's own label stays unique.
+                    <button
+                        type="button"
+                        className="button button-quiet button-small"
+                        title={`Rewrite ${label}`}
+                        disabled={busy}
+                        onClick={onRewrite}
+                    >
+                        {busy ? 'Rewriting…' : 'Rewrite'}
+                    </button>
+                )}
+            </div>
             {multiline ? (
                 <textarea
                     id={id}
@@ -40,6 +60,14 @@ export function TextField({ label, value, onChange, multiline, rows, hint, place
             {hint && (
                 <p id={hintId} className="hint">
                     {hint}
+                </p>
+            )}
+            {rewrite?.kind === 'error' && (
+                <p role="alert" className="field-error">
+                    <span>Couldn&apos;t rewrite {label}: {rewrite.message}</span>{' '}
+                    <button type="button" className="button button-quiet button-small" onClick={onRewrite}>
+                        Retry
+                    </button>
                 </p>
             )}
         </div>

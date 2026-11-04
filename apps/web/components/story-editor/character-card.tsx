@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 
-import { Character, Role, StartingBond } from '@/lib/story';
+import { Character, RewriteRequest, Role, StartingBond } from '@/lib/story';
 import { ConfirmButton, OrderButtons, TextField, Toolbar } from './fields';
+import { rewriteKey, RewriteStates } from './rewrite';
 
 type TextKey = 'name' | 'appearance' | 'personality' | 'voice' | 'background' | 'secrets' | 'arcDirections';
 
@@ -14,6 +15,8 @@ interface CharacterCardProps {
     cast: Character[];
     role: Role;
     bonds: StartingBond[];
+    rewrites: RewriteStates;
+    onRewrite(request: RewriteRequest): void;
     onText(field: TextKey, value: string): void;
     onExampleLines(lines: string[]): void;
     onMove(direction: -1 | 1): void;
@@ -26,7 +29,7 @@ interface CharacterCardProps {
 const ROLE_TARGET = 'role';
 
 export function CharacterCard(props: CharacterCardProps) {
-    const { character, index, count, cast, role, bonds } = props;
+    const { character, index, count, cast, role, bonds, rewrites } = props;
     const heading = character.name.trim() === '' ? `Character ${index + 1}` : character.name;
     const [target, setTarget] = useState<string>(ROLE_TARGET);
 
@@ -43,6 +46,13 @@ export function CharacterCard(props: CharacterCardProps) {
             .map((other) => ({ value: String(other.id), label: targetName(other.id) })),
     ].filter((option) => !taken.has(option.value));
     const chosen = targets.some((option) => option.value === target) ? target : (targets[0]?.value ?? '');
+
+    /** The props a text field of this Character, or of one of its Bonds, needs to offer Rewrite. */
+    const rewritable = (request: RewriteRequest) => ({
+        rewrite: rewrites[rewriteKey(request)],
+        onRewrite: () => props.onRewrite(request),
+    });
+    const ofCharacter = (field: TextKey) => rewritable({ target: 'character', id: character.id, field });
 
     const setLine = (lineIndex: number, value: string) => {
         const lines = [...character.exampleLines];
@@ -70,13 +80,14 @@ export function CharacterCard(props: CharacterCardProps) {
                     />
                 </Toolbar>
             </div>
-            <TextField label="Name" value={character.name} onChange={(v) => props.onText('name', v)} />
+            <TextField label="Name" value={character.name} onChange={(v) => props.onText('name', v)} {...ofCharacter('name')} />
             <TextField
                 label="Appearance"
                 value={character.appearance}
                 multiline
                 rows={3}
                 onChange={(v) => props.onText('appearance', v)}
+                {...ofCharacter('appearance')}
             />
             <TextField
                 label="Personality"
@@ -84,6 +95,7 @@ export function CharacterCard(props: CharacterCardProps) {
                 multiline
                 rows={3}
                 onChange={(v) => props.onText('personality', v)}
+                {...ofCharacter('personality')}
             />
             <TextField
                 label="Voice"
@@ -92,6 +104,7 @@ export function CharacterCard(props: CharacterCardProps) {
                 rows={3}
                 hint="How they talk: rhythm, words they use, what they never say."
                 onChange={(v) => props.onText('voice', v)}
+                {...ofCharacter('voice')}
             />
 
             <fieldset className="subsection">
@@ -142,6 +155,7 @@ export function CharacterCard(props: CharacterCardProps) {
                 multiline
                 rows={3}
                 onChange={(v) => props.onText('background', v)}
+                {...ofCharacter('background')}
             />
             <TextField
                 label="Secrets"
@@ -150,6 +164,7 @@ export function CharacterCard(props: CharacterCardProps) {
                 rows={3}
                 hint="Optional. What only this Character knows."
                 onChange={(v) => props.onText('secrets', v)}
+                {...ofCharacter('secrets')}
             />
             <TextField
                 label="Arc directions"
@@ -158,6 +173,7 @@ export function CharacterCard(props: CharacterCardProps) {
                 rows={3}
                 hint='Optional. How they might change, e.g. "if trusted, her coldness thaws".'
                 onChange={(v) => props.onText('arcDirections', v)}
+                {...ofCharacter('arcDirections')}
             />
 
             <fieldset className="subsection">
@@ -182,6 +198,7 @@ export function CharacterCard(props: CharacterCardProps) {
                             value={bond.label}
                             placeholder='e.g. "wary", "old friends"'
                             onChange={(v) => props.onBondText(bond.id, 'label', v)}
+                            {...rewritable({ target: 'startingBond', id: bond.id, field: 'label' })}
                         />
                         <TextField
                             label="Description"
@@ -189,6 +206,7 @@ export function CharacterCard(props: CharacterCardProps) {
                             multiline
                             rows={2}
                             onChange={(v) => props.onBondText(bond.id, 'description', v)}
+                            {...rewritable({ target: 'startingBond', id: bond.id, field: 'description' })}
                         />
                     </div>
                 ))}

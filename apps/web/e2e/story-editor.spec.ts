@@ -9,6 +9,8 @@ test('writes a Story by hand, sees it become playable, and the edits survive a r
 }) => {
     await page.goto('/');
     await page.getByRole('button', { name: 'New Story' }).click();
+    // The blank path beside "Draft from idea" (ticket 22).
+    await page.getByRole('region', { name: 'New Story' }).getByRole('button', { name: 'Start blank' }).click();
     await expect(page).toHaveURL(/\/stories\/\d+$/);
     const storyUrl = page.url();
 

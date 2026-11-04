@@ -17,6 +17,7 @@ as "the API can't be reached" and shows the can't-connect screen (`apps/web/lib/
 | 002 | Images |
 | 003 | Story authoring |
 | 004 | Chats and turns |
+| 005 | Story drafting |
 
 ## Codes
 
@@ -44,3 +45,7 @@ as "the API can't be reached" and shows the can't-connect screen (`apps/web/lib/
 | `409.004.003` | `NoTurnToRetryError` | Retry when the Chat is not waiting for a reply to a User Message. |
 | `409.004.004` | `TurnInProgressError` | A send while this Chat's turn is still being written. |
 | `422.004.005` | `EmptyMessageError` | A send with nothing but whitespace. |
+| `502.005.001` | `UnreadableDraftError` | The model's draft or rewrite could not be read (no JSON object, or no text). Nothing saved. Show with Retry. |
+| `502.005.002` | `InvalidDraftError` | The draft does not fit a Story (0 or 7 Characters, a Style value outside its set, a required field empty, a bad StartingBond). Nothing saved. Show with Retry. |
+| `422.005.003` | `EmptyIdeaError` | A draft was asked for with a blank idea. |
+| `422.005.004` | `NotRewritableError` | A rewrite named a field that is not a text field of that part of the Story. |

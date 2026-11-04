@@ -1,10 +1,13 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { startDisposablePostgres } from '../../../api/test/harness/postgres';
 import { buildApi, currentApiPid, killApi, migrate, spawnApi, writeState } from './api-server';
 import { E2E_API_PORT } from './ports';
+
+const RESULTS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../test-results');
 
 /**
  * Brings up the same stack the API tests use, but as a real server: a throwaway PostgreSQL,
@@ -31,6 +34,9 @@ export default async function globalSetup() {
     return async () => {
         await killApi(currentApiPid());
         await postgres.stop();
+        // Keep the API's output where the report lives, so a crash mid-run can be read.
+        await mkdir(RESULTS_DIR, { recursive: true });
+        await copyFile(path.join(tempDir, 'api.log'), path.join(RESULTS_DIR, 'api.log')).catch(() => {});
         await rm(tempDir, { recursive: true, force: true });
     };
 }

@@ -95,6 +95,16 @@ export const REPLY_LENGTH_LABELS: Record<ReplyLength, string> = {
 
 export const MAX_CHARACTERS = 6;
 
+/** Which part of the Story a rewrite is for (mirrors the API's REWRITE_TARGETS). */
+export type RewriteTarget = 'story' | 'role' | 'character' | 'startingBond' | 'scene';
+
+export interface RewriteRequest {
+    target: RewriteTarget;
+    /** The Character, starting Bond or Scene; not used for `story` and `role`. */
+    id?: number;
+    field: string;
+}
+
 export function storyTitle(story: { title: string }): string {
     return story.title.trim() === '' ? 'Untitled Story' : story.title;
 }
@@ -102,6 +112,11 @@ export function storyTitle(story: { title: string }): string {
 /** Every write answers with the whole Story, playable status included. */
 export const storyApi = {
     create: (fields: StoryFields = {}) => apiSend<Story>('POST', '/stories', fields),
+    /** One play-model call turns the idea into a whole, saved Story (ticket 22). */
+    draft: (idea: string) => apiSend<Story>('POST', '/stories/draft', { idea }),
+    /** One call regenerates a single text field; the answer differs only in that field. */
+    rewrite: (storyId: number, request: RewriteRequest) =>
+        apiSend<Story>('POST', `/stories/${storyId}/rewrite`, request),
     update: (storyId: number, fields: StoryFields) =>
         apiSend<Story>('PATCH', `/stories/${storyId}`, fields),
     remove: (storyId: number) => apiSend<void>('DELETE', `/stories/${storyId}`),
