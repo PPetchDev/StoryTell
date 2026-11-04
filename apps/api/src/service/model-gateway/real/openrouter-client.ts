@@ -171,26 +171,53 @@ export class OpenRouterClient {
         const message: string = typeof error.message === 'string' ? error.message : `HTTP ${status}`;
         const code: number = typeof error.code === 'number' ? error.code : status;
         const metadata = error.metadata ?? {};
+        const described = `OpenRouter: ${message}${describeProvider(metadata)}`;
 
-        // OpenRouter reserves credit per in-flight request and refuses with this message when
-        // the account can't cover one. A spent budget or key limit means the same thing.
+        // A 429 is a rate limit, OpenRouter's own or the host's (DeepInfra's engine_overloaded
+        // is relayed this way), and a 503 is an overloaded host. Both are transient: `send`
+        // retried them on the same host and gave up. Whatever metadata they carry, neither
+        // means credit (https://openrouter.ai/docs/api-reference/limits documents
+        // `limit_source` on 402 and 403 only), so they stay an outage.
+        if (isRetryable(code) || isRetryable(status)) {
+            return new ProviderOutageError(described);
+        }
+        // Credit: a 402 (balance, key limit or the per-request in-flight reservation) or a
+        // 403 budget block, both of which name their `limit_source`. OpenRouter refuses with
+        // the "exceed your available credits" message when the account can't cover one call.
         if (
             code === 402 ||
+            metadata.error_type === 'payment_required' ||
             /exceed(s)? your available credits/i.test(message) ||
             /insufficient credits/i.test(message) ||
             typeof metadata.limit_source === 'string'
         ) {
-            return new OutOfCreditError('text', `OpenRouter: ${message}`);
+            return new OutOfCreditError('text', described);
         }
         if (
             metadata.error_type === 'content_policy_violation' ||
             metadata.error_type === 'refusal' ||
             Array.isArray(metadata.reasons)
         ) {
-            return new ModelRefusalError(`OpenRouter: ${message}`);
+            return new ModelRefusalError(described);
         }
-        return new ProviderOutageError(`OpenRouter: ${message}`);
+        return new ProviderOutageError(described);
     }
+}
+
+/**
+ * The host's own words, when OpenRouter relayed them: ` (DeepInfra: engine_overloaded)`.
+ * `provider_code` is the host's error code; `raw` its verbatim payload, kept short.
+ */
+function describeProvider(metadata: Record<string, any>): string {
+    const detail: string | undefined =
+        typeof metadata.provider_code === 'string'
+            ? metadata.provider_code
+            : typeof metadata.raw === 'string'
+              ? metadata.raw.slice(0, 200)
+              : undefined;
+    if (!detail) return '';
+    const host = typeof metadata.provider_name === 'string' ? `${metadata.provider_name}: ` : '';
+    return ` (${host}${detail})`;
 }
 
 function round(usd: number): number {
