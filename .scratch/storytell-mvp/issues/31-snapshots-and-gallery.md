@@ -1,7 +1,7 @@
 # Snapshots and the Gallery
 
 Type: task
-Status: ready-for-agent
+Status: resolved
 Blocked by: 25, 28, 30
 Part of: [Spec: Storytell AI MVP](../spec.md)
 

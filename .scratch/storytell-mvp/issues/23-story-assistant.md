@@ -1,7 +1,7 @@
 # Story assistant with Undo
 
 Type: task
-Status: ready-for-agent
+Status: resolved
 Blocked by: 22
 Part of: [Spec: Storytell AI MVP](../spec.md)
 

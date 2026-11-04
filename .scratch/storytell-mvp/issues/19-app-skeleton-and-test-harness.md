@@ -1,7 +1,7 @@
 # App skeleton, PWA shell and test harness
 
 Type: task
-Status: ready-for-agent
+Status: resolved
 Blocked by: none
 Part of: [Spec: Storytell AI MVP](../spec.md)
 

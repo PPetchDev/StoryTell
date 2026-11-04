@@ -1,7 +1,7 @@
 # Play a Chat: one turn end to end
 
 Type: task
-Status: ready-for-agent
+Status: resolved
 Blocked by: 20, 21
 Part of: [Spec: Storytell AI MVP](../spec.md)
 

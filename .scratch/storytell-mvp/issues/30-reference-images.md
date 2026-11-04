@@ -1,7 +1,7 @@
 # Reference images for Characters
 
 Type: task
-Status: ready-for-agent
+Status: resolved
 Blocked by: 18, 20, 21
 Part of: [Spec: Storytell AI MVP](../spec.md)
 

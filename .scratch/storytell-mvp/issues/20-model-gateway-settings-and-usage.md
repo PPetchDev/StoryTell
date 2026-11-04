@@ -1,7 +1,7 @@
 # Real Model Gateway, Settings and the usage view
 
 Type: task
-Status: ready-for-agent
+Status: resolved
 Blocked by: 19
 Part of: [Spec: Storytell AI MVP](../spec.md)
 

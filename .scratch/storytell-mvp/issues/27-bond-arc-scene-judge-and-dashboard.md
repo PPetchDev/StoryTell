@@ -1,7 +1,7 @@
 # Bond, Arc and Scene judge, the change ledger, and the dashboard
 
 Type: task
-Status: ready-for-agent
+Status: resolved
 Blocked by: 25
 Part of: [Spec: Storytell AI MVP](../spec.md)
 

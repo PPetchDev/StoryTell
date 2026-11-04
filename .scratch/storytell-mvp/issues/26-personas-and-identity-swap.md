@@ -1,7 +1,7 @@
 # Personas and swapping identity mid-Chat
 
 Type: task
-Status: ready-for-agent
+Status: resolved
 Blocked by: 24
 Part of: [Spec: Storytell AI MVP](../spec.md)
 

@@ -1,7 +1,7 @@
 # Cast and Scene changes reaching existing Chats
 
 Type: task
-Status: ready-for-agent
+Status: resolved
 Blocked by: 27, 28
 Part of: [Spec: Storytell AI MVP](../spec.md)
 

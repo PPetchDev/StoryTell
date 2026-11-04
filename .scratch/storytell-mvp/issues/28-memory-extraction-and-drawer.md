@@ -1,7 +1,7 @@
 # Memory: extraction, the drawer and rollback
 
 Type: task
-Status: ready-for-agent
+Status: resolved
 Blocked by: 27
 Part of: [Spec: Storytell AI MVP](../spec.md)
 
