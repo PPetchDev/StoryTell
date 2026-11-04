@@ -33,6 +33,7 @@ import { LedgerModelService, LedgerState, RollbackCounts } from '../../model/led
 import { MemoryEntity } from '../../model/memory/entities/memory.entity.js';
 import { MemoryModelService } from '../../model/memory/memory.service.js';
 import { PersonaModelService } from '../../model/persona/persona.service.js';
+import { SnapshotModelService } from '../../model/snapshot/snapshot.service.js';
 import { SettingsModelService } from '../../model/settings/settings.service.js';
 import { StoryEntity } from '../../model/story/entities/story.entity.js';
 import { StoryModelService } from '../../model/story/story.service.js';
@@ -61,6 +62,8 @@ export interface ChatDetail extends ChatSummary {
     missing: MissingField[];
     /** True when the text pool's remaining credit is known and used up. */
     textCreditOut: boolean;
+    /** The same for the image pool: it disables only the camera. */
+    imageCreditOut: boolean;
     playModel: string;
     /** Set when the last AI Message came from a different model than the current play model. */
     drift: { lastModel: string; playModel: string } | null;
@@ -135,6 +138,7 @@ export class ChatManagerService {
         private readonly ledger: LedgerModelService,
         private readonly memoryModel: MemoryModelService,
         private readonly personaModel: PersonaModelService,
+        private readonly snapshotModel: SnapshotModelService,
         private readonly judge: JudgeManagerService,
         private readonly extraction: MemoryExtractionManagerService,
         private readonly gateway: ModelGateway,
@@ -171,8 +175,9 @@ export class ChatManagerService {
      * Spec: "Reset Chat". The title and the worn identity stay; every Message, all Memory,
      * the Bond history, Arc steps, Scene advances and copied Arc directions go; the Opening as it is
      * now comes in again as Message 1, StartingBonds and Arc directions are re-seeded from
-     * the current Story, and the Chat returns to the first Scene or free play. Like starting
-     * a Chat, it needs a playable Story.
+     * the current Story, and the Chat returns to the first Scene or free play. Snapshots lose
+     * their Message link with the Messages (ON DELETE SET NULL). Like starting a Chat, it
+     * needs a playable Story.
      */
     async resetChat(storyId: number, chatId: number): Promise<ChatDetail> {
         const { story, chat: loaded } = await this.load(storyId, chatId);
@@ -225,6 +230,8 @@ export class ChatManagerService {
         }
         const rolledBack = await this.ledger.rollbackFrom(chat.id, message.position);
         await this.chatModel.rewriteAiMessage(message, reply.parts);
+        // Its Snapshots show a moment the edit took away; they stay in the Gallery.
+        await this.snapshotModel.clearMessageLinks([message.id]);
         if (message.model !== AUTHOR_MODEL) {
             await this.chatModel.setJudgeStatus(message.id, BackgroundStatus.Pending);
             await this.chatModel.setMemoryStatus(message.id, BackgroundStatus.Pending);
@@ -289,7 +296,10 @@ export class ChatManagerService {
         return this.getChat(storyId, chatId);
     }
 
-    /** Spec: "Delete Chat". Its Messages and ledger records go with it. */
+    /**
+     * Spec: "Delete Chat". Its Messages and ledger records go with it; its Snapshots stay in
+     * the Gallery, their Chat and Message links cleared by ON DELETE SET NULL.
+     */
     async deleteChat(storyId: number, chatId: number): Promise<void> {
         const { chat } = await this.load(storyId, chatId);
         await this.chatModel.deleteChat(chat.id);
@@ -537,12 +547,18 @@ export class ChatManagerService {
     }
 
     private async textCreditOut(): Promise<boolean> {
-        const remaining = (await this.gateway.remainingCredit()).text.remainingUsd;
-        return remaining !== null && remaining <= 0;
+        return (await this.creditOut()).text;
+    }
+
+    /** Whether each pool's remaining credit is known and used up. */
+    private async creditOut(): Promise<{ text: boolean; image: boolean }> {
+        const credit = await this.gateway.remainingCredit();
+        const out = (remaining: number | null) => remaining !== null && remaining <= 0;
+        return { text: out(credit.text.remainingUsd), image: out(credit.image.remainingUsd) };
     }
 
     private async detail(story: StoryEntity, chat: ChatEntity): Promise<ChatDetail> {
-        const [settings, textCreditOut] = await Promise.all([this.settingsModel.get(), this.textCreditOut()]);
+        const [settings, creditOut] = await Promise.all([this.settingsModel.get(), this.creditOut()]);
         const scene = story.scenes.find((candidate) => candidate.id === chat.currentSceneId);
         const lastModel = lastAiModel(chat);
         const identity = wornIdentity(story, chat);
@@ -555,7 +571,8 @@ export class ChatManagerService {
             messages: chat.messages.map((message) => message.toResponse()),
             awaitingReply: awaitingReply(chat),
             ...playableStatus(story),
-            textCreditOut,
+            textCreditOut: creditOut.text,
+            imageCreditOut: creditOut.image,
             playModel: settings.playModel,
             drift:
                 lastModel !== null && lastModel !== settings.playModel

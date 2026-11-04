@@ -2,7 +2,7 @@
 export const CANDIDATE_COUNT = 4;
 
 /** Used when the Story's Image style is empty, so the candidates still share one look. */
-const DEFAULT_IMAGE_STYLE = 'realistic, natural lighting';
+export const DEFAULT_IMAGE_STYLE = 'realistic, natural lighting';
 
 /**
  * The prompt of every candidate in a round (spec: "Reference image"): one adult Character,

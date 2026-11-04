@@ -3,6 +3,7 @@ import {
     ImageModel,
     REFERENCE_IMAGE_MODEL,
     SnapshotModel,
+    TEXT_ONLY_SNAPSHOT_MODELS,
     TextCallKind,
     TextModel,
 } from '../model-gateway.js';
@@ -84,6 +85,12 @@ export const IMAGE_MODELS: Record<ImageModel, ImageModelSpec> = {
         listPriceUsd: 0.04,
         fallbackPromptCharacterLimit: 1500,
     },
+    'seedream-v4': {
+        id: 'seedream-v4',
+        endpoint: 'generate',
+        listPriceUsd: 0.05,
+        fallbackPromptCharacterLimit: 10_000,
+    },
     'qwen-image-3': {
         id: 'qwen-image-3',
         endpoint: 'generate',
@@ -94,6 +101,8 @@ export const IMAGE_MODELS: Record<ImageModel, ImageModelSpec> = {
 
 export const VENICE_HOST = 'venice';
 
-export function imageModelForKind(kind: ImageCallKind, snapshotModel: SnapshotModel): ImageModel {
-    return kind === 'reference_image' ? REFERENCE_IMAGE_MODEL : snapshotModel;
+/** A Snapshot with no reference image goes to its model's text-to-image sibling, which needs no base image. */
+export function imageModelForKind(kind: ImageCallKind, snapshotModel: SnapshotModel, referenceCount: number): ImageModel {
+    if (kind === 'reference_image') return REFERENCE_IMAGE_MODEL;
+    return referenceCount === 0 ? TEXT_ONLY_SNAPSHOT_MODELS[snapshotModel] : snapshotModel;
 }

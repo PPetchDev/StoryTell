@@ -55,6 +55,7 @@ export default function ChatsPage({ params }: { params: Promise<{ id: string }> 
         <main>
             <nav className="breadcrumbs">
                 <Link href="/">← Stories</Link>
+                <Link href={`/stories/${storyId}/gallery`}>Gallery</Link>
                 <Link href={`/stories/${storyId}`}>Edit Story</Link>
             </nav>
             <div className="page-header">

@@ -1,9 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { mkdir, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { AppConfig } from '../../config/app-config.js';
 import { ImageNotFoundError, InvalidImagePathError } from '../../errors/image.errors.js';
+import { ImageData } from '../../service/model-gateway/model-gateway.js';
 
 /** The extension a stored image gets, by MIME type; the inverse of MIME_TYPES. */
 const EXTENSIONS: Record<string, string> = {
@@ -43,6 +44,12 @@ export class ImageStoreService {
         if (!stats?.isFile()) throw new ImageNotFoundError();
 
         return { absolutePath, mimeType, size: stats.size };
+    }
+
+    /** The file's bytes, e.g. a Reference image to send along with a Snapshot. */
+    async read(relativePath: string): Promise<ImageData> {
+        const image = await this.open(relativePath);
+        return { bytes: await readFile(image.absolutePath), mimeType: image.mimeType };
     }
 
     /** The extension a file of this type is stored with; undefined for a type the store can't serve. */

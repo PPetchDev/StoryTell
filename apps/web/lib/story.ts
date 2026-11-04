@@ -138,7 +138,7 @@ export function characterRemovalWarning(name: string): string {
     return (
         `In every Chat of this Story, ${name}'s Bonds (both ways, with their history), Arc steps and Arc directions ` +
         `are deleted, ${name} is dropped from every Memory's Known by, and the Reference image is deleted. ` +
-        `Past lines keep the name ${name}. This can't be undone.`
+        `Past lines and Snapshots keep the name ${name}. This can't be undone.`
     );
 }
 

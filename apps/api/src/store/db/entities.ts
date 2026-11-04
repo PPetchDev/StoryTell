@@ -16,6 +16,8 @@ import { StartingBondEntity } from '../../model/story/entities/starting-bond.ent
 import { StoryEntity } from '../../model/story/entities/story.entity.js';
 import { UsageRecordEntity } from '../../model/usage-record/entities/usage-record.entity.js';
 import { PersonaEntity } from '../../model/persona/entities/persona.entity.js';
+import { SnapshotCharacterEntity } from '../../model/snapshot/entities/snapshot-character.entity.js';
+import { SnapshotEntity } from '../../model/snapshot/entities/snapshot.entity.js';
 
 // Every entity must be listed here, or @InjectRepository fails at boot.
 export const entities = [
@@ -37,4 +39,6 @@ export const entities = [
     MemoryKnownByEntity,
     MemoryChangeEntity,
     PersonaEntity,
+    SnapshotEntity,
+    SnapshotCharacterEntity,
 ];

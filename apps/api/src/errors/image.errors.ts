@@ -26,3 +26,23 @@ export class NoAppearanceError extends AppError {
         super('422.002.004', "Write the Character's Appearance first; the Reference image is drawn from it.");
     }
 }
+
+export class SnapshotNotFoundError extends AppError {
+    constructor() {
+        super('404.002.005', 'No such Snapshot in this Story.');
+    }
+}
+
+/** A Snapshot job is transient: it is gone once its Snapshot is stored, dismissed, or the API restarted. */
+export class SnapshotJobNotFoundError extends AppError {
+    constructor() {
+        super('404.002.006', 'That Snapshot is no longer being made. Take it again.');
+    }
+}
+
+/** Retry applies only to a job that failed. */
+export class SnapshotJobNotFailedError extends AppError {
+    constructor() {
+        super('409.002.007', 'That Snapshot is still being made.');
+    }
+}

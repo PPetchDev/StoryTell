@@ -14,7 +14,8 @@ import {
 
 /** A reply is plain text, a partial result to override defaults, or an error to reject with. */
 export type FakeTextReply = string | Partial<TextCompletionResult> | ModelGatewayError;
-export type FakeImageReply = Partial<ImageGenerationResult> | ModelGatewayError;
+/** `delayMs` holds the reply back, so a browser test can see work in progress. */
+export type FakeImageReply = (Partial<ImageGenerationResult> & { delayMs?: number }) | ModelGatewayError;
 
 export type FakeGatewayCall =
     | { method: 'completeText'; request: TextCompletionRequest }
@@ -128,7 +129,9 @@ export class FakeModelGateway extends ModelGateway {
         }
         if (reply instanceof ModelGatewayError) throw reply;
 
-        return { image: FAKE_PNG, model: FAKE_IMAGE_MODEL, costUsd: 0, ...reply };
+        const { delayMs, ...result } = reply;
+        if (delayMs) await new Promise((resolve) => setTimeout(resolve, delayMs));
+        return { image: FAKE_PNG, model: FAKE_IMAGE_MODEL, costUsd: 0, ...result };
     }
 
     async remainingCredit(): Promise<RemainingCredit> {

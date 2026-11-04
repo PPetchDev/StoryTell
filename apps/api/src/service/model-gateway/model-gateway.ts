@@ -45,7 +45,16 @@ export type TextModel = PlayModel | typeof BACKGROUND_MODEL;
 export const SNAPSHOT_MODELS = ['seedream-v4-edit', 'qwen-edit-uncensored'] as const;
 export type SnapshotModel = (typeof SNAPSHOT_MODELS)[number];
 export const REFERENCE_IMAGE_MODEL = 'qwen-image-3';
-export type ImageModel = SnapshotModel | typeof REFERENCE_IMAGE_MODEL;
+/**
+ * The edit models need a base image. A Snapshot with no Reference image among its Characters
+ * in frame is drawn from text alone (spec: story 42) by the same family's text-to-image model,
+ * picked from the Settings model, never as a fallback after a failure.
+ */
+export const TEXT_ONLY_SNAPSHOT_MODELS = {
+    'seedream-v4-edit': 'seedream-v4',
+    'qwen-edit-uncensored': REFERENCE_IMAGE_MODEL,
+} as const satisfies Record<SnapshotModel, string>;
+export type ImageModel = SnapshotModel | typeof REFERENCE_IMAGE_MODEL | (typeof TEXT_ONLY_SNAPSHOT_MODELS)[SnapshotModel];
 
 export const DEFAULT_PLAY_MODEL: PlayModel = 'glm-5.3';
 export const DEFAULT_SNAPSHOT_MODEL: SnapshotModel = 'seedream-v4-edit';

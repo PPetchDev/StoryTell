@@ -61,6 +61,8 @@ export interface Chat extends ChatSummary {
     playable: boolean;
     missing: MissingField[];
     textCreditOut: boolean;
+    /** Image credit is used up: only the camera is off. */
+    imageCreditOut: boolean;
     playModel: string;
     drift: { lastModel: string; playModel: string } | null;
 }

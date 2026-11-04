@@ -1,0 +1,28 @@
+{
+    "id": "gen-synthetic-snapshot-0001",
+    "provider": "DeepInfra",
+    "model": "deepseek/deepseek-v4-flash",
+    "object": "chat.completion",
+    "created": 1762300001,
+    "choices": [
+        {
+            "logprobs": null,
+            "finish_reason": "stop",
+            "native_finish_reason": "stop",
+            "index": 0,
+            "message": {
+                "role": "assistant",
+                "content": "{\"in_frame\":[\"Mira\"],\"scene\":\"Mira stands at a dark window in a wet oilskin coat, lamp in hand, looking at the viewer.\"}",
+                "refusal": null,
+                "reasoning": null
+            }
+        }
+    ],
+    "usage": {
+        "prompt_tokens": 600,
+        "completion_tokens": 40,
+        "total_tokens": 640,
+        "cost": 0.000085,
+        "is_byok": false
+    }
+}
