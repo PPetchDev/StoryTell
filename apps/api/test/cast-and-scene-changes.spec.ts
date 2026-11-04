@@ -305,6 +305,41 @@ describe('Cast and Scene changes reaching existing Chats', () => {
             const third = await createChat(story.id);
             expect(character(await dashboard(story.id, third.id), 'Tomas')!.bonds.map((bond) => bond.label)).toEqual(['Suspicious']);
         });
+
+        it('copies the first Arc direction typed after a blank add into existing Chats, and no later edit', async () => {
+            const story = await createStory();
+            const first = await createChat(story.id);
+            const second = await createChat(story.id);
+
+            // The editor's "Add Character" creates the Character blank; the author fills it in after.
+            const added = await t.http.post(`/api/stories/${story.id}/characters`).send({}).expect(201);
+            const tomas = (added.body as Story).characters[2];
+            await t.http
+                .patch(`/api/stories/${story.id}/characters/${tomas.id}`)
+                .send({ name: 'Tomas', appearance: 'Old.', personality: 'Quiet.', voice: 'Few words.' })
+                .expect(200);
+            expect(await count('chat_arc_direction WHERE character_id = $1', [tomas.id])).toBe(0);
+
+            await t.http
+                .patch(`/api/stories/${story.id}/characters/${tomas.id}`)
+                .send({ arcDirections: 'He may speak of the wreck.' })
+                .expect(200);
+            for (const chat of [first, second]) {
+                expect(character(await dashboard(story.id, chat.id), 'Tomas')!.arcDirection).toBe('He may speak of the wreck.');
+            }
+
+            // Once a Chat holds a copy, later edits are the author's and reach only new or reset Chats.
+            await t.http
+                .patch(`/api/stories/${story.id}/characters/${tomas.id}`)
+                .send({ arcDirections: 'He leaves on the supply boat.' })
+                .expect(200);
+            for (const chat of [first, second]) {
+                expect(character(await dashboard(story.id, chat.id), 'Tomas')!.arcDirection).toBe('He may speak of the wreck.');
+            }
+            expect(await count('chat_arc_direction WHERE character_id = $1', [tomas.id])).toBe(2);
+            // Kai's copy, made when the Chats started, is untouched by any of this.
+            expect(character(await dashboard(story.id, first.id), 'Kai')!.arcDirection).toBe('If trusted, his cheer turns to loyalty.');
+        });
     });
 
     describe('Remove a Character', () => {

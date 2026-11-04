@@ -130,6 +130,26 @@ export class LedgerModelService {
         });
     }
 
+    /**
+     * Copies a Character's Arc direction into each of `chatIds` that holds no copy for it yet
+     * (spec: "Add Character … its Arc directions are copied in"). A Chat that already holds one
+     * keeps it, since the author's later edits reach only new or reset Chats.
+     */
+    async copyArcDirectionWhereMissing(chatIds: number[], direction: ArcDirectionSeed): Promise<void> {
+        if (chatIds.length === 0) return;
+        const held = await this.arcDirections.find({
+            where: { chatId: In(chatIds), characterId: direction.characterId },
+            select: { chatId: true },
+        });
+        const holding = new Set(held.map((row) => row.chatId));
+        const missing = chatIds.filter((chatId) => !holding.has(chatId));
+        await this.arcDirections.save(
+            missing.map((chatId) =>
+                this.arcDirections.create({ chatId, characterId: direction.characterId, text: direction.text }),
+            ),
+        );
+    }
+
     async state(chatId: number): Promise<LedgerState> {
         const [bondChanges, arcSteps, sceneAdvances, arcDirections] = await Promise.all([
             this.bondChanges.find({ where: { chatId }, order: { id: 'ASC' } }),

@@ -279,9 +279,9 @@ Further gateway rules:
 - **Live vs copied edits.** Chats reference the Story, Role, Characters and Scenes, so text edits reach them on the next turn. Three things are copied into a Chat at start and on reset, and Story edits don't touch existing Chats' copies:
   - the Opening, which becomes Message 1
   - StartingBonds, which seed the Chat's first BondChanges
-  - Arc directions, which are copied into ChatArcDirections
+  - Arc directions, which are copied into ChatArcDirections. A Chat that holds no copy for a Character (it joined or the Chat started while its Arc directions were empty) takes the first non-empty value the author sets; once a Chat holds a copy, edits reach only new or reset Chats.
 - **Cast and Scene changes** follow the lifecycle table in the data model sketch:
-  - **Add Character:** joins every Chat as a stranger, and its Arc directions are copied in.
+  - **Add Character:** joins every Chat as a stranger, and its Arc directions are copied in (or, when it was added blank, the first ones the author types).
   - **Remove Character** (after a warning): deletes its Bonds both ways with their history, StartingBonds pointing at it, its Arc steps, its copied Arc directions and its Reference image file. It is dropped from every Known by; Memories left with nobody in Known by stay. Speech parts and Snapshots keep its stamped name, and their Character link is cleared.
   - **Add Scenes:** a Chat in free play enters the first new Scene after the last Scene it finished. A Chat that never had Scenes enters the first Scene.
   - **Reorder Scenes:** each Chat stays on the same Scene.

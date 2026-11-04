@@ -5,8 +5,9 @@ import type { ChatEntity } from '../../chat/entities/chat.entity.js';
 import type { CharacterEntity } from '../../story/entities/character.entity.js';
 
 /**
- * A Character's Arc directions as they were when the Chat started or was last reset (spec:
- * "Live vs copied edits"). The author's later edits reach only new or reset Chats.
+ * A Character's Arc directions as they were when the Chat started or was last reset, or the
+ * first non-empty ones set after that when there was none (spec: "Live vs copied edits"). Once
+ * a Chat holds a copy, the author's later edits reach only new or reset Chats.
  */
 @Entity('chat_arc_direction')
 export class ChatArcDirectionEntity {

@@ -167,14 +167,10 @@ export class StoryManagerService {
 
     /**
      * Spec: "Add Character". The Character joins every Chat as a stranger: no Bonds are
-     * seeded, and only its Arc directions, as they are now, are copied in.
+     * seeded, and only its Arc directions are copied in.
      */
     private async joinChats(storyId: number, character: CharacterEntity): Promise<void> {
-        const text = character.arcDirections ?? '';
-        if (text.trim() === '') return;
-        for (const chat of await this.chatModel.findByStory(storyId)) {
-            await this.ledger.seed(chat.id, [], [{ characterId: character.id, text }]);
-        }
+        await this.copyArcDirectionIntoChats(storyId, character);
     }
 
     async updateCharacter(
@@ -186,7 +182,21 @@ export class StoryManagerService {
         const character = this.findCharacter(story, characterId);
         this.assignCharacter(character, fields);
         await this.storyModel.saveCharacter(character);
+        // The editor adds a Character blank and its Arc directions are typed afterwards, so the
+        // first non-empty value fills each Chat that holds no copy yet. Chats with a copy keep it.
+        if (fields.arcDirections !== undefined) await this.copyArcDirectionIntoChats(storyId, character);
         return this.saved(storyId);
+    }
+
+    /** Copies the Character's Arc directions, when it has any, into each Chat without a copy. */
+    private async copyArcDirectionIntoChats(storyId: number, character: CharacterEntity): Promise<void> {
+        const text = character.arcDirections ?? '';
+        if (text.trim() === '') return;
+        const chats = await this.chatModel.findByStory(storyId);
+        await this.ledger.copyArcDirectionWhereMissing(
+            chats.map((chat) => chat.id),
+            { characterId: character.id, text },
+        );
     }
 
     /**
