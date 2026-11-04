@@ -45,7 +45,7 @@ Rules:
 - Everyone shown is a fictional adult.
 - Describe the moment concretely: the place, the light, each Character's pose, expression and action, and what each one is wearing right now. Always name the clothing; take it from the story so far, else from the Appearance.
 - Lasting changes from the story (a new scar, a haircut) override the Appearance: mention them.
-- Do not describe the art style; it is added separately. No text or captions in the image.
+- Do not describe the art style or quote dialogue; the style is added separately, and the image has no text or captions.
 
 Reply with JSON only:
 {"in_frame":["Name"],"scene":"one paragraph of at most 120 words"}`;
@@ -138,7 +138,8 @@ export function snapshotImagePrompt(input: {
 }): string {
     const style = input.imageStyle.trim() === '' ? DEFAULT_IMAGE_STYLE : input.imageStyle.trim();
     const lines = [
-        `First-person view through the eyes of ${input.identityName}, who is never shown: at most a glimpse of hands or sleeves at the edge of the frame.`,
+        `First-person view through the eyes of ${input.identityName}, who is never shown: at most a glimpse of hands or sleeves at the edge of the frame. ` +
+            `The camera is at ${input.identityName}'s eyes, so no head, hair, back or shoulder of ${input.identityName} is in the foreground.`,
         input.scene,
     ];
     if (input.inFrame.length === 0) {

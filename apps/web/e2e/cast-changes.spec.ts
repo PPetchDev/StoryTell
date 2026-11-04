@@ -51,7 +51,7 @@ test('removing a Character warns first, and an existing Chat keeps its old speec
         const confirm = kai.getByRole('group', { name: 'Remove Kai?' });
         await expect(confirm).toContainText("In every Chat of this Story, Kai's Bonds (both ways, with their history), Arc steps and Arc directions are deleted");
         await expect(confirm).toContainText("Kai is dropped from every Memory's Known by");
-        await expect(confirm).toContainText('Past lines keep the name Kai.');
+        await expect(confirm).toContainText('Past lines and Snapshots keep the name Kai.');
         // Cancel keeps him; confirming removes him.
         await confirm.getByRole('button', { name: 'Cancel' }).click();
         await expect(kai.getByLabel('Name')).toHaveValue('Kai');

@@ -38,7 +38,7 @@ export interface ScriptTextBody {
 export interface ScriptImageBody {
     kind: ImageCallKind;
     replies: Array<
-        { imageBase64?: string; mimeType?: string; model?: string; costUsd?: number } | ScriptedErrorJson
+        { imageBase64?: string; mimeType?: string; model?: string; costUsd?: number; delayMs?: number } | ScriptedErrorJson
     >;
 }
 

@@ -1,15 +1,17 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent, useEffect, useRef, useState } from 'react';
+import { FormEvent, Fragment, useEffect, useRef, useState } from 'react';
 
 import { MemoryDrawer } from '@/components/chat/memory-drawer';
+import { Camera, MessageSnapshots, SnapshotViewer, useChatSnapshots } from '@/components/chat/snapshots';
 import { useApiQuery, useConnection } from '@/components/connection';
 import { ConfirmButton } from '@/components/story-editor/fields';
 import { ApiError, apiFetch, ApiUnreachableError } from '@/lib/api';
 import { backgroundPending, Chat, chatApi, EditedChat, latestReply, Message, messageText, modelLabel, rollbackNotice } from '@/lib/chat';
 import { Memory, memoryApi, renderUser } from '@/lib/memory';
 import { PersonaList } from '@/lib/persona';
+import { Snapshot } from '@/lib/snapshot';
 
 function messageLabel(message: Message): string {
     if (message.kind === 'user') return `${message.identityName} said`;
@@ -229,7 +231,9 @@ const BACKGROUND_POLL_MS = 1_000;
  * which discards the Messages after it and rolls back their changes, with a short notice of
  * what went; Reset starts the Chat over from the Opening. Bonds and Arcs never show here:
  * the dashboard link leads to them. Memory does: the drawer lists it, and a "Memory added"
- * toast appears for each Memory the AI adds once a turn's extraction is done.
+ * toast appears for each Memory the AI adds once a turn's extraction is done. The camera
+ * takes a Snapshot of the latest AI Message while play goes on; Snapshots show under their
+ * Message, and a tap opens one full screen.
  */
 export function ChatScreen({ initial }: { initial: Chat }) {
     const { reportUnreachable } = useConnection();
@@ -242,6 +246,8 @@ export function ChatScreen({ initial }: { initial: Chat }) {
     const [rollback, setRollback] = useState<string | null>(null);
     const [drawer, setDrawer] = useState<{ open: boolean; focus: number | null; version: number }>({ open: false, focus: null, version: 0 });
     const [toasts, setToasts] = useState<Toast[]>([]);
+    const snaps = useChatSnapshots(initial.storyId, initial.id);
+    const [viewing, setViewing] = useState<Snapshot | null>(null);
     const endRef = useRef<HTMLDivElement>(null);
     const jumpedRef = useRef(false);
     /** The reply whose finished extraction was already announced, so a re-read never toasts twice. */
@@ -313,6 +319,8 @@ export function ChatScreen({ initial }: { initial: Chat }) {
         setDrawer((current) => ({ ...current, version: current.version + 1 }));
         setToasts([]);
         announcedRef.current = null;
+        // Snapshots of discarded or edited Messages left the timeline for the Gallery.
+        void snaps.refresh();
         return next;
     };
 
@@ -405,6 +413,7 @@ export function ChatScreen({ initial }: { initial: Chat }) {
                 <span className="muted">
                     {chat.currentScene ? `Scene: ${chat.currentScene.name}` : 'Free play'}
                 </span>
+                <Link href={`/stories/${chat.storyId}/gallery?chat=${chat.id}`}>Gallery</Link>
                 <Link href={`/stories/${chat.storyId}/chats/${chat.id}/dashboard`}>Dashboard →</Link>
             </nav>
             <div className="chat-head">
@@ -446,16 +455,26 @@ export function ChatScreen({ initial }: { initial: Chat }) {
 
             <section className="messages" aria-label="Messages">
                 {chat.messages.map((message, index) => (
-                    <MessageView
-                        key={message.id}
-                        message={message}
-                        later={chat.messages.length - index - 1}
-                        editing={editing === message.id}
-                        canEdit={!writing && !busy && editing === null && (message.kind === 'ai' || !blocked)}
-                        onEdit={() => setEditing(message.id)}
-                        onSave={(text) => saveEdit(message, text)}
-                        onCancel={() => setEditing(null)}
-                    />
+                    <Fragment key={message.id}>
+                        <MessageView
+                            message={message}
+                            later={chat.messages.length - index - 1}
+                            editing={editing === message.id}
+                            canEdit={!writing && !busy && editing === null && (message.kind === 'ai' || !blocked)}
+                            onEdit={() => setEditing(message.id)}
+                            onSave={(text) => saveEdit(message, text)}
+                            onCancel={() => setEditing(null)}
+                        />
+                        {message.kind === 'ai' && (
+                            <MessageSnapshots
+                                snapshots={snaps.state.snapshots.filter((snapshot) => snapshot.messageId === message.id)}
+                                jobs={snaps.state.jobs.filter((job) => job.messageId === message.id)}
+                                onOpen={setViewing}
+                                onRetry={(job) => void snaps.retry(job)}
+                                onDismiss={(job) => void snaps.dismiss(job)}
+                            />
+                        )}
+                    </Fragment>
                 ))}
                 {writing && (
                     <p className="writing muted" role="status">
@@ -490,6 +509,30 @@ export function ChatScreen({ initial }: { initial: Chat }) {
                 </p>
             )}
 
+            {viewing && (
+                <SnapshotViewer
+                    snapshot={viewing}
+                    onClose={() => setViewing(null)}
+                    onDelete={() => {
+                        setViewing(null);
+                        void snaps.remove(viewing);
+                    }}
+                    onRetake={
+                        chat.imageCreditOut || viewing.messageId === null
+                            ? undefined
+                            : () => {
+                                  setViewing(null);
+                                  void snaps.take(viewing.hint, viewing.messageId ?? undefined);
+                              }
+                    }
+                />
+            )}
+            <Camera
+                disabledNote={chat.imageCreditOut ? 'Snapshots are off: image credit is used up. Play goes on.' : null}
+                busy={writing || busy || editing !== null}
+                error={snaps.error}
+                onTake={(hint) => void snaps.take(hint)}
+            />
             <form className="composer" onSubmit={send} aria-label="Composer">
                 <textarea
                     aria-label={`Write as ${chat.identityName}`}
