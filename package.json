@@ -19,7 +19,8 @@
         "live:start": "node scripts/live.mjs start",
         "live:stop": "node scripts/live.mjs stop",
         "live:status": "node scripts/live.mjs status",
-        "live:rollback": "node scripts/live.mjs rollback"
+        "live:rollback": "node scripts/live.mjs rollback",
+        "live:backup": "node scripts/live.mjs backup"
     },
     "devDependencies": {
         "embedded-postgres": "^18.6.0-beta.19"

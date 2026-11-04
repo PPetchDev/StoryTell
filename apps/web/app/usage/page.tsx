@@ -1,5 +1,6 @@
 'use client';
 
+import { BackupBanner } from '@/components/backup-banner';
 import { useApiQuery } from '@/components/connection';
 import { CreditPool, POOL_LABEL, PoolUsage, UsageResponse, usd } from '@/lib/types';
 
@@ -63,6 +64,7 @@ export default function UsagePage() {
     return (
         <main>
             <h1>Usage</h1>
+            <BackupBanner />
             {usage.status === 'loading' && <p className="muted">Loading…</p>}
             {usage.status === 'error' && <p role="alert">{usage.error.message}</p>}
             {usage.status === 'ready' && (

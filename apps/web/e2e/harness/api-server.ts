@@ -28,6 +28,11 @@ export function writeState(state: ApiServerState): void {
     writeFileSync(stateFile(), JSON.stringify(state));
 }
 
+/** Where the running API reads the backup job's status (the job itself doesn't run in E2E). */
+export function backupStatusFile(): string {
+    return readState().env.BACKUP_STATUS_FILE;
+}
+
 async function isUp(): Promise<boolean> {
     try {
         return (await fetch(HEALTH_URL)).ok;

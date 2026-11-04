@@ -83,7 +83,14 @@ async function supervise() {
             cwd: path.join(app, 'apps', 'api'),
             args: ['dist/main.js'],
             // The fake gateway carries test-only control routes. Live always talks to the providers.
-            env: { ...env, PORT: String(apiPort), IMAGE_DIR: imageDir, MODEL_GATEWAY: 'real' },
+            env: {
+                ...env,
+                PORT: String(apiPort),
+                IMAGE_DIR: imageDir,
+                MODEL_GATEWAY: 'real',
+                // The backup job writes here; the Usage and Settings pages show a failure.
+                BACKUP_STATUS_FILE: path.join(home, 'backup', 'status.json'),
+            },
         },
         web: {
             cwd: path.join(app, 'apps', 'web'),
@@ -162,4 +169,16 @@ async function supervise() {
     while (Date.now() < deadline && !(await apiAnswers())) await new Promise((resolve) => setTimeout(resolve, 500));
     if (!(await apiAnswers())) say('API health check still failing after 60 s; starting the frontend anyway');
     start('web');
+
+    // The daily backup: now (the PC has just started, or live was restarted) and every hour after.
+    // backup.mjs makes at most one backup a day, so the hourly runs only retry a failed dump.
+    const backupJob = path.join(home, 'backup.mjs');
+    const runBackup = () => {
+        if (stopping || !existsSync(backupJob)) return;
+        const job = spawn(process.execPath, [backupJob], { cwd: home, stdio: 'ignore', windowsHide: true });
+        job.on('error', (error) => say(`backup job failed to start: ${error.message}`));
+        job.on('exit', (code) => code !== 0 && say(`backup job exited with code ${code}; see logs/backup.log`));
+    };
+    runBackup();
+    setInterval(runBackup, 3600_000);
 }

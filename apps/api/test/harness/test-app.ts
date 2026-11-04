@@ -40,6 +40,8 @@ export interface TestAppOptions {
     providerKeys?: Partial<ProviderKeys>;
     /** How long a send waits for a pending background call. Default 1.5 s. */
     backgroundWaitMs?: number;
+    /** The backup job's status file. Default: unset, as in dev. */
+    backupStatusFile?: string;
 }
 
 async function admin(sql: string): Promise<void> {
@@ -75,6 +77,7 @@ export async function startTestApp(options: TestAppOptions = {}): Promise<TestAp
                 modelGateway: options.modelGateway ?? 'fake',
                 // Short, so a test of the "still saving" path does not sit through the real wait.
                 backgroundWaitMs: options.backgroundWaitMs ?? 1_500,
+                backupStatusFile: options.backupStatusFile,
                 providerKeys: {
                     openRouter: undefined,
                     venice: undefined,

@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 
+import { BackupBanner } from '@/components/backup-banner';
 import { useApiQuery } from '@/components/connection';
 import { ApiError, apiFetch } from '@/lib/api';
 import { ModelOption, Settings, SettingsResponse } from '@/lib/types';
@@ -198,6 +199,7 @@ export default function SettingsPage() {
     return (
         <main>
             <h1>Settings</h1>
+            <BackupBanner />
             {settings.status === 'loading' && <p className="muted">Loading…</p>}
             {settings.status === 'error' && <p role="alert">{settings.error.message}</p>}
             {settings.status === 'ready' && <SettingsForm initial={settings.data} />}

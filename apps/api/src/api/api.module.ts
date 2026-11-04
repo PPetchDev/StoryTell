@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 
+import { BackupApiModule } from './backup/backup.module.js';
 import { ChatApiModule } from './chat/chat.module.js';
 import { HealthApiController } from './health/health.controller.js';
 import { ImageApiModule } from './image/image.module.js';
@@ -26,6 +27,7 @@ import { UsageApiModule } from './usage/usage.module.js';
         ReferenceImageApiModule,
         PersonaApiModule,
         SnapshotApiModule,
+        BackupApiModule,
     ],
     controllers: [HealthApiController],
 })

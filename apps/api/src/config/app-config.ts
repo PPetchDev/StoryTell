@@ -19,6 +19,11 @@ export abstract class AppConfig {
      * they are still saving (spec: "Send flow", step 2). Tests shorten it.
      */
     abstract readonly backgroundWaitMs: number;
+    /**
+     * Where the daily backup job (scripts/backup.mjs) writes how its last run went, so the app
+     * can show a failure. Live sets it; dev and tests leave it unset, and then nothing is shown.
+     */
+    abstract readonly backupStatusFile: string | undefined;
 }
 
 export const DEFAULT_BACKGROUND_WAIT_MS = 8_000;
@@ -61,6 +66,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
         imageDir: path.resolve(env.IMAGE_DIR!),
         modelGateway,
         backgroundWaitMs,
+        backupStatusFile: env.BACKUP_STATUS_FILE ? path.resolve(env.BACKUP_STATUS_FILE) : undefined,
         providerKeys: {
             openRouter: env.OPENROUTER_API_KEY || undefined,
             // The Venice dashboard calls it an inference key; either name works.

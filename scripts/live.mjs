@@ -48,12 +48,15 @@ switch (command) {
     case 'status':
         await status();
         break;
+    case 'backup':
+        backupNow();
+        break;
     case 'home':
         // For scripts/live-task.ps1, so LIVE_HOME is read in one place.
         console.log(home);
         break;
     default:
-        fail(`Unknown command "${command}". Use deploy [ref], rollback, start, stop or status.`);
+        fail(`Unknown command "${command}". Use deploy [ref], rollback, start, stop, status or backup.`);
 }
 
 function fail(message) {
@@ -167,7 +170,7 @@ async function deploy(target) {
     step('Switching to the new release');
     if (current) writeFileSync(previousFile, current);
     writeFileSync(currentFile, name);
-    copyFileSync(path.join(dir, 'scripts', 'live-run.mjs'), path.join(home, 'live-run.mjs'));
+    copyScripts(dir);
     copyFileSync(envFile, path.join(home, 'live.env'));
 
     step('Starting live');
@@ -192,9 +195,27 @@ async function rollback() {
     await stopApp();
     writeFileSync(currentFile, previous);
     if (current) writeFileSync(previousFile, current);
-    copyFileSync(path.join(releaseDir(previous), 'scripts', 'live-run.mjs'), path.join(home, 'live-run.mjs'));
+    copyScripts(releaseDir(previous));
     await startApp();
     await reportHealth();
+}
+
+/** The supervisor and the backup job run from LIVE_HOME, so the startup task's path never changes. */
+function copyScripts(dir) {
+    for (const script of ['live-run.mjs', 'backup.mjs']) {
+        const source = path.join(dir, 'scripts', script);
+        // Releases from before the backup job have no backup.mjs; keep whatever is there.
+        if (existsSync(source)) copyFileSync(source, path.join(home, script));
+    }
+}
+
+function backupNow() {
+    if (!existsSync(path.join(home, 'backup.mjs'))) fail(`No backup job in ${home}. Run npm run live:deploy first.`);
+    try {
+        run(process.execPath, [path.join(home, 'backup.mjs'), '--force'], home);
+    } catch {
+        fail(`The backup finished with a failure. See ${path.join(home, 'logs', 'backup.log')}.`);
+    }
 }
 
 function taskExists() {

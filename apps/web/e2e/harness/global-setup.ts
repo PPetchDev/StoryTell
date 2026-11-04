@@ -26,6 +26,8 @@ export default async function globalSetup() {
         PORT: String(E2E_API_PORT),
         DATABASE_URL: postgres.url('storytell_e2e'),
         IMAGE_DIR: path.join(tempDir, 'images'),
+        // No file there until a test writes one, so the backup banner stays hidden by default.
+        BACKUP_STATUS_FILE: path.join(tempDir, 'backup-status.json'),
         MODEL_GATEWAY: 'fake',
     };
     migrate(env);
