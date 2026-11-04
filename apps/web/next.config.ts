@@ -17,6 +17,11 @@ const nextConfig: NextConfig = {
     // Playwright sets its own, so E2E can run beside a running `npm run dev`.
     distDir: process.env.NEXT_DIST_DIR ?? '.next',
     turbopack: { root: repoRoot },
+    experimental: {
+        // E2E turns it off: a dev cache left by the previous run made the first page of the
+        // next run reload in a loop ("HMR hash mismatch") until the cache was deleted.
+        turbopackFileSystemCacheForDev: process.env.NEXT_DEV_FS_CACHE !== 'off',
+    },
     poweredByHeader: false,
     async rewrites() {
         return [{ source: '/api/:path*', destination: `${apiOrigin}/api/:path*` }];

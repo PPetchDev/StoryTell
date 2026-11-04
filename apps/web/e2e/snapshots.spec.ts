@@ -48,6 +48,8 @@ test('takes a Snapshot, sees the placeholder and then the image, resets, and fin
         await expect(placeholder).toHaveCount(0);
         await expect(thumb).toHaveAttribute('src', /^\/api\/images\/snapshots\/story-\d+\/chat-\d+-[0-9a-f]+\.png$/);
         await expect.poll(() => thumb.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+        // Shown whole in the thread, never cropped.
+        await expect(thumb).toHaveCSS('object-fit', 'contain');
 
         // Full screen, with the prompt it was drawn from.
         await thumb.click();

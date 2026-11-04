@@ -67,7 +67,7 @@ test('makes a Persona, swaps to it mid-Chat, and sees the next User Message unde
         await page.getByRole('button', { name: 'Send' }).click();
         const asRin = page.getByRole('article', { name: 'Rin said' });
         await expect(asRin).toContainText('I shake the salt out of my hair.');
-        await expect(asRin.locator('.speaker')).toHaveText('Rin');
+        await expect(asRin.getByText('Rin', { exact: true })).toBeVisible();
         await expect(page.getByRole('article', { name: 'Ash said' })).toContainText('I pull my boots off.');
         await expect(page.getByRole('article', { name: 'AI reply' }).last()).toContainText('And who are you, then?');
 

@@ -1,0 +1,25 @@
+/*
+ * The Chat fills the screen below whatever the app shell shows above it, so the thread can
+ * scroll on its own between the top bar and the composer and the composer never covers it.
+ */
+:global(.page):has(> .screen) {
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 0;
+}
+
+:global(.page):has(> .screen) > :not(.screen) {
+    flex: none;
+}
+
+.screen {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.screen > :not(section) {
+    flex: none;
+}
