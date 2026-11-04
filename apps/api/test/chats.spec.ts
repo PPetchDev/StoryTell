@@ -614,6 +614,210 @@ Nobody moves to help.`;
         });
     });
 
+    describe('editing a Message', () => {
+        /**
+         * The Opening, then two turns: positions 1 (user), 2 (ai), 3 (user), 4 (ai). The
+         * gateway's record of those two turns is cleared, so the test sees only its own calls.
+         */
+        async function playTwoTurns(storyId: number): Promise<Chat> {
+            const chat = await createChat(storyId);
+            await send(storyId, chat.id, 'Hello?', { text: 'Mira nods.', model: 'glm-5.3' });
+            const played = await send(storyId, chat.id, 'Where is the lamp?', { text: '@Mira: Upstairs.', model: 'glm-5.3' });
+            t.gateway.reset();
+            return played;
+        }
+
+        function edit(storyId: number, chatId: number, messageId: number, text: string) {
+            return t.http.patch(`/api/stories/${storyId}/chats/${chatId}/messages/${messageId}`).send({ text });
+        }
+
+        it('editing a User Message deletes the later Messages, overwrites its text, and runs exactly one new turn', async () => {
+            const story = await createStory();
+            const played = await playTwoTurns(story.id);
+            expect(played.messages).toHaveLength(5);
+            const [opening, firstUser] = played.messages;
+            t.gateway.scriptText('turn', { text: 'Rain drips from your hat.\n\n@Mira: Took you long enough.', model: 'glm-5.3' });
+
+            const { body } = await edit(story.id, played.id, firstUser.id, 'I shake the rain off my coat.').expect(200);
+            const chat = body as Chat;
+
+            expect(chat.awaitingReply).toBe(false);
+            expect(chat.messages.map((message) => message.id).slice(0, 2)).toEqual([opening.id, firstUser.id]);
+            expect(chat.messages).toHaveLength(3);
+            expect(chat.messages[1]).toMatchObject({ kind: 'user', text: 'I shake the rain off my coat.', identityName: 'Ash' });
+            expect(lastAi(chat).parts).toEqual([
+                { kind: 'narration', text: 'Rain drips from your hat.' },
+                { kind: 'speech', characterId: story.characters[0].id, speakerName: 'Mira', text: 'Took you long enough.' },
+            ]);
+            // Exactly one turn, and its prompt carries the new text after the Opening only.
+            const calls = t.gateway.textCalls('turn');
+            expect(calls).toHaveLength(1);
+            const conversation = calls[0].messages.filter((message) => message.role !== 'system');
+            expect(conversation.map((message) => message.role)).toEqual(['assistant', 'user']);
+            expect(conversation[1].content).toBe('I shake the rain off my coat.');
+            expect(calls[0].messages.map((message) => message.content).join('\n')).not.toContain('Upstairs');
+            // The discarded Messages and their parts are gone, not hidden.
+            expect(await countRows(countSql('message', 'chat_id = $1'), [chat.id])).toBe(3);
+            expect(
+                await countRows(
+                    countSql('message_part', 'message_id IN (SELECT id FROM "message" WHERE chat_id = $1)'),
+                    [chat.id],
+                ),
+            ).toBe(5);
+            expect(await getChat(story.id, chat.id)).toEqual(chat);
+        });
+
+        it('a failed turn after a User Message edit keeps the edited text with Retry', async () => {
+            const story = await createStory();
+            const played = await playTwoTurns(story.id);
+            t.gateway.scriptText('turn', new ProviderOutageError());
+
+            const failed = await edit(story.id, played.id, played.messages[1].id, 'Changed my mind.').expect(502);
+            expect(failed.body.error.code).toBe('502.001.001');
+
+            const waiting = await getChat(story.id, played.id);
+            expect(waiting.awaitingReply).toBe(true);
+            expect(waiting.messages).toHaveLength(2);
+            expect(waiting.messages[1]).toMatchObject({ kind: 'user', text: 'Changed my mind.' });
+
+            t.gateway.scriptText('turn', 'Mira shrugs.');
+            const retried = await t.http.post(`/api/stories/${story.id}/chats/${played.id}/retry`).expect(200);
+            expect(retried.body.messages).toHaveLength(3);
+            expect(lastAi(retried.body as Chat).parts).toEqual([{ kind: 'narration', text: 'Mira shrugs.' }]);
+        });
+
+        it('editing an AI Message re-splits its parts, deletes the later Messages, and runs no turn', async () => {
+            const story = await createStory();
+            const played = await playTwoTurns(story.id);
+            const firstReply = played.messages[2];
+
+            const { body } = await edit(
+                story.id,
+                played.id,
+                firstReply.id,
+                "Mira sets the pen down.\n\n@mira: Boots off.\nThen we talk.\n\n@Kai O'Rourke: Easy, friend.\n\n@Ghost: Boo.",
+            ).expect(200);
+            const chat = body as Chat;
+
+            expect(chat.messages).toHaveLength(3);
+            expect(chat.awaitingReply).toBe(false);
+            expect(chat.messages[2]).toMatchObject({ id: firstReply.id, kind: 'ai', model: 'glm-5.3' });
+            expect(chat.messages[2].parts).toEqual([
+                { kind: 'narration', text: 'Mira sets the pen down.' },
+                { kind: 'speech', characterId: story.characters[0].id, speakerName: 'Mira', text: 'Boots off.\nThen we talk.' },
+                { kind: 'speech', characterId: story.characters[1].id, speakerName: "Kai O'Rourke", text: 'Easy, friend.' },
+                { kind: 'speech', characterId: null, speakerName: 'Ghost', text: 'Boo.' },
+            ]);
+            expect(t.gateway.textCalls()).toHaveLength(0);
+            expect(chat.drift).toBeNull();
+
+            // A line written as the Role is kept: the user wrote it, so the guard is off.
+            const kept = await edit(story.id, played.id, firstReply.id, '@Mira: Well?\n\nAsh: I say nothing.').expect(200);
+            expect((kept.body as Chat).messages[2].parts).toEqual([
+                { kind: 'speech', characterId: story.characters[0].id, speakerName: 'Mira', text: 'Well?' },
+                { kind: 'narration', text: 'Ash: I say nothing.' },
+            ]);
+            expect(t.gateway.textCalls()).toHaveLength(0);
+        });
+
+        it('edits the Opening copy like any AI Message, keeping model "author"', async () => {
+            const story = await createStory();
+            const played = await playTwoTurns(story.id);
+
+            const { body } = await edit(story.id, played.id, played.messages[0].id, '@Mira: Boots off.').expect(200);
+
+            expect(body.messages).toHaveLength(1);
+            expect(body.messages[0]).toMatchObject({ id: played.messages[0].id, kind: 'ai', model: 'author' });
+            expect(body.messages[0].parts).toEqual([
+                { kind: 'speech', characterId: story.characters[0].id, speakerName: 'Mira', text: 'Boots off.' },
+            ]);
+        });
+
+        it('refuses an empty edit and an unknown Message, changing nothing', async () => {
+            const story = await createStory();
+            const played = await playTwoTurns(story.id);
+            const otherChat = await createChat(story.id);
+
+            const empty = await edit(story.id, played.id, played.messages[1].id, '  \n').expect(422);
+            expect(empty.body.error.code).toBe('422.004.005');
+
+            const missing = await edit(story.id, played.id, 999_999, 'Hello.').expect(404);
+            expect(missing.body.error.code).toBe('404.004.006');
+            // A Message of another Chat is not found through this one.
+            const foreign = await edit(story.id, otherChat.id, played.messages[1].id, 'Hello.').expect(404);
+            expect(foreign.body.error.code).toBe('404.004.006');
+
+            expect((await getChat(story.id, played.id)).messages).toEqual(played.messages);
+            expect(t.gateway.textCalls()).toHaveLength(0);
+        });
+
+        it('blocks a User Message edit, but not an AI Message edit, when sending is blocked', async () => {
+            const story = await createStory();
+            const played = await playTwoTurns(story.id);
+            t.gateway.setRemainingCredit({ text: { remainingUsd: 0, limitUsd: 22 } });
+
+            const blocked = await edit(story.id, played.id, played.messages[1].id, 'Hello.').expect(402);
+            expect(blocked.body.error.code).toBe('402.001.003');
+            expect((await getChat(story.id, played.id)).messages).toHaveLength(5);
+
+            const { body } = await edit(story.id, played.id, played.messages[4].id, 'Mira says nothing.').expect(200);
+            expect(body.messages).toHaveLength(5);
+            expect(body.messages[4].parts).toEqual([{ kind: 'narration', text: 'Mira says nothing.' }]);
+        });
+    });
+
+    describe('reset', () => {
+        it('keeps the title and identity, clears every Message, and copies the current Opening in again', async () => {
+            const story = await createStory({
+                scenes: [
+                    { name: 'Arrival', situation: 'Reach the lamp room.', moveOnCondition: 'Mira lets Ash up.' },
+                    { name: 'The lamp', situation: 'Light it.' },
+                ],
+            });
+            const started = await createChat(story.id);
+            await t.http.patch(`/api/stories/${story.id}/chats/${started.id}`).send({ title: 'Second try' }).expect(200);
+            await send(story.id, started.id, 'Hello?', 'Mira nods.');
+            // An Opening edited after the Chat started reaches it only through reset.
+            await t.http.patch(`/api/stories/${story.id}`).send({ opening: '@Mira: Boots off, keeper.' }).expect(200);
+            const before = await getChat(story.id, started.id);
+            expect(before.messages[0].parts).toHaveLength(3);
+            // Removing the Scene the Chat is on drops it to free play; reset brings it back to the first.
+            await t.http.delete(`/api/stories/${story.id}/scenes/${story.scenes[0].id}`).expect(200);
+            expect((await getChat(story.id, started.id)).currentScene).toBeNull();
+
+            const { body } = await t.http.post(`/api/stories/${story.id}/chats/${started.id}/reset`).expect(200);
+            const chat = body as Chat;
+
+            expect(chat).toMatchObject({
+                id: started.id,
+                title: 'Second try',
+                identityName: 'Ash',
+                createdAt: started.createdAt,
+                currentScene: { id: story.scenes[1].id, name: 'The lamp' },
+                awaitingReply: false,
+            });
+            expect(chat.messages).toHaveLength(1);
+            expect(chat.messages[0]).toMatchObject({ kind: 'ai', model: 'author' });
+            expect(chat.messages[0].parts).toEqual([
+                { kind: 'speech', characterId: story.characters[0].id, speakerName: 'Mira', text: 'Boots off, keeper.' },
+            ]);
+            expect(await countRows(countSql('message', 'chat_id = $1'), [chat.id])).toBe(1);
+            expect(t.gateway.textCalls()).toHaveLength(1);
+            expect(await getChat(story.id, chat.id)).toEqual(chat);
+        });
+
+        it('refuses to reset a Chat of a Story that is not playable', async () => {
+            const story = await createStory();
+            const chat = await createChat(story.id);
+            await t.http.patch(`/api/stories/${story.id}`).send({ opening: '' }).expect(200);
+
+            const { body } = await t.http.post(`/api/stories/${story.id}/chats/${chat.id}/reset`).expect(422);
+
+            expect(body.error.code).toBe('422.004.002');
+            expect((await getChat(story.id, chat.id)).messages[0].parts).toHaveLength(3);
+        });
+    });
+
     describe('the Drift notice', () => {
         it('appears once the play model differs from the model that wrote the last AI Message', async () => {
             const story = await createStory();

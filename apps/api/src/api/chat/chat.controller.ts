@@ -2,12 +2,12 @@ import { Body, Controller, Delete, Get, HttpCode, Param, ParseIntPipe, Patch, Po
 import { ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 
 import { ChatManagerService } from '../../manager/chat/chat.service.js';
-import { RenameChatRequestBodyDTO, SendMessageRequestBodyDTO } from './dto/chat.request.dto.js';
+import { EditMessageRequestBodyDTO, RenameChatRequestBodyDTO, SendMessageRequestBodyDTO } from './dto/chat.request.dto.js';
 import { ChatResponseBodyDTO, ListChatsResponseBodyDTO } from './dto/chat.response.dto.js';
 
 const Id = (name: string) => Param(name, ParseIntPipe);
 
-/** Chats per Story: create, list, rename, delete, send and retry (spec: "API surface"). */
+/** Chats per Story: create, list, rename, reset, delete, send, retry and edit a Message (spec: "API surface"). */
 @ApiTags('Chats')
 @Controller('stories/:storyId/chats')
 export class ChatApiController {
@@ -64,5 +64,29 @@ export class ChatApiController {
     @ApiOkResponse({ type: ChatResponseBodyDTO })
     retry(@Id('storyId') storyId: number, @Id('chatId') chatId: number): Promise<ChatResponseBodyDTO> {
         return this.chatManager.retry(storyId, chatId);
+    }
+
+    /**
+     * Rewrites a Message and deletes every Message after it. A User Message gets a fresh
+     * reply (on a failed turn the error is the gateway's); an AI Message is re-split from
+     * its `@Name:` text and no turn runs.
+     */
+    @Patch(':chatId/messages/:messageId')
+    @ApiOkResponse({ type: ChatResponseBodyDTO })
+    editMessage(
+        @Id('storyId') storyId: number,
+        @Id('chatId') chatId: number,
+        @Id('messageId') messageId: number,
+        @Body() body: EditMessageRequestBodyDTO,
+    ): Promise<ChatResponseBodyDTO> {
+        return this.chatManager.editMessage(storyId, chatId, messageId, body.text);
+    }
+
+    /** Clears every Message and copies the current Opening in again; title and identity stay. */
+    @Post(':chatId/reset')
+    @HttpCode(200)
+    @ApiOkResponse({ type: ChatResponseBodyDTO })
+    reset(@Id('storyId') storyId: number, @Id('chatId') chatId: number): Promise<ChatResponseBodyDTO> {
+        return this.chatManager.resetChat(storyId, chatId);
     }
 }

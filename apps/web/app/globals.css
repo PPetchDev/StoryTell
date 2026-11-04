@@ -484,6 +484,48 @@ a {
     color: #f3b26b;
 }
 
+/* Edit a Message in place and reset the Chat (ticket 25) */
+.chat-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+}
+
+.chat-head h1 {
+    margin: 0;
+}
+
+.message-tools {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 0.375rem;
+}
+
+.message-edit {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.message-edit textarea {
+    font: inherit;
+    width: 100%;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid #3a3150;
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.625rem;
+    resize: vertical;
+    min-width: 0;
+}
+
+.edit-hint {
+    margin: 0;
+    font-size: 0.8125rem;
+}
+
 .composer {
     display: grid;
     gap: 0.5rem;

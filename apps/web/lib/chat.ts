@@ -56,7 +56,20 @@ export const chatApi = {
     send: (storyId: number, chatId: number, text: string) =>
         apiSend<Chat>('POST', `/stories/${storyId}/chats/${chatId}/messages`, { text }),
     retry: (storyId: number, chatId: number) => apiSend<Chat>('POST', `/stories/${storyId}/chats/${chatId}/retry`),
+    /** Rewrites a Message and discards every Message after it; a User Message gets a new reply. */
+    edit: (storyId: number, chatId: number, messageId: number, text: string) =>
+        apiSend<Chat>('PATCH', `/stories/${storyId}/chats/${chatId}/messages/${messageId}`, { text }),
+    /** Clears every Message and copies the current Opening in again. */
+    reset: (storyId: number, chatId: number) => apiSend<Chat>('POST', `/stories/${storyId}/chats/${chatId}/reset`),
 };
+
+/** An AI Message as `@Name:` text, the form the edit box shows and the API re-splits. */
+export function messageText(message: Message): string {
+    if (message.kind === 'user') return message.text;
+    return message.parts
+        .map((part) => (part.kind === 'speech' ? `@${part.speakerName}: ${part.text}` : part.text))
+        .join('\n\n');
+}
 
 const MODEL_LABELS: Record<string, string> = {
     'glm-5.3': 'GLM-5.3',
