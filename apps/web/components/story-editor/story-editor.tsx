@@ -119,6 +119,7 @@ export function StoryEditor({ initial }: { initial: Story }) {
         <main className="editor">
             <nav className="breadcrumbs">
                 <Link href="/">← Stories</Link>
+                <Link href={`/stories/${storyId}/chats`}>Play →</Link>
                 <p className="save-state" role="status" aria-live="polite">
                     {SAVE_LABELS[state.kind]}
                     {state.kind === 'error' && `: ${state.message}`}

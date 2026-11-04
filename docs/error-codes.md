@@ -16,6 +16,7 @@ as "the API can't be reached" and shows the can't-connect screen (`apps/web/lib/
 | 001 | Model Gateway |
 | 002 | Images |
 | 003 | Story authoring |
+| 004 | Chats and turns |
 
 ## Codes
 
@@ -38,3 +39,8 @@ as "the API can't be reached" and shows the can't-connect screen (`apps/web/lib/
 | `409.003.006` | `DuplicateStartingBondError` | That Character already has a StartingBond in that direction. |
 | `422.003.007` | `SelfStartingBondError` | A StartingBond from a Character toward itself. |
 | `422.003.008` | `InvalidOrderError` | A reorder that does not list every Character (or Scene) of the Story exactly once. |
+| `404.004.001` | `ChatNotFoundError` | No Chat with that id in this Story. |
+| `422.004.002` | `StoryNotPlayableError` | The Story has a required field empty. The message names the missing fields. Blocks starting a Chat and sending. |
+| `409.004.003` | `NoTurnToRetryError` | Retry when the Chat is not waiting for a reply to a User Message. |
+| `409.004.004` | `TurnInProgressError` | A send while this Chat's turn is still being written. |
+| `422.004.005` | `EmptyMessageError` | A send with nothing but whitespace. |

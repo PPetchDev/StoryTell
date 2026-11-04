@@ -172,6 +172,8 @@ Global setup builds the API, starts a throwaway PostgreSQL, migrates it, and run
 API on port 4101 with the fake gateway. Playwright starts Next.js on port 3101, proxying to it.
 Tests run one at a time because some stop and restart the shared API
 (`apps/web/e2e/harness/api-server.ts`). The report is written to `apps/web/playwright-report/`.
+To run two suites at once (two worktrees, say), give the second one its own ports:
+`E2E_WEB_PORT=3151 E2E_API_PORT=4151 npm run test:e2e`.
 
 Browser tests can script and inspect the fake through test-only routes, mounted only when
 `MODEL_GATEWAY=fake`:
