@@ -2,14 +2,18 @@
 
 import { useState } from 'react';
 
-import { Character, RewriteRequest, Role, StartingBond } from '@/lib/story';
+import { Character, RewriteRequest, Role, StartingBond, Story } from '@/lib/story';
 import { ConfirmButton, OrderButtons, TextField, Toolbar } from './fields';
+import { ReferenceImage } from './reference-image';
 import { rewriteKey, RewriteStates } from './rewrite';
 
 type TextKey = 'name' | 'appearance' | 'personality' | 'voice' | 'background' | 'secrets' | 'arcDirections';
 
 interface CharacterCardProps {
+    storyId: number;
     character: Character;
+    /** The Story's Image style, which the Reference image follows (ticket 30). */
+    imageStyle: string;
     index: number;
     count: number;
     cast: Character[];
@@ -24,6 +28,9 @@ interface CharacterCardProps {
     onAddBond(toCharacterId: number | null): void;
     onBondText(bondId: number, field: 'label' | 'description', value: string): void;
     onRemoveBond(bondId: number): void;
+    /** For the Reference image: send pending edits, and run a whole-Story write after them. */
+    flush(): Promise<void>;
+    commit(run: () => Promise<Story>, onError: (message: string) => void): Promise<Story | undefined>;
 }
 
 const ROLE_TARGET = 'role';
@@ -88,6 +95,13 @@ export function CharacterCard(props: CharacterCardProps) {
                 rows={3}
                 onChange={(v) => props.onText('appearance', v)}
                 {...ofCharacter('appearance')}
+            />
+            <ReferenceImage
+                storyId={props.storyId}
+                character={character}
+                imageStyle={props.imageStyle}
+                flush={props.flush}
+                commit={props.commit}
             />
             <TextField
                 label="Personality"

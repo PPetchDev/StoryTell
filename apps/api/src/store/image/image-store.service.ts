@@ -1,9 +1,16 @@
 import { Injectable } from '@nestjs/common';
-import { stat } from 'node:fs/promises';
+import { mkdir, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { AppConfig } from '../../config/app-config.js';
 import { ImageNotFoundError, InvalidImagePathError } from '../../errors/image.errors.js';
+
+/** The extension a stored image gets, by MIME type; the inverse of MIME_TYPES. */
+const EXTENSIONS: Record<string, string> = {
+    'image/png': 'png',
+    'image/jpeg': 'jpg',
+    'image/webp': 'webp',
+};
 
 const MIME_TYPES: Record<string, string> = {
     '.png': 'image/png',
@@ -36,6 +43,23 @@ export class ImageStoreService {
         if (!stats?.isFile()) throw new ImageNotFoundError();
 
         return { absolutePath, mimeType, size: stats.size };
+    }
+
+    /** The extension a file of this type is stored with; undefined for a type the store can't serve. */
+    static extensionFor(mimeType: string): string | undefined {
+        return EXTENSIONS[mimeType.split(';')[0].trim().toLowerCase()];
+    }
+
+    /** Writes the bytes at `relativePath`, creating the folders on the way. */
+    async write(relativePath: string, bytes: Buffer): Promise<void> {
+        const absolutePath = this.resolve(relativePath);
+        await mkdir(path.dirname(absolutePath), { recursive: true });
+        await writeFile(absolutePath, bytes);
+    }
+
+    /** Deletes the file if it is there; a file already gone is not an error. */
+    async remove(relativePath: string): Promise<void> {
+        await rm(this.resolve(relativePath), { force: true });
     }
 
     private resolve(relativePath: string): string {

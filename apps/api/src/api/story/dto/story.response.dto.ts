@@ -85,6 +85,15 @@ export class CharacterDTO implements CharacterResponse {
 
     @ApiProperty()
     arcDirections: string;
+
+    @ApiProperty({
+        type: String,
+        nullable: true,
+        description:
+            'Path of the Reference image relative to the image folder, served at `GET /api/images/{path}`; ' +
+            'null while there is none. Shown only on the Character page, never in play.',
+    })
+    referenceImagePath: string | null;
 }
 
 export class StartingBondDTO implements StartingBondResponse {

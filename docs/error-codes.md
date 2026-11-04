@@ -32,6 +32,8 @@ as "the API can't be reached" and shows the can't-connect screen (`apps/web/lib/
 | `502.001.005` | `UnparseableOutputError` | The model's output could not be read. Show with Retry. |
 | `404.002.001` | `ImageNotFoundError` | No image file at that path. |
 | `400.002.002` | `InvalidImagePathError` | The path is absolute or leaves the image folder. |
+| `404.002.003` | `ReferenceCandidateNotFoundError` | No such Reference image candidate: it was picked, replaced by a newer round, expired, or never made. Generate again. |
+| `422.002.004` | `NoAppearanceError` | A Reference image was asked for while the Character's Appearance is empty. |
 | `404.003.001` | `StoryNotFoundError` | No Story with that id. |
 | `404.003.002` | `CharacterNotFoundError` | No Character with that id in this Story. |
 | `404.003.003` | `SceneNotFoundError` | No Scene with that id in this Story. |
