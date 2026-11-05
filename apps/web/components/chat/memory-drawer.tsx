@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 
 import { GraphSelection, MemoryGraph, memoriesAbout, personName } from '@/components/chat/memory-graph';
+import { StorySoFarCard } from '@/components/chat/story-so-far-card';
 import { useConnection } from '@/components/connection';
 import { Autosave, useAutosave } from '@/components/story-editor/autosave';
 import { ConfirmButton } from '@/components/story-editor/fields';
@@ -502,6 +503,7 @@ export function MemoryDrawer({ storyId, chatId, focusMemoryId, version, onClose,
                             Add a Memory
                         </button>
                     )}
+                    <StorySoFarCard storyId={storyId} chatId={chatId} version={version} />
                     <MemoryViewSwitch value={viewKind} onChange={memoryViewKind.set} />
                     {active.length === 0 ? (
                         <p className="muted">Nothing remembered yet.</p>

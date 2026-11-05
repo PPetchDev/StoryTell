@@ -5,6 +5,7 @@ import { ChatApiModule } from './chat/chat.module.js';
 import { HealthApiController } from './health/health.controller.js';
 import { ImageApiModule } from './image/image.module.js';
 import { MemoryApiModule } from './memory/memory.module.js';
+import { StorySoFarApiModule } from './story-so-far/story-so-far.module.js';
 import { PersonaApiModule } from './persona/persona.module.js';
 import { ReferenceImageApiModule } from './reference-image/reference-image.module.js';
 import { SettingsApiModule } from './settings/settings.module.js';
@@ -22,6 +23,7 @@ import { UsageApiModule } from './usage/usage.module.js';
         StoryAssistantApiModule,
         ChatApiModule,
         MemoryApiModule,
+        StorySoFarApiModule,
         SettingsApiModule,
         UsageApiModule,
         ReferenceImageApiModule,

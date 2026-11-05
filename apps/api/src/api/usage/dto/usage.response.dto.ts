@@ -15,6 +15,7 @@ const CALL_KINDS = Object.keys({
     story_assistant: true,
     snapshot_prompt: true,
     suggested_replies: true,
+    story_summary: true,
     snapshot_image: true,
     reference_image: true,
 } satisfies Record<CallKind, true>);

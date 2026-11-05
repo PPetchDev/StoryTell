@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, MoreThan, Repository } from 'typeorm';
 
-import { ChatEntity } from './entities/chat.entity.js';
+import { ChatEntity, StorySoFarAuthor } from './entities/chat.entity.js';
 import { MessagePartEntity, MessagePartKind } from './entities/message-part.entity.js';
 import { BackgroundStatus, MessageEntity, MessageKind } from './entities/message.entity.js';
 
@@ -96,6 +96,15 @@ export class ChatModelService {
         await this.chats.update({ id: In(chatIds) }, { currentSceneId: sceneId });
     }
 
+    /** One Chat's current Scene; null is free play. */
+    async setCurrentScene(chatId: number, sceneId: number | null): Promise<void> {
+        await this.chats.update({ id: chatId }, { currentSceneId: sceneId });
+    }
+
+    async setTitle(chatId: number, title: string): Promise<void> {
+        await this.chats.update({ id: chatId }, { title });
+    }
+
     async touchPlayed(chatId: number): Promise<void> {
         await this.chats.update({ id: chatId }, { lastPlayedAt: () => 'now()' });
     }
@@ -122,6 +131,44 @@ export class ChatModelService {
     /** Swaps the worn identity: a Persona's id, or null for the Story's Role. */
     async setPersona(chatId: number, personaId: number | null): Promise<void> {
         await this.chats.update({ id: chatId }, { personaId });
+    }
+
+    /**
+     * Stores a Story so far covering the Messages through position `through`, and clears any
+     * failure. The user's own text is also kept as the corrections every later rewrite gets.
+     */
+    async setStorySoFar(chatId: number, text: string, through: number, by: StorySoFarAuthor): Promise<void> {
+        await this.chats.update(
+            { id: chatId },
+            {
+                storySoFar: text,
+                storySoFarThrough: through,
+                storySoFarBy: by,
+                storySoFarUpdatedAt: () => 'now()',
+                storySoFarFailed: null,
+                ...(by === 'user' ? { storySoFarCorrections: text } : {}),
+            },
+        );
+    }
+
+    /** Records why an update failed; the Story so far it had stays as it was. */
+    async setStorySoFarFailed(chatId: number, reason: string): Promise<void> {
+        await this.chats.update({ id: chatId }, { storySoFarFailed: reason });
+    }
+
+    /** The Chat has no Story so far again. */
+    async clearStorySoFar(chatId: number): Promise<void> {
+        await this.chats.update(
+            { id: chatId },
+            {
+                storySoFar: null,
+                storySoFarThrough: null,
+                storySoFarBy: 'ai',
+                storySoFarUpdatedAt: null,
+                storySoFarFailed: null,
+                storySoFarCorrections: null,
+            },
+        );
     }
 
     /**

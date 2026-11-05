@@ -8,6 +8,7 @@ import {
     recentHistory,
     systemPrompt,
     TURN_PROMPT_TOKEN_BUDGET,
+    uncoveredHistory,
 } from '../turn/prompt.js';
 
 /**
@@ -55,7 +56,10 @@ Answer with only this JSON object and nothing else, one key per option:
 export function buildSuggestionsPrompt(input: SuggestionsPromptInput): SuggestionsPrompt {
     const system = systemPrompt(input);
     const instruction = suggestionsInstruction(input);
-    const kept = recentHistory(input.history, TURN_PROMPT_TOKEN_BUDGET - estimateTokens(system.text) - estimateTokens(instruction));
+    const kept = recentHistory(
+        uncoveredHistory(input.history, input.storySoFar),
+        TURN_PROMPT_TOKEN_BUDGET - estimateTokens(system.text) - estimateTokens(instruction),
+    );
     return {
         messages: [
             { role: 'system', content: system.text },

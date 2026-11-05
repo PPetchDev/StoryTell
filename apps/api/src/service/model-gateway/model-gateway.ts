@@ -33,7 +33,8 @@ export type TextCallKind =
     | 'field_rewrite'
     | 'story_assistant'
     | 'snapshot_prompt'
-    | 'suggested_replies';
+    | 'suggested_replies'
+    | 'story_summary';
 
 export type ImageCallKind = 'snapshot_image' | 'reference_image';
 

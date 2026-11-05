@@ -79,6 +79,13 @@ export interface PromptMemory {
     locked: boolean;
 }
 
+/** Spec: "Story so far": the events of the oldest Messages, which then stop being sent word for word. */
+export interface PromptStorySoFar {
+    text: string;
+    /** How many of the Chat's first Messages it covers. */
+    coveredMessages: number;
+}
+
 export interface TurnPromptInput {
     story: PromptStory;
     identity: PromptIdentity;
@@ -89,6 +96,8 @@ export interface TurnPromptInput {
     arcs: PromptArc[];
     /** Every non-archived Memory, in the stable order (spec: "Memory block"). */
     memories: PromptMemory[];
+    /** The Chat's Story so far; null or left out while the whole Chat still fits. */
+    storySoFar?: PromptStorySoFar | null;
     /** Every Message of the Chat before the new one, oldest first. */
     history: PromptHistoryMessage[];
     /** The user's message; null for a Continue turn, whose user-role message is the continue instruction. */
@@ -130,6 +139,7 @@ export const PROMPT_LAYERS = {
     feelings: '# Feelings',
     arcs: '# Arcs',
     memory: '# Memory',
+    storySoFar: '# Story so far',
 } as const;
 
 /** A rough token count: about four characters per token of English prose. */
@@ -249,6 +259,18 @@ A Character knows only the Memories it is tagged on and acts as if the rest neve
     };
 }
 
+/** Spec: "Prompt layer": the Story so far stands in for the Messages it covers, which the history then leaves out. */
+function storySoFarLayer(storySoFar: PromptStorySoFar): string {
+    return `${PROMPT_LAYERS.storySoFar} (everything that happened before the Messages below; treat it as having happened)
+${storySoFar.text.trim()}
+Each Character remembers only what it saw, did or was told of these events; the Narrator knows them all.`;
+}
+
+/** The Messages the prompt sends word for word: those after the ones the Story so far covers. */
+export function uncoveredHistory(history: PromptHistoryMessage[], storySoFar: PromptStorySoFar | null | undefined): PromptHistoryMessage[] {
+    return storySoFar ? history.slice(Math.min(storySoFar.coveredMessages, history.length)) : history;
+}
+
 /** Stop strings on the worn identity (spec); the gateway drops them for hosts without support. */
 export function stopStrings(identityName: string): string[] {
     return [`\n${identityName}:`, `\n@${identityName}:`, '\nYou:'];
@@ -284,6 +306,7 @@ export function systemPrompt(input: PromptLayersInput): { text: string; memories
         feelingsLayer(input.bonds, identity),
         arcsLayer(input.arcs),
         memory.text,
+        ...(input.storySoFar ? [storySoFarLayer(input.storySoFar)] : []),
     ].join('\n\n');
     return { text, memoriesLeftOut: memory.leftOut };
 }
@@ -306,15 +329,21 @@ export function povAndTense(story: PromptStory, identity: string): string {
     return `${POV_WORDS[story.pov](identity)}, ${story.tense} tense`;
 }
 
+/** The trailing system message of every turn. */
+export function turnFinalInstruction(identity: string): string {
+    return `Write the next turn now. Do not write anything ${identity} says, thinks or does. Use @Name: lines for Character speech.`;
+}
+
 export function buildTurnPrompt(input: TurnPromptInput): TurnPrompt {
     const identity = input.identity.name;
     const userText = input.userText ?? continueInstruction(identity);
     const system = systemPrompt(input);
-    const finalInstruction = `Write the next turn now. Do not write anything ${identity} says, thinks or does. Use @Name: lines for Character speech.`;
+    const finalInstruction = turnFinalInstruction(identity);
 
     const budget = input.tokenBudget ?? TURN_PROMPT_TOKEN_BUDGET;
     const fixed = estimateTokens(system.text) + estimateTokens(userText) + estimateTokens(finalInstruction);
-    const kept = recentHistory(input.history, budget - fixed);
+    const uncovered = uncoveredHistory(input.history, input.storySoFar);
+    const kept = recentHistory(uncovered, budget - fixed);
 
     return {
         messages: [
@@ -325,7 +354,8 @@ export function buildTurnPrompt(input: TurnPromptInput): TurnPrompt {
         ],
         stop: stopStrings(identity),
         maxTokens: REPLY_LENGTH_WORDS[input.story.replyLength].maxTokens,
-        trimmed: input.history.length - kept.length,
+        // Covered Messages are in the Story so far, so only uncovered ones count as left out.
+        trimmed: uncovered.length - kept.length,
         memoriesLeftOut: system.memoriesLeftOut,
     };
 }

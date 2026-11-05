@@ -33,6 +33,7 @@ export type CallKind =
     | 'story_assistant'
     | 'snapshot_prompt'
     | 'suggested_replies'
+    | 'story_summary'
     | 'snapshot_image'
     | 'reference_image';
 
@@ -46,6 +47,7 @@ export const CALL_KIND_LABEL: Record<CallKind, string> = {
     story_assistant: 'Story assistant',
     snapshot_prompt: 'Snapshot descriptions',
     suggested_replies: 'Suggested replies',
+    story_summary: 'Story so far',
     snapshot_image: 'Snapshots',
     reference_image: 'Reference images',
 };

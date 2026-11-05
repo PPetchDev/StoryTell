@@ -354,7 +354,7 @@ Further gateway rules:
   12. a final instruction
 - **Cast cards.** Every card is sent, because one call writes the whole turn. A card holds personality, voice and example lines, background, appearance, and its Secrets, marked as known only to that Character. Knowledge separation relies on prompt instructions; some leakage is accepted.
 - **Memory block.** Every non-archived Memory, with its Known-by tags, under the instruction that a Character knows only the Memories it's tagged on, while the Narrator knows all. `{user}` is rendered as the worn identity's name. The block stays in a stable order and is capped at about 2k tokens.
-- **Recent Messages.** As many of the latest Messages as fit a total prompt budget (about 16k tokens, tunable), trimmed from the oldest. There is no summary layer: Memory is the only record of older turns.
+- **Recent Messages.** As many of the latest Messages as fit a total prompt budget (about 16k tokens, tunable), trimmed from the oldest. There is no summary layer: Memory is the only record of older turns. _(Superseded: see [Spec: Story so far](../story-so-far/spec.md), where a Story so far stands in for the oldest Messages.)_
 - **Rules block** (from the prototype):
   - The story is fiction for a consenting adult reader, and all characters are adults.
   - Explicit content is allowed when the story leads there, with no moralising and no fade-to-black.
@@ -585,7 +585,7 @@ Further gateway rules:
 - Export and import of Stories and Chats, Trash, Chat-as-text download, Tavern cards and Duplicate Story. The daily disaster backup covers recovery and moving PCs.
 - Offline play, cached Chats or queued messages.
 - Automatic fallback between models or providers.
-- A summary ("Story so far") layer for Memory, author-set starting Memories, Message version history and Story version history.
+- A summary ("Story so far") layer for Memory _(superseded: built per [Spec: Story so far](../story-so-far/spec.md))_, author-set starting Memories, Message version history and Story version history.
 - Gallery albums, tags and favourites. Snapshot size settings and prompt preview.
 - Streaming replies. (Since brought in by [Spec: Streaming replies](../streaming/spec.md).)
 - 24/7 availability. The app is up only while the home PC is on.

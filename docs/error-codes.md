@@ -77,6 +77,8 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | `409.004.013` | `AwaitingReplyError` | A Continue while the last User Message still awaits its reply. Nothing stored; Retry that Message instead. |
 | `409.004.014` | `NotRegenerableError` | A Regenerate on a Message that is not the Chat's newest Message, on a User Message, or on the Opening. Nothing changes and no call is made. |
 | `502.004.015` | `UnreadableSuggestionsError` | The Suggested replies the model wrote could not be read as exactly three suggestions, one each of `action`, `speech` and `move`, each with text. Nothing stored. The client shows "Couldn't suggest replies, try again". |
+| `422.004.016` | `EmptyStorySoFarError` | The Story so far saved with nothing but whitespace. Nothing changes. |
+| `409.004.017` | `NoStorySoFarError` | The Story so far saved while the Chat has none yet: the whole Chat still fits in the turn prompt, so it would cover no Messages. Nothing changes. |
 | `502.005.001` | `UnreadableDraftError` | The model's draft or rewrite could not be read (no JSON object, or no text). Nothing saved. Show with Retry. |
 | `502.005.002` | `InvalidDraftError` | The draft does not fit a Story (0 or 7 Characters, a Style value outside its set, a required field empty, a bad StartingBond). Nothing saved. Show with Retry. |
 | `422.005.003` | `EmptyIdeaError` | A draft was asked for with a blank idea. |

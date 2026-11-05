@@ -70,6 +70,10 @@ _Avoid_: Note, lorebook entry, context, summary
 A picture of a Chat's Memories, shown in place of their list when the user chooses it: the identity the user wears and the Characters as people, and each Memory as a dot linked to the people it is about. Who a Memory is about is read from its text (`{user}` or a name), or failing that is the Characters who know it; it is not stored, and it is a different thing from who knows the Memory.
 _Avoid_: Mind map, knowledge graph, relationship map
 
+**Story so far**:
+A Chat's account, in order, of the events in its oldest Messages: what the AI reads in place of those Messages once the whole Chat no longer fits in a turn. A Chat has at most one, and none while the whole Chat still fits. It is written again from all the Messages it covers each time, and the user may correct it; their corrections win. A Story so far is events, where a Memory is a fact.
+_Avoid_: Summary, recap, chat history
+
 **Bond**:
 A Character's feelings toward the user or toward another Character within one Chat, which change as the story unfolds; in play they show only through how the Character behaves, and the user can look at them but never edit them.
 _Avoid_: Affection, affinity, relationship, love meter

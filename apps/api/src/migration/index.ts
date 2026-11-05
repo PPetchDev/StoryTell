@@ -9,6 +9,7 @@ import { Personas1763300000000 } from './1763300000000-Personas.js';
 import { Snapshots1763400000000 } from './1763400000000-Snapshots.js';
 import { PortraitCrop1763500000000 } from './1763500000000-PortraitCrop.js';
 import { StoryCover1763600000000 } from './1763600000000-StoryCover.js';
+import { StorySoFar1763700000000 } from './1763700000000-StorySoFar.js';
 
 // Listed by hand, oldest first, so migrations load the same way from compiled JS, the
 // TypeORM CLI and Vitest. Add every new migration here.
@@ -24,4 +25,5 @@ export const migrations = [
     Snapshots1763400000000,
     PortraitCrop1763500000000,
     StoryCover1763600000000,
+    StorySoFar1763700000000,
 ];

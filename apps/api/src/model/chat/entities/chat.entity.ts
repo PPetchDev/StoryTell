@@ -15,6 +15,9 @@ import type { SceneEntity } from '../../story/entities/scene.entity.js';
 import type { StoryEntity } from '../../story/entities/story.entity.js';
 import type { MessageEntity } from './message.entity.js';
 
+/** Who wrote a Chat's current Story so far. */
+export type StorySoFarAuthor = 'ai' | 'user';
+
 /** A Chat as the list shows it. */
 export interface ChatSummary {
     id: number;
@@ -65,6 +68,28 @@ export class ChatEntity {
     @ManyToOne('PersonaEntity', { onDelete: 'SET NULL', nullable: true })
     @JoinColumn({ name: 'persona_id' })
     persona: Relation<PersonaEntity> | null;
+
+    // Spec: "Story so far". Chat state outside the ledger: rewinds into it and Reset clear it.
+    @Column({ name: 'story_so_far', type: 'text', nullable: true })
+    storySoFar: string | null;
+
+    /** The position of the last Message the Story so far covers; null while there is none. */
+    @Column({ name: 'story_so_far_through', type: 'integer', nullable: true })
+    storySoFarThrough: number | null;
+
+    @Column({ name: 'story_so_far_by', type: 'text', default: 'ai' })
+    storySoFarBy: StorySoFarAuthor;
+
+    @Column({ name: 'story_so_far_updated_at', type: 'timestamptz', nullable: true })
+    storySoFarUpdatedAt: Date | null;
+
+    /** Why the last update failed; null once one succeeds. Never blocks a send. */
+    @Column({ name: 'story_so_far_failed', type: 'text', nullable: true })
+    storySoFarFailed: string | null;
+
+    /** The user's last own text, sent with every rewrite as corrections that win. */
+    @Column({ name: 'story_so_far_corrections', type: 'text', nullable: true })
+    storySoFarCorrections: string | null;
 
     // Loaded only through ChatModelService.findWithMessages(); never auto-loaded.
     @OneToMany('MessageEntity', 'chat')

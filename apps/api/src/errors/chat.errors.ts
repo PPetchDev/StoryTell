@@ -110,3 +110,17 @@ export class UnreadableSuggestionsError extends AppError {
         super('502.004.015', `Couldn't suggest replies (${reason}). Try again.`);
     }
 }
+
+/** The Story so far saved with nothing but whitespace. */
+export class EmptyStorySoFarError extends AppError {
+    constructor() {
+        super('422.004.016', 'Write what has happened so far.');
+    }
+}
+
+/** The user tried to save a Story so far while the Chat has none: the whole Chat still fits, so it would cover nothing. */
+export class NoStorySoFarError extends AppError {
+    constructor() {
+        super('409.004.017', 'This Chat has no Story so far yet: the whole Chat still fits in what the AI reads.');
+    }
+}

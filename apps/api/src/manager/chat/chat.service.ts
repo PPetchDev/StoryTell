@@ -46,6 +46,7 @@ import { MissingField, playableStatus } from '../story/playable.js';
 import { WornIdentity, wornIdentity } from './identity.js';
 import { currentBonds, JudgeManagerService, latestJudged, SettledBackground } from './judge/judge.service.js';
 import { latestExtracted, MemoryExtractionManagerService } from './memory/extraction.service.js';
+import { promptStorySoFar, StorySoFarManagerService } from './story-so-far/story-so-far.service.js';
 import { SuggestedRepliesManagerService } from './suggestions/suggested-replies.service.js';
 import { SuggestedReply } from './suggestions/suggestions-prompt.js';
 import { buildTurnPrompt, PromptArc, PromptBond, PromptHistoryMessage, PromptLayersInput, PromptMemory } from './turn/prompt.js';
@@ -157,6 +158,7 @@ export class ChatManagerService {
         private readonly judge: JudgeManagerService,
         private readonly extraction: MemoryExtractionManagerService,
         private readonly suggestedReplies: SuggestedRepliesManagerService,
+        private readonly storySoFar: StorySoFarManagerService,
         private readonly gateway: ModelGateway,
     ) {}
 
@@ -208,8 +210,9 @@ export class ChatManagerService {
         const chat = await this.settledForWrite(loaded);
 
         await this.ledger.clear(chat.id);
-        chat.currentSceneId = story.scenes[0]?.id ?? null;
-        await this.chatModel.saveChat(chat);
+        // Column updates, not a save of the loaded Chat: a save would write its old Story so far back.
+        await this.chatModel.setCurrentScene(chat.id, story.scenes[0]?.id ?? null);
+        await this.storySoFar.clear(chat.id);
         await this.chatModel.clearMessages(chat.id);
         await this.copyOpening(story, chat.id);
         await this.seedLedger(story, chat.id);
@@ -253,6 +256,7 @@ export class ChatManagerService {
             this.logger.warn(`Chat ${chat.id}: unknown speaker "${name}" in the edited Message; kept by name with no Character link`);
         }
         const rolledBack = await this.ledger.rollbackFrom(chat.id, message.position);
+        await this.storySoFar.rewound(chat, message.position);
         await this.chatModel.rewriteAiMessage(message, reply.parts);
         // Its Snapshots show a moment the edit took away; they stay in the Gallery.
         await this.snapshotModel.clearMessageLinks([message.id]);
@@ -313,6 +317,7 @@ export class ChatManagerService {
         // Stopped while the gate waited: nothing is rolled back or changed.
         if (stream?.signal.aborted) throw new TurnStoppedError();
         const rolledBack = await this.ledger.rollbackFrom(chatId, fromPosition);
+        await this.storySoFar.rewound(await this.reload(chatId), fromPosition);
         await change();
         // Reloaded: the rollback may have put the Chat back on an earlier Scene.
         await this.writeTurn(story, await this.reload(chatId), stream);
@@ -321,8 +326,12 @@ export class ChatManagerService {
 
     /** Spec: "Start both background calls in parallel, with their status set to pending." */
     private startBackground(story: StoryEntity, chatId: number, messageId: number): void {
-        this.judge.start(story, chatId, messageId);
-        this.extraction.start(story, chatId, messageId);
+        const judged = this.judge.run(story, chatId, messageId);
+        const extracted = this.extraction.run(story, chatId, messageId);
+        // Spec: "Story so far". Once both are done, so it measures the Memory they leave; never awaited.
+        void Promise.allSettled([judged, extracted]).then(() =>
+            this.storySoFar.start(story, chatId, (chat) => this.promptLayersFor(story, chat)),
+        );
     }
 
     /** The Opening becomes Message 1 with model "author", split by the same parser as replies. */
@@ -357,7 +366,8 @@ export class ChatManagerService {
         const { story, chat } = await this.load(storyId, chatId);
         if (title.trim() !== '') {
             chat.title = title.trim();
-            await this.chatModel.saveChat(chat);
+            // Only the title: saving the loaded Chat could write back a Story so far updated meanwhile.
+            await this.chatModel.setTitle(chat.id, chat.title);
         }
         return this.detail(story, chat);
     }
@@ -566,6 +576,7 @@ export class ChatManagerService {
             scene,
             ...promptLayers(story, state),
             memories: promptMemories(story, memories),
+            storySoFar: promptStorySoFar(chat),
             history,
             userText,
         });
@@ -657,6 +668,7 @@ export class ChatManagerService {
             scene,
             ...promptLayers(story, state),
             memories: promptMemories(story, memories),
+            storySoFar: promptStorySoFar(chat),
         };
     }
 
