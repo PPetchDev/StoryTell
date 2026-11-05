@@ -322,7 +322,7 @@ describe('Streaming replies', () => {
             }
         });
 
-        it('on a Regenerate after a Continue, leaves the Chat ending at the AI Message before it', async () => {
+        it('on a Regenerate after a Continue, keeps the reply it had, judged again', async () => {
             const { storyId, chatId } = await playableChat();
             t.gateway.scriptText('turn', 'Waves boom below.');
             scriptBackground();
@@ -330,6 +330,7 @@ describe('Streaming replies', () => {
             const reply = (continued.events[continued.events.length - 1].data as Chat).messages[1];
 
             t.gateway.scriptText('turn', { text: REPLY, pieceSize: 4, pieceDelayMs: 30 });
+            scriptBackground();
             await onceUnlocked(() =>
                 streamTurn('POST', `/api/stories/${storyId}/chats/${chatId}/messages/${reply.id}/regenerate`, undefined, (event, abort) => {
                     if (event.event === 'parts') abort();
@@ -338,7 +339,8 @@ describe('Streaming replies', () => {
             await stoppedCall();
 
             const chat = await getChat(storyId, chatId);
-            expect(chat.messages).toHaveLength(1);
+            expect(chat.messages.map((message) => message.id)).toEqual([chat.messages[0].id, reply.id]);
+            expect(JSON.stringify(chat.messages[1].parts)).toContain('Waves boom below.');
             expect(chat.awaitingReply).toBe(false);
         });
     });
@@ -410,7 +412,8 @@ describe('Streaming replies', () => {
             const done = events[events.length - 1].data as Chat;
             expect(done.rolledBack).toEqual({ memoryChanges: 0, bondChanges: 0, arcSteps: 0, sceneAdvances: 0 });
             expect(done.messages).toHaveLength(2);
-            expect(done.messages[1].id).not.toBe(old.id);
+            // The same Message, its new reply the second Reply version.
+            expect(done.messages[1]).toMatchObject({ id: old.id, versions: { current: 2, count: 2 } });
             expect(JSON.stringify(done.messages[1].parts)).toContain('Boots off');
         });
 

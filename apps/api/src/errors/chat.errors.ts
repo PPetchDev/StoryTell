@@ -124,3 +124,10 @@ export class NoStorySoFarError extends AppError {
         super('409.004.017', 'This Chat has no Story so far yet: the whole Chat still fits in what the AI reads.');
     }
 }
+
+/** A Reply version chosen that the Message does not have: only the newest AI Message has more than one. */
+export class ReplyVersionNotFoundError extends AppError {
+    constructor() {
+        super('404.004.018', 'That reply has no such version.');
+    }
+}

@@ -12,6 +12,7 @@ import {
     NoFailedJudgeError,
     NoTurnToRetryError,
     NotRegenerableError,
+    ReplyVersionNotFoundError,
     StoryNotPlayableError,
     TurnInProgressError,
 } from '../../errors/chat.errors.js';
@@ -133,6 +134,11 @@ export interface ChatDashboard {
     /** The background status of the most recent AI Messages, newest first. */
     background: DashboardBackground[];
 }
+
+/** How many Reply versions the newest AI Message keeps, the shown one included (spec: .scratch/swipe/spec.md). */
+export const MAX_REPLY_VERSIONS = 5;
+
+const NOTHING_ROLLED_BACK: RollbackCounts = { memoryChanges: 0, bondChanges: 0, arcSteps: 0, sceneAdvances: 0 };
 
 /** How many recent AI Messages the dashboard lists the background status of. */
 export const DASHBOARD_BACKGROUND_MESSAGES = 10;
@@ -261,21 +267,18 @@ export class ChatManagerService {
         await this.chatModel.rewriteAiMessage(message, reply.parts);
         // Its Snapshots show a moment the edit took away; they stay in the Gallery.
         await this.snapshotModel.clearMessageLinks([message.id]);
-        if (message.model !== AUTHOR_MODEL) {
-            await this.chatModel.setJudgeStatus(message.id, BackgroundStatus.Pending);
-            await this.chatModel.setMemoryStatus(message.id, BackgroundStatus.Pending);
-            this.startBackground(story, chat.id, message.id);
-        }
+        if (message.model !== AUTHOR_MODEL) await this.rerunBackground(story, chat.id, message.id);
         return { ...(await this.getChat(storyId, chatId)), rolledBack };
     }
 
     /**
-     * Spec: "Regenerate". The newest AI Message is replaced with a freshly written one, under
-     * the same gate as a send. Its Memory, Bond, Arc and Scene changes are rolled back as an
-     * edit's are, its Snapshots leave it for the Gallery, and it is deleted; then the turn
-     * runs again: the User Message's turn when one comes before it, a Continue otherwise. On a
-     * failed turn the old reply is already gone, so a User Message before it awaits Retry, and
-     * otherwise the Chat simply ends at the AI Message before it. No version is kept.
+     * Spec: "Regenerate" and .scratch/swipe/spec.md. The newest AI Message is written again,
+     * under the same gate as a send. Its Memory, Bond, Arc and Scene changes are rolled back as
+     * an edit's are; then the turn runs again from the history without it (the User Message's
+     * turn when one comes before it, a Continue otherwise), and the new reply is written into
+     * the same Message as its last Reply version. The replaced one is kept as a version, with
+     * its Snapshots. On a failed or stopped turn the Message keeps the reply it had; since its
+     * changes were rolled back for the new turn's prompt, both background calls run on it again.
      */
     async regenerateMessage(storyId: number, chatId: number, messageId: number, stream?: TurnStream): Promise<EditResult> {
         const { story, chat: loaded } = await this.load(storyId, chatId);
@@ -289,24 +292,66 @@ export class ChatManagerService {
         }
         const chat = await this.requireSendable(story, loaded);
 
-        return this.writingTurn(chat.id, () =>
-            this.rewindAndWrite(
-                story,
-                chat.id,
-                message.position,
-                async () => {
-                    await this.snapshotModel.clearMessageLinks([message.id]);
-                    await this.chatModel.deleteMessage(message.id);
-                },
-                stream,
-            ),
-        );
+        return this.writingTurn(chat.id, async () => {
+            // Stopped while the gate waited: nothing is rolled back or changed.
+            if (stream?.signal.aborted) throw new TurnStoppedError();
+            const rolledBack = await this.ledger.rollbackFrom(chat.id, message.position);
+            await this.storySoFar.rewound(await this.reload(chat.id), message.position);
+            // Reloaded: the rollback may have put the Chat back on an earlier Scene.
+            const rewound = await this.reload(chat.id);
+            const replaced = rewound.messages.find((candidate) => candidate.id === message.id) ?? message;
+            rewound.messages = rewound.messages.filter((candidate) => candidate.id !== message.id);
+            try {
+                await this.writeTurn(story, rewound, stream, replaced);
+            } catch (error) {
+                await this.rerunBackground(story, chat.id, message.id);
+                throw error;
+            }
+            return { ...(await this.getChat(story.id, chat.id)), rolledBack };
+        });
+    }
+
+    /**
+     * Spec: .scratch/swipe/spec.md, "Choosing a version". Shows the newest AI Message's Reply
+     * version `version` (1-based, in the order they were written). Under the same gate as an AI
+     * Message edit: the shown version's changes are rolled back, the two swap, and both
+     * background calls run on the chosen one. The version already shown changes nothing.
+     */
+    async chooseReplyVersion(storyId: number, chatId: number, messageId: number, version: number): Promise<EditResult> {
+        const { story, chat: loaded } = await this.load(storyId, chatId);
+        if (this.inFlight.has(loaded.id)) throw new TurnInProgressError();
+        const found = loaded.messages.find((candidate) => candidate.id === messageId);
+        if (!found) throw new MessageNotFoundError();
+        const ordinal = found.versionOrder()[version - 1];
+        if (ordinal === undefined) throw new ReplyVersionNotFoundError();
+        if (ordinal === (found.versionOrdinal ?? 1)) return { ...(await this.detail(story, loaded)), rolledBack: NOTHING_ROLLED_BACK };
+        const settled = await this.settledForWrite(loaded);
+
+        return this.writingTurn(settled.id, async () => {
+            // Read again inside the lock: a send meanwhile may have dropped the versions.
+            const chat = await this.reload(settled.id);
+            const message = chat.messages.find((candidate) => candidate.id === messageId);
+            const chosen = message?.versions?.find((candidate) => candidate.ordinal === ordinal);
+            if (!message || !chosen) throw new ReplyVersionNotFoundError();
+            const rolledBack = await this.ledger.rollbackFrom(chat.id, message.position);
+            await this.storySoFar.rewound(chat, message.position);
+            await this.chatModel.chooseVersion(message, chosen);
+            this.startBackground(story, chat.id, message.id);
+            return { ...(await this.getChat(storyId, chatId)), rolledBack };
+        });
+    }
+
+    /** Both background calls again on an AI Message whose ledger changes were just rolled back. */
+    private async rerunBackground(story: StoryEntity, chatId: number, messageId: number): Promise<void> {
+        await this.chatModel.setJudgeStatus(messageId, BackgroundStatus.Pending);
+        await this.chatModel.setMemoryStatus(messageId, BackgroundStatus.Pending);
+        this.startBackground(story, chatId, messageId);
     }
 
     /**
      * Inside the turn lock: rolls back every change from `fromPosition` on, applies `change`
      * to the Messages, then writes the turn, answering with what was rolled back. Shared by a
-     * User Message edit and Regenerate. A failed turn throws with the rollback and change kept.
+     * User Message edit. A failed turn throws with the rollback and change kept.
      */
     private async rewindAndWrite(
         story: StoryEntity,
@@ -411,6 +456,8 @@ export class ChatManagerService {
                 wornIdentity(story, chat),
             );
             chat.messages.push(userMessage);
+            // The reply before it is settled on its shown version, even if this turn fails.
+            await this.chatModel.dropReplyVersions(chat.id);
             await this.writeTurn(story, chat, stream);
             return this.getChat(storyId, chatId);
         });
@@ -558,7 +605,7 @@ export class ChatManagerService {
      * With a `stream`, the reply is streamed to it as it is written; a stopped stream throws
      * `TurnStoppedError` with nothing stored.
      */
-    private async writeTurn(story: StoryEntity, chat: ChatEntity, stream?: TurnStream): Promise<void> {
+    private async writeTurn(story: StoryEntity, chat: ChatEntity, stream?: TurnStream, replacing?: MessageEntity): Promise<void> {
         const userText = exchangeUserText(chat.messages, chat.messages.length);
         const history: PromptHistoryMessage[] = (userText !== null ? chat.messages.slice(0, -1) : chat.messages)
             .map((message) => ({
@@ -611,17 +658,20 @@ export class ChatManagerService {
         const parts: ReplyPart[] = reply.parts;
         // A Stop that came while the reply was parsed still stores nothing.
         if (stream?.signal.aborted) throw new TurnStoppedError();
-        const aiMessage = await this.chatModel.addAiMessage(
-            chat.id,
-            chat.messages.length,
-            result.model,
-            parts,
-            BackgroundStatus.Pending,
-        );
+        let aiMessageId: number;
+        if (replacing) {
+            // Regenerate: the new reply is the Message's last Reply version.
+            await this.chatModel.replaceReply(replacing, result.model, parts, MAX_REPLY_VERSIONS);
+            aiMessageId = replacing.id;
+        } else {
+            aiMessageId = (await this.chatModel.addAiMessage(chat.id, chat.messages.length, result.model, parts, BackgroundStatus.Pending)).id;
+            // A Message after the one with versions settles it on its shown version.
+            await this.chatModel.dropReplyVersions(chat.id);
+        }
         // Last, and only once stored: the client's final parts are the stored Message.
         stream?.onParts(parts);
         await this.chatModel.touchPlayed(chat.id);
-        this.startBackground(story, chat.id, aiMessage.id);
+        this.startBackground(story, chat.id, aiMessageId);
     }
 
     /**

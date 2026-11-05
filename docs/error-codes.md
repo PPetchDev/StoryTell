@@ -65,10 +65,10 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | `404.004.001` | `ChatNotFoundError` | No Chat with that id in this Story. |
 | `422.004.002` | `StoryNotPlayableError` | The Story has a required field empty. The message names the missing fields. Blocks starting a Chat, sending, Continue and Regenerate. |
 | `409.004.003` | `NoTurnToRetryError` | Retry when the Chat is not waiting for a reply to a User Message. |
-| `409.004.004` | `TurnInProgressError` | A send, a Continue, a Regenerate, Suggested replies, a Message edit or a reset while this Chat's turn is still being written. |
+| `409.004.004` | `TurnInProgressError` | A send, a Continue, a Regenerate, Suggested replies, a Message edit, choosing a Reply version or a reset while this Chat's turn is still being written. |
 | `422.004.005` | `EmptyMessageError` | A send or a Message edit with nothing but whitespace. |
 | `404.004.006` | `MessageNotFoundError` | No Message with that id in this Chat. |
-| `409.004.007` | `BackgroundStillSavingError` | A send, Retry, Continue, Regenerate, Message edit or reset while one of the previous AI Message's background calls (the judge, Memory extraction) was still pending past the short wait. Try again in a moment. |
+| `409.004.007` | `BackgroundStillSavingError` | A send, Retry, Continue, Regenerate, Message edit, choosing a Reply version or reset while one of the previous AI Message's background calls (the judge, Memory extraction) was still pending past the short wait. Try again in a moment. |
 | `409.004.008` | `BackgroundFailedError` | A send, Retry, Continue or Regenerate while one of the previous AI Message's background calls has failed. The message names which; retry it (on the Chat screen or the dashboard) first. |
 | `409.004.009` | `NoFailedJudgeError` | A judge retry on a Message whose judge did not fail, or that is not the latest AI Message. |
 | `409.004.010` | `NoFailedExtractionError` | A Memory extraction retry on a Message whose extraction did not fail, or that is not the latest AI Message. |
@@ -79,6 +79,7 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | `502.004.015` | `UnreadableSuggestionsError` | The Suggested replies the model wrote could not be read as exactly three suggestions, one each of `action`, `speech` and `move`, each with text. Nothing stored. The client shows "Couldn't suggest replies, try again". |
 | `422.004.016` | `EmptyStorySoFarError` | The Story so far saved with nothing but whitespace. Nothing changes. |
 | `409.004.017` | `NoStorySoFarError` | The Story so far saved while the Chat has none yet: the whole Chat still fits in the turn prompt, so it would cover no Messages. Nothing changes. |
+| `404.004.018` | `ReplyVersionNotFoundError` | A Reply version chosen that the Message does not have: a number outside 1..m of its ‹ n/m ›. Only the newest AI Message has more than one version, so any number but 1 on another Message is refused too. Nothing changes and no call is made. |
 | `502.005.001` | `UnreadableDraftError` | The model's draft or rewrite could not be read (no JSON object, or no text). Nothing saved. Show with Retry. |
 | `502.005.002` | `InvalidDraftError` | The draft does not fit a Story (0 or 7 Characters, a Style value outside its set, a required field empty, a bad StartingBond). Nothing saved. Show with Retry. |
 | `422.005.003` | `EmptyIdeaError` | A draft was asked for with a blank idea. |

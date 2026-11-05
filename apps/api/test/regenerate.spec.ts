@@ -3,8 +3,9 @@ import { TextCompletionRequest } from '../src/service/model-gateway/model-gatewa
 import { startTestApp, TestApp } from './harness/test-app.js';
 
 /**
- * Regenerate (friendly UI ticket 06, spec: "Regenerate"): ↺ Again replaces the Chat's newest
- * AI Message with a freshly written one, undoing everything the old one changed. Through the
+ * Regenerate (friendly UI ticket 06, spec: "Regenerate"): ↺ Again writes the Chat's newest
+ * AI Message again, undoing everything the shown one changed; the replaced one is kept as a
+ * Reply version (reply-versions.spec.ts covers those). Through the
  * HTTP API with the fake gateway scripted.
  */
 
@@ -183,7 +184,8 @@ describe('Regenerate', () => {
         expect(rolledBack).toEqual(NO_ROLLBACK);
         expect(after.messages.map((message) => message.kind)).toEqual(['ai', 'user', 'ai']);
         expect(after.messages[1]).toMatchObject({ id: played.messages[1].id, text: 'I take my boots off.' });
-        expect(lastAi(after).id).not.toBe(old.id);
+        // The same Message, now its second Reply version: the first is kept (.scratch/swipe/spec.md).
+        expect(lastAi(after)).toMatchObject({ id: old.id, versions: { current: 2, count: 2 } });
         expect(partTexts(lastAi(after))).toEqual(['About time.']);
         expect(after.awaitingReply).toBe(false);
         // The same turn as the first: the rerun prompt is the User Message's.
@@ -261,7 +263,7 @@ describe('Regenerate', () => {
     });
 
     describe('a failed turn', () => {
-        it('leaves the User Message awaiting Retry, with the old reply and its changes gone', async () => {
+        it('keeps the reply it had, with its changes made again by its background calls', async () => {
             const story = await createStory();
             const chat = await createChat(story.id);
             const played = await play(
@@ -273,32 +275,34 @@ describe('Regenerate', () => {
             );
             expect(played.currentScene?.name).toBe('The lamp');
 
-            script(new ProviderOutageError());
+            t.gateway.scriptText('turn', new ProviderOutageError());
+            t.gateway.scriptText('judge', JSON.stringify({ bond_changes: [], arc_steps: [], scene: { move_on: true, reason: 'She let Ash up.' } }));
+            t.gateway.scriptText('memory_extraction', NO_OPS);
             const failed = await regenerate(story.id, chat.id, lastAi(played).id).expect(502);
 
             expect(failed.body.error.code).toBe('502.001.001');
-            const waiting = await getChat(story.id, chat.id);
-            expect(waiting.awaitingReply).toBe(true);
-            expect(waiting.messages.map((message) => message.kind)).toEqual(['ai', 'user']);
-            expect(waiting.currentScene?.name).toBe('Arrival');
-
-            script('@Mira: Mind the step.');
-            const retried = await t.http.post(`/api/stories/${story.id}/chats/${chat.id}/retry`).expect(200);
-            expect(partTexts(lastAi(retried.body as Chat))).toEqual(['Mind the step.']);
-            await settled(story.id, chat.id);
+            const kept = await settled(story.id, chat.id);
+            expect(kept.awaitingReply).toBe(false);
+            expect(kept.messages.map((message) => message.id)).toEqual(played.messages.map((message) => message.id));
+            expect(partTexts(lastAi(kept))).toEqual(['Mira lets Ash pass.']);
+            expect(lastAi(kept)).toMatchObject({ judge: { status: 'done' }, memory: { status: 'done' }, versions: null });
+            expect(kept.currentScene?.name).toBe('The lamp');
         });
 
-        it('after a Continue reply, leaves the Chat ending at the AI Message before it', async () => {
+        it('after a Continue reply, keeps that reply too', async () => {
             const story = await createStory();
             const chat = await createChat(story.id);
             const played = await continued(story.id, chat.id, '@Mira: Well?');
 
             script(new ProviderOutageError());
+            t.gateway.scriptText('judge', NO_CHANGE);
+            t.gateway.scriptText('memory_extraction', NO_OPS);
             await regenerate(story.id, chat.id, lastAi(played).id).expect(502);
 
-            const after = await getChat(story.id, chat.id);
+            const after = await settled(story.id, chat.id);
             expect(after.awaitingReply).toBe(false);
-            expect(after.messages).toEqual([chat.messages[0]]);
+            expect(after.messages.map((message) => message.id)).toEqual(played.messages.map((message) => message.id));
+            expect(partTexts(lastAi(after))).toEqual(['Well?']);
         });
     });
 

@@ -41,6 +41,13 @@ export interface BackgroundCall {
     error: string | null;
 }
 
+/** Where the shown Reply version stands: the n and m of ‹ n/m › (.scratch/swipe/spec.md). */
+export interface ReplyVersions {
+    /** 1-based, in the order the versions were written. */
+    current: number;
+    count: number;
+}
+
 export interface AiMessage {
     id: number;
     kind: 'ai';
@@ -51,6 +58,8 @@ export interface AiMessage {
     judge: BackgroundCall | null;
     /** Memory extraction; null on the Opening and on replies from before it existed. */
     memory: BackgroundCall | null;
+    /** Its Reply versions; null while it has only one. Only the newest AI Message has more. */
+    versions: ReplyVersions | null;
     createdAt: string;
 }
 
@@ -205,11 +214,17 @@ export const chatApi = {
     edit: (storyId: number, chatId: number, messageId: number, text: string, stream?: TurnStream) =>
         turn<EditedChat>('PATCH', `/stories/${storyId}/chats/${chatId}/messages/${messageId}`, { text }, stream),
     /**
-     * ↺ Again: replaces the newest AI Message with a freshly written one, rolling back its
-     * changes like an edit. A failed turn has already removed the old reply.
+     * ↺ Again: writes the newest AI Message again, rolling back its changes like an edit; the
+     * replaced reply is kept as a Reply version. A failed turn keeps the reply it had.
      */
     regenerate: (storyId: number, chatId: number, messageId: number, stream?: TurnStream) =>
         turn<EditedChat>('POST', `/stories/${storyId}/chats/${chatId}/messages/${messageId}/regenerate`, undefined, stream),
+    /**
+     * Shows another Reply version of the newest AI Message: what the shown one changed is rolled
+     * back, and the chosen one is judged and extracted from again.
+     */
+    chooseVersion: (storyId: number, chatId: number, messageId: number, version: number) =>
+        apiSend<EditedChat>('PUT', `/stories/${storyId}/chats/${chatId}/messages/${messageId}/version`, { version }),
     /** Wears a Persona, or the Story's Role for null, from the next User Message on. */
     swapIdentity: (storyId: number, chatId: number, personaId: number | null) =>
         apiSend<Chat>('PUT', `/stories/${storyId}/chats/${chatId}/identity`, { personaId }),

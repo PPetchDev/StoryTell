@@ -4,6 +4,7 @@ import type { Request, Response } from 'express';
 
 import { ChatManagerService } from '../../manager/chat/chat.service.js';
 import {
+    ChooseReplyVersionRequestBodyDTO,
     EditMessageRequestBodyDTO,
     RenameChatRequestBodyDTO,
     SendMessageRequestBodyDTO,
@@ -150,10 +151,11 @@ export class ChatApiController {
     }
 
     /**
-     * Spec: "Regenerate". Replaces the Chat's newest AI Message with a freshly written one:
-     * its changes are rolled back, it is deleted, and the turn runs again (the User Message's
-     * turn, or a Continue). Answers with the rollback counts like an edit. On a failed turn
-     * the error is the gateway's, and the old reply is already gone.
+     * Spec: "Regenerate". Writes the Chat's newest AI Message again: its changes are rolled
+     * back and the turn runs again (the User Message's turn, or a Continue); the new reply goes
+     * into the same Message as its last Reply version, and the replaced one is kept. Answers
+     * with the rollback counts like an edit. On a failed turn the error is the gateway's, and
+     * the Message keeps the reply it had, judged and extracted from again.
      */
     @Post(':chatId/messages/:messageId/regenerate')
     @ApiOkResponse({ type: EditMessageResponseBodyDTO })
@@ -168,6 +170,22 @@ export class ChatApiController {
         return answerTurn<EditMessageResponseBodyDTO>(request, response, 200, (stream) =>
             this.chatManager.regenerateMessage(storyId, chatId, messageId, stream),
         );
+    }
+
+    /**
+     * Shows another Reply version of the newest AI Message (.scratch/swipe/spec.md): the shown
+     * one's changes are rolled back and both background calls run on the chosen one. Answers
+     * like an AI Message edit; the version already shown changes nothing.
+     */
+    @Put(':chatId/messages/:messageId/version')
+    @ApiOkResponse({ type: EditMessageResponseBodyDTO })
+    chooseVersion(
+        @Id('storyId') storyId: number,
+        @Id('chatId') chatId: number,
+        @Id('messageId') messageId: number,
+        @Body() body: ChooseReplyVersionRequestBodyDTO,
+    ): Promise<EditMessageResponseBodyDTO> {
+        return this.chatManager.chooseReplyVersion(storyId, chatId, messageId, body.version);
     }
 
     /** Spec: "Dashboard (read-only)". Bonds with history, Arc steps, the Scene and background status. */

@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, In, MoreThan, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, IsNull, MoreThan, Not, Repository } from 'typeorm';
 
 import { ChatEntity, StorySoFarAuthor } from './entities/chat.entity.js';
 import { MessagePartEntity, MessagePartKind } from './entities/message-part.entity.js';
 import { BackgroundStatus, MessageEntity, MessageKind } from './entities/message.entity.js';
+import { ReplyVersionEntity } from './entities/reply-version.entity.js';
 
 /** The worn identity as a User Message records it: the Persona (null for the Role) and the name. */
 export interface StampedIdentity {
@@ -21,6 +22,7 @@ function inOrder(chat: ChatEntity): ChatEntity {
     chat.messages = [...chat.messages].sort((a, b) => a.position - b.position);
     for (const message of chat.messages) {
         message.parts = [...(message.parts ?? [])].sort((a, b) => a.position - b.position);
+        if (message.versions) message.versions = [...message.versions].sort((a, b) => a.ordinal - b.ordinal);
     }
     return chat;
 }
@@ -73,7 +75,7 @@ export class ChatModelService {
     async findWithMessages(chatId: number): Promise<ChatEntity | null> {
         const chat = await this.chats.findOne({
             where: { id: chatId },
-            relations: { persona: true, messages: { parts: true } },
+            relations: { persona: true, messages: { parts: true, versions: true } },
         });
         return chat && inOrder(chat);
     }
@@ -239,6 +241,90 @@ export class ChatModelService {
             await manager.delete(MessagePartEntity, { messageId: message.id });
             await manager.save(partEntities(manager, message.id, parts));
         });
+    }
+
+    /**
+     * Regenerate's new reply, written into the newest AI Message (spec: .scratch/swipe/spec.md).
+     * In one transaction: the shown version is kept as a version row, with its Snapshots; the new
+     * parts become the last version, with both background calls pending; and past `maxVersions`
+     * in all, the oldest version rows go (their Snapshots stay in the Gallery, unlinked).
+     */
+    replaceReply(message: MessageEntity, model: string, parts: NewMessagePart[], maxVersions: number): Promise<void> {
+        return this.dataSource.transaction(async (manager) => {
+            const shown = message.versionOrdinal ?? 1;
+            const kept = await manager.find(ReplyVersionEntity, { where: { messageId: message.id }, order: { ordinal: 'ASC' } });
+            const putAway = await this.putAway(manager, message, shown);
+            const ordinal = Math.max(shown, ...kept.map((version) => version.ordinal)) + 1;
+            const over = kept.length + 2 - maxVersions;
+            const dropped = [...kept, putAway].sort((a, b) => a.ordinal - b.ordinal).slice(0, Math.max(0, over));
+            if (dropped.length > 0) await manager.delete(ReplyVersionEntity, { id: In(dropped.map((version) => version.id)) });
+            await this.showParts(manager, message.id, model, parts, ordinal);
+        });
+    }
+
+    /**
+     * Shows another Reply version, in one transaction: the shown one is put away with its
+     * Snapshots, and the chosen row's parts and Snapshots come back under the Message, with both
+     * background calls pending.
+     */
+    chooseVersion(message: MessageEntity, chosen: ReplyVersionEntity): Promise<void> {
+        return this.dataSource.transaction(async (manager) => {
+            await this.putAway(manager, message, message.versionOrdinal ?? 1);
+            await manager.query('UPDATE "snapshot" SET "message_id" = $1, "reply_version_id" = NULL WHERE "reply_version_id" = $2', [
+                message.id,
+                chosen.id,
+            ]);
+            await manager.delete(ReplyVersionEntity, { id: chosen.id });
+            await this.showParts(manager, message.id, chosen.model, chosen.parts, chosen.ordinal);
+        });
+    }
+
+    /** Drops every Reply version not shown in the Chat; their Snapshots stay in the Gallery, unlinked. */
+    async dropReplyVersions(chatId: number): Promise<void> {
+        await this.dataSource.transaction(async (manager) => {
+            const ids = (await manager.find(MessageEntity, { where: { chatId, versionOrdinal: Not(IsNull()) }, select: { id: true } })).map(
+                (message) => message.id,
+            );
+            if (ids.length === 0) return;
+            await manager.delete(ReplyVersionEntity, { messageId: In(ids) });
+            await manager.update(MessageEntity, { id: In(ids) }, { versionOrdinal: null });
+        });
+    }
+
+    /** Stores the shown version of `message` as a version row, moving its Snapshots onto that row. */
+    private async putAway(manager: EntityManager, message: MessageEntity, ordinal: number): Promise<ReplyVersionEntity> {
+        const row = await manager.save(
+            manager.create(ReplyVersionEntity, {
+                messageId: message.id,
+                ordinal,
+                model: message.model ?? '',
+                parts: [...message.parts].sort((a, b) => a.position - b.position).map((part) => part.toResponse()),
+                writtenAt: message.createdAt,
+            }),
+        );
+        await manager.query('UPDATE "snapshot" SET "message_id" = NULL, "reply_version_id" = $1 WHERE "message_id" = $2', [
+            row.id,
+            message.id,
+        ]);
+        return row;
+    }
+
+    /** Puts `parts` under the Message as its shown version, with both background calls pending. */
+    private async showParts(manager: EntityManager, messageId: number, model: string, parts: NewMessagePart[], ordinal: number): Promise<void> {
+        await manager.delete(MessagePartEntity, { messageId });
+        await manager.save(partEntities(manager, messageId, parts));
+        await manager.update(
+            MessageEntity,
+            { id: messageId },
+            {
+                model,
+                versionOrdinal: ordinal,
+                judgeStatus: BackgroundStatus.Pending,
+                judgeError: null,
+                memoryStatus: BackgroundStatus.Pending,
+                memoryError: null,
+            },
+        );
     }
 
     /** Deletes one Message for good; its parts go through ON DELETE CASCADE. */

@@ -237,10 +237,10 @@ export function ChatScreen({ initial, cast, portraits, scenes }: ChatScreenProps
     };
 
     /**
-     * ↺ Again (spec: "Regenerate"): the newest reply is replaced in place, with the writing
-     * indicator where it was, and the rollback notice notes what it had changed. A failed
-     * turn has already removed it, so the re-read Chat shows its User Message with Retry,
-     * or ends at the AI Message before it; the Memory and Snapshots re-read either way.
+     * ↺ Again (spec: "Regenerate"): the newest reply is written again in place, with the writing
+     * indicator where it was, and the rollback notice notes what it had changed. The replaced
+     * reply is kept as a Reply version (‹ n/m ›). A failed turn keeps the reply it had, so the
+     * re-read Chat shows it again; the Memory and Snapshots re-read either way.
      */
     const again = (messageId: number) => {
         if (writing || busy || blocked) return;
@@ -254,6 +254,12 @@ export function ChatScreen({ initial, cast, portraits, scenes }: ChatScreenProps
                 throw caught;
             }
         }).finally(() => setReplacing(null));
+    };
+
+    /** ‹ n/m › or a swipe: shows another Reply version, with the rollback notice like an edit. */
+    const chooseVersion = (messageId: number, version: number) => {
+        if (writing || busy) return;
+        void runWrite(async () => refreshMemory(noteRollback(await chatApi.chooseVersion(chat.storyId, chat.id, messageId, version))));
     };
 
     const saveEdit = (message: Message, text: string) => {
@@ -347,6 +353,7 @@ export function ChatScreen({ initial, cast, portraits, scenes }: ChatScreenProps
                 snapshots={snaps.state}
                 replacing={replacing}
                 onAgain={again}
+                onVersion={chooseVersion}
                 onEdit={setEditing}
                 onSave={saveEdit}
                 onCancelEdit={() => setEditing(null)}

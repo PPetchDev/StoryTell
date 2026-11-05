@@ -26,7 +26,7 @@ interface OpeningPreviewProps {
 
 /** The Opening as a Chat's first Message, so the parts render exactly as they will in play. */
 function asMessage(parts: MessagePart[]): AiMessage {
-    return { id: 0, kind: 'ai', model: 'author', parts, judge: null, memory: null, createdAt: '' };
+    return { id: 0, kind: 'ai', model: 'author', parts, judge: null, memory: null, versions: null, createdAt: '' };
 }
 
 /**
