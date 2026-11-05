@@ -8,6 +8,8 @@ import { ApiError, apiFetch, ApiUnreachableError } from '@/lib/api';
 import { ChatSummary } from '@/lib/chat';
 import { EARLIER_VERSION, GalleryItem, galleryPath, snapshotApi, snapshotImageUrl } from '@/lib/snapshot';
 
+import styles from './gallery.module.css';
+
 interface GalleryProps {
     storyId: number;
     chats: ChatSummary[];
@@ -16,16 +18,16 @@ interface GalleryProps {
 }
 
 /**
- * Every Snapshot of the Story, newest first, as a grid (spec: "Gallery"). Filter by Chat; a
- * tap opens one full screen with its prompt, download and delete. An item whose Message is
- * gone is marked as from an earlier version of its Chat; one whose Message is still there
- * jumps to it from the full-screen view.
+ * Every Snapshot of the Story, newest first, as a grid of whole images (spec: "Gallery").
+ * Filter by Chat; a tap opens the shared full-screen viewer, which swipes through the current
+ * filter and keeps the prompt, download and delete. An item whose Message is gone is marked
+ * as from an earlier version of its Chat; one whose Message is still there jumps to it.
  */
 export function Gallery({ storyId, chats, initialChatId }: GalleryProps) {
     const { reportUnreachable } = useConnection();
     const [chatId, setChatId] = useState<number | null>(initialChatId);
     const [items, setItems] = useState<GalleryItem[] | null>(null);
-    const [viewing, setViewing] = useState<GalleryItem | null>(null);
+    const [viewing, setViewing] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
 
     const load = useCallback(async () => {
@@ -58,7 +60,7 @@ export function Gallery({ storyId, chats, initialChatId }: GalleryProps) {
 
     return (
         <>
-            <label className="gallery-filter">
+            <label className={styles.filter}>
                 <span className="muted">Chat</span>
                 <select
                     aria-label="Filter by Chat"
@@ -79,21 +81,27 @@ export function Gallery({ storyId, chats, initialChatId }: GalleryProps) {
             ) : items.length === 0 ? (
                 <p className="muted">No Snapshots yet. Take one with the camera in a Chat.</p>
             ) : (
-                <ul className="gallery-grid" aria-label="Gallery">
+                <ul className={styles.grid} aria-label="Gallery">
                     {items.map((item) => (
                         <li key={item.id}>
-                            <button type="button" className="snapshot-thumb" onClick={() => setViewing(item)}>
+                            <button type="button" className={styles.thumb} onClick={() => setViewing(item.id)}>
                                 {/* eslint-disable-next-line @next/next/no-img-element -- served by the API from the image folder */}
                                 <img src={snapshotImageUrl(item)} alt={snapshotAlt(item)} />
                             </button>
                             <span className="muted small">{item.chatTitle ?? 'A deleted Chat'}</span>
-                            {item.messageId === null && <span className="gallery-earlier small">{EARLIER_VERSION}</span>}
+                            {item.messageId === null && <span className={`${styles.earlier} small`}>{EARLIER_VERSION}</span>}
                         </li>
                     ))}
                 </ul>
             )}
-            {viewing && (
-                <SnapshotViewer snapshot={viewing} showLink onClose={() => setViewing(null)} onDelete={() => void remove(viewing)} />
+            {viewing !== null && items && (
+                <SnapshotViewer
+                    snapshots={items}
+                    openId={viewing}
+                    showLink
+                    onClose={() => setViewing(null)}
+                    onDelete={(item) => void remove(item)}
+                />
             )}
         </>
     );

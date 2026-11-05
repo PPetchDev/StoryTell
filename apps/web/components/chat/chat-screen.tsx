@@ -287,18 +287,20 @@ export function ChatScreen({ initial, cast }: ChatScreenProps) {
 
             {viewing && (
                 <SnapshotViewer
-                    snapshot={viewing}
+                    // A swipe moves through the Chat's Snapshots in thread order.
+                    snapshots={chat.messages.flatMap((message) => snaps.state.snapshots.filter((s) => s.messageId === message.id))}
+                    openId={viewing.id}
                     onClose={() => setViewing(null)}
-                    onDelete={() => {
+                    onDelete={(snapshot) => {
                         setViewing(null);
-                        void snaps.remove(viewing);
+                        void snaps.remove(snapshot);
                     }}
                     onRetake={
-                        chat.imageCreditOut || viewing.messageId === null
+                        chat.imageCreditOut
                             ? undefined
-                            : () => {
+                            : (snapshot) => {
                                   setViewing(null);
-                                  void snaps.take(viewing.hint, viewing.messageId ?? undefined);
+                                  void snaps.take(snapshot.hint, snapshot.messageId ?? undefined);
                               }
                     }
                 />
