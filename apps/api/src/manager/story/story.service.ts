@@ -5,13 +5,17 @@ import {
     CastFullError,
     CharacterNotFoundError,
     DuplicateStartingBondError,
+    InvalidCoverChoiceError,
     InvalidOrderError,
+    NoCoverError,
     NoReferenceImageError,
+    NoReferenceImageForCoverError,
     SceneNotFoundError,
     SelfStartingBondError,
     StartingBondNotFoundError,
     StoryNotFoundError,
 } from '../../errors/story.errors.js';
+import { SnapshotNotFoundError, UnsupportedImageError } from '../../errors/image.errors.js';
 import { ChatModelService } from '../../model/chat/chat.service.js';
 import { LedgerModelService } from '../../model/ledger/ledger.service.js';
 import { SnapshotModelService } from '../../model/snapshot/snapshot.service.js';
@@ -19,6 +23,7 @@ import { CharacterEntity, PortraitCrop } from '../../model/story/entities/charac
 import { SceneEntity } from '../../model/story/entities/scene.entity.js';
 import { StartingBondEntity } from '../../model/story/entities/starting-bond.entity.js';
 import {
+    CoverFocus,
     Pov,
     ReplyLength,
     StoryEntity,
@@ -26,7 +31,7 @@ import {
     StorySummary,
     Tense,
 } from '../../model/story/entities/story.entity.js';
-import { StoryModelService } from '../../model/story/story.service.js';
+import { CoverColumns, StoryModelService } from '../../model/story/story.service.js';
 import { ImageData } from '../../service/model-gateway/model-gateway.js';
 import { ImageStoreService } from '../../store/image/image-store.service.js';
 import { parseReply, ReplyPart } from '../chat/turn/reply-parser.js';
@@ -48,10 +53,21 @@ export interface StoryListItem extends StorySummary, PlayableStatus {
     lastPlayedAt: string | null;
     /** That Chat; null when it has no Chats. */
     latestChat: LatestChat | null;
-    /** The newest Snapshot's image, relative to the image folder; null when it has none. */
+    /**
+     * The picture on its card, relative to the image folder: the Cover when one is chosen, else
+     * the newest Snapshot; null when there is neither.
+     */
     coverImagePath: string | null;
+    /** The Cover's focus point; null for the newest Snapshot, or a Cover with none chosen. */
+    coverFocus: CoverFocus | null;
     /** The Setting's first sentence, cut to about 120 characters. */
     hook: string;
+}
+
+/** Where a Cover is picked from: exactly one of the two. */
+export interface CoverChoice {
+    snapshotId?: number;
+    characterId?: number;
 }
 
 export interface StoryFields {
@@ -138,12 +154,14 @@ export class StoryManagerService {
         return stories.map((story) => {
             const chat = chatOf.get(story.id);
             const scene = chat && story.scenes.find((candidate) => candidate.id === chat.currentSceneId);
+            const cover = story.cover();
             return {
                 ...story.toSummary(),
                 ...playableStatus(story),
                 lastPlayedAt: chat ? chat.lastPlayedAt.toISOString() : null,
                 latestChat: chat ? { id: chat.id, sceneName: scene?.name ?? null } : null,
-                coverImagePath: coverOf.get(story.id) ?? null,
+                coverImagePath: cover?.imagePath ?? coverOf.get(story.id) ?? null,
+                coverFocus: cover?.focus ?? null,
                 hook: storyHook(story.setting),
             };
         });
@@ -183,7 +201,7 @@ export class StoryManagerService {
         return this.reload(storyId);
     }
 
-    /** Removes the Story and everything under it, Reference image and Gallery files included (spec: "Delete Story"). */
+    /** Removes the Story and everything under it, Reference image, Gallery and Cover files included (spec: "Delete Story"). */
     async deleteStory(storyId: number): Promise<void> {
         const story = await this.load(storyId);
         // Read before the delete: the Gallery's records go with the Story through CASCADE.
@@ -191,6 +209,72 @@ export class StoryManagerService {
         await this.storyModel.deleteStory(storyId);
         for (const character of story.characters) await this.removeReferenceImageFile(character);
         for (const imagePath of galleryFiles) await this.removeFile(imagePath);
+        if (story.coverImagePath) await this.removeFile(story.coverImagePath);
+    }
+
+    /**
+     * Makes a Snapshot of the Story's Gallery, or a Character's Reference image, the Cover. The
+     * Cover only points at it: the file stays the Snapshot's or the Character's. A Character's
+     * Cover follows their Reference image when it is replaced. The focus starts centred.
+     */
+    async chooseCover(storyId: number, choice: CoverChoice): Promise<StoryDetail> {
+        const story = await this.load(storyId);
+        const { snapshotId, characterId } = choice;
+        if ((snapshotId === undefined) === (characterId === undefined)) throw new InvalidCoverChoiceError();
+        const none: CoverColumns = { snapshotId: null, characterId: null, imagePath: null, focus: null };
+        if (snapshotId !== undefined) {
+            const snapshot = await this.snapshotModel.findOne(storyId, snapshotId);
+            if (!snapshot) throw new SnapshotNotFoundError();
+            await this.replaceCover(story, { ...none, snapshotId: snapshot.id });
+        } else {
+            const character = this.findCharacter(story, characterId!);
+            if (!character.referenceImagePath) throw new NoReferenceImageForCoverError();
+            await this.replaceCover(story, { ...none, characterId: character.id });
+        }
+        return this.reload(storyId);
+    }
+
+    /**
+     * Stores an uploaded picture as the Cover, which owns its file. The type is read from the
+     * bytes, not from what the upload claims. The file is written before the Story points at it.
+     */
+    async uploadCover(storyId: number, bytes: Buffer): Promise<StoryDetail> {
+        const story = await this.load(storyId);
+        const mimeType = ImageStoreService.sniffMimeType(bytes);
+        if (!mimeType) throw new UnsupportedImageError();
+        const extension = ImageStoreService.extensionFor(mimeType)!;
+        // A fresh name per upload, so a browser never shows the replaced picture from its cache.
+        const relativePath = `covers/story-${storyId}/cover-${randomBytes(6).toString('hex')}.${extension}`;
+        await this.imageStore.write(relativePath, bytes);
+        try {
+            await this.replaceCover(story, { snapshotId: null, characterId: null, imagePath: relativePath, focus: null });
+        } catch (error) {
+            await this.removeFile(relativePath);
+            throw error;
+        }
+        return this.reload(storyId);
+    }
+
+    /** Back to no Cover: Home shows the newest Snapshot again, or the Story's gradient. */
+    async clearCover(storyId: number): Promise<StoryDetail> {
+        const story = await this.load(storyId);
+        await this.replaceCover(story, { snapshotId: null, characterId: null, imagePath: null, focus: null });
+        return this.reload(storyId);
+    }
+
+    /** Sets or clears the point of the Cover kept in view when a card crops it. */
+    async setCoverFocus(storyId: number, focus: CoverFocus | null): Promise<StoryDetail> {
+        const story = await this.load(storyId);
+        if (!story.cover()) throw new NoCoverError();
+        await this.storyModel.setCoverFocus(storyId, focus ? { x: focus.x, y: focus.y } : null);
+        return this.reload(storyId);
+    }
+
+    /** Points the Story at its new Cover, then deletes the old Cover's file if the Cover owned one. */
+    private async replaceCover(story: StoryEntity, cover: CoverColumns): Promise<void> {
+        const previous = story.coverImagePath;
+        await this.storyModel.setCover(story.id, cover);
+        if (previous && previous !== cover.imagePath) await this.removeFile(previous);
     }
 
     async updateRole(storyId: number, fields: RoleFields): Promise<StoryDetail> {
@@ -292,6 +376,10 @@ export class StoryManagerService {
         character.referenceImagePath = null;
         character.portraitCrop = null;
         await this.storyModel.saveCharacter(character);
+        // A Cover showing this image goes with it, rather than coming back with their next one.
+        if (story.coverCharacterId === characterId) {
+            await this.replaceCover(story, { snapshotId: null, characterId: null, imagePath: null, focus: null });
+        }
         if (previous) await this.removeFile(previous);
         return this.saved(storyId);
     }

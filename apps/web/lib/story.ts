@@ -26,8 +26,10 @@ export interface StorySummary {
     lastPlayedAt: string | null;
     /** That Chat; null when it has no Chats. */
     latestChat: LatestChat | null;
-    /** The newest Snapshot's image, relative to the image folder; null when it has none. */
+    /** The card's picture, relative to the image folder: the Cover if one is chosen, else the newest Snapshot; null when neither. */
     coverImagePath: string | null;
+    /** The Cover's focus point; null for the newest Snapshot or a Cover with none chosen. */
+    coverFocus: CoverFocus | null;
     /** The Setting's first sentence, cut to about 120 characters. */
     hook: string;
 }
@@ -89,6 +91,26 @@ export interface MissingField {
     label: string;
 }
 
+/** The point of a Cover kept in view when it is cropped, in fractions of its width and height (mirrors CoverFocusDTO). */
+export interface CoverFocus {
+    x: number;
+    y: number;
+}
+
+/** Only an upload's file belongs to the Cover; the others point at a Snapshot or a Reference image. */
+export type CoverSource = 'snapshot' | 'reference_image' | 'upload';
+
+/** The picture the author chose for the Story (mirrors StoryCoverDTO). */
+export interface StoryCover {
+    source: CoverSource;
+    /** Relative to the image folder. */
+    imagePath: string;
+    /** Null while none is chosen: the picture is centred. */
+    focus: CoverFocus | null;
+    snapshotId: number | null;
+    characterId: number | null;
+}
+
 export interface Story {
     id: number;
     title: string;
@@ -99,6 +121,8 @@ export interface Story {
     characters: Character[];
     startingBonds: StartingBond[];
     scenes: Scene[];
+    /** Null while the author has chosen none. */
+    cover: StoryCover | null;
     playable: boolean;
     missing: MissingField[];
     createdAt: string;
@@ -228,4 +252,18 @@ export const storyApi = {
         apiSend<Story>('PUT', `/stories/${storyId}/characters/${characterId}/reference-image/portrait`, crop),
     clearPortraitCrop: (storyId: number, characterId: number) =>
         apiSend<Story>('DELETE', `/stories/${storyId}/characters/${characterId}/reference-image/portrait`),
+
+    /** Makes a Snapshot of the Gallery, or a Character's Reference image, the Cover; the Cover only points at it. */
+    chooseCover: (storyId: number, choice: { snapshotId: number } | { characterId: number }) =>
+        apiSend<Story>('PUT', `/stories/${storyId}/cover`, choice),
+    /** Stores a picture from the phone as the Cover, which owns its file. */
+    uploadCover: (storyId: number, picture: Blob, filename: string) => {
+        const form = new FormData();
+        form.append('image', picture, filename);
+        return apiFetch<Story>(`/stories/${storyId}/cover/upload`, { method: 'PUT', body: form });
+    },
+    clearCover: (storyId: number) => apiSend<Story>('DELETE', `/stories/${storyId}/cover`),
+    setCoverFocus: (storyId: number, focus: CoverFocus) =>
+        apiSend<Story>('PUT', `/stories/${storyId}/cover/focus`, focus),
+    clearCoverFocus: (storyId: number) => apiSend<Story>('DELETE', `/stories/${storyId}/cover/focus`),
 };

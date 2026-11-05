@@ -58,3 +58,24 @@ export class NoReferenceImageError extends AppError {
         super('409.003.009', 'Add a Reference image first: the chat picture is cropped from it.');
     }
 }
+
+/** A Cover is picked from exactly one place: a Snapshot of the Gallery or a Character's Reference image. */
+export class InvalidCoverChoiceError extends AppError {
+    constructor() {
+        super('422.003.010', 'Pick exactly one: a Snapshot (snapshotId) or a Character (characterId).');
+    }
+}
+
+/** A focus point for a Story that has no Cover to focus. */
+export class NoCoverError extends AppError {
+    constructor() {
+        super('409.003.011', 'Choose a Cover first: the focus point is a spot on its picture.');
+    }
+}
+
+/** A Cover picked from a Character who has no Reference image. */
+export class NoReferenceImageForCoverError extends AppError {
+    constructor() {
+        super('409.003.012', 'That Character has no Reference image to use as the Cover.');
+    }
+}

@@ -36,6 +36,10 @@ _Avoid_: Player character, protagonist
 The user's own reusable self-description, which can be worn in place of a Story's Role.
 _Avoid_: Profile, avatar, user character
 
+**Cover**:
+The picture the author chooses for a Story, shown on its card on Home and at the top of its editor, cropped around a focus point the author taps. It is a Snapshot from the Story's Gallery, a Character's Reference image (which it follows when that is replaced), or a picture uploaded from the phone; only an uploaded one belongs to the Cover and is deleted with it. Without one, Home shows the newest Snapshot.
+_Avoid_: Thumbnail, banner, key art
+
 ## Playing
 
 **Chat**:

@@ -1,4 +1,4 @@
-import { LatestChat, StorySummary } from './story';
+import { CoverFocus, LatestChat, StorySummary } from './story';
 
 /** Hue pairs that sit well on the dark purple theme; a Story's id picks one, so it never changes. */
 const GRADIENTS: Array<[string, string]> = [
@@ -21,9 +21,24 @@ export function coverGradient(storyId: number): string {
     return `linear-gradient(${angle}deg, ${from}, ${to})`;
 }
 
-/** The background of a cover: the newest Snapshot when there is one, else the Story's gradient. */
-export function coverBackground(story: Pick<StorySummary, 'id' | 'coverImagePath'>): string {
-    return story.coverImagePath ? `url("/api/images/${story.coverImagePath}") center / cover` : coverGradient(story.id);
+/**
+ * Where a cropped Cover sits, as a CSS position: the focus point of the picture lands on the
+ * same point of the box, so it is always in view whatever the box's shape. Centred without one.
+ */
+export function coverPosition(focus: CoverFocus | null): string {
+    if (!focus) return 'center';
+    const percent = (fraction: number) => `${Math.round(fraction * 1000) / 10}%`;
+    return `${percent(focus.x)} ${percent(focus.y)}`;
+}
+
+/**
+ * The background of a card's picture: the Cover when one is chosen, else the newest Snapshot,
+ * else the Story's gradient.
+ */
+export function coverBackground(story: Pick<StorySummary, 'id' | 'coverImagePath' | 'coverFocus'>): string {
+    return story.coverImagePath
+        ? `url("/api/images/${story.coverImagePath}") ${coverPosition(story.coverFocus)} / cover no-repeat`
+        : coverGradient(story.id);
 }
 
 const UNITS: Array<[Intl.RelativeTimeFormatUnit, number]> = [
