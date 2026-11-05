@@ -50,6 +50,7 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | `400.002.008` | `NoImageFileError` | An upload with no file in its `image` field. |
 | `415.002.009` | `UnsupportedImageError` | An uploaded file whose bytes are not a PNG, JPEG or WebP picture. |
 | `413.002.010` | `ImageTooLargeError` | An uploaded picture over the size limit (15 MB for a Cover). |
+| `422.002.011` | `SnapshotSizeNotOfferedError` | A Settings change that asks for a Snapshot size the Snapshot model is not drawn at, such as 2K for Seedream V4.5 edit. |
 | `404.003.001` | `StoryNotFoundError` | No Story with that id. |
 | `404.003.002` | `CharacterNotFoundError` | No Character with that id in this Story. |
 | `404.003.003` | `SceneNotFoundError` | No Scene with that id in this Story. |

@@ -70,6 +70,27 @@ export type ImageModel = SnapshotModel | typeof REFERENCE_IMAGE_MODEL | (typeof 
 export const DEFAULT_PLAY_MODEL: PlayModel = 'glm-5.3';
 export const DEFAULT_SNAPSHOT_MODEL: SnapshotModel = 'seedream-v4-edit';
 
+/** How large a Snapshot is drawn: Venice's resolution tiers, the long side about 1024 or 2048 px. */
+export const SNAPSHOT_SIZES = ['1K', '2K'] as const;
+export type SnapshotSize = (typeof SNAPSHOT_SIZES)[number];
+export const DEFAULT_SNAPSHOT_SIZE: SnapshotSize = '1K';
+
+/**
+ * What one Snapshot costs at each size its model draws at, with one input image (Venice's
+ * `GET /models` on 2026-11-05). A size left out is not offered for that model. The real
+ * gateway's model table takes these prices, and Settings shows them.
+ */
+export const SNAPSHOT_MODEL_PRICES: Record<SnapshotModel, { '1K': number; '2K'?: number }> = {
+    'seedream-v4-edit': { '1K': 0.05 },
+    'seedream-v5-pro-edit': { '1K': 0.06, '2K': 0.11 },
+    'qwen-edit-uncensored': { '1K': 0.04 },
+};
+
+/** The sizes a Snapshot model is offered at, smallest first. */
+export function snapshotSizesOf(model: SnapshotModel): SnapshotSize[] {
+    return SNAPSHOT_SIZES.filter((size) => SNAPSHOT_MODEL_PRICES[model][size] !== undefined);
+}
+
 export interface PromptMessage {
     role: 'system' | 'user' | 'assistant';
     content: string;

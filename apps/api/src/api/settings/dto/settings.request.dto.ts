@@ -1,9 +1,9 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsIn, IsInt, IsNumber, IsOptional, Max, Min } from 'class-validator';
 
-import { PLAY_MODELS, SNAPSHOT_MODELS } from '../../../service/model-gateway/model-gateway.js';
+import { PLAY_MODELS, SNAPSHOT_MODELS, SNAPSHOT_SIZES } from '../../../service/model-gateway/model-gateway.js';
 
-import type { PlayModel, SnapshotModel } from '../../../service/model-gateway/model-gateway.js';
+import type { PlayModel, SnapshotModel, SnapshotSize } from '../../../service/model-gateway/model-gateway.js';
 
 /** Every field is optional; only the ones sent change. */
 export class UpdateSettingsRequestBodyDTO {
@@ -19,6 +19,14 @@ export class UpdateSettingsRequestBodyDTO {
     @IsOptional()
     @IsIn(SNAPSHOT_MODELS)
     imageModel?: SnapshotModel;
+
+    @ApiPropertyOptional({
+        description: 'How large Snapshots are drawn. 2K only for an image model that lists it in its sizes.',
+        enum: SNAPSHOT_SIZES,
+    })
+    @IsOptional()
+    @IsIn(SNAPSHOT_SIZES)
+    snapshotSize?: SnapshotSize;
 
     @ApiPropertyOptional({
         description: 'Warn when remaining text credit is at or below this percent of the text cap.',

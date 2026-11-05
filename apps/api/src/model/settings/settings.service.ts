@@ -5,6 +5,7 @@ import { Repository } from 'typeorm';
 import {
     DEFAULT_PLAY_MODEL,
     DEFAULT_SNAPSHOT_MODEL,
+    DEFAULT_SNAPSHOT_SIZE,
 } from '../../service/model-gateway/model-gateway.js';
 import { SETTINGS_ROW_ID, SettingsEntity } from './entities/settings.entity.js';
 
@@ -13,6 +14,7 @@ export type SettingsPatch = Partial<
         SettingsEntity,
         | 'playModel'
         | 'imageModel'
+        | 'snapshotSize'
         | 'textLowCreditPercent'
         | 'imageLowCreditPercent'
         | 'textCreditCapUsd'
@@ -24,6 +26,7 @@ export type SettingsPatch = Partial<
 export const DEFAULT_SETTINGS: SettingsPatch = {
     playModel: DEFAULT_PLAY_MODEL,
     imageModel: DEFAULT_SNAPSHOT_MODEL,
+    snapshotSize: DEFAULT_SNAPSHOT_SIZE,
     textLowCreditPercent: 20,
     imageLowCreditPercent: 20,
     textCreditCapUsd: 22,

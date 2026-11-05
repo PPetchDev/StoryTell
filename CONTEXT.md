@@ -90,6 +90,10 @@ _Avoid_: Character development, inconsistency
 An AI-generated image of the moment of a Chat's latest Message, seen through the user's eyes and made only on the user's request; it is kept in the Story's Gallery even after editing or resetting the Chat takes its moment away.
 _Avoid_: Illustration, picture, render
 
+**Snapshot size**:
+How large Snapshots are drawn, 1K or 2K, chosen in Settings next to the Snapshot model; 2K is offered only for a model Venice draws at 2K, and costs that model's 2K price.
+_Avoid_: Resolution, quality
+
 **Gallery**:
 The collection of every Snapshot taken in any of a Story's Chats.
 _Avoid_: Album, library

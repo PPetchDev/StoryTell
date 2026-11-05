@@ -13,21 +13,23 @@ import {
     PlayModel,
     RemainingCredit,
     SnapshotModel,
+    SnapshotSize,
     TextCompletionRequest,
     TextCompletionResult,
     TextStream,
     TextModel,
     TextStreamResult,
 } from '../model-gateway.js';
-import { IMAGE_MODELS, imageModelForKind, ImageModelSpec, isPlayModelKind, TEXT_MODELS, VENICE_HOST } from './model-table.js';
+import { drawnSize, IMAGE_MODELS, imageModelForKind, ImageModelSpec, isPlayModelKind, TEXT_MODELS, VENICE_HOST } from './model-table.js';
 import { defaultSleep, SleepFn } from './http.js';
 import { OpenRouterChatRequest, OpenRouterClient, TextBill } from './openrouter-client.js';
 import { VeniceClient } from './venice-client.js';
 
-/** The two Settings the gateway reads before each call. */
+/** The Settings the gateway reads before each call. */
 export interface GatewayModelSettings {
     playModel: PlayModel;
     imageModel: SnapshotModel;
+    snapshotSize: SnapshotSize;
 }
 
 export interface NewUsageRecord {
@@ -156,19 +158,18 @@ export class RealModelGateway extends ModelGateway {
         if (referenceCount > MAX_REFERENCE_IMAGES) {
             throw new RangeError(`At most ${MAX_REFERENCE_IMAGES} reference images, got ${referenceCount}`);
         }
-        const modelName = imageModelForKind(
-            request.kind,
-            (await this.deps.settings.current()).imageModel,
-            referenceCount,
-        );
+        const settings = await this.deps.settings.current();
+        const modelName = imageModelForKind(request.kind, settings.imageModel, referenceCount);
         const model = IMAGE_MODELS[modelName];
+        const size = drawnSize(model, request.kind === 'reference_image' ? '2K' : settings.snapshotSize);
 
         const image = await this.deps.venice.generate({
             model,
             prompt: request.prompt,
             referenceImages: request.referenceImages,
+            ...(size === '2K' ? { resolution: '2K' as const } : {}),
         });
-        const costUsd = imageListPrice(model, request.referenceImages?.length ?? 0);
+        const costUsd = imageListPrice(model, size, referenceCount);
 
         await this.deps.usage.record({
             kind: request.kind,
@@ -215,8 +216,8 @@ export class RealModelGateway extends ModelGateway {
 }
 
 /** An image's list price: the model's price, plus each input image past the first where the model charges for them. */
-function imageListPrice(model: ImageModelSpec, inputImages: number): number {
+function imageListPrice(model: ImageModelSpec, size: SnapshotSize, inputImages: number): number {
     const extra = (model.extraInputImageUsd ?? 0) * Math.max(0, inputImages - 1);
     // Whole millionths of a dollar, so $0.06 + 2 × $0.00345 records as 0.0669 and not 0.06690000000000001.
-    return Math.round((model.listPriceUsd + extra) * 1e6) / 1e6;
+    return Math.round(((model.prices[size] ?? model.prices['1K']) + extra) * 1e6) / 1e6;
 }

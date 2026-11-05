@@ -5,6 +5,7 @@ export type CreditPool = 'text' | 'image';
 export interface Settings {
     playModel: string;
     imageModel: string;
+    snapshotSize: SnapshotSize;
     textLowCreditPercent: number;
     imageLowCreditPercent: number;
     textCreditCapUsd: number;
@@ -17,10 +18,18 @@ export interface ModelOption {
     label: string;
 }
 
+/** How large Snapshots are drawn. */
+export type SnapshotSize = '1K' | '2K';
+
+export interface ImageModelOption extends ModelOption {
+    /** The sizes the model draws at, smallest first, each with the list price of one Snapshot. */
+    sizes: Array<{ size: SnapshotSize; priceUsd: number }>;
+}
+
 export interface SettingsResponse {
     settings: Settings;
     playModels: ModelOption[];
-    imageModels: ModelOption[];
+    imageModels: ImageModelOption[];
 }
 
 /** The call kinds a UsageRecord is written under (apps/api's `CallKind`). */
