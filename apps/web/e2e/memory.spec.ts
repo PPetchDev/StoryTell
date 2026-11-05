@@ -1,5 +1,8 @@
 import { APIRequestContext, expect, test } from '@playwright/test';
 
+// Used on a phone (spec: "Phone width"): 390px wide, with touch.
+test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
 const OPENING = 'The lamp went out an hour ago.\n\n@Mira: Boots off, keeper.';
 const NO_CHANGE = '{"bond_changes":[],"arc_steps":[],"scene":{"move_on":false}}';
 const ADDS_ONE = JSON.stringify({
@@ -68,8 +71,9 @@ test('a "Memory added" toast follows a turn and opens the Memory; a hand-added M
 
         // A Memory added by hand is locked, written by you, and known by Mira (present in the exchange).
         await drawer.getByRole('button', { name: 'Add a Memory' }).click();
-        await drawer.getByRole('textbox', { name: 'Memory text' }).fill('{user} left the horse at the ferry.');
-        await drawer.getByRole('button', { name: 'Add', exact: true }).click();
+        await drawer.getByRole('group', { name: 'New Memory' }).getByRole('textbox', { name: 'Memory text' }).fill('{user} left the horse at the ferry.');
+        await expect(drawer.getByRole('status').filter({ hasText: /Sav|save/ })).toHaveText('Saved');
+        await drawer.getByRole('button', { name: 'Done' }).click();
         const own = drawer.getByRole('listitem').filter({ hasText: 'Ash left the horse at the ferry.' });
         await expect(own).toBeVisible();
         await expect(own).toContainText('Locked');

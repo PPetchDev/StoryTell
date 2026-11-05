@@ -19,13 +19,12 @@ export const SAVE_LABELS: Record<SaveState['kind'], string> = {
     error: "Couldn't save",
 };
 
-type Run = () => Promise<Story>;
 type OnError = (message: string) => void;
 
 interface Pending {
     timer: ReturnType<typeof setTimeout>;
-    run: Run;
-    apply: (story: Story) => void;
+    run: () => Promise<unknown>;
+    apply: (value: unknown) => void;
 }
 
 /** How long typing may pause before a field is sent (spec: "Autosave"). */
@@ -90,9 +89,12 @@ export function useAutosave() {
         [reportUnreachable, settle],
     );
 
-    /** Debounced: a later call with the same key replaces the earlier one. */
+    /**
+     * Debounced: a later call with the same key replaces the earlier one. The answer is usually
+     * the Story; the Memory drawer, Personas and Settings (ticket 11) save other records.
+     */
     const queue = useCallback(
-        (key: string, run: Run, apply: (story: Story) => void) => {
+        <T = Story,>(key: string, run: () => Promise<T>, apply: (value: T) => void) => {
             const earlier = pending.current.get(key);
             if (earlier) clearTimeout(earlier.timer);
             setState((current) => (current.kind === 'saving' ? current : { kind: 'dirty' }));
@@ -100,9 +102,26 @@ export function useAutosave() {
                 pending.current.delete(key);
                 void enqueue(run, apply);
             }, DEBOUNCE_MS);
-            pending.current.set(key, { timer, run, apply });
+            pending.current.set(key, { timer, run, apply: apply as (value: unknown) => void });
         },
         [enqueue],
+    );
+
+    /**
+     * Drops a field edit still waiting to be sent: the field now holds a value that must not be
+     * saved (an empty name, a number out of range), so the one typed before it must not land either.
+     */
+    const cancel = useCallback(
+        (key: string) => {
+            const earlier = pending.current.get(key);
+            if (!earlier) return;
+            clearTimeout(earlier.timer);
+            pending.current.delete(key);
+            // Nothing left to send: "Unsaved changes" settles; a failed save keeps its message.
+            if (unmounted.current || inFlight.current > 0 || pending.current.size > 0) return;
+            setState((current) => (current.kind === 'dirty' ? { kind: 'saved' } : current));
+        },
+        [],
     );
 
     /** Sends every pending field edit now and waits for all of them. */
@@ -128,5 +147,8 @@ export function useAutosave() {
         [enqueue, flush],
     );
 
-    return { state, queue, commit, flush };
+    return { state, queue, cancel, commit, flush };
 }
+
+/** What `useAutosave` hands a page, for the components that save through it. */
+export type Autosave = ReturnType<typeof useAutosave>;

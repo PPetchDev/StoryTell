@@ -1,5 +1,8 @@
 import { APIRequestContext, expect, test } from '@playwright/test';
 
+// Used on a phone (spec: "Phone width"): 390px wide, with touch.
+test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
 const OPENING = 'The lamp went out an hour ago.\n\n@Mira: Boots off, keeper.';
 
 /** A playable Story with one Chat, made through the API, so the browser test covers only the swap. */
@@ -40,12 +43,15 @@ test('makes a Persona, swaps to it mid-Chat, and sees the next User Message unde
         await page.goto('/');
         await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Personas' }).click();
         await expect(page.getByRole('heading', { name: 'Personas', level: 1 })).toBeVisible();
-        const form = page.getByRole('form', { name: 'New Persona' });
-        await form.getByLabel('Name').fill('Rin');
-        await form.getByLabel('Description').fill('A drifter with salt in her hair.');
-        await form.getByRole('button', { name: 'Create' }).click();
+        // "New Persona" makes one at once; its Name and Description save as they are typed.
+        await page.getByRole('button', { name: 'New Persona' }).click();
+        const fresh = page.getByRole('list', { name: 'Personas' }).getByRole('listitem', { name: 'New Persona' });
+        await expect(fresh.getByLabel('Name')).toBeFocused();
+        await fresh.getByLabel('Description').fill('A drifter with salt in her hair.');
+        await fresh.getByLabel('Name').fill('Rin');
+        await expect(page.getByRole('status').filter({ hasText: /Sav|save/ })).toHaveText('Saved');
         const card = page.getByRole('list', { name: 'Personas' }).getByRole('listitem', { name: 'Rin' });
-        await expect(card).toContainText('A drifter with salt in her hair.');
+        await expect(card.getByLabel('Description')).toHaveValue('A drifter with salt in her hair.');
         const personas = (await (await request.get('/api/personas')).json()).personas as Array<{ id: number; name: string }>;
         personaId = personas.find((persona) => persona.name === 'Rin')!.id;
 
