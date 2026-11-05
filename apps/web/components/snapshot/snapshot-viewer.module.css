@@ -84,8 +84,9 @@
     gap: 0.5rem;
     max-height: 45dvh;
     overflow-y: auto;
-    /* The prompt can be long: let it scroll. */
+    /* The prompt can be long: let it scroll, without the page behind scrolling on. */
     touch-action: pan-y;
+    overscroll-behavior: contain;
     padding: 0.5rem 1rem max(1rem, env(safe-area-inset-bottom));
 }
 

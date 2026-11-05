@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { PointerEvent, useEffect, useRef, useState } from 'react';
 
+import { keepFocusIn } from '@/components/sheet/sheet';
 import { ConfirmButton } from '@/components/story-editor/fields';
 import { formatWhen, messageHref } from '@/lib/chat';
 import { EARLIER_VERSION, Snapshot, snapshotDownloadUrl, snapshotImageUrl } from '@/lib/snapshot';
@@ -40,6 +41,7 @@ export function SnapshotViewer<T extends Snapshot>({ snapshots, openId, onClose,
     const [currentId, setCurrentId] = useState(openId);
     const [showPrompt, setShowPrompt] = useState(false);
     const [drag, setDrag] = useState<Drag | null>(null);
+    const panelRef = useRef<HTMLDivElement>(null);
     const closeRef = useRef<HTMLButtonElement>(null);
 
     const index = snapshots.findIndex((snapshot) => snapshot.id === currentId);
@@ -52,18 +54,30 @@ export function SnapshotViewer<T extends Snapshot>({ snapshots, openId, onClose,
         setShowPrompt(false);
     };
 
-    // Re-bound on each render, so the keys act on the latest list and position.
+    // The keys act on the latest list and position.
+    const keys = useRef({ step, onClose });
     useEffect(() => {
-        const onKey = (event: KeyboardEvent) => {
-            if (event.key === 'Escape') onClose();
-            else if (event.key === 'ArrowLeft') step(-1);
-            else if (event.key === 'ArrowRight') step(1);
-        };
-        window.addEventListener('keydown', onKey);
-        return () => window.removeEventListener('keydown', onKey);
+        keys.current = { step, onClose };
     });
 
-    useEffect(() => closeRef.current?.focus(), []);
+    // Focus moves in on open, stays in while open, and goes back to the opener on close.
+    useEffect(() => {
+        const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        closeRef.current?.focus();
+        const onKey = (event: KeyboardEvent) => {
+            const panel = panelRef.current;
+            // Escape while the delete question is up leaves the viewer open.
+            if (event.key === 'Escape' && !panel?.querySelector('.confirm')) keys.current.onClose();
+            else if (event.key === 'ArrowLeft') keys.current.step(-1);
+            else if (event.key === 'ArrowRight') keys.current.step(1);
+            else if (event.key === 'Tab' && panel) keepFocusIn(panel, event);
+        };
+        document.addEventListener('keydown', onKey);
+        return () => {
+            document.removeEventListener('keydown', onKey);
+            opener?.focus({ preventScroll: true });
+        };
+    }, []);
 
     // The Snapshot on screen left the list (deleted, or its Chat re-read without it).
     useEffect(() => {
@@ -72,7 +86,8 @@ export function SnapshotViewer<T extends Snapshot>({ snapshots, openId, onClose,
     if (snapshot === null) return null;
 
     const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
-        if (!event.isPrimary || drag) return;
+        // One finger, or the main mouse button.
+        if (!event.isPrimary || event.button !== 0 || drag) return;
         event.currentTarget.setPointerCapture(event.pointerId);
         setDrag({ pointerId: event.pointerId, x: event.clientX, y: event.clientY, dx: 0, dy: 0 });
     };
@@ -89,7 +104,8 @@ export function SnapshotViewer<T extends Snapshot>({ snapshots, openId, onClose,
         else if (dx < -SWIPE_STEP_PX && Math.abs(dx) > Math.abs(dy)) step(1);
         else if (dx > SWIPE_STEP_PX && Math.abs(dx) > Math.abs(dy)) step(-1);
     };
-    const onPointerCancel = () => setDrag(null);
+    // The gesture ended some other way (cancelled, or capture lost): the image goes back.
+    const dropDrag = () => setDrag(null);
 
     // The image follows the finger: sideways to move on (with less give past either end), down to close.
     let offsetX = 0;
@@ -106,6 +122,7 @@ export function SnapshotViewer<T extends Snapshot>({ snapshots, openId, onClose,
 
     return (
         <div
+            ref={panelRef}
             className={styles.viewer}
             role="dialog"
             aria-modal="true"
@@ -127,7 +144,8 @@ export function SnapshotViewer<T extends Snapshot>({ snapshots, openId, onClose,
                 onPointerDown={onPointerDown}
                 onPointerMove={onPointerMove}
                 onPointerUp={onPointerUp}
-                onPointerCancel={onPointerCancel}
+                onPointerCancel={dropDrag}
+                onLostPointerCapture={dropDrag}
             >
                 {/* eslint-disable-next-line @next/next/no-img-element -- served by the API from the image folder */}
                 <img

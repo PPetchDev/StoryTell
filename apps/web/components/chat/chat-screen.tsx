@@ -12,7 +12,7 @@ import { ApiError, apiFetch, ApiUnreachableError } from '@/lib/api';
 import { Cast } from '@/lib/character-colour';
 import { backgroundPending, Chat, chatApi, EditedChat, latestReply, Message, rollbackNotice } from '@/lib/chat';
 import { Memory, memoryApi, renderUser } from '@/lib/memory';
-import { Snapshot } from '@/lib/snapshot';
+import { inThreadOrder, Snapshot } from '@/lib/snapshot';
 
 import styles from './chat-screen.module.css';
 
@@ -287,8 +287,7 @@ export function ChatScreen({ initial, cast }: ChatScreenProps) {
 
             {viewing && (
                 <SnapshotViewer
-                    // A swipe moves through the Chat's Snapshots in thread order.
-                    snapshots={chat.messages.flatMap((message) => snaps.state.snapshots.filter((s) => s.messageId === message.id))}
+                    snapshots={inThreadOrder(chat.messages, snaps.state.snapshots)}
                     openId={viewing.id}
                     onClose={() => setViewing(null)}
                     onDelete={(snapshot) => {

@@ -129,10 +129,14 @@ test('in the Gallery, the same viewer swipes through the filter, steps with the 
         await expect(thumbs).toHaveCount(1);
         expect(await sources(thumbs)).toEqual([newest]);
 
-        // Swipe down closes it here too.
+        // Swipe down closes it here too, and so does Escape.
         await thumbs.first().click();
         await expect(viewer).toContainText('1 / 1');
         await swipe(page, 0, 250);
+        await expect(viewer).toHaveCount(0);
+        await thumbs.first().click();
+        await expect(viewer).toBeVisible();
+        await page.keyboard.press('Escape');
         await expect(viewer).toHaveCount(0);
     } finally {
         await request.delete(`/api/stories/${storyId}`);

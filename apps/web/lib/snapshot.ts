@@ -47,6 +47,11 @@ export interface ChatSnapshots {
     jobs: SnapshotJob[];
 }
 
+/** The Snapshots under the given Messages, in thread order: the list the Chat's viewer swipes through. */
+export function inThreadOrder(messages: { id: number }[], snapshots: Snapshot[]): Snapshot[] {
+    return messages.flatMap((message) => snapshots.filter((snapshot) => snapshot.messageId === message.id));
+}
+
 /** Where the API serves a Snapshot's image. */
 export function snapshotImageUrl(snapshot: Snapshot): string {
     return `/api/images/${snapshot.imagePath}`;

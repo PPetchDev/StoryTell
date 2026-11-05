@@ -27,7 +27,7 @@ export function Gallery({ storyId, chats, initialChatId }: GalleryProps) {
     const { reportUnreachable } = useConnection();
     const [chatId, setChatId] = useState<number | null>(initialChatId);
     const [items, setItems] = useState<GalleryItem[] | null>(null);
-    const [viewing, setViewing] = useState<number | null>(null);
+    const [viewingId, setViewingId] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
 
     const load = useCallback(async () => {
@@ -44,7 +44,7 @@ export function Gallery({ storyId, chats, initialChatId }: GalleryProps) {
     }, [load]);
 
     const remove = async (item: GalleryItem) => {
-        setViewing(null);
+        setViewingId(null);
         setError(null);
         try {
             await snapshotApi.remove(storyId, item.id);
@@ -79,12 +79,12 @@ export function Gallery({ storyId, chats, initialChatId }: GalleryProps) {
             {items === null ? (
                 <p className="muted">Loading…</p>
             ) : items.length === 0 ? (
-                <p className="muted">No Snapshots yet. Take one with the camera in a Chat.</p>
+                <p className="muted">No Snapshots yet. Take one in a Chat.</p>
             ) : (
                 <ul className={styles.grid} aria-label="Gallery">
                     {items.map((item) => (
                         <li key={item.id}>
-                            <button type="button" className={styles.thumb} onClick={() => setViewing(item.id)}>
+                            <button type="button" className={styles.thumb} onClick={() => setViewingId(item.id)}>
                                 {/* eslint-disable-next-line @next/next/no-img-element -- served by the API from the image folder */}
                                 <img src={snapshotImageUrl(item)} alt={snapshotAlt(item)} />
                             </button>
@@ -94,12 +94,12 @@ export function Gallery({ storyId, chats, initialChatId }: GalleryProps) {
                     ))}
                 </ul>
             )}
-            {viewing !== null && items && (
+            {viewingId !== null && items && (
                 <SnapshotViewer
                     snapshots={items}
-                    openId={viewing}
+                    openId={viewingId}
                     showLink
-                    onClose={() => setViewing(null)}
+                    onClose={() => setViewingId(null)}
                     onDelete={(item) => void remove(item)}
                 />
             )}
