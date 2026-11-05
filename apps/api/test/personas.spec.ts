@@ -206,9 +206,7 @@ describe('Personas and swapping the worn identity', () => {
             expect(system).toContain('second person for Rin ("you")');
             expect(system).not.toContain('Ash');
             expect(system).not.toContain('The new keeper');
-            expect(call.messages[call.messages.length - 1].content).toBe(
-                'Write the next turn now. Do not write anything Rin says, thinks or does. Use @Name: lines for Character speech.',
-            );
+            expect(call.messages[call.messages.length - 1].content).toEqual(expect.stringMatching(/^Where things stand: [^\n]+\nWrite the next turn now. Do not write anything Rin says, thinks or does. Use @Name: lines for Character speech.$/));
             expect(call.stop).toEqual(['\nRin:', '\n@Rin:', '\nYou:']);
 
             expect(userMessages(played).map((message) => [message.identityName, message.personaId])).toEqual([

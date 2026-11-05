@@ -474,7 +474,7 @@ A Character knows only the Memories it is tagged on and acts as if the rest neve
                 { role: 'user', content: 'I knock the rain off my hat.' },
                 {
                     role: 'system',
-                    content: 'Write the next turn now. Do not write anything Ash says, thinks or does. Use @Name: lines for Character speech.',
+                    content: expect.stringMatching(/^Where things stand: [^\n]+\nWrite the next turn now. Do not write anything Ash says, thinks or does. Use @Name: lines for Character speech.$/),
                 },
             ]);
             expect(call.stop).toEqual(['\nAsh:', '\n@Ash:', '\nYou:']);
@@ -521,7 +521,7 @@ A Character knows only the Memories it is tagged on and acts as if the rest neve
                 'Turn 3. The ',
                 'Reply three.',
                 'Turn 4. The ',
-                'Write the ne',
+                'Where things',
             ]);
             // Every stored Message is still there; only the prompt window is trimmed.
             expect((await getChat(story.id, chat.id)).messages).toHaveLength(9);
@@ -883,7 +883,7 @@ A Character knows only the Memories it is tagged on and acts as if the rest neve
                 },
                 {
                     role: 'system',
-                    content: 'Write the next turn now. Do not write anything Ash says, thinks or does. Use @Name: lines for Character speech.',
+                    content: expect.stringMatching(/^Where things stand: [^\n]+\nWrite the next turn now. Do not write anything Ash says, thinks or does. Use @Name: lines for Character speech.$/),
                 },
             ]);
             // The rule against writing the worn identity still holds in the system message.

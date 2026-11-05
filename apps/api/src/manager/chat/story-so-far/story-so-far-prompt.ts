@@ -3,6 +3,7 @@ import {
     estimateTokens,
     PromptHistoryMessage,
     PromptLayersInput,
+    stateReminder,
     systemPrompt,
     TURN_PROMPT_TOKEN_BUDGET,
     turnFinalInstruction,
@@ -33,8 +34,13 @@ const ALWAYS_UNCOVERED = 2;
  */
 export function storySoFarCoverage(layers: PromptLayersInput, history: PromptHistoryMessage[], budget = TURN_PROMPT_TOKEN_BUDGET): number | null {
     const covered = Math.min(layers.storySoFar?.coveredMessages ?? 0, history.length);
+    // The reminder names who is present, which isn't known here: the cast stands in for it.
+    const reminder = stateReminder({ ...layers, present: layers.story.characters.map((character) => character.name) });
     const fixed =
-        estimateTokens(systemPrompt(layers).text) + NEXT_USER_MESSAGE_TOKENS + estimateTokens(turnFinalInstruction(layers.identity.name));
+        estimateTokens(systemPrompt(layers).text) +
+        NEXT_USER_MESSAGE_TOKENS +
+        estimateTokens(`${reminder}
+${turnFinalInstruction(layers.identity.name)}`);
     const room = budget - fixed;
     const cost = (message: PromptHistoryMessage) => estimateTokens(message.text);
     let uncovered = history.slice(covered).reduce((sum, message) => sum + cost(message), 0);

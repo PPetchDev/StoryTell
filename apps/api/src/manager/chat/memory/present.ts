@@ -7,10 +7,15 @@ import { CastName, ReplyPart } from '../turn/reply-parser.js';
  * taken as present rather than nobody, so a user-added Memory is never known by no one.
  */
 export function presentCharacters(cast: CastName[], userText: string, reply: ReplyPart[]): CastName[] {
+    const present = charactersInExchange(cast, userText, reply);
+    return present.length > 0 ? present : [...cast];
+}
+
+/** The Characters who speak in the reply or are named in it or the user's text; possibly none. */
+export function charactersInExchange(cast: CastName[], userText: string, reply: ReplyPart[]): CastName[] {
     const spoke = new Set(reply.flatMap((part) => (part.kind === 'speech' && part.characterId !== null ? [part.characterId] : [])));
     const text = `${userText}\n${reply.map((part) => part.text).join('\n')}`.toLowerCase();
-    const present = cast.filter((character) => spoke.has(character.id) || mentions(text, character.name));
-    return present.length > 0 ? present : [...cast];
+    return cast.filter((character) => spoke.has(character.id) || mentions(text, character.name));
 }
 
 /** Whether `text` (lower-cased) names the Character as a whole word, by full name or first name. */

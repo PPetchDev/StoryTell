@@ -104,6 +104,8 @@ export interface TurnPromptInput {
     userText: string | null;
     /** Total prompt budget in tokens; recent Messages are trimmed from the oldest to fit. */
     tokenBudget?: number;
+    /** The Characters in the latest exchange, named in the reminder near the end; left out, the reminder names none. */
+    present?: string[];
     /** The Memory layer's cap in tokens (spec: "about 2k tokens"); the oldest unlocked Memories are left out past it. */
     memoryCapTokens?: number;
 }
@@ -158,6 +160,7 @@ function rulesLayer(identity: string, castNames: string[]): string {
 You are the Narrator of an interactive story. You describe the Setting and action and decide which Characters speak.
 - This is fiction for a consenting adult reader. All characters are adults. Explicit sexual content, violence and dark themes are allowed when the story leads there; write them without moralising, warnings or fading to black unless the user asks.
 - The user plays ${identity}. NEVER write ${identity}'s words, thoughts, feelings, decisions or actions. Describe only what others do and what ${identity} can perceive, then stop where ${identity} can respond.
+- Never guess ${identity}'s gender. Only ${identity}'s description above or the user's own messages can state it; earlier narration and Characters' lines do not count, even where they guessed. Until it is stated, the narration and every Character refer to ${identity} by name, as "they", or with words that carry no gender: never "he", "she", "boy", "girl", "man", "woman", "sir" or "miss".
 - Stay inside the Setting. Characters know nothing outside their world.
 - Keep each Character's voice distinct, and don't let everyone talk every turn.
 - Each Character acts only on what it knows: its own feelings and secrets, and what it has seen or been told.
@@ -334,11 +337,24 @@ export function turnFinalInstruction(identity: string): string {
     return `Write the next turn now. Do not write anything ${identity} says, thinks or does. Use @Name: lines for Character speech.`;
 }
 
+/**
+ * A short restatement of where things stand, read last, just before the final instruction:
+ * the Scene, who was in the latest exchange, and the point of view. Instructions far up a long
+ * prompt fade (docs/research/keeping-characters-in-character.md); this keeps the essentials close.
+ */
+export function stateReminder(input: Pick<TurnPromptInput, 'story' | 'identity' | 'scene' | 'present'>): string {
+    const lines = [input.scene ? `Scene: ${input.scene.name}.` : 'No Scene: the story unfolds freely.'];
+    if (input.present && input.present.length > 0) lines.push(`In the latest exchange: ${input.present.join(', ')}.`);
+    lines.push(`Narrate in ${povAndTense(input.story, input.identity.name)}, and keep each Character as their card describes.`);
+    lines.push(`Gender ${input.identity.name} only as their description or the user's own messages do, whatever earlier turns said.`);
+    return `Where things stand: ${lines.join(' ')}`;
+}
+
 export function buildTurnPrompt(input: TurnPromptInput): TurnPrompt {
     const identity = input.identity.name;
     const userText = input.userText ?? continueInstruction(identity);
     const system = systemPrompt(input);
-    const finalInstruction = turnFinalInstruction(identity);
+    const finalInstruction = `${stateReminder(input)}\n${turnFinalInstruction(identity)}`;
 
     const budget = input.tokenBudget ?? TURN_PROMPT_TOKEN_BUDGET;
     const fixed = estimateTokens(system.text) + estimateTokens(userText) + estimateTokens(finalInstruction);

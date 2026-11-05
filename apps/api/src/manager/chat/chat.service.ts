@@ -46,6 +46,7 @@ import { MissingField, playableStatus } from '../story/playable.js';
 import { WornIdentity, wornIdentity } from './identity.js';
 import { currentBonds, JudgeManagerService, latestJudged, SettledBackground } from './judge/judge.service.js';
 import { latestExtracted, MemoryExtractionManagerService } from './memory/extraction.service.js';
+import { charactersInExchange } from './memory/present.js';
 import { promptStorySoFar, StorySoFarManagerService } from './story-so-far/story-so-far.service.js';
 import { SuggestedRepliesManagerService } from './suggestions/suggested-replies.service.js';
 import { SuggestedReply } from './suggestions/suggestions-prompt.js';
@@ -579,6 +580,7 @@ export class ChatManagerService {
             storySoFar: promptStorySoFar(chat),
             history,
             userText,
+            present: inLatestExchange(story, chat, userText),
         });
         if (prompt.trimmed > 0) {
             this.logger.log(`Chat ${chat.id}: left out the ${prompt.trimmed} oldest Messages to fit the prompt budget`);
@@ -816,6 +818,17 @@ function promptMemories(story: StoryEntity, memories: MemoryEntity[]): PromptMem
     return memories
         .filter((memory) => !memory.archived)
         .map((memory) => ({ text: memory.text, knownBy: memory.knownByIds(order).flatMap(nameOf), locked: memory.locked }));
+}
+
+/**
+ * The Characters in the latest exchange, for the reminder near the end of the turn prompt: who
+ * spoke in or was named by the newest AI Message, or by the user's new message.
+ */
+function inLatestExchange(story: StoryEntity, chat: ChatEntity, userText: string | null): string[] {
+    const lastAi = [...chat.messages].reverse().find((message) => message.kind === MessageKind.Ai);
+    const parts = lastAi ? [...lastAi.parts].sort((a, b) => a.position - b.position).map((part) => part.toResponse()) : [];
+    const cast = story.characters.map((character) => ({ id: character.id, name: character.name }));
+    return charactersInExchange(cast, userText ?? '', parts).map((character) => character.name);
 }
 
 /** "Chat N" for the first title not yet taken in this Story. */

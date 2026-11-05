@@ -253,7 +253,7 @@ describe('Regenerate', () => {
             ['user', 'I take my boots off.'],
             ['assistant', 'Mira grunts.'],
             ['user', CONTINUE_INSTRUCTION],
-            ['system', 'Write the next turn now. Do not write anything Ash says, thinks or does. Use @Name: lines for Character speech.'],
+            ['system', expect.stringMatching(/^Where things stand: [^\n]+\nWrite the next turn now. Do not write anything Ash says, thinks or does. Use @Name: lines for Character speech.$/)],
         ]);
         // The same Continue as the one it replaces.
         expect(call.messages).toEqual(turnCalls()[1].messages);
