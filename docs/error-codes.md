@@ -47,6 +47,9 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | `404.002.005` | `SnapshotNotFoundError` | No Snapshot with that id in this Story. |
 | `404.002.006` | `SnapshotJobNotFoundError` | No such Snapshot job in this Chat: it succeeded, was dismissed, or the API restarted. Take the Snapshot again. |
 | `409.002.007` | `SnapshotJobNotFailedError` | A Retry or dismiss of a Snapshot job that is still running. |
+| `400.002.008` | `NoImageFileError` | An upload with no file in its `image` field. |
+| `415.002.009` | `UnsupportedImageError` | An uploaded file whose bytes are not a PNG, JPEG or WebP picture. |
+| `413.002.010` | `ImageTooLargeError` | An uploaded picture over the size limit (15 MB for a Cover). |
 | `404.003.001` | `StoryNotFoundError` | No Story with that id. |
 | `404.003.002` | `CharacterNotFoundError` | No Character with that id in this Story. |
 | `404.003.003` | `SceneNotFoundError` | No Scene with that id in this Story. |
@@ -56,6 +59,9 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | `422.003.007` | `SelfStartingBondError` | A StartingBond from a Character toward itself. |
 | `422.003.008` | `InvalidOrderError` | A reorder that does not list every Character (or Scene) of the Story exactly once. |
 | `409.003.009` | `NoReferenceImageError` | A Portrait crop for a Character with no Reference image. Add one first. |
+| `422.003.010` | `InvalidCoverChoiceError` | A Cover pick that names both a Snapshot and a Character, or neither. |
+| `409.003.011` | `NoCoverError` | A Cover focus point for a Story with no Cover. |
+| `409.003.012` | `NoReferenceImageForCoverError` | A Cover picked from a Character with no Reference image. |
 | `404.004.001` | `ChatNotFoundError` | No Chat with that id in this Story. |
 | `422.004.002` | `StoryNotPlayableError` | The Story has a required field empty. The message names the missing fields. Blocks starting a Chat, sending, Continue and Regenerate. |
 | `409.004.003` | `NoTurnToRetryError` | Retry when the Chat is not waiting for a reply to a User Message. |

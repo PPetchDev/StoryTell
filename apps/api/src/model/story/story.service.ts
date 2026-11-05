@@ -6,10 +6,18 @@ import { CharacterEntity } from './entities/character.entity.js';
 import { RoleEntity } from './entities/role.entity.js';
 import { SceneEntity } from './entities/scene.entity.js';
 import { StartingBondEntity } from './entities/starting-bond.entity.js';
-import { StoryEntity } from './entities/story.entity.js';
+import { CoverFocus, StoryEntity } from './entities/story.entity.js';
 
 // Relations are opted into here only; nothing on the entities auto-loads.
-const FULL_RELATIONS = { role: true, characters: true, startingBonds: true, scenes: true };
+const FULL_RELATIONS = { role: true, characters: true, startingBonds: true, scenes: true, coverSnapshot: true };
+
+/** A Story's Cover columns: at most one of the three pointers set, and where to look. */
+export interface CoverColumns {
+    snapshotId: number | null;
+    characterId: number | null;
+    imagePath: string | null;
+    focus: CoverFocus | null;
+}
 
 function byPosition<T extends { position: number; id: number }>(items: T[]): T[] {
     return [...items].sort((a, b) => a.position - b.position || a.id - b.id);
@@ -58,13 +66,40 @@ export class StoryModelService {
         });
     }
 
-    saveStory(story: StoryEntity): Promise<StoryEntity> {
-        return this.stories.save(story);
+    /**
+     * Writes the Story's authored fields and marks it saved. Only these: the Cover has its own
+     * writer, and a whole-entity save from an older read would put an older Cover back.
+     */
+    async saveStory(story: StoryEntity): Promise<void> {
+        const { title, setting, opening, pov, tense, replyLength, imageStyle } = story;
+        await this.stories.update(
+            { id: story.id },
+            { title, setting, opening, pov, tense, replyLength, imageStyle, updatedAt: () => 'now()' },
+        );
     }
 
     /** Bumps `updated_at`, so a change anywhere under the Story counts as saving it. */
     async touch(storyId: number): Promise<void> {
         await this.stories.update({ id: storyId }, { updatedAt: () => 'now()' });
+    }
+
+    /** Writes all four Cover columns at once and marks the Story saved. */
+    async setCover(storyId: number, cover: CoverColumns): Promise<void> {
+        await this.stories.update(
+            { id: storyId },
+            {
+                coverSnapshotId: cover.snapshotId,
+                coverCharacterId: cover.characterId,
+                coverImagePath: cover.imagePath,
+                coverFocus: cover.focus,
+                updatedAt: () => 'now()',
+            },
+        );
+    }
+
+    /** Moves the focus point only; the picture stays as it is. */
+    async setCoverFocus(storyId: number, focus: CoverFocus | null): Promise<void> {
+        await this.stories.update({ id: storyId }, { coverFocus: focus, updatedAt: () => 'now()' });
     }
 
     async deleteStory(id: number): Promise<void> {

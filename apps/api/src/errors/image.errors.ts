@@ -46,3 +46,23 @@ export class SnapshotJobNotFailedError extends AppError {
         super('409.002.007', 'That Snapshot is still being made.');
     }
 }
+
+/** An upload with no file in its `image` field. */
+export class NoImageFileError extends AppError {
+    constructor() {
+        super('400.002.008', 'Send the picture as the `image` field of a multipart form.');
+    }
+}
+
+/** An upload whose bytes are not a PNG, JPEG or WebP picture, whatever its name says. */
+export class UnsupportedImageError extends AppError {
+    constructor() {
+        super('415.002.009', 'That file is not a PNG, JPEG or WebP picture.');
+    }
+}
+
+export class ImageTooLargeError extends AppError {
+    constructor(maxMegabytes: number) {
+        super('413.002.010', `That picture is too large: at most ${maxMegabytes} MB.`);
+    }
+}

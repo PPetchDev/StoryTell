@@ -6,7 +6,39 @@ import { CharacterResponse, PortraitCrop } from '../../../model/story/entities/c
 import { RoleResponse } from '../../../model/story/entities/role.entity.js';
 import { SceneResponse } from '../../../model/story/entities/scene.entity.js';
 import { StartingBondResponse } from '../../../model/story/entities/starting-bond.entity.js';
-import { Pov, ReplyLength, Tense } from '../../../model/story/entities/story.entity.js';
+import {
+    CoverFocus,
+    CoverSource,
+    Pov,
+    ReplyLength,
+    StoryCover,
+    Tense,
+} from '../../../model/story/entities/story.entity.js';
+
+export class CoverFocusDTO implements CoverFocus {
+    @ApiProperty({ description: "Across, as a fraction of the picture's width.", minimum: 0, maximum: 1 })
+    x: number;
+
+    @ApiProperty({ description: "Down, as a fraction of the picture's height.", minimum: 0, maximum: 1 })
+    y: number;
+}
+
+export class StoryCoverDTO implements StoryCover {
+    @ApiProperty({ enum: CoverSource, description: 'Only an `upload` owns its file; the others point at a Snapshot or a Reference image.' })
+    source: CoverSource;
+
+    @ApiProperty({ description: 'Relative to the image folder, served at `GET /api/images/{path}`.' })
+    imagePath: string;
+
+    @ApiProperty({ type: CoverFocusDTO, nullable: true, description: 'The point kept in view when it is cropped; null centres it.' })
+    focus: CoverFocusDTO | null;
+
+    @ApiProperty({ type: Number, nullable: true, description: 'The Snapshot it shows, for `snapshot`.' })
+    snapshotId: number | null;
+
+    @ApiProperty({ type: Number, nullable: true, description: 'The Character whose Reference image it shows, for `reference_image`.' })
+    characterId: number | null;
+}
 
 export class LatestChatDTO implements LatestChat {
     @ApiProperty({ description: 'Chat id.' })
@@ -52,9 +84,18 @@ export class StorySummaryDTO implements StoryListItem {
     @ApiProperty({
         type: String,
         nullable: true,
-        description: "The newest Snapshot's image, relative to the image folder; null when it has none.",
+        description:
+            "The card's picture, relative to the image folder: the Cover when one is chosen, else the newest Snapshot; " +
+            'null when there is neither.',
     })
     coverImagePath: string | null;
+
+    @ApiProperty({
+        type: CoverFocusDTO,
+        nullable: true,
+        description: "The Cover's focus point; null for the newest Snapshot or a Cover with none chosen.",
+    })
+    coverFocus: CoverFocusDTO | null;
 
     @ApiProperty({ description: "The Setting's first sentence, cut to about 120 characters; empty when there is none." })
     hook: string;
@@ -216,6 +257,9 @@ export class StoryResponseBodyDTO implements StoryDetail {
 
     @ApiProperty({ type: [SceneDTO], description: 'In play order.' })
     scenes: SceneDTO[];
+
+    @ApiProperty({ type: StoryCoverDTO, nullable: true, description: 'The picture the author chose; null while there is none.' })
+    cover: StoryCoverDTO | null;
 
     @ApiProperty({ description: 'True when `missing` is empty.' })
     playable: boolean;

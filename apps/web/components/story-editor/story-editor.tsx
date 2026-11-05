@@ -25,6 +25,7 @@ import { focusChoice, movedIndex } from './arrow-keys';
 import { useAutosave } from './autosave';
 import { CharacterCard } from './character-card';
 import { EditorHeader } from './editor-header';
+import { CoverBanner, CoverSheet } from './story-cover';
 import {
     ADD_CHARACTER_ID,
     FieldPlace,
@@ -100,6 +101,7 @@ export function StoryEditor({ initial }: { initial: Story }) {
     const [tab, setTab] = useState<TabKey>(() => tabFrom(searchParams.get('tab')));
     const [flashed, setFlashed] = useState<string | null>(null);
     const [previewOpen, setPreviewOpen] = useState(false);
+    const [coverOpen, setCoverOpen] = useState(false);
     const flashTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
     const tabList = useRef<HTMLDivElement>(null);
     const header = useRef<HTMLDivElement>(null);
@@ -328,6 +330,14 @@ export function StoryEditor({ initial }: { initial: Story }) {
                     ))}
                 </div>
             </div>
+            <CoverBanner story={story} onOpen={() => setCoverOpen(true)} />
+            {coverOpen && (
+                <CoverSheet
+                    story={story}
+                    commit={(run, onError) => commit(run, applyWhole, onError)}
+                    onClose={() => setCoverOpen(false)}
+                />
+            )}
             <StatusBox playable={story.playable} missing={story.missing} onGo={goTo} />
 
             <FieldMarksContext.Provider value={marks}>
