@@ -71,7 +71,8 @@ test('shows a scripted Bond change with its event on the dashboard, and editing 
         await page.goto(`/stories/${storyId}/chats/${chatId}`);
         // No Bond or Arc on the Chat screen itself.
         await expect(page.getByText('Curious')).toHaveCount(0);
-        await page.getByRole('link', { name: 'Dashboard →' }).click();
+        await page.getByRole('button', { name: 'Chat menu' }).click();
+        await page.getByRole('dialog', { name: 'Chat menu' }).getByRole('link', { name: /^Dashboard/ }).click();
         await expect(page).toHaveURL(new RegExp(`/stories/${storyId}/chats/${chatId}/dashboard$`));
 
         const mira = page.getByRole('region', { name: 'Mira' });
@@ -99,7 +100,8 @@ test('shows a scripted Bond change with its event on the dashboard, and editing 
         await expect(page.getByRole('status').filter({ hasText: 'Rolled back: 1 Bond change.' })).toBeVisible();
         await expect(reply).toContainText('Boots.');
 
-        await page.getByRole('link', { name: 'Dashboard →' }).click();
+        await page.getByRole('button', { name: 'Chat menu' }).click();
+        await page.getByRole('dialog', { name: 'Chat menu' }).getByRole('link', { name: /^Dashboard/ }).click();
         await expect(page.getByRole('region', { name: 'Mira' })).toContainText('A stranger to everyone so far.');
         await expect(page.getByText('Curious')).toHaveCount(0);
     } finally {

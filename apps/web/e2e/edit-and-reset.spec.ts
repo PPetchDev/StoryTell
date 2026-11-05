@@ -84,8 +84,9 @@ test('edits an earlier User Message, sees the later Messages gone and a new repl
         await expect(page.getByText('Where is the lamp room?')).toHaveCount(0);
 
         // Reset clears everything but the Opening and keeps the title.
-        await page.getByRole('button', { name: 'Reset' }).click();
-        await page.getByRole('group', { name: /start this Chat over/ }).getByRole('button', { name: 'Reset' }).click();
+        await page.getByRole('button', { name: 'Chat menu' }).click();
+        await page.getByRole('dialog', { name: 'Chat menu' }).getByRole('button', { name: /^Reset/ }).click();
+        await page.getByRole('alertdialog', { name: /start this Chat over/ }).getByRole('button', { name: 'Reset' }).click();
         await expect(said).toHaveCount(0);
         await expect(replies).toHaveCount(0);
         await expect(page.getByRole('article', { name: 'Opening' })).toContainText('Boots off, keeper.');

@@ -71,12 +71,14 @@ test('takes a Snapshot from the action row with a hint, sees the placeholder and
         await viewer.getByRole('button', { name: 'Close' }).click();
 
         // Reset takes the Message away; the Snapshot leaves the timeline.
-        await page.getByRole('button', { name: 'Reset' }).click();
-        await page.getByRole('group', { name: /start this Chat over/ }).getByRole('button', { name: 'Reset' }).click();
+        await page.getByRole('button', { name: 'Chat menu' }).click();
+        await page.getByRole('dialog', { name: 'Chat menu' }).getByRole('button', { name: /^Reset/ }).click();
+        await page.getByRole('alertdialog', { name: /start this Chat over/ }).getByRole('button', { name: 'Reset' }).click();
         await expect(thumb).toHaveCount(0);
 
         // The Gallery keeps it, marked as from an earlier version of this Chat.
-        await page.getByRole('link', { name: 'Gallery' }).click();
+        await page.getByRole('button', { name: 'Chat menu' }).click();
+        await page.getByRole('dialog', { name: 'Chat menu' }).getByRole('link', { name: /^Gallery/ }).click();
         await expect(page.getByRole('heading', { name: /Gallery/ })).toBeVisible();
         const gallery = page.getByRole('list', { name: 'Gallery' });
         await expect(gallery.getByRole('listitem')).toHaveCount(1);

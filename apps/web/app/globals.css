@@ -12,6 +12,9 @@
     --accent-soft: rgba(143, 115, 255, 0.18);
     --accent-line: rgba(143, 115, 255, 0.35);
     --danger: #ff7a8a;
+    /* The danger button: a dark red fill with light text, quieter than the accent button. */
+    --danger-soft: #5a1f2b;
+    --danger-text: #ffd5db;
     --warning: #ffc46b;
     color-scheme: dark;
 }

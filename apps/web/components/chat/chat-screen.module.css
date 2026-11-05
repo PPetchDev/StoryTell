@@ -6,6 +6,8 @@
     height: 100dvh;
     display: flex;
     flex-direction: column;
+    /* The thin top bar sits at the very top, below only the phone's status bar. */
+    padding-top: env(safe-area-inset-top);
     padding-bottom: 0;
 }
 
