@@ -161,7 +161,7 @@ You are the Narrator of an interactive story. You describe the Setting and actio
 function styleLayer(story: PromptStory, identity: string): string {
     const words = REPLY_LENGTH_WORDS[story.replyLength];
     return `${PROMPT_LAYERS.style}
-- Write in English, ${POV_WORDS[story.pov](identity)}, ${story.tense} tense.
+- Write in English, ${povAndTense(story, identity)}.
 - Reply length: ${words.min}–${words.max} words in total.`;
 }
 
@@ -263,12 +263,18 @@ export function continueInstruction(identity: string): string {
     return `(${identity} does nothing new this turn and waits.) Continue the story from exactly where it stands: let the Characters and the world move it forward. Do not write anything ${identity} says, thinks, feels, decides or does, and stop where ${identity} can respond.`;
 }
 
-export function buildTurnPrompt(input: TurnPromptInput): TurnPrompt {
+/** The layers a prompt is built on: everything of a turn's input but the Messages. */
+export type PromptLayersInput = Omit<TurnPromptInput, 'history' | 'userText' | 'tokenBudget'>;
+
+/**
+ * Layers 1–9 as the one system message, shared by the turn and by Suggested replies so they
+ * read the Chat the same way. Reports how many Memories were left out to fit the cap.
+ */
+export function systemPrompt(input: PromptLayersInput): { text: string; memoriesLeftOut: number } {
     const identity = input.identity.name;
-    const userText = input.userText ?? continueInstruction(identity);
     const castNames = input.story.characters.map((character) => character.name);
     const memory = memoryLayer(input.memories, identity, input.memoryCapTokens ?? MEMORY_CAP_TOKENS);
-    const system = [
+    const text = [
         rulesLayer(identity, castNames),
         `${PROMPT_LAYERS.setting}\n${input.story.setting}`,
         `${PROMPT_LAYERS.identity}\n${identity}: ${input.identity.description}`,
@@ -279,22 +285,40 @@ export function buildTurnPrompt(input: TurnPromptInput): TurnPrompt {
         arcsLayer(input.arcs),
         memory.text,
     ].join('\n\n');
+    return { text, memoriesLeftOut: memory.leftOut };
+}
+
+/** The newest Messages that fit in `budget` tokens, oldest first; older ones are left out. */
+export function recentHistory(history: PromptHistoryMessage[], budget: number): PromptHistoryMessage[] {
+    let remaining = budget;
+    const kept: PromptHistoryMessage[] = [];
+    for (let i = history.length - 1; i >= 0; i--) {
+        const cost = estimateTokens(history[i].text);
+        if (cost > remaining) break;
+        remaining -= cost;
+        kept.unshift(history[i]);
+    }
+    return kept;
+}
+
+/** The Story's point of view and tense for the worn identity, as the Style layer words them. */
+export function povAndTense(story: PromptStory, identity: string): string {
+    return `${POV_WORDS[story.pov](identity)}, ${story.tense} tense`;
+}
+
+export function buildTurnPrompt(input: TurnPromptInput): TurnPrompt {
+    const identity = input.identity.name;
+    const userText = input.userText ?? continueInstruction(identity);
+    const system = systemPrompt(input);
     const finalInstruction = `Write the next turn now. Do not write anything ${identity} says, thinks or does. Use @Name: lines for Character speech.`;
 
     const budget = input.tokenBudget ?? TURN_PROMPT_TOKEN_BUDGET;
-    const fixed = estimateTokens(system) + estimateTokens(userText) + estimateTokens(finalInstruction);
-    let remaining = budget - fixed;
-    const kept: PromptHistoryMessage[] = [];
-    for (let i = input.history.length - 1; i >= 0; i--) {
-        const cost = estimateTokens(input.history[i].text);
-        if (cost > remaining) break;
-        remaining -= cost;
-        kept.unshift(input.history[i]);
-    }
+    const fixed = estimateTokens(system.text) + estimateTokens(userText) + estimateTokens(finalInstruction);
+    const kept = recentHistory(input.history, budget - fixed);
 
     return {
         messages: [
-            { role: 'system', content: system },
+            { role: 'system', content: system.text },
             ...kept.map((message) => ({ role: message.role, content: message.text })),
             { role: 'user', content: userText },
             { role: 'system', content: finalInstruction },
@@ -302,6 +326,6 @@ export function buildTurnPrompt(input: TurnPromptInput): TurnPrompt {
         stop: stopStrings(identity),
         maxTokens: REPLY_LENGTH_WORDS[input.story.replyLength].maxTokens,
         trimmed: input.history.length - kept.length,
-        memoriesLeftOut: memory.leftOut,
+        memoriesLeftOut: system.memoriesLeftOut,
     };
 }

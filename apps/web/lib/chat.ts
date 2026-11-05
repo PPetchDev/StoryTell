@@ -153,6 +153,15 @@ export interface ChatDashboard {
     background: DashboardBackground[];
 }
 
+/**
+ * A Suggested reply (spec: "Suggested replies"): something the worn identity does, a line it
+ * says, or a bold move that pushes the story on. It only fills the composer.
+ */
+export interface SuggestedReply {
+    kind: 'action' | 'speech' | 'move';
+    text: string;
+}
+
 /** Writes answer with the whole Chat; the list and the Chat itself are read with useApiQuery. */
 export const chatApi = {
     create: (storyId: number) => apiSend<Chat>('POST', `/stories/${storyId}/chats`),
@@ -164,6 +173,9 @@ export const chatApi = {
     retry: (storyId: number, chatId: number) => apiSend<Chat>('POST', `/stories/${storyId}/chats/${chatId}/retry`),
     /** Lets the story go on without a line from the user: the Narrator writes the next reply. */
     continue: (storyId: number, chatId: number) => apiSend<Chat>('POST', `/stories/${storyId}/chats/${chatId}/continue`),
+    /** Three things the user might write next, as the worn identity. Nothing is stored. */
+    suggest: (storyId: number, chatId: number) =>
+        apiSend<{ suggestions: SuggestedReply[] }>('POST', `/stories/${storyId}/chats/${chatId}/suggestions`),
     /**
      * Rewrites a Message, discards every Message after it and rolls back their changes; a
      * User Message gets a new reply, an AI Message is judged again.

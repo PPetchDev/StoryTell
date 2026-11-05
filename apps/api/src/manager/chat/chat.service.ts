@@ -46,7 +46,9 @@ import { MissingField, playableStatus } from '../story/playable.js';
 import { WornIdentity, wornIdentity } from './identity.js';
 import { currentBonds, JudgeManagerService, latestJudged, SettledBackground } from './judge/judge.service.js';
 import { latestExtracted, MemoryExtractionManagerService } from './memory/extraction.service.js';
-import { buildTurnPrompt, PromptArc, PromptBond, PromptHistoryMessage, PromptMemory } from './turn/prompt.js';
+import { SuggestedRepliesManagerService } from './suggestions/suggested-replies.service.js';
+import { SuggestedReply } from './suggestions/suggestions-prompt.js';
+import { buildTurnPrompt, PromptArc, PromptBond, PromptHistoryMessage, PromptLayersInput, PromptMemory } from './turn/prompt.js';
 import { parseReply, partsToText, ReplyPart } from './turn/reply-parser.js';
 
 /** A Chat as a Story's Chat list shows it (spec: "Lists and Home"). */
@@ -153,6 +155,7 @@ export class ChatManagerService {
         private readonly snapshotModel: SnapshotModelService,
         private readonly judge: JudgeManagerService,
         private readonly extraction: MemoryExtractionManagerService,
+        private readonly suggestedReplies: SuggestedRepliesManagerService,
         private readonly gateway: ModelGateway,
     ) {}
 
@@ -500,6 +503,21 @@ export class ChatManagerService {
     }
 
     /**
+     * Spec: "Suggested replies". Three things the user might write next, from the turn's
+     * layers and the whole history, written as the worn identity. Nothing is stored.
+     * Refused while a turn is in flight or text credit is out. Unlike a send it never waits
+     * for, or is blocked by, the previous reply's background calls: a slightly stale state is
+     * fine for a suggestion.
+     */
+    async suggestReplies(storyId: number, chatId: number): Promise<SuggestedReply[]> {
+        const { story, chat } = await this.load(storyId, chatId);
+        if (this.inFlight.has(chat.id)) throw new TurnInProgressError();
+        if (await this.textCreditOut()) throw new OutOfCreditError('text');
+        const layers = await this.promptLayersFor(story, chat);
+        return this.suggestedReplies.suggest({ ...layers, history: promptHistory(chat.messages) }, { storyId: story.id, chatId: chat.id });
+    }
+
+    /**
      * One play-model call for the Chat's next turn. When the last Message is a User Message
      * it is that Message's turn; when it is an AI Message it is a Continue turn, written on
      * from the whole history with the continue instruction in place of user text (spec:
@@ -561,6 +579,22 @@ export class ChatManagerService {
         );
         await this.chatModel.touchPlayed(chat.id);
         this.startBackground(story, chat.id, aiMessage.id);
+    }
+
+    /**
+     * Layers 1–9 of a prompt as the Chat stands now: the worn identity, the current Scene,
+     * every Bond and Arc, and the Memory, read the way `writeTurn` reads them.
+     */
+    private async promptLayersFor(story: StoryEntity, chat: ChatEntity): Promise<PromptLayersInput> {
+        const scene = story.scenes.find((candidate) => candidate.id === chat.currentSceneId) ?? null;
+        const [state, memories] = await Promise.all([this.ledger.state(chat.id), this.memoryModel.findByChat(chat.id)]);
+        return {
+            story,
+            identity: wornIdentity(story, chat),
+            scene,
+            ...promptLayers(story, state),
+            memories: promptMemories(story, memories),
+        };
     }
 
     /** Holds the Chat's turn lock while `work` runs; a second send meanwhile is refused. */
@@ -668,6 +702,14 @@ export class ChatManagerService {
         if (!chat || chat.storyId !== storyId) throw new ChatNotFoundError();
         return { story, chat };
     }
+}
+
+/** Messages as the prompt reads them, the way `writeTurn` reads its history: the user's text, or the AI's `@Name:` text. */
+function promptHistory(messages: MessageEntity[]): PromptHistoryMessage[] {
+    return messages.map((message) => ({
+        role: message.kind === MessageKind.User ? 'user' : 'assistant',
+        text: message.kind === MessageKind.User ? (message.text ?? '') : partsToText(message.parts.map((part) => part.toResponse())),
+    }));
 }
 
 /** The Feelings and Arcs layers from the ledger: every current Bond, and each Character's Arc. */

@@ -2,12 +2,46 @@ import { ApiProperty } from '@nestjs/swagger';
 
 import { PoolUsage, UsageSummary } from '../../../manager/usage/usage.service.js';
 
+import type { KindSpend } from '../../../model/usage-record/usage-record.service.js';
+import type { CallKind } from '../../../service/model-gateway/model-gateway.js';
+
+/** Every call kind, for the docs; a Record so a new kind fails the typecheck until it is listed. */
+const CALL_KINDS = Object.keys({
+    turn: true,
+    judge: true,
+    memory_extraction: true,
+    story_draft: true,
+    field_rewrite: true,
+    story_assistant: true,
+    snapshot_prompt: true,
+    suggested_replies: true,
+    snapshot_image: true,
+    reference_image: true,
+} satisfies Record<CallKind, true>);
+
+export class KindSpendDTO implements KindSpend {
+    @ApiProperty({ enum: CALL_KINDS, description: 'The call kind the usage records were written under.' })
+    kind: CallKind;
+
+    @ApiProperty({ description: "This month's spend on calls of this kind, in USD." })
+    spentUsd: number;
+
+    @ApiProperty({ description: 'How many calls of this kind the pool served this month.' })
+    calls: number;
+}
+
 export class PoolUsageDTO implements PoolUsage {
     @ApiProperty({ description: "This month's spend for the pool, the sum of its usage records, in USD." })
     spentUsd: number;
 
     @ApiProperty({ description: 'How many model calls the pool served this month.' })
     calls: number;
+
+    @ApiProperty({
+        type: [KindSpendDTO],
+        description: "This month's spend per call kind, most spent first. Kinds with no calls this month are left out.",
+    })
+    byKind: KindSpendDTO[];
 
     @ApiProperty({
         description: 'Remaining credit read from the provider, in USD. Null when it cannot be read.',

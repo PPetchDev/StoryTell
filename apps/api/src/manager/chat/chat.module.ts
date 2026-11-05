@@ -11,10 +11,11 @@ import { ChatManagerService } from './chat.service.js';
 import { JudgeManagerService } from './judge/judge.service.js';
 import { MemoryExtractionManagerService } from './memory/extraction.service.js';
 import { MemoryManagerService } from './memory/memory.service.js';
+import { SuggestedRepliesManagerService } from './suggestions/suggested-replies.service.js';
 
 @Module({
     imports: [ChatModelModule, StoryModelModule, SettingsModelModule, LedgerModelModule, MemoryModelModule, PersonaModelModule, SnapshotModelModule],
-    providers: [ChatManagerService, JudgeManagerService, MemoryExtractionManagerService, MemoryManagerService],
+    providers: [ChatManagerService, JudgeManagerService, MemoryExtractionManagerService, MemoryManagerService, SuggestedRepliesManagerService],
     exports: [ChatManagerService, MemoryManagerService],
 })
 export class ChatManagerModule {}

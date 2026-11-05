@@ -49,9 +49,14 @@ describe('Usage', () => {
                 // 20% of $22 is $4.40, so $4.50 is just above the line.
                 lowCredit: false,
             });
+            expect(body.pools.text.byKind).toEqual([
+                { kind: 'turn', spentUsd: 0.000987, calls: 1 },
+                { kind: 'judge', spentUsd: 0.000112, calls: 1 },
+            ]);
             expect(body.pools.image).toEqual({
                 spentUsd: 0.04,
                 calls: 1,
+                byKind: [{ kind: 'reference_image', spentUsd: 0.04, calls: 1 }],
                 remainingUsd: 6.4,
                 capUsd: 8,
                 lowCreditPercent: 20,

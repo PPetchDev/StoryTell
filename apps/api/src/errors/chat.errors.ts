@@ -103,3 +103,10 @@ export class NotRegenerableError extends AppError {
         super('409.004.014', 'Only the newest reply can be written again, and never the Opening.');
     }
 }
+
+/** The model's Suggested replies could not be read as three suggestions of the three kinds. Nothing stored. */
+export class UnreadableSuggestionsError extends AppError {
+    constructor(reason: string) {
+        super('502.004.015', `Couldn't suggest replies (${reason}). Try again.`);
+    }
+}

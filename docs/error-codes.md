@@ -49,7 +49,7 @@ as "the API can't be reached" and shows the can't-connect screen (`apps/web/lib/
 | `404.004.001` | `ChatNotFoundError` | No Chat with that id in this Story. |
 | `422.004.002` | `StoryNotPlayableError` | The Story has a required field empty. The message names the missing fields. Blocks starting a Chat, sending, Continue and Regenerate. |
 | `409.004.003` | `NoTurnToRetryError` | Retry when the Chat is not waiting for a reply to a User Message. |
-| `409.004.004` | `TurnInProgressError` | A send, a Continue, a Regenerate, a Message edit or a reset while this Chat's turn is still being written. |
+| `409.004.004` | `TurnInProgressError` | A send, a Continue, a Regenerate, Suggested replies, a Message edit or a reset while this Chat's turn is still being written. |
 | `422.004.005` | `EmptyMessageError` | A send or a Message edit with nothing but whitespace. |
 | `404.004.006` | `MessageNotFoundError` | No Message with that id in this Chat. |
 | `409.004.007` | `BackgroundStillSavingError` | A send, Retry, Continue, Regenerate, Message edit or reset while one of the previous AI Message's background calls (the judge, Memory extraction) was still pending past the short wait. Try again in a moment. |
@@ -60,6 +60,7 @@ as "the API can't be reached" and shows the can't-connect screen (`apps/web/lib/
 | `422.004.012` | `EmptyMemoryError` | A Memory added or edited with nothing but whitespace. |
 | `409.004.013` | `AwaitingReplyError` | A Continue while the last User Message still awaits its reply. Nothing stored; Retry that Message instead. |
 | `409.004.014` | `NotRegenerableError` | A Regenerate on a Message that is not the Chat's newest Message, on a User Message, or on the Opening. Nothing changes and no call is made. |
+| `502.004.015` | `UnreadableSuggestionsError` | The Suggested replies the model wrote could not be read as exactly three suggestions, one each of `action`, `speech` and `move`, each with text. Nothing stored. The client shows "Couldn't suggest replies, try again". |
 | `502.005.001` | `UnreadableDraftError` | The model's draft or rewrite could not be read (no JSON object, or no text). Nothing saved. Show with Retry. |
 | `502.005.002` | `InvalidDraftError` | The draft does not fit a Story (0 or 7 Characters, a Style value outside its set, a required field empty, a bad StartingBond). Nothing saved. Show with Retry. |
 | `422.005.003` | `EmptyIdeaError` | A draft was asked for with a blank idea. |

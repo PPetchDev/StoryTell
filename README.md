@@ -83,7 +83,7 @@ from the kind and Settings, and writes one `usage_record` row per answered call.
 
 | Kind | Model | Host | Request settings |
 |---|---|---|---|
-| turn, story_draft, field_rewrite, story_assistant | play model from Settings: GLM-5.3 (default) or DeepSeek V4 Pro | DeepInfra / GMICloud via OpenRouter | `provider.only` + `allow_fallbacks: false`; GLM `reasoning: {effort: "minimal"}` with stop strings; V4 Pro `reasoning: {enabled: false}`, stop strings never sent |
+| turn, story_draft, field_rewrite, story_assistant, suggested_replies | play model from Settings: GLM-5.3 (default) or DeepSeek V4 Pro | DeepInfra / GMICloud via OpenRouter | `provider.only` + `allow_fallbacks: false`; GLM `reasoning: {effort: "minimal"}` with stop strings; V4 Pro `reasoning: {enabled: false}`, stop strings never sent |
 | judge, memory_extraction, snapshot_prompt | DeepSeek V4 Flash | DeepInfra via OpenRouter | `reasoning: {enabled: false}`, `response_format: json_object` when asked |
 | snapshot_image | Snapshot model from Settings: `seedream-v4-edit` (default, $0.05) or `qwen-edit-uncensored` ($0.04) | Venice `POST /image/multi-edit` | up to 3 reference images, `aspect_ratio: "2:3"`, `safe_mode: false` |
 | reference_image | `qwen-image-3` ($0.04) | Venice `POST /image/generate` | `aspect_ratio: "2:3"`, `safe_mode: false` |
