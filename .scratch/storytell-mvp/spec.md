@@ -607,7 +607,7 @@ Further gateway rules:
 - **Decisions this spec fills in that the tickets left open:** blocking the next send when a background call failed, polling instead of websockets, no streaming, the ~16k prompt budget for recent Messages, and the assistant's removal warning. Each is a reasonable default; change any of them in play without reopening the map.
 - **Cost estimate:** a turn costs about $0.0025 and the judge about $0.0002, so ~60 turns/day comes to roughly $5/month at the prototype's prompt sizes. Longer Chats, extraction calls and Snapshots (~$0.05 each) add to it within the $30 cap. A suggested credit split is about $22 text and $8 image.
 - **Hosts and backup services** all ban images that look like real people. Snapshots and Reference images must depict only fictional adult Characters.
-- **Source decisions:** [map](map.md), [data model sketch](assets/11-data-model.md), and the resolved tickets 05–15 under `issues/`. The turn prototype lives on branch `prototype/one-ai-turn`.
+- **Source decisions:** [map](map.md), [data model sketch](assets/11-data-model.md), and the resolved tickets 05–15 under `issues/`. The turn prototype lives in `prototypes/one-ai-turn/` (commit `99969a4`).
 
 ## Implementation tickets
 

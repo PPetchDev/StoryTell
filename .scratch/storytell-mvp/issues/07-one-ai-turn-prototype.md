@@ -15,7 +15,7 @@ Constraint from [How Bond and Arc change](13-how-bond-and-arc-change.md): after 
 
 ## Answer
 
-Prototyped 2026-11-03. Prototype: `prototypes/one-ai-turn/` (kept on branch `prototype/one-ai-turn`). It is a local page that plays turns of a sample Story ("The Drowned Lantern": Mira, Kai, Oren) through OpenRouter with pinned hosts and `allow_fallbacks: false`. It also includes:
+Prototyped 2026-11-03. Prototype: `prototypes/one-ai-turn/` on master (added in commit `99969a4`). It is a local page that plays turns of a sample Story ("The Drowned Lantern": Mira, Kai, Oren) through OpenRouter with pinned hosts and `allow_fallbacks: false`. It also includes:
 
 - a scripted 10-turn battery run on both models in both turn shapes,
 - a side-by-side reader,
@@ -68,7 +68,7 @@ Graduated fog: "Model-specific techniques for keeping Characters in character" i
 
 ### 2026-11-03 — Venice comparison: `venice-uncensored-role-play` and GLM 5.3 on Venice against GLM-5.3 on DeepInfra
 
-Evidence for the user's choice. The ticket 05 decision is unchanged. Prototype changes are on branch `claude/beautiful-lamport-a28661`, which merges `prototype/one-ai-turn`:
+Evidence for the user's choice. The ticket 05 decision is unchanged. Prototype changes came from branch `claude/beautiful-lamport-a28661` (merged into master; both branches since deleted):
 - a Venice transport in `server.mjs`: direct `POST https://api.venice.ai/api/v1/chat/completions`, with `venice_parameters.include_venice_system_prompt: false`
 - model keys `vrp` and `vglm`
 - `battery.mjs model:shape` args
