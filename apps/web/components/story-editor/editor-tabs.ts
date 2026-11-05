@@ -1,4 +1,4 @@
-import { MissingField, Story } from '@/lib/story';
+import { MissingField, RewriteRequest, RewriteTarget, Story } from '@/lib/story';
 import { fieldDomId } from './rewrite';
 
 /** The editor's sections, one tab panel at a time (spec: "Story editor", Tabs). */
@@ -68,4 +68,20 @@ export function neededIds(missing: MissingField[], story: Story): Set<string> {
         if (domId) ids.add(domId);
     }
     return ids;
+}
+
+/** The Story's fields shown on the Style tab; its other fields are on the Story tab. */
+const STYLE_FIELDS: ReadonlySet<string> = new Set(['pov', 'tense', 'replyLength', 'imageStyle']);
+
+const TAB_OF_TARGET: Record<Exclude<RewriteTarget, 'story'>, TabKey> = {
+    role: 'role',
+    character: 'characters',
+    startingBond: 'bonds',
+    scene: 'scenes',
+};
+
+/** Where a field named as the Rewrite buttons name it lives, e.g. one the assistant changed. */
+export function placeOfField(request: RewriteRequest): FieldPlace {
+    const tab = request.target === 'story' ? (STYLE_FIELDS.has(request.field) ? 'style' : 'story') : TAB_OF_TARGET[request.target];
+    return { tab, domId: fieldDomId(request) };
 }

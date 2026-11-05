@@ -5,9 +5,10 @@ import { KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from
 import { flushSync } from 'react-dom';
 
 import { useConnection } from '@/components/connection';
-import { StoryAssistantPanel } from '@/components/story-assistant/story-assistant-panel';
-import { useStoryAssistant } from '@/components/story-assistant/use-story-assistant';
+import { StoryAssistantSheet } from '@/components/story-assistant/story-assistant-sheet';
+import { fieldOf, useStoryAssistant } from '@/components/story-assistant/use-story-assistant';
 import { ApiUnreachableError } from '@/lib/api';
+import { AppliedChange } from '@/lib/story-assistant';
 import {
     MAX_CHARACTERS,
     MissingField,
@@ -23,7 +24,17 @@ import { focusChoice, movedIndex } from './arrow-keys';
 import { useAutosave } from './autosave';
 import { CharacterCard } from './character-card';
 import { EditorHeader } from './editor-header';
-import { ADD_CHARACTER_ID, neededIds, placeOf, TabKey, tabFrom, TABS, tabsWithMissing } from './editor-tabs';
+import {
+    ADD_CHARACTER_ID,
+    FieldPlace,
+    neededIds,
+    placeOf,
+    placeOfField,
+    TabKey,
+    tabFrom,
+    TABS,
+    tabsWithMissing,
+} from './editor-tabs';
 import { FieldMarksContext } from './field-marks';
 import { ConfirmButton, SegmentedField, TextField } from './fields';
 import { OpeningPreview } from './opening-preview';
@@ -58,6 +69,18 @@ function prefersReducedMotion(): boolean {
     return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
+/** What a jump focuses: the target when it takes focus itself (an input, Add Character), else a group's first stop. */
+function focusStop(target: HTMLElement): HTMLElement | null {
+    return target.tabIndex >= 0 ? target : target.querySelector<HTMLElement>('input, textarea, [tabindex="0"]');
+}
+
+/** Whether the element fits in the band the page's scroll padding leaves: under the header, above the sheet. */
+function fitsInView(target: HTMLElement): boolean {
+    const root = getComputedStyle(document.documentElement);
+    const padding = (parseFloat(root.scrollPaddingTop) || 0) + (parseFloat(root.scrollPaddingBottom) || 0);
+    return target.offsetHeight <= window.innerHeight - padding;
+}
+
 /**
  * The Story editor (spec: "Story authoring module", and Friendly UI's "Story editor"). The
  * local Story is what the author sees; every edit is saved on its own, and each answer brings
@@ -78,6 +101,7 @@ export function StoryEditor({ initial }: { initial: Story }) {
     const [previewOpen, setPreviewOpen] = useState(false);
     const flashTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
     const tabList = useRef<HTMLDivElement>(null);
+    const header = useRef<HTMLDivElement>(null);
     const storyId = initial.id;
 
     useEffect(() => () => clearTimeout(flashTimer.current), []);
@@ -100,8 +124,19 @@ export function StoryEditor({ initial }: { initial: Story }) {
     }, []);
     /** A structural change: the API's Story becomes the editor's. */
     const applyWhole = useCallback((saved: Story) => setStory(saved), []);
-    /** The assistant (ticket 23): its answers land through the same chain as structural changes. */
-    const assistant = useStoryAssistant({ storyId, commit, applyWhole });
+    /**
+     * The assistant (ticket 23): its answers land through the same chain as structural changes,
+     * and the editor shows the first changed field, without taking focus from the sheet.
+     */
+    const assistant = useStoryAssistant({
+        storyId,
+        commit,
+        applyWhole,
+        onApplied: (changes: AppliedChange[]) => {
+            const field = changes.map(fieldOf).find((request) => request !== null);
+            if (field) showField(field, { focus: false });
+        },
+    });
     const highlights = assistant.highlights;
 
     /** Shows a tab, and keeps it in the URL so reload and back return to it. */
@@ -119,18 +154,52 @@ export function StoryEditor({ initial }: { initial: Story }) {
         flashTimer.current = setTimeout(() => setFlashed(null), FLASH_MS);
     }, []);
 
-    /** A missing item's link: its tab, then its field scrolled into view, focused and lit. */
-    const goTo = (item: MissingField) => {
-        const place = placeOf(item.field, story);
+    /**
+     * A field's tab, then the field scrolled into view and lit, and focused unless the author is
+     * busy elsewhere. The page's scroll padding keeps it under the header and above the sheet; a
+     * field too tall for that band shows from its top, where its label is.
+     */
+    const jumpTo = (place: FieldPlace, { focus }: { focus: boolean }) => {
         // Render the tab now, so its field is in the page to scroll to.
         flushSync(() => selectTab(place.tab));
         if (!place.domId) return;
         const target = document.getElementById(place.domId);
         if (!target) return;
-        target.scrollIntoView({ block: 'center', behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
-        target.focus({ preventScroll: true });
+        target.scrollIntoView({
+            block: fitsInView(target) ? 'center' : 'start',
+            behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+        });
+        if (focus) focusStop(target)?.focus({ preventScroll: true });
         flash(place.domId);
     };
+    /** A missing item's link: its field, focused. */
+    const goTo = (item: MissingField) => jumpTo(placeOf(item.field, story), { focus: true });
+    /** A field the Assistant changed: on landing, and from its link in the transcript. */
+    const showField = (field: RewriteRequest, how: { focus: boolean }) => jumpTo(placeOfField(field), how);
+
+    // What scrolls into view (a jump, Tab, the browser's own scroll to a focused field) lands
+    // under the sticky header, kept measured as it wraps, and above the Assistant's sheet.
+    useEffect(() => {
+        const node = header.current;
+        if (!node) return;
+        const root = document.documentElement;
+        const measure = () => root.style.setProperty('--editor-top', `${node.offsetHeight}px`);
+        measure();
+        const observer = new ResizeObserver(measure);
+        observer.observe(node);
+        root.classList.add(styles.underHeaderRoot);
+        return () => {
+            observer.disconnect();
+            root.classList.remove(styles.underHeaderRoot);
+            root.style.removeProperty('--editor-top');
+        };
+    }, []);
+    useEffect(() => {
+        if (!assistant.open) return;
+        const root = document.documentElement;
+        root.classList.add(styles.underSheetRoot);
+        return () => root.classList.remove(styles.underSheetRoot);
+    }, [assistant.open]);
 
     const marks = useMemo(() => ({ needed: neededIds(story.missing, story), flashed }), [story, flashed]);
     const tabsMissing = useMemo(() => tabsWithMissing(story.missing, story), [story]);
@@ -227,14 +296,14 @@ export function StoryEditor({ initial }: { initial: Story }) {
     };
 
     return (
-        <main>
-            <div className={styles.top}>
+        <main className={assistant.open ? styles.underSheet : undefined}>
+            <div ref={header} className={styles.top}>
                 <EditorHeader
                     title={storyTitle(story)}
                     save={state}
                     playable={story.playable}
                     missingCount={story.missing.length}
-                    onAssistant={assistant.openPanel}
+                    onAssistant={assistant.openSheet}
                     onPlay={play}
                 />
                 <div ref={tabList} className={styles.tabs} role="tablist" aria-label="Story sections" onKeyDown={onTabKey}>
@@ -258,8 +327,6 @@ export function StoryEditor({ initial }: { initial: Story }) {
                     ))}
                 </div>
             </div>
-            {assistant.open && <StoryAssistantPanel assistant={assistant} />}
-
             <StatusBox playable={story.playable} missing={story.missing} onGo={goTo} />
 
             <FieldMarksContext.Provider value={marks}>
@@ -319,6 +386,7 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                 hint='Who tells the story: "I", "you" or "they".'
                                 onChange={(v) => setStyle('pov', v)}
                                 highlighted={styleHighlighted('pov')}
+                                domId={fieldDomId({ target: 'story', field: 'pov' })}
                             />
                             <SegmentedField
                                 label="Tense"
@@ -327,6 +395,7 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                 hint="Told as it happens, or looking back."
                                 onChange={(v) => setStyle('tense', v)}
                                 highlighted={styleHighlighted('tense')}
+                                domId={fieldDomId({ target: 'story', field: 'tense' })}
                             />
                             <SegmentedField
                                 label="Reply length"
@@ -335,6 +404,7 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                 hint="How much the AI writes each turn."
                                 onChange={(v) => setStyle('replyLength', v)}
                                 highlighted={styleHighlighted('replyLength')}
+                                domId={fieldDomId({ target: 'story', field: 'replyLength' })}
                             />
                             <TextField
                                 label="Image style"
@@ -468,6 +538,9 @@ export function StoryEditor({ initial }: { initial: Story }) {
                 </div>
             </FieldMarksContext.Provider>
 
+            {assistant.open && (
+                <StoryAssistantSheet assistant={assistant} onShow={(field) => showField(field, { focus: true })} />
+            )}
             {previewOpen && (
                 <OpeningPreview
                     storyId={storyId}

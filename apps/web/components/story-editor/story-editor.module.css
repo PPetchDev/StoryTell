@@ -181,3 +181,25 @@
     justify-content: center;
     text-align: left;
 }
+
+/* With the Assistant's sheet open: room at the end, so the last fields scroll above the sheet. */
+.underSheet {
+    padding-bottom: var(--sheet-half);
+}
+
+/* Set on <html> by the editor: what scrolls into view lands under the sticky header... */
+.underHeaderRoot {
+    scroll-padding-top: var(--editor-top, 0px);
+}
+
+/* ...and, while the Assistant's sheet is open, above it. */
+.underSheetRoot {
+    scroll-padding-bottom: var(--sheet-half);
+}
+
+/* Example lines, just jumped to from the Assistant's link. */
+.linesFlash {
+    border-radius: 0.75rem;
+    box-shadow: 0 0 0 6px var(--accent-line);
+    background: var(--accent-soft);
+}
