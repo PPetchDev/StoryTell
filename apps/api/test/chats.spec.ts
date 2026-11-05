@@ -544,6 +544,9 @@ A Character knows only the Memories it is tagged on and acts as if the rest neve
             expect(Date.parse(waiting.lastPlayedAt)).toBe(Date.parse(chat.lastPlayedAt));
 
             t.gateway.scriptText('turn', '@Mira: Took you long enough.');
+            // Scripted, so no failing background call (and its automatic retry) spills into the next test.
+            t.gateway.scriptText('judge', NO_CHANGE);
+            t.gateway.scriptText('memory_extraction', NO_OPS);
             const retried = await t.http.post(`/api/stories/${story.id}/chats/${chat.id}/retry`).expect(200);
 
             expect(retried.body.awaitingReply).toBe(false);
@@ -555,6 +558,7 @@ A Character knows only the Memories it is tagged on and acts as if the rest neve
             const calls = t.gateway.textCalls('turn');
             expect(calls).toHaveLength(2);
             expect(calls[1].messages).toEqual(calls[0].messages);
+            await awaitJudge(t.http, story.id, chat.id);
         });
 
         it('refuses Retry when the Chat is not waiting for a reply', async () => {
@@ -991,7 +995,8 @@ A Character knows only the Memories it is tagged on and acts as if the rest neve
             const story = await createStory();
             const chat = await createChat(story.id);
             t.gateway.scriptText('turn', 'Mira nods.');
-            t.gateway.scriptText('judge', new ProviderOutageError('DeepInfra answered 503.'));
+            // The try and its automatic retry.
+            t.gateway.scriptText('judge', new ProviderOutageError('DeepInfra answered 503.'), new ProviderOutageError('DeepInfra answered 503.'));
             t.gateway.scriptText('memory_extraction', NO_OPS);
             await t.http.post(`/api/stories/${story.id}/chats/${chat.id}/messages`).send({ text: 'Hello?' }).expect(201);
             const failed = await awaitJudge(t.http, story.id, chat.id);

@@ -29,6 +29,8 @@ export default async function globalSetup() {
         // No file there until a test writes one, so the backup banner stays hidden by default.
         BACKUP_STATUS_FILE: path.join(tempDir, 'backup-status.json'),
         MODEL_GATEWAY: 'fake',
+        // A failed background call is retried once on its own; here at once, so tests script both tries.
+        BACKGROUND_RETRY_MS: '0',
     };
     migrate(env);
     writeState({ env, pid: await spawnApi(env) });

@@ -10,7 +10,7 @@ import {
     EditResult,
 } from '../../../manager/chat/chat.service.js';
 import { ChatSummary } from '../../../model/chat/entities/chat.entity.js';
-import { BackgroundCallResponse, BackgroundStatus } from '../../../model/chat/entities/message.entity.js';
+import { BackgroundCallResponse, BackgroundStatus, ReplyVersionsResponse } from '../../../model/chat/entities/message.entity.js';
 import { ArcStepResponse } from '../../../model/ledger/entities/arc-step.entity.js';
 import { BondChangeResponse } from '../../../model/ledger/entities/bond-change.entity.js';
 import { SceneAdvanceResponse } from '../../../model/ledger/entities/scene-advance.entity.js';
@@ -75,6 +75,14 @@ export class MessagePartDTO {
     text: string;
 }
 
+export class ReplyVersionsDTO implements ReplyVersionsResponse {
+    @ApiProperty({ description: 'The shown version, 1-based, in the order the versions were written.' })
+    current: number;
+
+    @ApiProperty({ description: 'How many versions there are, the shown one included; at most 5.' })
+    count: number;
+}
+
 export class MessageDTO {
     @ApiProperty()
     id: number;
@@ -114,6 +122,13 @@ export class MessageDTO {
         description: 'AI Message only: Memory extraction; null on the Opening and on replies from before it existed.',
     })
     memory?: BackgroundCallDTO | null;
+
+    @ApiPropertyOptional({
+        type: ReplyVersionsDTO,
+        nullable: true,
+        description: 'AI Message only: its Reply versions (‹ n/m ›); null while it has only one. Only the newest AI Message has more.',
+    })
+    versions?: ReplyVersionsDTO | null;
 
     @ApiProperty()
     createdAt: string;

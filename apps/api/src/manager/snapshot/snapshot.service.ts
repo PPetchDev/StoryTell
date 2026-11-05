@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 
+import { AppConfig } from '../../config/app-config.js';
 import { AppError } from '../../errors/app-error.js';
 import { ChatNotFoundError, MessageNotFoundError } from '../../errors/chat.errors.js';
 import { SnapshotJobNotFailedError, SnapshotJobNotFoundError, SnapshotNotFoundError } from '../../errors/image.errors.js';
@@ -83,6 +84,7 @@ export class SnapshotManagerService {
         private readonly snapshotModel: SnapshotModelService,
         private readonly imageStore: ImageStoreService,
         private readonly gateway: ModelGateway,
+        private readonly config: AppConfig,
     ) {}
 
     /**
@@ -106,11 +108,11 @@ export class SnapshotManagerService {
         };
         this.sweep();
         this.jobs.set(job.id, job);
-        void this.run(storyId, job);
+        void this.run(storyId, job, true);
         return { ...job };
     }
 
-    /** Runs a failed job again, with the same Message and hint. */
+    /** Runs a failed job again, with the same Message and hint: once, with no automatic retry. */
     async retry(storyId: number, chatId: number, jobId: string): Promise<SnapshotJob> {
         await this.load(storyId, chatId);
         const job = this.findJob(chatId, jobId);
@@ -119,7 +121,7 @@ export class SnapshotManagerService {
         job.status = 'pending';
         job.error = null;
         job.startedAt = new Date().toISOString();
-        void this.run(storyId, job);
+        void this.run(storyId, job, false);
         return { ...job };
     }
 
@@ -176,9 +178,22 @@ export class SnapshotManagerService {
         await this.removeFile(snapshot.imagePath);
     }
 
-    private async run(storyId: number, job: SnapshotJob): Promise<void> {
+    /**
+     * Makes the job's Snapshot. With `autoRetry` (a camera press), a failure is tried once more
+     * after `backgroundRetryMs`, the job pending meanwhile; only then is it marked failed
+     * (.scratch/background-retry/spec.md).
+     */
+    private async run(storyId: number, job: SnapshotJob, autoRetry: boolean): Promise<void> {
         try {
-            await this.make(storyId, job);
+            try {
+                await this.make(storyId, job);
+            } catch (first) {
+                // Out of credit would only fail the same way again.
+                if (!autoRetry || first instanceof OutOfCreditError) throw first;
+                this.logger.log(`Chat ${job.chatId}: Snapshot failed, trying once more: ${first instanceof Error ? first.message : first}`);
+                await new Promise((resolve) => setTimeout(resolve, this.config.backgroundRetryMs));
+                await this.make(storyId, job);
+            }
             this.jobs.delete(job.id);
         } catch (error) {
             job.status = 'failed';

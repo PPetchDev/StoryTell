@@ -55,11 +55,13 @@ export class BackgroundStillSavingError extends AppError {
 /** The names of the background calls, in the plain words the failed notice reads them in. */
 export type BackgroundCallName = 'Bonds, Arcs and Scene' | 'Memories';
 
-/** A previous AI Message's background call failed; it must be retried before the next turn. */
+/** A previous AI Message's background call failed, its automatic retry too; it must be retried before the next turn. */
 export class BackgroundFailedError extends AppError {
     constructor(failed: BackgroundCallName[] = ['Bonds, Arcs and Scene']) {
-        const what = failed.length > 1 ? 'Bonds, Arcs, Scene and Memories' : failed[0];
-        super('409.004.008', `The ${what} couldn't update after the previous turn. Retry before sending.`);
+        const judge = failed.includes('Bonds, Arcs and Scene');
+        const memory = failed.includes('Memories');
+        const what = judge && memory ? 'the Memories, feelings and Scene' : memory ? 'the Memories' : 'the feelings and the Scene';
+        super('409.004.008', `Couldn't save ${what} from the last reply. Retry before sending.`);
     }
 }
 
@@ -122,5 +124,12 @@ export class EmptyStorySoFarError extends AppError {
 export class NoStorySoFarError extends AppError {
     constructor() {
         super('409.004.017', 'This Chat has no Story so far yet: the whole Chat still fits in what the AI reads.');
+    }
+}
+
+/** A Reply version chosen that the Message does not have: only the newest AI Message has more than one. */
+export class ReplyVersionNotFoundError extends AppError {
+    constructor() {
+        super('404.004.018', 'That reply has no such version.');
     }
 }

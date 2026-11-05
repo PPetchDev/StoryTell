@@ -13,6 +13,7 @@ import type { Relation } from 'typeorm';
 import type { PersonaEntity } from '../../persona/entities/persona.entity.js';
 import type { ChatEntity } from './chat.entity.js';
 import type { MessagePartEntity, MessagePartResponse } from './message-part.entity.js';
+import type { ReplyVersionEntity } from './reply-version.entity.js';
 
 export enum MessageKind {
     User = 'user',
@@ -46,6 +47,13 @@ export interface UserMessageResponse {
     createdAt: string;
 }
 
+/** Where the shown Reply version stands among the newest AI Message's versions: the n and m of ‹ n/m ›. */
+export interface ReplyVersionsResponse {
+    /** 1-based, in the order the versions were written. */
+    current: number;
+    count: number;
+}
+
 export interface AiMessageResponse {
     id: number;
     kind: 'ai';
@@ -56,6 +64,8 @@ export interface AiMessageResponse {
     judge: BackgroundCallResponse | null;
     /** Memory extraction's status; null for the Opening, and for replies from before ticket 28. */
     memory: BackgroundCallResponse | null;
+    /** Its Reply versions; null while it has only the one (spec: .scratch/swipe/spec.md). */
+    versions: ReplyVersionsResponse | null;
     createdAt: string;
 }
 
@@ -128,11 +138,31 @@ export class MessageEntity {
     @Column({ name: 'memory_error', type: 'text', nullable: true })
     memoryError: string | null;
 
+    // The shown Reply version's place among the Message's versions; NULL while it has no others.
+    @Column({ name: 'version_ordinal', type: 'integer', nullable: true })
+    versionOrdinal: number | null;
+
     @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
     createdAt: Date;
 
     @OneToMany('MessagePartEntity', 'message')
     parts: Relation<MessagePartEntity[]>;
+
+    /** The Reply versions not shown; loaded by ChatModelService.findWithMessages. */
+    @OneToMany('ReplyVersionEntity', 'message')
+    versions?: Relation<ReplyVersionEntity[]>;
+
+    /** The ordinals of every version, the shown one included, in the order they were written. */
+    versionOrder(): number[] {
+        const shown = this.versionOrdinal ?? 1;
+        return [shown, ...(this.versions ?? []).map((version) => version.ordinal)].sort((a, b) => a - b);
+    }
+
+    private versionsResponse(): ReplyVersionsResponse | null {
+        if (!this.versions || this.versions.length === 0) return null;
+        const order = this.versionOrder();
+        return { current: order.indexOf(this.versionOrdinal ?? 1) + 1, count: order.length };
+    }
 
     /** An AI Message needs its parts loaded (ChatModelService.findWithMessages). */
     toResponse(): MessageResponse {
@@ -153,6 +183,7 @@ export class MessageEntity {
             parts: this.parts.map((part) => part.toResponse()),
             judge: this.judgeStatus === null ? null : { status: this.judgeStatus, error: this.judgeError },
             memory: this.memoryStatus === null ? null : { status: this.memoryStatus, error: this.memoryError },
+            versions: this.versionsResponse(),
             createdAt: this.createdAt.toISOString(),
         };
     }

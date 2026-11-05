@@ -40,6 +40,8 @@ export interface TestAppOptions {
     providerKeys?: Partial<ProviderKeys>;
     /** How long a send waits for a pending background call. Default 1.5 s. */
     backgroundWaitMs?: number;
+    /** How long a failed background call waits before its one automatic retry. Default 0. */
+    backgroundRetryMs?: number;
     /** The backup job's status file. Default: unset, as in dev. */
     backupStatusFile?: string;
 }
@@ -77,6 +79,7 @@ export async function startTestApp(options: TestAppOptions = {}): Promise<TestAp
                 modelGateway: options.modelGateway ?? 'fake',
                 // Short, so a test of the "still saving" path does not sit through the real wait.
                 backgroundWaitMs: options.backgroundWaitMs ?? 1_500,
+                backgroundRetryMs: options.backgroundRetryMs ?? 0,
                 backupStatusFile: options.backupStatusFile,
                 providerKeys: {
                     openRouter: undefined,

@@ -1,12 +1,12 @@
 'use client';
 
-import { CSSProperties, KeyboardEvent, MouseEvent, ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { CSSProperties, KeyboardEvent, MouseEvent, PointerEvent, ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { AiMessageParts, MessageBody, UserLine } from '@/components/chat/message-body';
 import { MessageSnapshots } from '@/components/chat/snapshots';
 import { ConfirmButton } from '@/components/story-editor/fields';
 import { Cast, Portraits } from '@/lib/character-colour';
-import { isOpening, Message, MessagePart, messageText } from '@/lib/chat';
+import { isOpening, Message, MessagePart, messageText, ReplyVersions } from '@/lib/chat';
 import { ChatSnapshots, Snapshot, SnapshotJob } from '@/lib/snapshot';
 import { STORY_TEXT_SIZE, useTextSize } from '@/lib/text-size';
 
@@ -92,20 +92,61 @@ function EditAction({ onEdit }: { onEdit(): void }) {
     );
 }
 
+/** How far a finger must travel sideways on a reply before a swipe changes its version, in CSS pixels. */
+const SWIPE_VERSION_PX = 60;
+
+interface VersionSwitchProps {
+    versions: ReplyVersions;
+    onVersion(version: number): void;
+}
+
+/** ‹ n/m › (.scratch/swipe/spec.md): steps through the newest reply's Reply versions. */
+function VersionSwitch({ versions, onVersion }: VersionSwitchProps) {
+    const { current, count } = versions;
+    return (
+        <span className={styles.versions} role="group" aria-label="Reply versions">
+            <button
+                type="button"
+                className={styles.versionStep}
+                aria-label="Previous version"
+                disabled={current <= 1}
+                onClick={() => onVersion(current - 1)}
+            >
+                ‹
+            </button>
+            <span className={styles.versionCount} aria-label={`Version ${current} of ${count}`}>
+                {current}/{count}
+            </span>
+            <button
+                type="button"
+                className={styles.versionStep}
+                aria-label="Next version"
+                disabled={current >= count}
+                onClick={() => onVersion(current + 1)}
+            >
+                ›
+            </button>
+        </span>
+    );
+}
+
 interface ActionRowProps {
     /** ↺ Again; null where it isn't offered (the Opening, an older reply, or sending blocked). */
     onAgain: (() => void) | null;
     onEdit(): void;
     onSnapshot(): void;
+    /** ‹ n/m ›; null while the reply has only one version. */
+    versions: VersionSwitchProps | null;
 }
 
 /**
- * Under the newest AI Message while no turn is in flight (spec: "Action row"). ↺ Again goes
- * first, and never on the Opening.
+ * Under the newest AI Message while no turn is in flight (spec: "Action row"). ‹ n/m › goes
+ * first when the reply has versions, then ↺ Again, never on the Opening.
  */
-function ActionRow({ onAgain, onEdit, onSnapshot }: ActionRowProps) {
+function ActionRow({ onAgain, onEdit, onSnapshot, versions }: ActionRowProps) {
     return (
         <div className={styles.actions} role="group" aria-label="Message actions">
+            {versions && <VersionSwitch {...versions} />}
             {onAgain && (
                 <button type="button" className={styles.action} onClick={onAgain}>
                     <span aria-hidden="true">↺</span>Again
@@ -131,11 +172,29 @@ interface MessageViewProps {
     snapshots: ReactNode;
     /** A tap on the Message shows or hides its Edit; null when it has none to show. */
     onTap: (() => void) | null;
+    /** A sideways swipe: 1 for the next Reply version (a swipe left), -1 for the one before; null when it has none. */
+    onSwipe: ((step: 1 | -1) => void) | null;
     onSave(text: string): void;
     onCancel(): void;
 }
 
-function MessageView({ message, cast, portraits, later, editing, tools, snapshots, onTap, onSave, onCancel }: MessageViewProps) {
+function MessageView({ message, cast, portraits, later, editing, tools, snapshots, onTap, onSwipe, onSave, onCancel }: MessageViewProps) {
+    // Where a finger went down on a reply with versions; a sideways move past the threshold steps.
+    const swipeRef = useRef<{ pointerId: number; x: number; y: number } | null>(null);
+    const swipeStart = (event: PointerEvent<HTMLElement>) => {
+        // A swipe may start on a button too: a finger that moves sideways never clicks it.
+        if (!onSwipe || !event.isPrimary || event.pointerType === 'mouse') return;
+        swipeRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+    };
+    const swipeEnd = (event: PointerEvent<HTMLElement>) => {
+        const start = swipeRef.current;
+        swipeRef.current = null;
+        if (!onSwipe || start?.pointerId !== event.pointerId) return;
+        const dx = event.clientX - start.x;
+        const dy = event.clientY - start.y;
+        if (Math.abs(dx) < SWIPE_VERSION_PX || Math.abs(dx) <= Math.abs(dy)) return;
+        onSwipe(dx < 0 ? 1 : -1);
+    };
     const tap = (event: MouseEvent<HTMLElement>) => {
         // A drag that selects text is reading, not a tap.
         const selecting = (window.getSelection()?.toString() ?? '') !== '';
@@ -151,11 +210,16 @@ function MessageView({ message, cast, portraits, later, editing, tools, snapshot
     return (
         <article
             id={messageAnchor(message.id)}
-            className={[styles.message, message.kind === 'user' && styles.fromUser, onTap && styles.tappable].filter(Boolean).join(' ')}
+            className={[styles.message, message.kind === 'user' && styles.fromUser, onTap && styles.tappable, onSwipe && styles.swipeable]
+                .filter(Boolean)
+                .join(' ')}
             aria-label={messageLabel(message)}
             tabIndex={onTap ? 0 : undefined}
             onClick={tap}
             onKeyDown={key}
+            onPointerDown={swipeStart}
+            onPointerUp={swipeEnd}
+            onPointerCancel={() => (swipeRef.current = null)}
         >
             {editing ? (
                 <EditForm message={message} later={later} onSave={onSave} onCancel={onCancel} />
@@ -289,13 +353,14 @@ interface ChatThreadProps {
     replacing: number | null;
     /** ↺ Again on the newest reply. */
     onAgain(messageId: number): void;
+    /** Shows another Reply version of the newest reply (‹ n/m › or a swipe). */
+    onVersion(messageId: number, version: number): void;
     onEdit(messageId: number): void;
     onSave(message: Message, text: string): void;
     onCancelEdit(): void;
     /** 📷 in the action row: a Snapshot of the latest AI Message. */
     onSnapshot(): void;
     onOpenSnapshot(snapshot: Snapshot): void;
-    onRetrySnapshot(job: SnapshotJob): void;
     onDismissSnapshot(job: SnapshotJob): void;
 }
 
@@ -313,12 +378,12 @@ export function ChatThread({
     snapshots,
     replacing,
     onAgain,
+    onVersion,
     onEdit,
     onSave,
     onCancelEdit,
     onSnapshot,
     onOpenSnapshot,
-    onRetrySnapshot,
     onDismissSnapshot,
 }: ChatThreadProps) {
     // ↺ Again replaces the reply in place: it leaves the thread while the writing indicator shows.
@@ -347,6 +412,14 @@ export function ChatThread({
                     const editable = canEdit && (message.kind === 'ai' || !blocked);
                     const withRow = canEdit && message === newestAiMessage;
                     let tools: ReactNode = null;
+                    // Only the newest reply has Reply versions, and they change only while no turn or write is in flight.
+                    const versions = withRow && message === last && message.kind === 'ai' ? message.versions : null;
+                    const step = versions
+                        ? (by: 1 | -1) => {
+                              const version = versions.current + by;
+                              if (version >= 1 && version <= versions.count) onVersion(message.id, version);
+                          }
+                        : null;
                     if (withRow) {
                         // ↺ Again runs a turn: only on a reply that is the newest Message, never the Opening.
                         const again = message === last && !isOpening(message) && !blocked;
@@ -355,6 +428,7 @@ export function ChatThread({
                                 onAgain={again ? () => onAgain(message.id) : null}
                                 onEdit={() => edit(message.id)}
                                 onSnapshot={onSnapshot}
+                                versions={versions ? { versions, onVersion: (version) => onVersion(message.id, version) } : null}
                             />
                         );
                     } else if (editable && tapped === message.id) {
@@ -379,12 +453,12 @@ export function ChatThread({
                                         snapshots={snapshots.snapshots.filter((snapshot) => snapshot.messageId === message.id)}
                                         jobs={snapshots.jobs.filter((job) => job.messageId === message.id)}
                                         onOpen={onOpenSnapshot}
-                                        onRetry={onRetrySnapshot}
                                         onDismiss={onDismissSnapshot}
                                     />
                                 )
                             }
                             onTap={editable && !withRow ? () => setTapped((current) => (current === message.id ? null : message.id)) : null}
+                            onSwipe={editing === message.id ? null : step}
                             onSave={(text) => onSave(message, text)}
                             onCancel={onCancelEdit}
                         />

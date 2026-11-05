@@ -5,34 +5,29 @@ import { FormEvent, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { useConnection } from '@/components/connection';
 import { ApiUnreachableError } from '@/lib/api';
-import { Chat, chatApi, latestReply, modelLabel, SuggestedReply } from '@/lib/chat';
+import { backgroundNotice, Chat, chatApi, modelLabel, SuggestedReply } from '@/lib/chat';
 
 import styles from './chat-composer.module.css';
 
 interface NoticesProps {
     chat: Chat;
-    onRetryJudge(messageId: number): void;
-    onRetryExtraction(messageId: number): void;
+    /** How many of the Chat's Snapshots failed, their automatic retry too. */
+    failedSnapshots: number;
+    /** Reruns everything that failed in the background. */
+    onRetryBackground(): void;
     retrying: boolean;
 }
 
 /** What stands between the user and the next turn, if anything. */
-function Notices({ chat, onRetryJudge, onRetryExtraction, retrying }: NoticesProps) {
-    const reply = latestReply(chat);
+function Notices({ chat, failedSnapshots, onRetryBackground, retrying }: NoticesProps) {
+    // One notice, in plain words, for everything that didn't save; one Retry reruns all of it.
+    const failed = backgroundNotice(chat, failedSnapshots);
     return (
         <>
-            {reply?.judge?.status === 'failed' && (
+            {failed && (
                 <p className="notice" role="status">
-                    Sending is paused: the Characters&apos; feelings and the Scene couldn&apos;t update after the last reply.{' '}
-                    <button type="button" className="button button-quiet" disabled={retrying} onClick={() => onRetryJudge(reply.id)}>
-                        {retrying ? 'Retrying…' : 'Retry'}
-                    </button>
-                </p>
-            )}
-            {reply?.memory?.status === 'failed' && (
-                <p className="notice" role="status">
-                    Sending is paused: Memories couldn&apos;t update after the last reply.{' '}
-                    <button type="button" className="button button-quiet" disabled={retrying} onClick={() => onRetryExtraction(reply.id)}>
+                    {failed}{' '}
+                    <button type="button" className="button button-quiet" disabled={retrying} onClick={onRetryBackground}>
                         {retrying ? 'Retrying…' : 'Retry'}
                     </button>
                 </p>
@@ -197,6 +192,8 @@ interface ChatComposerProps {
     error: string | null;
     rollback: string | null;
     snapshotError: string | null;
+    /** The Chat's failed Snapshots, for the background notice. */
+    failedSnapshots: number;
     onDraft(text: string): void;
     onSend(): void;
     /** ▶ on an empty box: the story goes on without a line from the user. */
@@ -204,8 +201,8 @@ interface ChatComposerProps {
     /** ■ Stop, in place of the send button while a reply is written. */
     onStop(): void;
     onRetry(): void;
-    onRetryJudge(messageId: number): void;
-    onRetryExtraction(messageId: number): void;
+    /** The background notice's one Retry: the failed judge, extraction and Snapshots again. */
+    onRetryBackground(): void;
 }
 
 /** Under the thread: what blocks or failed, and the box the user writes in. */
@@ -218,13 +215,13 @@ export function ChatComposer({
     error,
     rollback,
     snapshotError,
+    failedSnapshots,
     onDraft,
     onSend,
     onContinue,
     onStop,
     onRetry,
-    onRetryJudge,
-    onRetryExtraction,
+    onRetryBackground,
 }: ChatComposerProps) {
     const box = useAutoGrow(draft);
     const suggestions = useSuggestedReplies(chat);
@@ -243,7 +240,7 @@ export function ChatComposer({
                     {rollback}
                 </p>
             )}
-            <Notices chat={chat} onRetryJudge={onRetryJudge} onRetryExtraction={onRetryExtraction} retrying={busy} />
+            <Notices chat={chat} failedSnapshots={failedSnapshots} onRetryBackground={onRetryBackground} retrying={busy} />
             {error && (
                 <p role="alert" className="turn-error">
                     {error}

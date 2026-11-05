@@ -704,7 +704,8 @@ Ash: I take them off.
             const story = await createStory();
             const chat = await createChat(story.id);
             t.gateway.scriptText('turn', 'Reply one.');
-            t.gateway.scriptText('judge', new ProviderOutageError('DeepInfra answered 503.'));
+            // The try and its automatic retry (.scratch/background-retry/spec.md).
+            t.gateway.scriptText('judge', new ProviderOutageError('first try'), new ProviderOutageError('DeepInfra answered 503.'));
             t.gateway.scriptText('memory_extraction', NO_OPS, NO_OPS);
             await t.http.post(`/api/stories/${story.id}/chats/${chat.id}/messages`).send({ text: 'One.' }).expect(201);
             const failed = await awaitJudge(story.id, chat.id);
@@ -732,7 +733,7 @@ Ash: I take them off.
             ]);
             expect(character(retried.body as Dashboard, 'Mira').bonds[0].label).toBe('Curious');
             expect(t.gateway.textCalls('turn')).toHaveLength(1);
-            expect(t.gateway.textCalls('judge')).toHaveLength(2);
+            expect(t.gateway.textCalls('judge')).toHaveLength(3);
             expect(lastAi(await getChat(story.id, chat.id)).judge).toEqual({ status: 'done', error: null });
 
             // Retry is for a failed judge on the latest reply only.
@@ -752,6 +753,8 @@ Ash: I take them off.
             const story = await createStory();
             const chat = await createChat(story.id);
 
+            // The try, and its automatic retry, which goes the same way.
+            t.gateway.scriptText('judge', 'Sorry, I cannot judge that.');
             const played = await play(story.id, chat.id, 'One.', 'Reply one.', 'Sorry, I cannot judge that.');
 
             expect(lastAi(played)).toMatchObject({
@@ -766,7 +769,7 @@ Ash: I take them off.
             const chat = await createChat(story.id);
             const played = await play(story.id, chat.id, 'One.', 'Reply one.');
             t.gateway.scriptText('turn', 'Reply one, again.');
-            t.gateway.scriptText('judge', new ProviderOutageError());
+            t.gateway.scriptText('judge', new ProviderOutageError(), new ProviderOutageError());
             t.gateway.scriptText('memory_extraction', NO_OPS);
 
             await t.http.patch(`/api/stories/${story.id}/chats/${chat.id}/messages/${played.messages[1].id}`).send({ text: 'One, again.' }).expect(200);

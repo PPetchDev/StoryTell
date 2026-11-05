@@ -55,8 +55,12 @@ Asking the Narrator to write the next part of the Chat without a Message from th
 _Avoid_: Skip, auto-play, next
 
 **Regenerate**:
-Replacing the Chat's newest AI Message with a freshly written one, undoing everything the old one changed; the old one is not kept.
+Writing the Chat's newest AI Message again, undoing everything the shown one changed; the replaced one is kept as a Reply version.
 _Avoid_: Reroll, swipe, retry, redo
+
+**Reply version**:
+One take of the Chat's newest AI Message. That Message keeps up to five: the shown one, which the Chat, the AI and the Bonds, Arcs and Memory know, and the ones Regenerate replaced, which only wait to be chosen again. Choosing one undoes what the shown one changed. Anything that adds a Message after it, or takes it away, drops the others.
+_Avoid_: Swipe, alternative, variant, draft
 
 **Suggested reply**:
 One of three things the user might write next, offered on request in the voice of the Role or Persona they wear; it only fills the composer and is never part of the Chat's history.
