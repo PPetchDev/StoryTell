@@ -8,7 +8,7 @@ import { ModelOptionDTO, SettingsResponseBodyDTO } from './dto/settings.response
 
 const PLAY_MODEL_OPTIONS: ModelOptionDTO[] = [
     { id: 'glm-5.3', label: 'GLM-5.3 (DeepInfra)' },
-    { id: 'deepseek-v4-pro', label: 'DeepSeek V4 Pro (GMICloud)' },
+    { id: 'deepseek-v4-pro', label: 'DeepSeek V4 Pro (DeepInfra)' },
 ];
 
 const IMAGE_MODEL_OPTIONS: ModelOptionDTO[] = [

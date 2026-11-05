@@ -64,6 +64,7 @@ export class VeniceClient {
                 hide_watermark: true,
                 return_binary: false,
                 variants: 1,
+                ...(model.resolution ? { resolution: model.resolution } : {}),
             };
         }
         return {

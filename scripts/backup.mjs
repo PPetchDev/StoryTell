@@ -12,6 +12,7 @@
 import { execFileSync } from 'node:child_process';
 import {
     appendFileSync,
+    copyFileSync,
     cpSync,
     existsSync,
     mkdirSync,
@@ -171,6 +172,35 @@ async function renameWithRetries(from, to) {
     }
 }
 
+/**
+ * Copies the image folder into `to`, overwriting what is there. A file or folder the app deletes
+ * mid-copy is skipped rather than failing the whole backup, as `cpSync` would.
+ */
+function copyImages(from, to) {
+    mkdirSync(to, { recursive: true });
+    let entries;
+    try {
+        entries = readdirSync(from, { withFileTypes: true });
+    } catch (error) {
+        if (error.code === 'ENOENT') return;
+        throw error;
+    }
+    for (const entry of entries) {
+        const source = path.join(from, entry.name);
+        const target = path.join(to, entry.name);
+        if (entry.isDirectory()) {
+            copyImages(source, target);
+            continue;
+        }
+        if (!entry.isFile()) continue;
+        try {
+            copyFileSync(source, target);
+        } catch (error) {
+            if (error.code !== 'ENOENT') throw error;
+        }
+    }
+}
+
 function folderStats(dir) {
     let files = 0;
     let bytes = 0;
@@ -191,7 +221,7 @@ async function backUp() {
     const writeStatus = () => writeFileSync(path.join(backupDir, 'status.json'), JSON.stringify(status, null, 2));
     log(`backup ${name} starting (targets: ${targets.join(', ')})`);
 
-    // 1. Dump the database and copy the image folder into a staging folder.
+    // 1. Copy the image folder, dump the database, then add any images made meanwhile, into a staging folder.
     try {
         rmSync(path.join(backupDir, 'staging'), { recursive: true, force: true });
         mkdirSync(staging, { recursive: true });
@@ -202,12 +232,18 @@ async function backUp() {
         const password = decodeURIComponent(url.password) || url.searchParams.get('password') || '';
         url.password = '';
         url.searchParams.delete('password');
+        // Images are copied on both sides of the dump, so every image the dump names is whole in the
+        // backup. The app writes an image's file before its row, so the second copy, which
+        // overwrites, has every file the dump names in full, including one caught mid-write by the
+        // first. A file deleted while the dump ran is still there from the first copy, since
+        // copying never removes. Either order alone loses one of those.
+        const stagedImages = path.join(staging, 'images');
+        copyImages(imageDir, stagedImages);
         execFileSync(pgDump, ['--format=custom', '--no-owner', '--file', path.join(staging, 'storytell.dump'), '--dbname', url.toString()], {
             stdio: ['ignore', 'ignore', 'pipe'],
             env: { ...process.env, PGPASSWORD: password },
         });
-        if (existsSync(imageDir)) cpSync(imageDir, path.join(staging, 'images'), { recursive: true });
-        else mkdirSync(path.join(staging, 'images'));
+        copyImages(imageDir, stagedImages);
         writeFileSync(
             path.join(staging, 'manifest.json'),
             JSON.stringify(

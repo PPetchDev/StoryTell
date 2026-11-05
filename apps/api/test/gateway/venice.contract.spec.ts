@@ -21,7 +21,7 @@ const edited: RecordedResponse = { bytes: JPEG, contentType: 'image/jpeg' };
 // Spec: Testing Decisions, "Model Gateway contract tests". Fixtures under test/fixtures/venice
 // are synthetic; the image bytes are a bare JPEG header.
 describe('Venice contract', () => {
-    it('draws Reference images with qwen-image-3 at 2:3 and safe mode off, and records list price', async () => {
+    it('draws Reference images with qwen-image-3 at 2:3 and 2K with safe mode off, and records list price', async () => {
         const net = recordedFetch([...modelLists, { fixture: 'venice/generate.json' }]);
         const { gateway, records } = gatewayUnderTest(net.fetch);
 
@@ -43,6 +43,7 @@ describe('Venice contract', () => {
             hide_watermark: true,
             return_binary: false,
             variants: 1,
+            resolution: '2K',
         });
         expect(result.model).toBe('qwen-image-3');
         expect(result.costUsd).toBe(0.04);
@@ -103,6 +104,8 @@ describe('Venice contract', () => {
             const request = net.requests[2];
             expect(request.url).toBe(`${BASE}/image/generate`);
             expect(request.body).toMatchObject({ model: textOnly, aspect_ratio: '2:3', safe_mode: false });
+            // Only qwen-image-3 costs the same at 2K; the Seedream text-to-image models stay at 1K.
+            expect(request.body.resolution).toBe(textOnly === 'qwen-image-3' ? '2K' : undefined);
             expect(result).toMatchObject({ model: textOnly, costUsd: price });
             expect(records[0]).toMatchObject({ kind: 'snapshot_image', pool: 'image', model: textOnly, costUsd: price });
         }

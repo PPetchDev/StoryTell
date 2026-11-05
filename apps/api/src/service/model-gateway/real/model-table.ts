@@ -22,7 +22,7 @@ export interface TextModelSpec {
      * effort; the DeepSeek models take `enabled: false`.
      */
     reasoning: { effort: 'minimal' } | { enabled: false };
-    /** GMICloud ignores `stop`, so stop strings are never sent there. */
+    /** False for a host that ignores `stop` (GMICloud did), so stop strings are never sent there. */
     stopStrings: boolean;
 }
 
@@ -33,11 +33,12 @@ export const TEXT_MODELS: Record<TextModel, TextModelSpec> = {
         reasoning: { effort: 'minimal' },
         stopStrings: true,
     },
+    // On DeepInfra since 2026-11-05: GMICloud's terms ban "obscene" material, and it ignored `stop`.
     'deepseek-v4-pro': {
         id: 'deepseek/deepseek-v4-pro',
-        host: 'gmicloud',
+        host: 'deepinfra',
         reasoning: { enabled: false },
-        stopStrings: false,
+        stopStrings: true,
     },
     'deepseek-v4-flash': {
         id: 'deepseek/deepseek-v4-flash',
@@ -68,6 +69,8 @@ export interface ImageModelSpec {
     listPriceUsd: number;
     /** The list price of each input image past the first, where Venice charges for them (`pricing.inputImages`). */
     extraInputImageUsd?: number;
+    /** Sent as `resolution` where a tier costs no more than 1K; left out, Venice draws at 1K. */
+    resolution?: '2K';
     /**
      * `GET /models` reports `constraints.promptCharacterLimit`; this is the value read on
      * 2026-11-04, used when that call fails.
@@ -108,10 +111,12 @@ export const IMAGE_MODELS: Record<ImageModel, ImageModelSpec> = {
         listPriceUsd: 0.06,
         fallbackPromptCharacterLimit: 10_000,
     },
+    // Venice's `GET /models` on 2026-11-05: $0.04 at both 1K and 2K, so it draws at 2K.
     'qwen-image-3': {
         id: 'qwen-image-3',
         endpoint: 'generate',
         listPriceUsd: 0.04,
+        resolution: '2K',
         fallbackPromptCharacterLimit: 10_000,
     },
 };

@@ -38,7 +38,7 @@ describe('OpenRouter contract', () => {
             expect(net.requests[0].body).not.toHaveProperty('response_format');
         });
 
-        it('plays turns on DeepSeek V4 Pro pinned to GMICloud, reasoning off, and never sends stop strings', async () => {
+        it('plays turns on DeepSeek V4 Pro pinned to DeepInfra, reasoning off, with stop strings', async () => {
             const net = recordedFetch([{ fixture: 'openrouter/chat-success.json' }]);
             const { gateway } = gatewayUnderTest(net.fetch, { settings: { playModel: 'deepseek-v4-pro' } });
 
@@ -46,10 +46,10 @@ describe('OpenRouter contract', () => {
 
             expect(net.requests[0].body).toMatchObject({
                 model: 'deepseek/deepseek-v4-pro',
-                provider: { only: ['gmicloud'], allow_fallbacks: false },
+                provider: { only: ['deepinfra'], allow_fallbacks: false },
                 reasoning: { enabled: false },
+                stop: ['\n@You:'],
             });
-            expect(net.requests[0].body).not.toHaveProperty('stop');
             expect(result.model).toBe('deepseek-v4-pro');
         });
 

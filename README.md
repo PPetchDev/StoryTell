@@ -83,10 +83,10 @@ from the kind and Settings, and writes one `usage_record` row per answered call.
 
 | Kind | Model | Host | Request settings |
 |---|---|---|---|
-| turn, story_draft, field_rewrite, story_assistant, suggested_replies | play model from Settings: GLM-5.3 (default) or DeepSeek V4 Pro | DeepInfra / GMICloud via OpenRouter | `provider.only` + `allow_fallbacks: false`; GLM `reasoning: {effort: "minimal"}` with stop strings; V4 Pro `reasoning: {enabled: false}`, stop strings never sent |
+| turn, story_draft, field_rewrite, story_assistant, suggested_replies | play model from Settings: GLM-5.3 (default) or DeepSeek V4 Pro | DeepInfra via OpenRouter | `provider.only` + `allow_fallbacks: false`, with stop strings; GLM `reasoning: {effort: "minimal"}`; V4 Pro `reasoning: {enabled: false}` |
 | judge, memory_extraction, snapshot_prompt | DeepSeek V4 Flash | DeepInfra via OpenRouter | `reasoning: {enabled: false}`, `response_format: json_object` when asked |
-| snapshot_image | Snapshot model from Settings: `seedream-v4-edit` (default, $0.05) or `qwen-edit-uncensored` ($0.04) | Venice `POST /image/multi-edit` | up to 3 reference images, `aspect_ratio: "2:3"`, `safe_mode: false` |
-| reference_image | `qwen-image-3` ($0.04) | Venice `POST /image/generate` | `aspect_ratio: "2:3"`, `safe_mode: false` |
+| snapshot_image | Snapshot model from Settings: `seedream-v4-edit` (default, $0.05), `seedream-v5-pro-edit` ($0.06, +$0.00345 per reference image past the first) or `qwen-edit-uncensored` ($0.04) | Venice `POST /image/multi-edit` | up to 3 reference images, `aspect_ratio: "2:3"`, `safe_mode: false` |
+| reference_image | `qwen-image-3` ($0.04 at 1K or 2K) | Venice `POST /image/generate` | `aspect_ratio: "2:3"`, `resolution: "2K"`, `safe_mode: false` |
 
 - The gateway never switches model or host. A 429 or 503 is retried up to 3 times on the same
   host with backoff (`Retry-After` honoured); anything else fails with a typed error.
@@ -285,8 +285,8 @@ the hosts below ever see a request. What their own policy pages said on 2026-11-
 | Host | What | Prompts and outputs | Training |
 |---|---|---|---|
 | [OpenRouter](https://openrouter.ai/docs/guides/privacy/data-collection) | routes every text call | Not stored unless you opt in to logging (off by default). Metadata such as token counts is kept, no period stated. | Only if you opt in. With training opted out in account settings, it won't route to providers that train. |
-| [DeepInfra](https://docs.deepinfra.com/account/data-privacy) | GLM-5.3 (play), DeepSeek V4 Flash (background calls) | Not stored on disk; outputs deleted once returned. Only metadata (request ID, cost) is logged. | No. |
-| [GMICloud](https://www.gmicloud.ai/en/legal/console-terms-of-service) | DeepSeek V4 Pro (manual fallback) | Unclear. Its terms say inputs aren't stored without opting in to prompt logging, but OpenRouter flags it as retaining prompts, with no period. | No general-purpose training. |
+| [DeepInfra](https://docs.deepinfra.com/account/data-privacy) | GLM-5.3 and DeepSeek V4 Pro (play), DeepSeek V4 Flash (background calls) | Not stored on disk; outputs deleted once returned. Only metadata (request ID, cost) is logged. | No. |
+| [GMICloud](https://www.gmicloud.ai/en/legal/console-terms-of-service) | No longer used: DeepSeek V4 Pro moved to DeepInfra on 2026-11-05, as GMICloud's terms ban "obscene" material and it ignored `stop`. Before that: | Unclear. Its terms say inputs aren't stored without opting in to prompt logging, but OpenRouter flags it as retaining prompts, with no period. | No general-purpose training. |
 | [Venice](https://docs.venice.ai/overview/privacy) | Snapshots and Reference images | Venice says it doesn't store prompt or response content; it keeps metadata (key ID, IP, timestamps). But `seedream-v4-edit`, `seedream-v4` and `qwen-image-3` are Venice "anonymized" models, not "private" ones: the upstream image provider still sees the prompt and reference images, under terms Venice doesn't state. | Not mentioned. |
 
 Worth doing in your accounts: in OpenRouter → Settings → Privacy, keep prompt logging off and

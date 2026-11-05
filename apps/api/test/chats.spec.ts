@@ -1189,7 +1189,7 @@ describe('Chats through the real gateway', () => {
         expect(usage.body.pools.text).toMatchObject({ calls: 3, spentUsd: 0.00121 });
     });
 
-    it('sends no stop strings for DeepSeek V4 Pro', async () => {
+    it('sends stop strings for DeepSeek V4 Pro on DeepInfra', async () => {
         const { storyId, chatId } = await playableChat();
         await t.http.put('/api/settings').send({ playModel: 'deepseek-v4-pro' }).expect(200);
         const before = turnRequests().length;
@@ -1199,9 +1199,9 @@ describe('Chats through the real gateway', () => {
         const request = turnRequests()[before];
         expect(request.body).toMatchObject({
             model: 'deepseek/deepseek-v4-pro',
-            provider: { only: ['gmicloud'], allow_fallbacks: false },
+            provider: { only: ['deepinfra'], allow_fallbacks: false },
         });
-        expect(request.body).not.toHaveProperty('stop');
+        expect(request.body.stop).toEqual(['\nAsh:', '\n@Ash:', '\nYou:']);
         expect(body.messages[2]).toMatchObject({ kind: 'ai', model: 'deepseek-v4-pro' });
         await awaitJudge(t.http, storyId, chatId);
 

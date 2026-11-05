@@ -138,7 +138,7 @@ export class OpenRouterClient {
      * 200, and is mapped the same way.
      *
      * Aborting `signal` closes the connection, which stops the model and its billing on hosts
-     * that support cancellation (DeepInfra does; GMICloud is not listed either way). The call
+     * that support cancellation (DeepInfra, which serves every text model, does). The call
      * then resolves with `stopped` and the text so far, but no usage: an aborted stream never
      * gets its usage chunk, so the caller reads the bill with `generation(generationId)`.
      */
