@@ -1,5 +1,6 @@
 import { CSSProperties, ReactNode, useId } from 'react';
 
+import { useCharacterProfile } from '@/components/chat/character-profile';
 import { PortraitImage } from '@/components/portrait/portrait-image';
 import { Cast, characterColour, Portrait, Portraits } from '@/lib/character-colour';
 import { Message, MessagePart } from '@/lib/chat';
@@ -43,14 +44,25 @@ export function UserLine({ identityName, text }: { identityName: string; text: s
     );
 }
 
-/** A Character's line: their picture, their name in their colour, and the line in a bubble. */
+/**
+ * A Character's line: their picture, their name in their colour, and the line in a bubble. In a
+ * Chat, a tap on the picture opens the Character's profile.
+ */
 function Speech({ part, cast, portraits }: { part: Extract<MessagePart, { kind: 'speech' }>; cast: Cast; portraits: Portraits }) {
     const nameId = useId();
     const colour = characterColour(part.characterId, cast);
     const portrait = part.characterId === null ? undefined : portraits[part.characterId];
+    const openProfile = useCharacterProfile(part.characterId);
+    const avatar = <Avatar name={part.speakerName} colour={colour} portrait={portrait} />;
     return (
         <div className={styles.speech} style={{ '--speaker-colour': colour } as CSSProperties} role="group" aria-labelledby={nameId}>
-            <Avatar name={part.speakerName} colour={colour} portrait={portrait} />
+            {openProfile ? (
+                <button type="button" className={styles.avatarButton} aria-label={`Profile of ${part.speakerName}`} onClick={openProfile}>
+                    {avatar}
+                </button>
+            ) : (
+                avatar
+            )}
             <div className={styles.column}>
                 <p id={nameId} className={styles.speaker}>
                     {part.speakerName}

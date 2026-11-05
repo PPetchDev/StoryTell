@@ -116,3 +116,28 @@
     color: var(--accent-text);
     border-radius: 1.1rem 0.3rem 1.1rem 1.1rem;
 }
+
+/* In a Chat, the picture beside a Character's line opens their profile. */
+.avatarButton {
+    position: relative;
+    flex: none;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* A 44px touch target around the 36px picture. */
+.avatarButton::before {
+    content: '';
+    position: absolute;
+    inset: -0.25rem;
+    border-radius: 999px;
+}
+
+.avatarButton:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}

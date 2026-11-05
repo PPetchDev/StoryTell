@@ -83,9 +83,13 @@ The collection of every Snapshot taken in any of a Story's Chats.
 _Avoid_: Album, library
 
 **Reference image**:
-An image of a Character, chosen by the author, that keeps the Character looking the same in every Snapshot; in play only its Portrait is shown.
+An image of a Character, chosen by the author, that keeps the Character looking the same in every Snapshot; in play its Portrait shows beside their lines, and the whole image only in their Character profile.
 _Avoid_: Avatar, profile picture
 
 **Portrait**:
 The square of a Character's Reference image that the author picks to show beside the Character's lines in a Chat; until one is picked, a square near the top middle stands in, and without a Reference image, the Character's initial.
 _Avoid_: Avatar, profile picture, icon
+
+**Character profile**:
+What a tap on a Character's Portrait in a Chat opens: their whole Reference image, name, Appearance, Personality, Voice and Background, but never their Secrets or Arc directions, which would give the story away.
+_Avoid_: Bio, character card
