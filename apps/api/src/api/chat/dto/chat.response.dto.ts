@@ -9,7 +9,7 @@ import {
     DashboardCharacter,
     EditResult,
 } from '../../../manager/chat/chat.service.js';
-import { ChatSummary } from '../../../model/chat/entities/chat.entity.js';
+import { ChatSummary, TimeOfDay, TIMES_OF_DAY } from '../../../model/chat/entities/chat.entity.js';
 import { BackgroundCallResponse, BackgroundStatus } from '../../../model/chat/entities/message.entity.js';
 import { ArcStepResponse } from '../../../model/ledger/entities/arc-step.entity.js';
 import { BondChangeResponse } from '../../../model/ledger/entities/bond-change.entity.js';
@@ -139,6 +139,9 @@ export class DriftDTO {
 export class ChatResponseBodyDTO extends ChatSummaryDTO implements Omit<ChatDetail, 'messages'> {
     @ApiProperty({ type: CurrentSceneDTO, nullable: true, description: 'null means free play.' })
     currentScene: CurrentSceneDTO | null;
+
+    @ApiProperty({ enum: TIMES_OF_DAY, nullable: true, description: 'The Time of day in the story; null until the story makes one clear.' })
+    timeOfDay: TimeOfDay | null;
 
     @ApiProperty({ description: 'The worn identity, under which the next User Message shows.' })
     identityName: string;

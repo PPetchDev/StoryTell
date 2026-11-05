@@ -56,8 +56,13 @@ export interface AiMessage {
 
 export type Message = UserMessage | AiMessage;
 
+/** Where the Chat's story is in the day (CONTEXT.md: "Time of day"). */
+export type TimeOfDay = 'dawn' | 'morning' | 'noon' | 'afternoon' | 'evening' | 'night';
+
 export interface Chat extends ChatSummary {
     currentScene: { id: number; name: string } | null;
+    /** null until the story makes the time of day clear. */
+    timeOfDay: TimeOfDay | null;
     /** The worn identity, under which the next User Message shows. */
     identityName: string;
     /** The worn Persona; null while the Chat wears its Story's Role. */

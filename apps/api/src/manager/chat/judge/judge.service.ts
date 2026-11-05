@@ -131,6 +131,7 @@ export class JudgeManagerService {
                     steps: state.arcSteps.filter((step) => step.characterId === character.id).map((step) => step.step),
                 })),
                 scene: scene ? { name: scene.name, moveOnCondition: scene.moveOnCondition } : null,
+                timeOfDay: chat.timeOfDay,
                 recent: context.map((entry) => messageLine(entry, identityName)),
                 userText,
                 aiText: partsToText(message.parts.map((part) => part.toResponse())),
@@ -151,6 +152,7 @@ export class JudgeManagerService {
                     bonds,
                     scenes: story.scenes.map((candidate) => ({ id: candidate.id, name: candidate.name })),
                     currentSceneId: chat.currentSceneId,
+                    timeOfDay: chat.timeOfDay,
                 },
                 judgement,
             );

@@ -19,7 +19,7 @@ import { OutOfCreditError } from '../../errors/model-gateway.errors.js';
 import { PersonaNotFoundError } from '../../errors/persona.errors.js';
 import { StoryNotFoundError } from '../../errors/story.errors.js';
 import { ChatModelService } from '../../model/chat/chat.service.js';
-import { ChatEntity, ChatSummary } from '../../model/chat/entities/chat.entity.js';
+import { ChatEntity, ChatSummary, TimeOfDay } from '../../model/chat/entities/chat.entity.js';
 import {
     AUTHOR_MODEL,
     BackgroundCallResponse,
@@ -66,6 +66,8 @@ export interface ChatListItem extends ChatSummary {
 export interface ChatDetail extends ChatSummary {
     /** The Scene the Chat is on; null means free play. */
     currentScene: { id: number; name: string } | null;
+    /** The Time of day in the story (spec: "Story clock"); null until the story makes one clear. */
+    timeOfDay: TimeOfDay | null;
     /** The worn identity's name, under which the next User Message shows. */
     identityName: string;
     /** The worn Persona; null while the Chat wears its Story's Role. */
@@ -578,6 +580,7 @@ export class ChatManagerService {
             ...promptLayers(story, state),
             memories: promptMemories(story, memories),
             storySoFar: promptStorySoFar(chat),
+            timeOfDay: chat.timeOfDay,
             history,
             userText,
             present: inLatestExchange(story, chat, userText),
@@ -671,6 +674,7 @@ export class ChatManagerService {
             ...promptLayers(story, state),
             memories: promptMemories(story, memories),
             storySoFar: promptStorySoFar(chat),
+            timeOfDay: chat.timeOfDay,
             present: inLatestExchange(story, chat, null),
         };
     }
@@ -752,6 +756,7 @@ export class ChatManagerService {
         return {
             ...chat.toSummary(),
             currentScene: scene ? { id: scene.id, name: scene.name } : null,
+            timeOfDay: chat.timeOfDay,
             identityName: identity.name,
             personaId: identity.personaId,
             roleName: story.role.name,

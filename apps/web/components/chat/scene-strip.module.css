@@ -34,6 +34,12 @@
     font-weight: 600;
 }
 
+/* The Time of day: short, so it never gives way to the goal. */
+.time {
+    flex: none;
+    color: var(--text);
+}
+
 .goal {
     flex: 1;
     min-width: 0;

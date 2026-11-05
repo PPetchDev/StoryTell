@@ -15,6 +15,10 @@ import type { SceneEntity } from '../../story/entities/scene.entity.js';
 import type { StoryEntity } from '../../story/entities/story.entity.js';
 import type { MessageEntity } from './message.entity.js';
 
+/** Spec: "Story clock". Where a Chat's story is in the day, in order through it. */
+export const TIMES_OF_DAY = ['dawn', 'morning', 'noon', 'afternoon', 'evening', 'night'] as const;
+export type TimeOfDay = (typeof TIMES_OF_DAY)[number];
+
 /** Who wrote a Chat's current Story so far. */
 export type StorySoFarAuthor = 'ai' | 'user';
 
@@ -59,6 +63,13 @@ export class ChatEntity {
     @ManyToOne('SceneEntity', { onDelete: 'SET NULL', nullable: true })
     @JoinColumn({ name: 'current_scene_id' })
     currentScene: Relation<SceneEntity> | null;
+
+    /**
+     * Spec: "Story clock". The current Time of day; null until the story makes one clear. Set
+     * and rolled back with the ledger's TimeChanges, like `currentSceneId` with SceneAdvances.
+     */
+    @Column({ name: 'time_of_day', type: 'text', nullable: true })
+    timeOfDay: TimeOfDay | null;
 
     // Swapping identity is Chat state outside the ledger: never rolled back, kept by reset.
     @Column({ name: 'persona_id', type: 'integer', nullable: true })

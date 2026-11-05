@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, MoreThanOrEqual, Repository } from 'typeorm';
 
-import { ChatEntity } from '../chat/entities/chat.entity.js';
+import { ChatEntity, TimeOfDay } from '../chat/entities/chat.entity.js';
 import { BackgroundStatus, MessageEntity } from '../chat/entities/message.entity.js';
 import { MemoryKnownByEntity } from '../memory/entities/memory-known-by.entity.js';
 import { MemoryAuthor, MemoryEntity, MemorySnapshot } from '../memory/entities/memory.entity.js';
@@ -12,6 +12,7 @@ import { BondChangeEntity } from './entities/bond-change.entity.js';
 import { ChatArcDirectionEntity } from './entities/chat-arc-direction.entity.js';
 import { MemoryChangeEntity, MemoryChangeKind } from './entities/memory-change.entity.js';
 import { SceneAdvanceEntity } from './entities/scene-advance.entity.js';
+import { TimeChangeEntity } from './entities/time-change.entity.js';
 
 /** A StartingBond as it is seeded into a Chat: no event, no causing Message. */
 export interface BondSeed {
@@ -49,11 +50,18 @@ export interface NewSceneAdvance {
     event: string;
 }
 
+export interface NewTimeChange {
+    fromTime: TimeOfDay | null;
+    toTime: TimeOfDay;
+}
+
 /** What one judgement changed, recorded together against the AI Message that caused it. */
 export interface MessageChanges {
     bonds: NewBondChange[];
     arcs: NewArcStep[];
     scene: NewSceneAdvance | null;
+    /** The Time of day moving on; null or left out when it stayed. */
+    time?: NewTimeChange | null;
 }
 
 /**
@@ -85,9 +93,9 @@ export interface RollbackCounts {
 
 /**
  * The change ledger (spec: "Change ledger and rollback"): every AI-made change to Memory,
- * Bonds, Arcs and the Scene as a record against its causing AI Message, so a rewind can undo
- * them. Small interface: seed, record for a Message (the judge's changes, or the
- * extraction's), roll back from a Message, clear. Rollback undoes newest first and returns
+ * Bonds, Arcs, the Scene and the Time of day as a record against its causing AI Message, so a
+ * rewind can undo them. Small interface: seed, record for a Message (the judge's changes, or
+ * the extraction's), roll back from a Message, clear. Rollback undoes newest first and returns
  * counts by kind.
  */
 @Injectable()
@@ -195,6 +203,10 @@ export class LedgerModelService {
                 await manager.save(manager.create(SceneAdvanceEntity, { chatId, messageId, ...changes.scene }));
                 await manager.update(ChatEntity, { id: chatId }, { currentSceneId: changes.scene.toSceneId });
             }
+            if (changes.time) {
+                await manager.save(manager.create(TimeChangeEntity, { chatId, messageId, ...changes.time }));
+                await manager.update(ChatEntity, { id: chatId }, { timeOfDay: changes.time.toTime });
+            }
             await manager.update(
                 MessageEntity,
                 { id: messageId },
@@ -301,6 +313,12 @@ export class LedgerModelService {
                 await manager.delete(SceneAdvanceEntity, { id: advance.id });
                 counts.sceneAdvances++;
             }
+            // Not counted: the rollback notice leaves the Time of day out (spec: "Story clock").
+            const times = newestFirst(await manager.find(TimeChangeEntity, { where: { messageId: In(ids) } }));
+            for (const time of times) {
+                await manager.update(ChatEntity, { id: chatId }, { timeOfDay: time.fromTime });
+                await manager.delete(TimeChangeEntity, { id: time.id });
+            }
             const arcs = newestFirst(await manager.find(ArcStepEntity, { where: { messageId: In(ids) } }));
             for (const arc of arcs) {
                 await manager.delete(ArcStepEntity, { id: arc.id });
@@ -317,10 +335,12 @@ export class LedgerModelService {
 
     /**
      * Spec: "Reset Chat". All Memory (user-written included), Bond history, Arc steps, Scene
-     * advances and copied Arc directions go.
+     * advances, Time of day changes and copied Arc directions go, and the Chat has no time of day.
      */
     clear(chatId: number): Promise<void> {
         return this.dataSource.transaction(async (manager: EntityManager) => {
+            await manager.delete(TimeChangeEntity, { chatId });
+            await manager.update(ChatEntity, { id: chatId }, { timeOfDay: null });
             await manager.delete(MemoryChangeEntity, { chatId });
             await manager.delete(MemoryEntity, { chatId });
             await manager.delete(SceneAdvanceEntity, { chatId });

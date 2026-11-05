@@ -1,10 +1,12 @@
+import { TimeOfDay } from '../../../model/chat/entities/chat.entity.js';
 import { MessageChanges, NewBondChange } from '../../../model/ledger/ledger.service.js';
 import { Judgement } from './judge-prompt.js';
 
 /**
  * The backend rules for applying a judgement (spec: "Backend rules when applying a
  * judgement"): drop unknown names and self-Bonds, drop a Bond "change" to the same label,
- * keep one change per Bond per turn, advance at most one Scene. Pure logic.
+ * keep one change per Bond per turn, advance at most one Scene, drop a Time of day equal to
+ * the current one. Pure logic.
  */
 
 export interface ApplyCastMember {
@@ -33,6 +35,8 @@ export interface ApplyInput {
     /** The Story's Scenes in order, and the one the Chat is on (null: free play). */
     scenes: ApplyScene[];
     currentSceneId: number | null;
+    /** The Chat's Time of day now; null while there is none. Left out, it reads as null. */
+    timeOfDay?: TimeOfDay | null;
 }
 
 export interface AppliedJudgement extends MessageChanges {
@@ -113,5 +117,13 @@ export function applyJudgement(input: ApplyInput, judgement: Judgement): Applied
         rejected.push('Scene: move on while in free play');
     }
 
-    return { bonds, arcs, scene, rejected };
+    const now = input.timeOfDay ?? null;
+    let time: MessageChanges['time'] = null;
+    if (judgement.timeOfDay && judgement.timeOfDay !== now) {
+        time = { fromTime: now, toTime: judgement.timeOfDay };
+    } else if (judgement.timeOfDay) {
+        rejected.push(`Time of day: still ${judgement.timeOfDay} — not a change`);
+    }
+
+    return { bonds, arcs, scene, time, rejected };
 }

@@ -1,4 +1,5 @@
 import { Pov, ReplyLength, Tense } from '../../../model/story/entities/story.entity.js';
+import type { TimeOfDay } from '../../../model/chat/entities/chat.entity.js';
 import { PromptMessage } from '../../../service/model-gateway/model-gateway.js';
 import { MEMORY_CAP_TOKENS, memoryLine } from '../memory/memory-prompt.js';
 import { memoryIsAbout } from '../memory/present.js';
@@ -110,6 +111,8 @@ export interface TurnPromptInput {
      * reminder names none. Past the Memory cap, Memories about them are kept before others.
      */
     present?: string[];
+    /** The Chat's Time of day, stated in the reminder near the end; null or left out while there is none. */
+    timeOfDay?: TimeOfDay | null;
     /** The Memory layer's cap in tokens (spec: "about 2k tokens"); past it, Memories are left out in `memoryLeaveOutOrder`. */
     memoryCapTokens?: number;
 }
@@ -361,11 +364,13 @@ export function turnFinalInstruction(identity: string): string {
 
 /**
  * A short restatement of where things stand, read last, just before the final instruction:
- * the Scene, who was in the latest exchange, and the point of view. Instructions far up a long
- * prompt fade (docs/research/keeping-characters-in-character.md); this keeps the essentials close.
+ * the Scene, the Time of day, who was in the latest exchange, and the point of view. Instructions
+ * far up a long prompt fade (docs/research/keeping-characters-in-character.md); this keeps the
+ * essentials close.
  */
-export function stateReminder(input: Pick<TurnPromptInput, 'story' | 'identity' | 'scene' | 'present'>): string {
+export function stateReminder(input: Pick<TurnPromptInput, 'story' | 'identity' | 'scene' | 'present' | 'timeOfDay'>): string {
     const lines = [input.scene ? `Scene: ${input.scene.name}.` : 'No Scene: the story unfolds freely.'];
+    if (input.timeOfDay) lines.push(`Time: ${input.timeOfDay}.`);
     if (input.present && input.present.length > 0) lines.push(`In the latest exchange: ${input.present.join(', ')}.`);
     lines.push(`Narrate in ${povAndTense(input.story, input.identity.name)}, and keep each Character as their card describes.`);
     lines.push(`Gender ${input.identity.name} only as their description or the user's own messages do, whatever earlier turns said.`);

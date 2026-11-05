@@ -218,6 +218,7 @@ export class SnapshotManagerService {
                     })),
                 hint: job.hint,
                 hintNames,
+                timeOfDay: chat.timeOfDay,
             }),
             maxTokens: SNAPSHOT_PROMPT_MAX_TOKENS,
             json: true,

@@ -35,6 +35,8 @@ export interface SnapshotPromptInput {
     hint: string;
     /** The Characters the hint names; when there are any, exactly they are in frame. */
     hintNames: string[];
+    /** The Chat's Time of day (spec: "Story clock"); null or left out while there is none. */
+    timeOfDay?: string | null;
 }
 
 export function snapshotPromptMessages(input: SnapshotPromptInput): PromptMessage[] {
@@ -71,6 +73,7 @@ ${template}`;
         `Memory:\n${input.memories.length > 0 ? input.memories.map((text) => `- ${text}`).join('\n') : '(none)'}`,
         `The latest Messages, oldest first; the image shows the end of the last one:\n${input.messages.map((message) => `[${message.speaker}]\n${message.text}`).join('\n\n')}`,
     ];
+    if (input.timeOfDay) sections.push(`The time of day at this moment is ${input.timeOfDay}: the light must match it.`);
     if (input.hint.trim() !== '') {
         sections.push(`The user's hint for this image, which you follow: ${input.hint.trim()}`);
     }

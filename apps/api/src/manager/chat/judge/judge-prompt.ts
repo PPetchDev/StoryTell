@@ -1,9 +1,10 @@
 import { UnparseableOutputError } from '../../../errors/model-gateway.errors.js';
+import { TimeOfDay, TIMES_OF_DAY } from '../../../model/chat/entities/chat.entity.js';
 import { PromptMessage } from '../../../service/model-gateway/model-gateway.js';
 import { exchangeUserLine } from '../exchange.js';
 
 /**
- * The Bond, Arc and Scene judge's prompt and output (spec: "Background judge"), from the turn
+ * The Bond, Arc, Scene and Time of day judge's prompt and output (spec: "Background judge"), from the turn
  * prototype after its re-judge fix. Pure logic over plain inputs: the manager gathers them.
  */
 
@@ -34,6 +35,8 @@ export interface JudgePromptInput {
     bonds: JudgeBond[];
     arcs: JudgeArc[];
     scene: { name: string; moveOnCondition: string } | null;
+    /** The Chat's Time of day; null while the story has not made one clear. Left out, it reads as null. */
+    timeOfDay?: TimeOfDay | null;
     /** The Messages before the exchange, oldest first, as `Name: text` or the AI's `@Name:` text. */
     recent: string[];
     /** The exchange to judge: what the user wrote (null after a Continue) and the AI's reply as `@Name:` text. */
@@ -64,10 +67,14 @@ Arc rules:
 Scene rule:
 - Judge whether the current Scene's move-on condition has now been met, with the Bonds in view. Be strict: met means clearly met in the story, not "getting closer".
 
+Time of day rule:
+- Give the in-story time of day only when the latest exchange moves it on to a new one, or first makes it clear: one of "dawn", "morning", "noon", "afternoon", "evening" or "night". Otherwise null. Read it from the story (light, meals, sleep, the sky); never guess.
+
 Reply with JSON only:
 {"bond_changes":[{"from":"Name","to":"user|Name","label":"...","description":"...","cause":"..."}],
  "arc_steps":[{"character":"Name","step":"...","cause":"..."}],
- "scene":{"move_on":false,"reason":"..."}}
+ "scene":{"move_on":false,"reason":"..."},
+ "time_of_day":null}
 Empty arrays when nothing changed.`;
 
 export function buildJudgePrompt(input: JudgePromptInput): { messages: PromptMessage[]; maxTokens: number } {
@@ -98,6 +105,9 @@ ${arcs}
 
 # Current Scene
 ${input.scene ? `${input.scene.name}. Move-on condition: ${input.scene.moveOnCondition || '(none)'}` : 'none'}
+
+# Time of day
+${input.timeOfDay ?? 'not yet known'}
 
 # Recent story (context)
 ${input.recent.join('\n\n') || '(start)'}
@@ -140,6 +150,8 @@ export interface Judgement {
     arcSteps: JudgedArcStep[];
     /** One entry per move-on signal the judge gave; the backend applies at most one. */
     scenes: JudgedScene[];
+    /** The Time of day the story moved on to; null when the judge gave none (unchanged). */
+    timeOfDay: TimeOfDay | null;
 }
 
 const str = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
@@ -179,5 +191,11 @@ export function parseJudgement(text: string): Judgement {
     const scenes = (Array.isArray(json.scene) ? json.scene : [json.scene]).flatMap((item): JudgedScene[] =>
         isObject(item) ? [{ moveOn: item.move_on === true, reason: str(item.reason) }] : [],
     );
-    return { bondChanges, arcSteps, scenes };
+    return { bondChanges, arcSteps, scenes, timeOfDay: readTimeOfDay(json.time_of_day) };
+}
+
+/** One of the six, in any case; a missing field, a null or anything else means unchanged. */
+function readTimeOfDay(value: unknown): TimeOfDay | null {
+    const time = str(value).toLowerCase();
+    return (TIMES_OF_DAY as readonly string[]).includes(time) ? (time as TimeOfDay) : null;
 }

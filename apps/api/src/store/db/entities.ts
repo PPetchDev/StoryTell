@@ -6,6 +6,7 @@ import { BondChangeEntity } from '../../model/ledger/entities/bond-change.entity
 import { ChatArcDirectionEntity } from '../../model/ledger/entities/chat-arc-direction.entity.js';
 import { MemoryChangeEntity } from '../../model/ledger/entities/memory-change.entity.js';
 import { SceneAdvanceEntity } from '../../model/ledger/entities/scene-advance.entity.js';
+import { TimeChangeEntity } from '../../model/ledger/entities/time-change.entity.js';
 import { MemoryKnownByEntity } from '../../model/memory/entities/memory-known-by.entity.js';
 import { MemoryEntity } from '../../model/memory/entities/memory.entity.js';
 import { SettingsEntity } from '../../model/settings/entities/settings.entity.js';
@@ -34,6 +35,7 @@ export const entities = [
     BondChangeEntity,
     ArcStepEntity,
     SceneAdvanceEntity,
+    TimeChangeEntity,
     ChatArcDirectionEntity,
     MemoryEntity,
     MemoryKnownByEntity,
