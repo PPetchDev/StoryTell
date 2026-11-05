@@ -10,9 +10,9 @@ import { SceneStrip } from '@/components/chat/scene-strip';
 import { SnapshotSheet } from '@/components/chat/snapshot-sheet';
 import { SnapshotViewer, useChatSnapshots } from '@/components/chat/snapshots';
 import { useConnection } from '@/components/connection';
-import { ApiError, apiFetch, ApiUnreachableError } from '@/lib/api';
+import { ApiError, apiFetch, ApiUnreachableError, StreamBrokenError, StreamStoppedError } from '@/lib/api';
 import { Cast, Portraits } from '@/lib/character-colour';
-import { backgroundPending, Chat, chatApi, EditedChat, latestReply, Message, rollbackNotice } from '@/lib/chat';
+import { backgroundPending, Chat, chatApi, EditedChat, latestReply, Message, MessagePart, rollbackNotice, TurnStream } from '@/lib/chat';
 import { Memory, memoryApi, renderUser } from '@/lib/memory';
 import { setSceneStripHidden, useSceneStripHidden } from '@/lib/scene-strip';
 import { inThreadOrder, Snapshot } from '@/lib/snapshot';
@@ -30,11 +30,12 @@ interface Toast {
 const BACKGROUND_POLL_MS = 1_000;
 
 /**
- * The Chat screen (spec: "Chat screen"): a top bar, the thread and the composer. No
- * streaming: a "writing" indicator shows while the turn is written, and a failed turn leaves
- * the User Message with Retry. Any Message can be edited in place, which discards the
- * Messages after it and rolls back their changes, with a short notice of what went; Reset
- * starts the Chat over from the Opening. Bonds and Arcs never show here: the dashboard link
+ * The Chat screen (spec: "Chat screen"): a top bar, the thread and the composer. Every turn
+ * streams (spec: streaming replies): the reply shows as it is written, with the "writing"
+ * indicator after it, and ■ Stop ends it early. A stopped or failed turn leaves nothing of the
+ * reply, and a User Message it was answering stays with Retry. Any Message can be edited in
+ * place, which discards the Messages after it and rolls back their changes, with a short
+ * notice of what went; Reset starts the Chat over from the Opening. Bonds and Arcs never show here: the dashboard link
  * leads to them. Memory does: the drawer lists it, and a "Memory added" toast appears for each
  * Memory the AI adds once a turn's extraction is done. 📷 in the newest reply's action row
  * opens a sheet that takes a Snapshot of the latest AI Message while play goes on; Snapshots
@@ -56,6 +57,10 @@ export function ChatScreen({ initial, cast, portraits, scenes }: ChatScreenProps
     /** The line just sent, shown in the thread until the turn settles. */
     const [pending, setPending] = useState<PendingLine | null>(null);
     const [writing, setWriting] = useState(false);
+    /** The reply so far while a turn streams; null before its first words and once it settles. */
+    const [replySoFar, setReplySoFar] = useState<MessagePart[] | null>(null);
+    /** Stops the turn being written. */
+    const stopRef = useRef<AbortController | null>(null);
     const [busy, setBusy] = useState(false);
     const [editing, setEditing] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -138,36 +143,51 @@ export function ChatScreen({ initial, cast, portraits, scenes }: ChatScreenProps
     };
 
     /**
-     * Runs a turn with the writing indicator up. A failed turn shows its error and re-reads
-     * the Chat, since the User Message may have been stored before the turn failed: it then
-     * shows with Retry. `unsent` is called when it wasn't stored, so its text isn't lost.
+     * Runs a turn as a stream, with the writing indicator up: each `parts` event shows the
+     * reply so far. A failed or stopped turn drops the reply at once and re-reads the Chat,
+     * since the User Message may have been stored before the turn failed: it then shows with
+     * Retry. A failure shows its error; a Stop does not. `unsent` is called when the User
+     * Message wasn't stored, so its text isn't lost.
      */
-    const runTurn = async (turn: () => Promise<Chat>, unsent?: () => void) => {
+    const runTurn = async (turn: (stream: TurnStream) => Promise<Chat>, unsent?: () => void) => {
+        const stop = new AbortController();
+        stopRef.current = stop;
         setWriting(true);
         setError(null);
         setRollback(null);
         try {
-            setChat(await turn());
+            setChat(await turn({ signal: stop.signal, onParts: setReplySoFar }));
         } catch (caught) {
+            setReplySoFar(null);
             if (caught instanceof ApiUnreachableError) {
                 unsent?.();
                 reportUnreachable();
                 return;
             }
-            setError(caught instanceof ApiError ? caught.message : 'The turn failed.');
+            if (!(caught instanceof StreamStoppedError)) {
+                setError(caught instanceof ApiError || caught instanceof StreamBrokenError ? caught.message : 'The turn failed.');
+            }
+            // A stream that broke off had begun, so the API had stored the User Message by then.
+            const stored = caught instanceof StreamBrokenError;
             try {
                 const reread = await apiFetch<Chat>(`/stories/${chat.storyId}/chats/${chat.id}`);
                 setChat(reread);
                 if (!reread.awaitingReply) unsent?.();
-            } catch {
+            } catch (rereadFailed) {
                 // The error above already tells the user; a reload shows the rest.
-                unsent?.();
+                if (!stored) unsent?.();
+                if (rereadFailed instanceof ApiUnreachableError) reportUnreachable();
             }
         } finally {
+            stopRef.current = null;
+            setReplySoFar(null);
             setWriting(false);
             setPending(null);
         }
     };
+
+    /** ■ Stop: ends the reply being written; the API keeps nothing of it. */
+    const stopTurn = () => stopRef.current?.abort();
 
     /** A write that runs no turn: an AI Message edit, Reset, or a judge retry. */
     const runWrite = async (write: () => Promise<Chat>) => {
@@ -195,7 +215,7 @@ export function ChatScreen({ initial, cast, portraits, scenes }: ChatScreenProps
         setDraft('');
         setPending({ text, identityName: chat.identityName });
         void runTurn(
-            () => chatApi.send(chat.storyId, chat.id, text),
+            (stream) => chatApi.send(chat.storyId, chat.id, text, stream),
             () => setDraft((current) => (current === '' ? text : current)),
         );
     };
@@ -203,7 +223,7 @@ export function ChatScreen({ initial, cast, portraits, scenes }: ChatScreenProps
     /** ▶ (spec: "Continue"): a turn with no User Message. A failed one stores nothing, so ▶ again is the way on. */
     const continueStory = () => {
         if (writing || busy || blocked || chat.awaitingReply) return;
-        void runTurn(() => chatApi.continue(chat.storyId, chat.id));
+        void runTurn((stream) => chatApi.continue(chat.storyId, chat.id, stream));
     };
 
     /**
@@ -216,9 +236,9 @@ export function ChatScreen({ initial, cast, portraits, scenes }: ChatScreenProps
         if (writing || busy || blocked) return;
         setReplacing(messageId);
         // Shown again only once the turn has settled, so the old reply never flashes back first.
-        void runTurn(async () => {
+        void runTurn(async (stream) => {
             try {
-                return refreshMemory(noteRollback(await chatApi.regenerate(chat.storyId, chat.id, messageId)));
+                return refreshMemory(noteRollback(await chatApi.regenerate(chat.storyId, chat.id, messageId, stream)));
             } catch (caught) {
                 if (!(caught instanceof ApiUnreachableError)) refreshMemory(chat);
                 throw caught;
@@ -228,10 +248,13 @@ export function ChatScreen({ initial, cast, portraits, scenes }: ChatScreenProps
 
     const saveEdit = (message: Message, text: string) => {
         setEditing(null);
-        const edit = async () => refreshMemory(noteRollback(await chatApi.edit(chat.storyId, chat.id, message.id, text)));
+        const edited = (next: EditedChat) => refreshMemory(noteRollback(next));
         // An edited User Message gets a fresh reply, so it runs as a turn; an AI Message does not.
-        if (message.kind === 'user') void runTurn(edit);
-        else void runWrite(edit);
+        if (message.kind === 'user') {
+            void runTurn(async (stream) => edited(await chatApi.edit(chat.storyId, chat.id, message.id, text, stream)));
+        } else {
+            void runWrite(async () => edited(await chatApi.edit(chat.storyId, chat.id, message.id, text)));
+        }
     };
 
     /** Swaps the worn identity; the drawer re-reads, since it renders {user} as the worn name. */
@@ -307,6 +330,7 @@ export function ChatScreen({ initial, cast, portraits, scenes }: ChatScreenProps
                 portraits={portraits}
                 pending={pending}
                 writing={writing}
+                replySoFar={replySoFar}
                 editing={editing}
                 canEdit={!writing && !busy && editing === null}
                 blocked={blocked}
@@ -334,7 +358,8 @@ export function ChatScreen({ initial, cast, portraits, scenes }: ChatScreenProps
                 onDraft={setDraft}
                 onSend={send}
                 onContinue={continueStory}
-                onRetry={() => void runTurn(() => chatApi.retry(chat.storyId, chat.id))}
+                onStop={stopTurn}
+                onRetry={() => void runTurn((stream) => chatApi.retry(chat.storyId, chat.id, stream))}
                 onRetryJudge={retryJudge}
                 onRetryExtraction={retryExtraction}
             />

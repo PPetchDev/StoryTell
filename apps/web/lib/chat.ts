@@ -1,4 +1,4 @@
-import { apiSend } from './api';
+import { apiSend, apiSendStream } from './api';
 import { MissingField } from './story';
 
 // Mirrors the API's Chat response DTOs (apps/api/src/api/chat/dto/chat.response.dto.ts).
@@ -162,17 +162,39 @@ export interface SuggestedReply {
     text: string;
 }
 
+/**
+ * A turn asked for as a stream (spec: streaming replies): each `parts` event is the whole
+ * reply so far, and aborting `signal` stops it (Stop). The answer is the same Chat either way.
+ */
+export interface TurnStream {
+    signal: AbortSignal;
+    onParts(parts: MessagePart[]): void;
+}
+
+/** A turn write: streamed when `stream` is given, else answered once as JSON. */
+function turn<T>(method: 'POST' | 'PATCH', path: string, body: object | undefined, stream?: TurnStream): Promise<T> {
+    if (!stream) return apiSend<T>(method, path, body);
+    return apiSendStream<T>(method, path, body, {
+        signal: stream.signal,
+        onEvent: (event, data) => {
+            if (event === 'parts') stream.onParts((data as { parts: MessagePart[] }).parts);
+        },
+    });
+}
+
 /** Writes answer with the whole Chat; the list and the Chat itself are read with useApiQuery. */
 export const chatApi = {
     create: (storyId: number) => apiSend<Chat>('POST', `/stories/${storyId}/chats`),
     rename: (storyId: number, chatId: number, title: string) =>
         apiSend<Chat>('PATCH', `/stories/${storyId}/chats/${chatId}`, { title }),
     remove: (storyId: number, chatId: number) => apiSend<void>('DELETE', `/stories/${storyId}/chats/${chatId}`),
-    send: (storyId: number, chatId: number, text: string) =>
-        apiSend<Chat>('POST', `/stories/${storyId}/chats/${chatId}/messages`, { text }),
-    retry: (storyId: number, chatId: number) => apiSend<Chat>('POST', `/stories/${storyId}/chats/${chatId}/retry`),
+    send: (storyId: number, chatId: number, text: string, stream?: TurnStream) =>
+        turn<Chat>('POST', `/stories/${storyId}/chats/${chatId}/messages`, { text }, stream),
+    retry: (storyId: number, chatId: number, stream?: TurnStream) =>
+        turn<Chat>('POST', `/stories/${storyId}/chats/${chatId}/retry`, undefined, stream),
     /** Lets the story go on without a line from the user: the Narrator writes the next reply. */
-    continue: (storyId: number, chatId: number) => apiSend<Chat>('POST', `/stories/${storyId}/chats/${chatId}/continue`),
+    continue: (storyId: number, chatId: number, stream?: TurnStream) =>
+        turn<Chat>('POST', `/stories/${storyId}/chats/${chatId}/continue`, undefined, stream),
     /** Three things the user might write next, as the worn identity. Nothing is stored. */
     suggest: (storyId: number, chatId: number) =>
         apiSend<{ suggestions: SuggestedReply[] }>('POST', `/stories/${storyId}/chats/${chatId}/suggestions`),
@@ -180,14 +202,14 @@ export const chatApi = {
      * Rewrites a Message, discards every Message after it and rolls back their changes; a
      * User Message gets a new reply, an AI Message is judged again.
      */
-    edit: (storyId: number, chatId: number, messageId: number, text: string) =>
-        apiSend<EditedChat>('PATCH', `/stories/${storyId}/chats/${chatId}/messages/${messageId}`, { text }),
+    edit: (storyId: number, chatId: number, messageId: number, text: string, stream?: TurnStream) =>
+        turn<EditedChat>('PATCH', `/stories/${storyId}/chats/${chatId}/messages/${messageId}`, { text }, stream),
     /**
      * ↺ Again: replaces the newest AI Message with a freshly written one, rolling back its
      * changes like an edit. A failed turn has already removed the old reply.
      */
-    regenerate: (storyId: number, chatId: number, messageId: number) =>
-        apiSend<EditedChat>('POST', `/stories/${storyId}/chats/${chatId}/messages/${messageId}/regenerate`),
+    regenerate: (storyId: number, chatId: number, messageId: number, stream?: TurnStream) =>
+        turn<EditedChat>('POST', `/stories/${storyId}/chats/${chatId}/messages/${messageId}/regenerate`, undefined, stream),
     /** Wears a Persona, or the Story's Role for null, from the next User Message on. */
     swapIdentity: (storyId: number, chatId: number, personaId: number | null) =>
         apiSend<Chat>('PUT', `/stories/${storyId}/chats/${chatId}/identity`, { personaId }),

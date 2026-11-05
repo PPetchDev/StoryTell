@@ -282,6 +282,46 @@ describe('Streaming replies', () => {
             expect(after.awaitingReply).toBe(false);
         });
 
+        it('while the send still waits on the last reply\'s background calls, stores no User Message', async () => {
+            const { storyId, chatId } = await playableChat();
+            // The last reply's judge is held, so the next send waits for it in its gate.
+            let releaseJudge: () => void = () => {};
+            const judgeHeld = new Promise<void>((resolve) => (releaseJudge = resolve));
+            const original = t.gateway.completeText.bind(t.gateway);
+            t.gateway.completeText = async (request) => {
+                if (request.kind === 'judge') await judgeHeld;
+                return original(request);
+            };
+            try {
+                t.gateway.scriptText('turn', 'Waves boom below.');
+                scriptBackground();
+                await streamTurn('POST', `/api/stories/${storyId}/chats/${chatId}/continue`);
+                t.gateway.scriptText('turn', REPLY);
+
+                const controller = new AbortController();
+                const sent = fetch(`${origin}/api/stories/${storyId}/chats/${chatId}/messages`, {
+                    method: 'POST',
+                    headers: { Accept: 'text/event-stream', 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: 'Evening.' }),
+                    signal: controller.signal,
+                }).catch(() => undefined);
+                await new Promise((resolve) => setTimeout(resolve, 200));
+                controller.abort();
+                await sent;
+                // The judge settles after the Stop, inside the send's wait: the gate then passes.
+                await new Promise((resolve) => setTimeout(resolve, 200));
+                releaseJudge();
+                await new Promise((resolve) => setTimeout(resolve, 600));
+
+                const chat = await getChat(storyId, chatId);
+                expect(chat.messages.map((message) => message.kind)).toEqual(['ai', 'ai']);
+                expect(t.gateway.textCalls('turn')).toHaveLength(1);
+            } finally {
+                releaseJudge();
+                t.gateway.completeText = original;
+            }
+        });
+
         it('on a Regenerate after a Continue, leaves the Chat ending at the AI Message before it', async () => {
             const { storyId, chatId } = await playableChat();
             t.gateway.scriptText('turn', 'Waves boom below.');

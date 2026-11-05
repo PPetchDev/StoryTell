@@ -310,6 +310,8 @@ export class ChatManagerService {
         change: () => Promise<void>,
         stream: TurnStream | undefined,
     ): Promise<EditResult> {
+        // Stopped while the gate waited: nothing is rolled back or changed.
+        if (stream?.signal.aborted) throw new TurnStoppedError();
         const rolledBack = await this.ledger.rollbackFrom(chatId, fromPosition);
         await change();
         // Reloaded: the rollback may have put the Chat back on an earlier Scene.
@@ -389,6 +391,8 @@ export class ChatManagerService {
         const chat = await this.requireSendable(story, loaded);
 
         return this.writingTurn(chat.id, async () => {
+            // Stopped while the gate waited: nothing is stored, and the client keeps the text.
+            if (stream?.signal.aborted) throw new TurnStoppedError();
             const userMessage = await this.chatModel.addUserMessage(
                 chat.id,
                 chat.messages.length,
