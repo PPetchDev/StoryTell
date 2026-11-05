@@ -1,11 +1,15 @@
 'use client';
 
-import { FormEvent, useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 
 import { useConnection } from '@/components/connection';
+import { useAutosave } from '@/components/story-editor/autosave';
 import { ConfirmButton } from '@/components/story-editor/fields';
+import { SaveStatus } from '@/components/story-editor/save-status';
 import { ApiError, ApiUnreachableError } from '@/lib/api';
 import { Memory, memoryApi, MemoryList, renderUser } from '@/lib/memory';
+
+type Queue = ReturnType<typeof useAutosave>['queue'];
 
 interface KnownByPickerProps {
     cast: MemoryList['cast'];
@@ -38,45 +42,107 @@ function KnownByPicker({ cast, value, onChange }: KnownByPickerProps) {
     );
 }
 
-interface MemoryFormProps {
+interface MemoryEditorProps {
+    label: string;
     cast: MemoryList['cast'];
     initialText: string;
     initialKnownBy: number[];
-    submitLabel: string;
-    busy: boolean;
-    onSubmit(text: string, knownBy: number[]): void;
-    onCancel?(): void;
+    /** Called on every change that can be sent: the text is not empty. */
+    onChange(text: string, knownBy: number[]): void;
+    onDone(): void;
 }
 
-function MemoryForm({ cast, initialText, initialKnownBy, submitLabel, busy, onSubmit, onCancel }: MemoryFormProps) {
+/**
+ * A Memory's text and Known-by set, saved as they change (spec: "Saving"). What was typed stays
+ * here whatever the API answers, so a failed save loses nothing; empty text is not sent.
+ */
+function MemoryEditor({ label, cast, initialText, initialKnownBy, onChange, onDone }: MemoryEditorProps) {
     const [text, setText] = useState(initialText);
     const [knownBy, setKnownBy] = useState(initialKnownBy);
-    const submit = (event: FormEvent) => {
-        event.preventDefault();
-        if (text.trim() === '' || busy) return;
-        onSubmit(text, knownBy);
+    const errorId = useId();
+    const empty = text.trim() === '';
+
+    const change = (nextText: string, nextKnownBy: number[]) => {
+        setText(nextText);
+        setKnownBy(nextKnownBy);
+        if (nextText.trim() !== '') onChange(nextText, nextKnownBy);
     };
+
     return (
-        <form className="memory-form" aria-label={`${submitLabel} Memory`} onSubmit={submit}>
+        <div className="memory-form" role="group" aria-label={label}>
             <textarea
                 aria-label="Memory text"
                 placeholder="What happened, or what was learned. Write {user} for yourself."
                 value={text}
                 rows={3}
-                onChange={(event) => setText(event.target.value)}
+                autoFocus
+                aria-describedby={empty && initialText !== '' ? errorId : undefined}
+                onChange={(event) => change(event.target.value, knownBy)}
             />
-            <KnownByPicker cast={cast} value={knownBy} onChange={setKnownBy} />
+            {/* A new Memory starts empty; only clearing an existing one's text is an error. */}
+            {empty && initialText !== '' && (
+                <p id={errorId} role="alert" className="field-error">
+                    A Memory needs some text. Use Delete to forget it.
+                </p>
+            )}
+            <KnownByPicker cast={cast} value={knownBy} onChange={(next) => change(text, next)} />
             <div className="toolbar">
-                <button type="submit" className="button button-small" disabled={busy || text.trim() === ''}>
-                    {submitLabel}
+                <button type="button" className="button button-small" onClick={onDone}>
+                    Done
                 </button>
-                {onCancel && (
-                    <button type="button" className="button button-quiet button-small" onClick={onCancel}>
-                        Cancel
-                    </button>
-                )}
             </div>
-        </form>
+        </div>
+    );
+}
+
+interface NewMemoryProps {
+    list: MemoryList;
+    storyId: number;
+    chatId: number;
+    queue: Queue;
+    /** The Memory this form made, once its first save lands; the drawer leaves it out of the list meanwhile. */
+    onCreated(memoryId: number): void;
+    onSaved(memory: Memory): void;
+    onDone(): void;
+}
+
+/** A Memory being added: its first save with text adds it, and later ones edit it. */
+function NewMemory({ list, storyId, chatId, queue, onCreated, onSaved, onDone }: NewMemoryProps) {
+    const key = useId();
+    // Read when each save runs, after the earlier ones, so the add happens exactly once.
+    const created = useRef<number | null>(null);
+    // A save still waiting when Done is pressed lands after the form has gone: the Memory then
+    // simply joins the list, so the drawer must not be told to hide it.
+    const open = useRef(true);
+    useEffect(() => {
+        open.current = true;
+        return () => {
+            open.current = false;
+        };
+    }, []);
+
+    const save = (text: string, knownBy: number[]) =>
+        queue(
+            `memory.new.${key}`,
+            async () => {
+                if (created.current !== null) return memoryApi.edit(storyId, chatId, created.current, { text, knownBy });
+                const memory = await memoryApi.add(storyId, chatId, text, knownBy);
+                created.current = memory.id;
+                if (open.current) onCreated(memory.id);
+                return memory;
+            },
+            onSaved,
+        );
+
+    return (
+        <MemoryEditor
+            label="New Memory"
+            cast={list.cast}
+            initialText=""
+            initialKnownBy={list.present}
+            onChange={save}
+            onDone={onDone}
+        />
     );
 }
 
@@ -106,17 +172,13 @@ function MemoryView({ list, memory, highlighted, busy, onEdit, onDelete, onResto
             aria-label={label}
         >
             {editing ? (
-                <MemoryForm
+                <MemoryEditor
+                    label={`Edit ${label}`}
                     cast={list.cast}
                     initialText={memory.text}
                     initialKnownBy={memory.knownBy}
-                    submitLabel="Save"
-                    busy={busy}
-                    onSubmit={(text, knownBy) => {
-                        setEditing(false);
-                        onEdit(text, knownBy);
-                    }}
-                    onCancel={() => setEditing(false)}
+                    onChange={onEdit}
+                    onDone={() => setEditing(false)}
                 />
             ) : (
                 <>
@@ -185,21 +247,20 @@ export interface MemoryDrawerProps {
 /**
  * The Memory drawer on the Chat screen (spec: "Memory drawer"): every Memory with its text,
  * Known-by chips, author, lock and jump-to-Message link; Archived in a collapsed section;
- * add, edit (which locks), delete, restore (which locks). Opens from the Chat head and from a
- * "Memory added" toast, which lands on that Memory.
+ * add, edit (which locks), delete, restore (which locks). Adds and edits save as they are
+ * typed, with the status in the drawer's header (spec: "Saving"). Opens from the Chat head and
+ * from a "Memory added" toast, which lands on that Memory.
  */
 export function MemoryDrawer({ storyId, chatId, focusMemoryId, version, onClose, onJump }: MemoryDrawerProps) {
     const { reportUnreachable } = useConnection();
+    const { state, queue, commit } = useAutosave();
     const [list, setList] = useState<MemoryList | null>(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [adding, setAdding] = useState(false);
+    /** The Memory the open "new" form has added, kept out of the list until the form closes. */
+    const [draftId, setDraftId] = useState<number | null>(null);
     const focusedRef = useRef<number | null>(null);
-
-    const fail = (caught: unknown, fallback: string) => {
-        if (caught instanceof ApiUnreachableError) reportUnreachable();
-        else setError(caught instanceof ApiError ? caught.message : fallback);
-    };
 
     useEffect(() => {
         let cancelled = false;
@@ -222,27 +283,65 @@ export function MemoryDrawer({ storyId, chatId, focusMemoryId, version, onClose,
         document.getElementById(`memory-${focusMemoryId}`)?.scrollIntoView({ block: 'center' });
     }, [list, focusMemoryId]);
 
-    /** A write, then the list re-read so the drawer shows the Memory as the API has it. */
+    /** A saved Memory takes its place in the list, or joins it when it is new. */
+    const saved = (memory: Memory) =>
+        setList((current) => {
+            if (!current) return current;
+            const known = current.memories.some((each) => each.id === memory.id);
+            return {
+                ...current,
+                memories: known
+                    ? current.memories.map((each) => (each.id === memory.id ? memory : each))
+                    : [...current.memories, memory],
+            };
+        });
+
+    const edit = (memoryId: number) => (text: string, knownBy: number[]) =>
+        queue(`memory.${memoryId}`, () => memoryApi.edit(storyId, chatId, memoryId, { text, knownBy }), saved);
+
+    /** Delete or restore, after any edits still waiting, then the list re-read as the API has it. */
     const write = async (work: () => Promise<unknown>) => {
         setBusy(true);
         setError(null);
-        try {
-            await work();
-            setList(await memoryApi.list(storyId, chatId));
-        } catch (caught) {
-            fail(caught, 'Something went wrong.');
-        } finally {
-            setBusy(false);
-        }
+        await commit(
+            async () => {
+                await work();
+                return memoryApi.list(storyId, chatId);
+            },
+            setList,
+            setError,
+        );
+        setBusy(false);
     };
 
-    const active = list?.memories.filter((memory) => !memory.archived) ?? [];
-    const archived = list?.memories.filter((memory) => memory.archived) ?? [];
+    const closeNew = () => {
+        setAdding(false);
+        setDraftId(null);
+    };
+
+    const shown = list?.memories.filter((memory) => memory.id !== draftId) ?? [];
+    const active = shown.filter((memory) => !memory.archived);
+    const archived = shown.filter((memory) => memory.archived);
+
+    const view = (memory: Memory) => (
+        <MemoryView
+            key={memory.id}
+            list={list!}
+            memory={memory}
+            highlighted={memory.id === focusMemoryId}
+            busy={busy}
+            onEdit={edit(memory.id)}
+            onDelete={() => void write(() => memoryApi.remove(storyId, chatId, memory.id))}
+            onRestore={() => void write(() => memoryApi.restore(storyId, chatId, memory.id))}
+            onJump={onJump}
+        />
+    );
 
     return (
         <aside className="memory-drawer" aria-label="Memory">
             <div className="memory-drawer-head">
                 <h2>Memory</h2>
+                {list && <SaveStatus state={state} />}
                 <button type="button" className="button button-quiet button-small" onClick={onClose}>
                     Close
                 </button>
@@ -261,17 +360,14 @@ export function MemoryDrawer({ storyId, chatId, focusMemoryId, version, onClose,
             ) : (
                 <>
                     {adding ? (
-                        <MemoryForm
-                            cast={list.cast}
-                            initialText=""
-                            initialKnownBy={list.present}
-                            submitLabel="Add"
-                            busy={busy}
-                            onSubmit={(text, knownBy) => {
-                                setAdding(false);
-                                void write(() => memoryApi.add(storyId, chatId, text, knownBy));
-                            }}
-                            onCancel={() => setAdding(false)}
+                        <NewMemory
+                            list={list}
+                            storyId={storyId}
+                            chatId={chatId}
+                            queue={queue}
+                            onCreated={setDraftId}
+                            onSaved={saved}
+                            onDone={closeNew}
                         />
                     ) : (
                         <button type="button" className="button button-small" disabled={busy} onClick={() => setAdding(true)}>
@@ -282,38 +378,14 @@ export function MemoryDrawer({ storyId, chatId, focusMemoryId, version, onClose,
                         <p className="muted">Nothing remembered yet.</p>
                     ) : (
                         <ul className="memory-list" aria-label="Memories">
-                            {active.map((memory) => (
-                                <MemoryView
-                                    key={memory.id}
-                                    list={list}
-                                    memory={memory}
-                                    highlighted={memory.id === focusMemoryId}
-                                    busy={busy}
-                                    onEdit={(text, knownBy) => void write(() => memoryApi.edit(storyId, chatId, memory.id, { text, knownBy }))}
-                                    onDelete={() => void write(() => memoryApi.remove(storyId, chatId, memory.id))}
-                                    onRestore={() => void write(() => memoryApi.restore(storyId, chatId, memory.id))}
-                                    onJump={onJump}
-                                />
-                            ))}
+                            {active.map(view)}
                         </ul>
                     )}
                     {archived.length > 0 && (
                         <details className="memory-archived">
                             <summary>Archived ({archived.length})</summary>
                             <ul className="memory-list" aria-label="Archived Memories">
-                                {archived.map((memory) => (
-                                    <MemoryView
-                                        key={memory.id}
-                                        list={list}
-                                        memory={memory}
-                                        highlighted={memory.id === focusMemoryId}
-                                        busy={busy}
-                                        onEdit={(text, knownBy) => void write(() => memoryApi.edit(storyId, chatId, memory.id, { text, knownBy }))}
-                                        onDelete={() => void write(() => memoryApi.remove(storyId, chatId, memory.id))}
-                                        onRestore={() => void write(() => memoryApi.restore(storyId, chatId, memory.id))}
-                                        onJump={onJump}
-                                    />
-                                ))}
+                                {archived.map(view)}
                             </ul>
                         </details>
                     )}

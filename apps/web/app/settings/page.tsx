@@ -1,19 +1,45 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { BackupBanner } from '@/components/backup-banner';
 import { useApiQuery } from '@/components/connection';
+import { useAutosave } from '@/components/story-editor/autosave';
+import { SaveStatus } from '@/components/story-editor/save-status';
 import { TextSizeSetting } from '@/components/text-size-setting';
-import { ApiError, apiFetch } from '@/lib/api';
+import { apiSend } from '@/lib/api';
 import { ModelOption, Settings, SettingsResponse } from '@/lib/types';
 
-type Form = Omit<Settings, 'updatedAt'>;
+type Queue = ReturnType<typeof useAutosave>['queue'];
+type ModelKey = 'playModel' | 'imageModel';
+type NumberKey = 'textCreditCapUsd' | 'textLowCreditPercent' | 'imageCreditCapUsd' | 'imageLowCreditPercent';
 
-function toForm(settings: Settings): Form {
-    const { updatedAt: _updatedAt, ...form } = settings;
-    return form;
+/** Sends one changed setting; the API changes only the fields it is sent. */
+const saveSetting = (fields: Partial<Omit<Settings, 'updatedAt'>>) => () =>
+    apiSend<SettingsResponse>('PUT', '/settings', fields);
+
+/** Ignores the answer: the fields keep what the user typed. */
+const keepTyped = () => {};
+
+/** A percent of a pool: a whole number from 0 to 100, as the API takes it. */
+function checkPercent(text: string): number | string {
+    const value = Number(text);
+    if (text.trim() === '' || !Number.isInteger(value) || value < 0 || value > 100) {
+        return 'Enter a whole number from 0 to 100.';
+    }
+    return value;
 }
+
+/** A pool's size in USD: 0 or more, to the cent, as the API takes it. Checked as typed, so 0.07 stays 0.07. */
+function checkUsd(text: string): number | string {
+    if (!/^(\d+(\.\d{0,2})?|\.\d{1,2})$/.test(text.trim())) return 'Enter an amount of 0 or more, to the cent.';
+    return Number(text);
+}
+
+const NUMBER_KINDS = {
+    percent: { check: checkPercent, max: 100, step: 1 },
+    usd: { check: checkUsd, max: undefined, step: 0.01 },
+};
 
 function ModelSelect({
     id,
@@ -42,23 +68,44 @@ function ModelSelect({
     );
 }
 
+/**
+ * A numeric setting, saved once it holds a valid value (spec: "Saving"). An invalid value
+ * shows its error here and is not sent; the field keeps what was typed either way.
+ */
 function NumberField({
     id,
     label,
-    value,
+    initial,
     min,
     max,
     step,
-    onChange,
+    check,
+    onValid,
 }: {
     id: string;
     label: string;
-    value: number;
+    initial: number;
     min: number;
     max?: number;
     step: number;
-    onChange(value: number): void;
+    check(text: string): number | string;
+    onValid(value: number): void;
 }) {
+    const [text, setText] = useState(String(initial));
+    const [error, setError] = useState<string | null>(null);
+    const errorId = `${id}-error`;
+
+    const change = (next: string) => {
+        setText(next);
+        const checked = check(next);
+        if (typeof checked === 'string') {
+            setError(checked);
+            return;
+        }
+        setError(null);
+        onValid(checked);
+    };
+
     return (
         <div className="field">
             <label htmlFor={id}>{label}</label>
@@ -66,62 +113,63 @@ function NumberField({
                 id={id}
                 type="number"
                 inputMode="decimal"
-                value={value}
+                value={text}
                 min={min}
                 max={max}
                 step={step}
                 required
-                onChange={(event) => onChange(Number(event.target.value))}
+                aria-invalid={error !== null}
+                aria-describedby={error ? errorId : undefined}
+                onChange={(event) => change(event.target.value)}
             />
+            {error && (
+                <p id={errorId} role="alert" className="field-error">
+                    {error}
+                </p>
+            )}
         </div>
     );
 }
 
-function SettingsForm({ initial }: { initial: SettingsResponse }) {
-    const [saved, setSaved] = useState(initial.settings);
-    const [form, setForm] = useState<Form>(toForm(initial.settings));
-    const [saving, setSaving] = useState(false);
-    const [notice, setNotice] = useState<string | undefined>();
-    const [error, setError] = useState<string | undefined>();
+/** Every setting saves as it changes, with the status in the page header. */
+function SettingsForm({ initial, queue }: { initial: SettingsResponse; queue: Queue }) {
+    // The play model when the page opened: a different one now is a Drift risk.
+    const [loadedPlayModel] = useState(initial.settings.playModel);
+    const [models, setModels] = useState<Record<ModelKey, string>>({
+        playModel: initial.settings.playModel,
+        imageModel: initial.settings.imageModel,
+    });
 
-    const set = <K extends keyof Form>(key: K, value: Form[K]) =>
-        setForm((current) => ({ ...current, [key]: value }));
-    const playModelChanged = form.playModel !== saved.playModel;
-
-    useEffect(() => setNotice(undefined), [form]);
-
-    const save = async (event: FormEvent) => {
-        event.preventDefault();
-        setSaving(true);
-        setError(undefined);
-        try {
-            const response = await apiFetch<SettingsResponse>('/settings', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(form),
-            });
-            setSaved(response.settings);
-            setForm(toForm(response.settings));
-            setNotice('Saved.');
-        } catch (caught) {
-            setError(caught instanceof ApiError ? caught.message : 'Could not save.');
-        } finally {
-            setSaving(false);
-        }
+    const changeModel = (key: ModelKey, value: string) => {
+        setModels((current) => ({ ...current, [key]: value }));
+        queue(`settings.${key}`, saveSetting({ [key]: value }), keepTyped);
     };
 
+    const numberField = (key: NumberKey, id: string, label: string, kind: keyof typeof NUMBER_KINDS) => (
+        <NumberField
+            id={id}
+            label={label}
+            initial={initial.settings[key]}
+            min={0}
+            max={NUMBER_KINDS[kind].max}
+            step={NUMBER_KINDS[kind].step}
+            check={NUMBER_KINDS[kind].check}
+            onValid={(value) => queue(`settings.${key}`, saveSetting({ [key]: value }), keepTyped)}
+        />
+    );
+
     return (
-        <form onSubmit={save}>
+        <>
             <section className="card">
                 <h2>Models</h2>
                 <ModelSelect
                     id="play-model"
                     label="Play model"
-                    value={form.playModel}
+                    value={models.playModel}
                     options={initial.playModels}
-                    onChange={(value) => set('playModel', value)}
+                    onChange={(value) => changeModel('playModel', value)}
                 />
-                {playModelChanged && (
+                {models.playModel !== loadedPlayModel && (
                     <p role="alert" className="warning">
                         <strong>Drift warning.</strong> A different model plays Characters
                         differently. Chats whose last reply came from the old model will show a
@@ -131,9 +179,9 @@ function SettingsForm({ initial }: { initial: SettingsResponse }) {
                 <ModelSelect
                     id="image-model"
                     label="Snapshot model"
-                    value={form.imageModel}
+                    value={models.imageModel}
                     options={initial.imageModels}
-                    onChange={(value) => set('imageModel', value)}
+                    onChange={(value) => changeModel('imageModel', value)}
                 />
             </section>
 
@@ -144,66 +192,32 @@ function SettingsForm({ initial }: { initial: SettingsResponse }) {
                     holds when topped up.
                 </p>
                 <div className="field-row">
-                    <NumberField
-                        id="text-cap"
-                        label="Text pool (USD)"
-                        value={form.textCreditCapUsd}
-                        min={0}
-                        step={0.01}
-                        onChange={(value) => set('textCreditCapUsd', value)}
-                    />
-                    <NumberField
-                        id="text-threshold"
-                        label="Text warning (%)"
-                        value={form.textLowCreditPercent}
-                        min={0}
-                        max={100}
-                        step={1}
-                        onChange={(value) => set('textLowCreditPercent', value)}
-                    />
+                    {numberField('textCreditCapUsd', 'text-cap', 'Text pool (USD)', 'usd')}
+                    {numberField('textLowCreditPercent', 'text-threshold', 'Text warning (%)', 'percent')}
                 </div>
                 <div className="field-row">
-                    <NumberField
-                        id="image-cap"
-                        label="Image pool (USD)"
-                        value={form.imageCreditCapUsd}
-                        min={0}
-                        step={0.01}
-                        onChange={(value) => set('imageCreditCapUsd', value)}
-                    />
-                    <NumberField
-                        id="image-threshold"
-                        label="Image warning (%)"
-                        value={form.imageLowCreditPercent}
-                        min={0}
-                        max={100}
-                        step={1}
-                        onChange={(value) => set('imageLowCreditPercent', value)}
-                    />
+                    {numberField('imageCreditCapUsd', 'image-cap', 'Image pool (USD)', 'usd')}
+                    {numberField('imageLowCreditPercent', 'image-threshold', 'Image warning (%)', 'percent')}
                 </div>
             </section>
-
-            <div className="actions">
-                <button type="submit" className="button" disabled={saving}>
-                    {saving ? 'Saving…' : 'Save'}
-                </button>
-                {notice && <span className="muted">{notice}</span>}
-                {error && <span role="alert">{error}</span>}
-            </div>
-        </form>
+        </>
     );
 }
 
 export default function SettingsPage() {
     const settings = useApiQuery<SettingsResponse>('/settings');
+    const { state, queue } = useAutosave();
 
     return (
         <main>
-            <h1>Settings</h1>
+            <div className="page-header">
+                <h1>Settings</h1>
+                {settings.status === 'ready' && <SaveStatus state={state} />}
+            </div>
             <BackupBanner />
             {settings.status === 'loading' && <p className="muted">Loading…</p>}
             {settings.status === 'error' && <p role="alert">{settings.error.message}</p>}
-            {settings.status === 'ready' && <SettingsForm initial={settings.data} />}
+            {settings.status === 'ready' && <SettingsForm initial={settings.data} queue={queue} />}
             <TextSizeSetting />
         </main>
     );

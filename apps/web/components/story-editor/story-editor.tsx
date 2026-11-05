@@ -18,7 +18,8 @@ import {
     storyTitle,
     TENSE_LABELS,
 } from '@/lib/story';
-import { SAVE_LABELS, useAutosave } from './autosave';
+import { useAutosave } from './autosave';
+import { SaveStatus } from './save-status';
 import { CharacterCard } from './character-card';
 import { ConfirmButton, SelectField, TextField } from './fields';
 import { rewriteKey, RewriteStates } from './rewrite';
@@ -164,10 +165,7 @@ export function StoryEditor({ initial }: { initial: Story }) {
                         Assistant
                     </button>
                 )}
-                <p className="save-state" role="status" aria-live="polite">
-                    {SAVE_LABELS[state.kind]}
-                    {state.kind === 'error' && `: ${state.message}`}
-                </p>
+                <SaveStatus state={state} />
             </nav>
             <h1 className="visually-hidden">{storyTitle(story)}</h1>
             {assistant.open && <StoryAssistantPanel assistant={assistant} />}

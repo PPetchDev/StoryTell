@@ -19,13 +19,12 @@ export const SAVE_LABELS: Record<SaveState['kind'], string> = {
     error: "Couldn't save",
 };
 
-type Run = () => Promise<Story>;
 type OnError = (message: string) => void;
 
 interface Pending {
     timer: ReturnType<typeof setTimeout>;
-    run: Run;
-    apply: (story: Story) => void;
+    run: () => Promise<unknown>;
+    apply: (value: unknown) => void;
 }
 
 /** How long typing may pause before a field is sent (spec: "Autosave"). */
@@ -90,9 +89,12 @@ export function useAutosave() {
         [reportUnreachable, settle],
     );
 
-    /** Debounced: a later call with the same key replaces the earlier one. */
+    /**
+     * Debounced: a later call with the same key replaces the earlier one. The answer is usually
+     * the Story; the Memory drawer, Personas and Settings (ticket 11) save other records.
+     */
     const queue = useCallback(
-        (key: string, run: Run, apply: (story: Story) => void) => {
+        <T = Story,>(key: string, run: () => Promise<T>, apply: (value: T) => void) => {
             const earlier = pending.current.get(key);
             if (earlier) clearTimeout(earlier.timer);
             setState((current) => (current.kind === 'saving' ? current : { kind: 'dirty' }));
@@ -100,7 +102,7 @@ export function useAutosave() {
                 pending.current.delete(key);
                 void enqueue(run, apply);
             }, DEBOUNCE_MS);
-            pending.current.set(key, { timer, run, apply });
+            pending.current.set(key, { timer, run, apply: apply as (value: unknown) => void });
         },
         [enqueue],
     );

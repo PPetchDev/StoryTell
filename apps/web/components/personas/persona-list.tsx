@@ -1,45 +1,64 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { useState } from 'react';
 
-import { useConnection } from '@/components/connection';
+import { useAutosave } from '@/components/story-editor/autosave';
 import { ConfirmButton } from '@/components/story-editor/fields';
-import { ApiError, ApiUnreachableError } from '@/lib/api';
 import { Persona, personaApi } from '@/lib/persona';
 
-interface PersonaFormProps {
-    /** The form's accessible name and the id prefix of its fields. */
-    label: string;
-    idPrefix: string;
-    initial: { name: string; description: string };
-    submitLabel: string;
-    /** Resolves once saved; a failure keeps what was typed. */
-    onSubmit(fields: { name: string; description: string }): Promise<boolean>;
-    onCancel?(): void;
+type Autosave = Pick<ReturnType<typeof useAutosave>, 'queue' | 'commit'>;
+
+interface PersonaCardProps {
+    persona: Persona;
+    autosave: Autosave;
+    /** A Persona just made with "New Persona": its name is focused and selected. */
+    fresh: boolean;
+    onSaved(persona: Persona): void;
+    onDelete(): void;
 }
 
-function PersonaForm({ label, idPrefix, initial, submitLabel, onSubmit, onCancel }: PersonaFormProps) {
-    const [name, setName] = useState(initial.name);
-    const [description, setDescription] = useState(initial.description);
-    const [saving, setSaving] = useState(false);
+/**
+ * One Persona, its Name and Description saved as they are typed (spec: "Saving"). What was
+ * typed stays in the fields whatever the API answers, so a failed save loses nothing.
+ */
+function PersonaCard({ persona, autosave, fresh, onSaved, onDelete }: PersonaCardProps) {
+    const [name, setName] = useState(persona.name);
+    const [description, setDescription] = useState(persona.description);
+    const idPrefix = `persona-${persona.id}`;
+    const nameMissing = name.trim() === '';
 
-    const submit = async (event: FormEvent) => {
-        event.preventDefault();
-        if (name.trim() === '') return;
-        setSaving(true);
-        const saved = await onSubmit({ name, description });
-        setSaving(false);
-        if (saved && !onCancel) {
-            setName('');
-            setDescription('');
-        }
+    const changeName = (value: string) => {
+        setName(value);
+        // An empty name is shown as an error and not sent.
+        if (value.trim() === '') return;
+        autosave.queue(`persona.${persona.id}.name`, () => personaApi.update(persona.id, { name: value }), onSaved);
+    };
+
+    const changeDescription = (value: string) => {
+        setDescription(value);
+        autosave.queue(`persona.${persona.id}.description`, () => personaApi.update(persona.id, { description: value }), onSaved);
     };
 
     return (
-        <form className="persona-form" aria-label={label} onSubmit={submit}>
+        <li className="card persona-form" aria-label={persona.name}>
             <div className="field">
                 <label htmlFor={`${idPrefix}-name`}>Name</label>
-                <input id={`${idPrefix}-name`} type="text" value={name} required onChange={(event) => setName(event.target.value)} />
+                <input
+                    id={`${idPrefix}-name`}
+                    type="text"
+                    value={name}
+                    required
+                    autoFocus={fresh}
+                    onFocus={fresh ? (event) => event.target.select() : undefined}
+                    aria-invalid={nameMissing}
+                    aria-describedby={nameMissing ? `${idPrefix}-name-error` : undefined}
+                    onChange={(event) => changeName(event.target.value)}
+                />
+                {nameMissing && (
+                    <p id={`${idPrefix}-name-error`} role="alert" className="field-error">
+                        A Persona needs a name.
+                    </p>
+                )}
             </div>
             <div className="field">
                 <label htmlFor={`${idPrefix}-description`}>Description</label>
@@ -48,20 +67,18 @@ function PersonaForm({ label, idPrefix, initial, submitLabel, onSubmit, onCancel
                     rows={3}
                     value={description}
                     placeholder="Who you are while wearing it: what Characters can see and know about you."
-                    onChange={(event) => setDescription(event.target.value)}
+                    onChange={(event) => changeDescription(event.target.value)}
                 />
             </div>
             <div className="toolbar">
-                <button type="submit" className="button" disabled={saving || name.trim() === ''}>
-                    {saving ? 'Saving…' : submitLabel}
-                </button>
-                {onCancel && (
-                    <button type="button" className="button button-quiet" onClick={onCancel}>
-                        Cancel
-                    </button>
-                )}
+                <ConfirmButton
+                    label="Delete"
+                    question={`Delete "${persona.name}"? Chats wearing it go back to their Role; Messages keep the name.`}
+                    confirmLabel="Delete"
+                    onConfirm={onDelete}
+                />
             </div>
-        </form>
+        </li>
     );
 }
 
@@ -69,51 +86,42 @@ function PersonaForm({ label, idPrefix, initial, submitLabel, onSubmit, onCancel
  * The user's Personas (spec: "Personas: create, read, update, delete"), app-wide, Name and
  * Description only. Any Chat can wear one in place of its Story's Role. Renaming or deleting
  * one never changes the name on Messages already written; a Chat wearing a deleted one goes
- * back to its Role.
+ * back to its Role. Edits save as they are typed, with the status in the page header.
  */
-export function PersonaList({ initial }: { initial: Persona[] }) {
-    const { reportUnreachable } = useConnection();
+export function PersonaList({ initial, autosave }: { initial: Persona[]; autosave: Autosave }) {
     const [personas, setPersonas] = useState(initial);
-    const [editing, setEditing] = useState<number | null>(null);
+    const [fresh, setFresh] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
 
-    const run = async (work: () => Promise<void>): Promise<boolean> => {
+    const saved = (persona: Persona) =>
+        setPersonas((current) => current.map((each) => (each.id === persona.id ? persona : each)));
+
+    const create = () => {
         setError(null);
-        try {
-            await work();
-            return true;
-        } catch (caught) {
-            if (caught instanceof ApiUnreachableError) reportUnreachable();
-            else setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
-            return false;
-        }
+        void autosave.commit(
+            () => personaApi.create({ name: 'New Persona', description: '' }),
+            (created) => {
+                setPersonas((current) => [...current, created]);
+                setFresh(created.id);
+            },
+            setError,
+        );
     };
 
-    const create = (fields: { name: string; description: string }) =>
-        run(async () => {
-            const created = await personaApi.create(fields);
-            setPersonas((current) => [...current, created]);
-        });
-
-    const update = (personaId: number, fields: { name: string; description: string }) =>
-        run(async () => {
-            const saved = await personaApi.update(personaId, fields);
-            setPersonas((current) => current.map((persona) => (persona.id === personaId ? saved : persona)));
-            setEditing(null);
-        });
-
-    const remove = (personaId: number) =>
-        void run(async () => {
-            await personaApi.remove(personaId);
-            setPersonas((current) => current.filter((persona) => persona.id !== personaId));
-        });
+    const remove = (personaId: number) => {
+        setError(null);
+        void autosave.commit(
+            () => personaApi.remove(personaId),
+            () => setPersonas((current) => current.filter((persona) => persona.id !== personaId)),
+            setError,
+        );
+    };
 
     return (
         <>
-            <section className="card" aria-label="New Persona">
-                <h2>New Persona</h2>
-                <PersonaForm label="New Persona" idPrefix="new-persona" initial={{ name: '', description: '' }} submitLabel="Create" onSubmit={create} />
-            </section>
+            <button type="button" className="button" onClick={create}>
+                New Persona
+            </button>
 
             {error && <p role="alert">{error}</p>}
 
@@ -122,36 +130,14 @@ export function PersonaList({ initial }: { initial: Persona[] }) {
             ) : (
                 <ul className="persona-list" aria-label="Personas">
                     {personas.map((persona) => (
-                        <li key={persona.id} className="card" aria-label={persona.name}>
-                            {editing === persona.id ? (
-                                <PersonaForm
-                                    label={`Edit ${persona.name}`}
-                                    idPrefix={`persona-${persona.id}`}
-                                    initial={persona}
-                                    submitLabel="Save"
-                                    onSubmit={(fields) => update(persona.id, fields)}
-                                    onCancel={() => setEditing(null)}
-                                />
-                            ) : (
-                                <>
-                                    <h3>{persona.name}</h3>
-                                    <p className={persona.description ? 'persona-description' : 'muted'}>
-                                        {persona.description || 'No description.'}
-                                    </p>
-                                    <div className="toolbar">
-                                        <button type="button" className="button button-quiet" onClick={() => setEditing(persona.id)}>
-                                            Edit
-                                        </button>
-                                        <ConfirmButton
-                                            label="Delete"
-                                            question={`Delete "${persona.name}"? Chats wearing it go back to their Role; Messages keep the name.`}
-                                            confirmLabel="Delete"
-                                            onConfirm={() => remove(persona.id)}
-                                        />
-                                    </div>
-                                </>
-                            )}
-                        </li>
+                        <PersonaCard
+                            key={persona.id}
+                            persona={persona}
+                            autosave={autosave}
+                            fresh={persona.id === fresh}
+                            onSaved={saved}
+                            onDelete={() => remove(persona.id)}
+                        />
                     ))}
                 </ul>
             )}
