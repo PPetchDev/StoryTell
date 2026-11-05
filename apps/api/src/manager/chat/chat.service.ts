@@ -486,10 +486,26 @@ export class ChatManagerService {
      */
     private async writeTurn(story: StoryEntity, chat: ChatEntity): Promise<void> {
         const userText = exchangeUserText(chat.messages, chat.messages.length);
-        const history = promptHistory(userText !== null ? chat.messages.slice(0, -1) : chat.messages);
-        const layers = await this.promptLayersFor(story, chat);
-        const identity: WornIdentity = layers.identity;
-        const prompt = buildTurnPrompt({ ...layers, history, userText });
+        const history: PromptHistoryMessage[] = (userText !== null ? chat.messages.slice(0, -1) : chat.messages)
+            .map((message) => ({
+                role: message.kind === MessageKind.User ? 'user' : 'assistant',
+                text:
+                    message.kind === MessageKind.User
+                        ? (message.text ?? '')
+                        : partsToText(message.parts.map((part) => part.toResponse())),
+            }));
+        const scene = story.scenes.find((candidate) => candidate.id === chat.currentSceneId) ?? null;
+        const identity: WornIdentity = wornIdentity(story, chat);
+        const [state, memories] = await Promise.all([this.ledger.state(chat.id), this.memoryModel.findByChat(chat.id)]);
+        const prompt = buildTurnPrompt({
+            story,
+            identity,
+            scene,
+            ...promptLayers(story, state),
+            memories: promptMemories(story, memories),
+            history,
+            userText,
+        });
         if (prompt.trimmed > 0) {
             this.logger.log(`Chat ${chat.id}: left out the ${prompt.trimmed} oldest Messages to fit the prompt budget`);
         }
@@ -527,9 +543,9 @@ export class ChatManagerService {
 
     /**
      * Layers 1–9 of a prompt as the Chat stands now: the worn identity, the current Scene,
-     * every Bond and Arc, and the Memory. The turn and Suggested replies share them.
+     * every Bond and Arc, and the Memory, read the way `writeTurn` reads them.
      */
-    private async promptLayersFor(story: StoryEntity, chat: ChatEntity): Promise<PromptLayersInput & { identity: WornIdentity }> {
+    private async promptLayersFor(story: StoryEntity, chat: ChatEntity): Promise<PromptLayersInput> {
         const scene = story.scenes.find((candidate) => candidate.id === chat.currentSceneId) ?? null;
         const [state, memories] = await Promise.all([this.ledger.state(chat.id), this.memoryModel.findByChat(chat.id)]);
         return {
@@ -648,7 +664,7 @@ export class ChatManagerService {
     }
 }
 
-/** Messages as the prompt reads them: the user's text, or the AI's `@Name:` text. */
+/** Messages as the prompt reads them, the way `writeTurn` reads its history: the user's text, or the AI's `@Name:` text. */
 function promptHistory(messages: MessageEntity[]): PromptHistoryMessage[] {
     return messages.map((message) => ({
         role: message.kind === MessageKind.User ? 'user' : 'assistant',

@@ -38,7 +38,7 @@ export type CallKind =
 
 /** What each call kind is for, in the words the Usage page shows. */
 export const CALL_KIND_LABEL: Record<CallKind, string> = {
-    turn: 'Story replies',
+    turn: 'Turns',
     judge: 'Bond, Arc and Scene checks',
     memory_extraction: 'Memory keeping',
     story_draft: 'Story drafts',

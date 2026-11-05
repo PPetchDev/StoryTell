@@ -25,7 +25,6 @@ export interface SuggestedReply {
 export interface SuggestionsPromptInput extends PromptLayersInput {
     /** Every Message of the Chat, oldest first. */
     history: PromptHistoryMessage[];
-    tokenBudget?: number;
 }
 
 export interface SuggestionsPrompt {
@@ -56,8 +55,7 @@ Answer with only this JSON object and nothing else:
 export function buildSuggestionsPrompt(input: SuggestionsPromptInput): SuggestionsPrompt {
     const system = systemPrompt(input);
     const instruction = suggestionsInstruction(input);
-    const budget = input.tokenBudget ?? TURN_PROMPT_TOKEN_BUDGET;
-    const kept = recentHistory(input.history, budget - estimateTokens(system.text) - estimateTokens(instruction));
+    const kept = recentHistory(input.history, TURN_PROMPT_TOKEN_BUDGET - estimateTokens(system.text) - estimateTokens(instruction));
     return {
         messages: [
             { role: 'system', content: system.text },

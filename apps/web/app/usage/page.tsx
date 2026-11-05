@@ -16,7 +16,7 @@ function monthName(month: string): string {
     });
 }
 
-function calls(count: number): string {
+function callCount(count: number): string {
     return `${count} ${count === 1 ? 'call' : 'calls'}`;
 }
 
@@ -31,13 +31,13 @@ function PoolCard({ pool, usage }: { pool: CreditPool; usage: PoolUsage }) {
                 <dt>Spent this month</dt>
                 <dd>
                     {usd(usage.spentUsd)}{' '}
-                    <span className="muted">({calls(usage.calls)})</span>
+                    <span className="muted">({callCount(usage.calls)})</span>
                     {usage.byKind.length > 0 && (
                         <ul className={styles.kinds} aria-label={`${POOL_LABEL[pool]} spend by kind`}>
                             {usage.byKind.map((kind) => (
                                 <li key={kind.kind}>
                                     {CALL_KIND_LABEL[kind.kind]}: {usd(kind.spentUsd)}{' '}
-                                    <span className="muted">({calls(kind.calls)})</span>
+                                    <span className="muted">({callCount(kind.calls)})</span>
                                 </li>
                             ))}
                         </ul>

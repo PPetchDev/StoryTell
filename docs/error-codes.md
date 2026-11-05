@@ -59,7 +59,7 @@ as "the API can't be reached" and shows the can't-connect screen (`apps/web/lib/
 | `404.004.011` | `MemoryNotFoundError` | No Memory with that id in this Chat. |
 | `422.004.012` | `EmptyMemoryError` | A Memory added or edited with nothing but whitespace. |
 | `409.004.013` | `AwaitingReplyError` | A Continue while the last User Message still awaits its reply. Nothing stored; Retry that Message instead. |
-| `502.004.014` | `UnreadableSuggestionsError` | The Suggested replies the model wrote could not be read as exactly three suggestions, one each of `action`, `speech` and `move`, each with text. Nothing stored. The client shows "Couldn't suggest replies, try again".
+| `502.004.014` | `UnreadableSuggestionsError` | The Suggested replies the model wrote could not be read as exactly three suggestions, one each of `action`, `speech` and `move`, each with text. Nothing stored. The client shows "Couldn't suggest replies, try again". |
 | `502.005.001` | `UnreadableDraftError` | The model's draft or rewrite could not be read (no JSON object, or no text). Nothing saved. Show with Retry. |
 | `502.005.002` | `InvalidDraftError` | The draft does not fit a Story (0 or 7 Characters, a Style value outside its set, a required field empty, a bad StartingBond). Nothing saved. Show with Retry. |
 | `422.005.003` | `EmptyIdeaError` | A draft was asked for with a blank idea. |
