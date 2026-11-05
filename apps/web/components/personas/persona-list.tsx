@@ -2,17 +2,15 @@
 
 import { useState } from 'react';
 
-import { useAutosave } from '@/components/story-editor/autosave';
+import { Autosave } from '@/components/story-editor/autosave';
 import { ConfirmButton } from '@/components/story-editor/fields';
 import { Persona, personaApi } from '@/lib/persona';
-
-type Autosave = Pick<ReturnType<typeof useAutosave>, 'queue' | 'commit'>;
 
 interface PersonaCardProps {
     persona: Persona;
     autosave: Autosave;
     /** A Persona just made with "New Persona": its name is focused and selected. */
-    fresh: boolean;
+    justCreated: boolean;
     onSaved(persona: Persona): void;
     onDelete(): void;
 }
@@ -21,7 +19,7 @@ interface PersonaCardProps {
  * One Persona, its Name and Description saved as they are typed (spec: "Saving"). What was
  * typed stays in the fields whatever the API answers, so a failed save loses nothing.
  */
-function PersonaCard({ persona, autosave, fresh, onSaved, onDelete }: PersonaCardProps) {
+function PersonaCard({ persona, autosave, justCreated, onSaved, onDelete }: PersonaCardProps) {
     const [name, setName] = useState(persona.name);
     const [description, setDescription] = useState(persona.description);
     const idPrefix = `persona-${persona.id}`;
@@ -29,9 +27,10 @@ function PersonaCard({ persona, autosave, fresh, onSaved, onDelete }: PersonaCar
 
     const changeName = (value: string) => {
         setName(value);
-        // An empty name is shown as an error and not sent.
-        if (value.trim() === '') return;
-        autosave.queue(`persona.${persona.id}.name`, () => personaApi.update(persona.id, { name: value }), onSaved);
+        const key = `persona.${persona.id}.name`;
+        // An empty name is shown as an error and not sent, nor is the name typed before it.
+        if (value.trim() === '') autosave.cancel(key);
+        else autosave.queue(key, () => personaApi.update(persona.id, { name: value }), onSaved);
     };
 
     const changeDescription = (value: string) => {
@@ -47,9 +46,8 @@ function PersonaCard({ persona, autosave, fresh, onSaved, onDelete }: PersonaCar
                     id={`${idPrefix}-name`}
                     type="text"
                     value={name}
-                    required
-                    autoFocus={fresh}
-                    onFocus={fresh ? (event) => event.target.select() : undefined}
+                    autoFocus={justCreated}
+                    onFocus={justCreated ? (event) => event.target.select() : undefined}
                     aria-invalid={nameMissing}
                     aria-describedby={nameMissing ? `${idPrefix}-name-error` : undefined}
                     onChange={(event) => changeName(event.target.value)}
@@ -90,22 +88,26 @@ function PersonaCard({ persona, autosave, fresh, onSaved, onDelete }: PersonaCar
  */
 export function PersonaList({ initial, autosave }: { initial: Persona[]; autosave: Autosave }) {
     const [personas, setPersonas] = useState(initial);
-    const [fresh, setFresh] = useState<number | null>(null);
+    const [justCreated, setJustCreated] = useState<number | null>(null);
+    const [creating, setCreating] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const saved = (persona: Persona) =>
         setPersonas((current) => current.map((each) => (each.id === persona.id ? persona : each)));
 
-    const create = () => {
+    /** Makes a Persona at once, named "New Persona", to be renamed in place. */
+    const create = async () => {
         setError(null);
-        void autosave.commit(
+        setCreating(true);
+        await autosave.commit(
             () => personaApi.create({ name: 'New Persona', description: '' }),
             (created) => {
                 setPersonas((current) => [...current, created]);
-                setFresh(created.id);
+                setJustCreated(created.id);
             },
             setError,
         );
+        setCreating(false);
     };
 
     const remove = (personaId: number) => {
@@ -119,7 +121,7 @@ export function PersonaList({ initial, autosave }: { initial: Persona[]; autosav
 
     return (
         <>
-            <button type="button" className="button" onClick={create}>
+            <button type="button" className="button" disabled={creating} onClick={() => void create()}>
                 New Persona
             </button>
 
@@ -134,7 +136,7 @@ export function PersonaList({ initial, autosave }: { initial: Persona[]; autosav
                             key={persona.id}
                             persona={persona}
                             autosave={autosave}
-                            fresh={persona.id === fresh}
+                            justCreated={persona.id === justCreated}
                             onSaved={saved}
                             onDelete={() => remove(persona.id)}
                         />

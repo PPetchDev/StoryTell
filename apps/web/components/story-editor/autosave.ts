@@ -107,6 +107,23 @@ export function useAutosave() {
         [enqueue],
     );
 
+    /**
+     * Drops a field edit still waiting to be sent: the field now holds a value that must not be
+     * saved (an empty name, a number out of range), so the one typed before it must not land either.
+     */
+    const cancel = useCallback(
+        (key: string) => {
+            const earlier = pending.current.get(key);
+            if (!earlier) return;
+            clearTimeout(earlier.timer);
+            pending.current.delete(key);
+            // Nothing left to send: "Unsaved changes" settles; a failed save keeps its message.
+            if (unmounted.current || inFlight.current > 0 || pending.current.size > 0) return;
+            setState((current) => (current.kind === 'dirty' ? { kind: 'saved' } : current));
+        },
+        [],
+    );
+
     /** Sends every pending field edit now and waits for all of them. */
     const flush = useCallback(async () => {
         for (const [key, item] of pending.current) {
@@ -130,5 +147,8 @@ export function useAutosave() {
         [enqueue, flush],
     );
 
-    return { state, queue, commit, flush };
+    return { state, queue, cancel, commit, flush };
 }
+
+/** What `useAutosave` hands a page, for the components that save through it. */
+export type Autosave = ReturnType<typeof useAutosave>;

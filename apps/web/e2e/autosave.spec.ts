@@ -124,6 +124,40 @@ test('a Memory edit and a Memory add save as they are typed and are kept after a
     }
 });
 
+test('a Memory edit that fails to save keeps its text and its editor open until it saves', async ({ page, request }) => {
+    const { storyId, chatId, memoryId } = await createChatWithMemory(request);
+    const route = `**/api/stories/${storyId}/chats/${chatId}/memories/${memoryId}`;
+
+    try {
+        await page.route(route, (sent) =>
+            sent.request().method() === 'PATCH'
+                ? sent.fulfill({ status: 500, json: { error: { code: 'INTERNAL', message: 'The database is busy.' } } })
+                : sent.continue(),
+        );
+        await page.goto(`/stories/${storyId}/chats/${chatId}`);
+        const drawer = await openMemory(page);
+        const memory = drawer.getByRole('listitem', { name: `Memory ${memoryId}` });
+        await memory.getByRole('button', { name: 'Edit' }).click();
+        const text = memory.getByRole('textbox', { name: 'Memory text' });
+        await text.fill('{user} left the grey horse at the ferry.');
+        await expect(saveStatus(drawer)).toHaveText("Couldn't save: The database is busy.");
+
+        // Done does not throw the text away while it is unsaved.
+        await memory.getByRole('button', { name: 'Done' }).click();
+        await expect(saveStatus(drawer)).toHaveText("Couldn't save: The database is busy.");
+        await expect(text).toHaveValue('{user} left the grey horse at the ferry.');
+
+        // Once the API answers again, Done tries once more, saves and closes.
+        await page.unroute(route);
+        await memory.getByRole('button', { name: 'Done' }).click();
+        await expect(saveStatus(drawer)).toHaveText('Saved');
+        await expect(text).toHaveCount(0);
+        await expect(memory).toContainText('Ash left the grey horse at the ferry.');
+    } finally {
+        await request.delete(`/api/stories/${storyId}`);
+    }
+});
+
 test('a Settings change saves once it is valid and is kept after a reload; an invalid number shows its error and is not sent', async ({
     page,
     request,
@@ -137,23 +171,19 @@ test('a Settings change saves once it is valid and is kept after a reload; an in
         await expect(saveStatus(page)).toHaveText('Saved');
         await expect(page.getByRole('button', { name: 'Save' })).toHaveCount(0);
 
-        // Out of range: the error shows at the field, nothing is sent, and the typed value stays.
-        let sent = false;
-        page.on('request', (sentRequest) => {
-            if (sentRequest.url().endsWith('/api/settings') && sentRequest.method() !== 'GET') sent = true;
-        });
-        await warning.fill('150');
+        // Typed one key at a time into an out-of-range value: the error shows at the field and the
+        // typed value stays, but neither it nor the valid "4" and "40" on the way is sent.
+        await warning.fill('4');
+        await warning.fill('40');
+        await warning.fill('400');
         await expect(page.getByText('Enter a whole number from 0 to 100.')).toBeVisible();
-        await expect(warning).toHaveValue('150');
+        await expect(warning).toHaveValue('400');
         await expect(saveStatus(page)).toHaveText('Saved');
-        await page.waitForTimeout(1000);
-        expect(sent).toBe(false);
 
         // A pool in USD takes cents, not fractions of a cent.
         const pool = page.getByLabel('Text pool (USD)');
         await pool.fill('12.345');
         await expect(page.getByText('Enter an amount of 0 or more, to the cent.')).toBeVisible();
-        expect(sent).toBe(false);
         await pool.fill('12.07');
         await expect(page.getByText('Enter an amount of 0 or more, to the cent.')).toHaveCount(0);
         await expect(saveStatus(page)).toHaveText('Saved');

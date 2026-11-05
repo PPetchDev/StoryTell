@@ -4,13 +4,12 @@ import { useState } from 'react';
 
 import { BackupBanner } from '@/components/backup-banner';
 import { useApiQuery } from '@/components/connection';
-import { useAutosave } from '@/components/story-editor/autosave';
+import { Autosave, useAutosave } from '@/components/story-editor/autosave';
 import { SaveStatus } from '@/components/story-editor/save-status';
 import { TextSizeSetting } from '@/components/text-size-setting';
 import { apiSend } from '@/lib/api';
 import { ModelOption, Settings, SettingsResponse } from '@/lib/types';
 
-type Queue = ReturnType<typeof useAutosave>['queue'];
 type ModelKey = 'playModel' | 'imageModel';
 type NumberKey = 'textCreditCapUsd' | 'textLowCreditPercent' | 'imageCreditCapUsd' | 'imageLowCreditPercent';
 
@@ -81,6 +80,7 @@ function NumberField({
     step,
     check,
     onValid,
+    onInvalid,
 }: {
     id: string;
     label: string;
@@ -90,6 +90,8 @@ function NumberField({
     step: number;
     check(text: string): number | string;
     onValid(value: number): void;
+    /** The field holds a value that must not be sent, nor the one typed before it. */
+    onInvalid(): void;
 }) {
     const [text, setText] = useState(String(initial));
     const [error, setError] = useState<string | null>(null);
@@ -100,6 +102,7 @@ function NumberField({
         const checked = check(next);
         if (typeof checked === 'string') {
             setError(checked);
+            onInvalid();
             return;
         }
         setError(null);
@@ -117,7 +120,6 @@ function NumberField({
                 min={min}
                 max={max}
                 step={step}
-                required
                 aria-invalid={error !== null}
                 aria-describedby={error ? errorId : undefined}
                 onChange={(event) => change(event.target.value)}
@@ -132,7 +134,7 @@ function NumberField({
 }
 
 /** Every setting saves as it changes, with the status in the page header. */
-function SettingsForm({ initial, queue }: { initial: SettingsResponse; queue: Queue }) {
+function SettingsForm({ initial, autosave }: { initial: SettingsResponse; autosave: Autosave }) {
     // The play model when the page opened: a different one now is a Drift risk.
     const [loadedPlayModel] = useState(initial.settings.playModel);
     const [models, setModels] = useState<Record<ModelKey, string>>({
@@ -142,7 +144,7 @@ function SettingsForm({ initial, queue }: { initial: SettingsResponse; queue: Qu
 
     const changeModel = (key: ModelKey, value: string) => {
         setModels((current) => ({ ...current, [key]: value }));
-        queue(`settings.${key}`, saveSetting({ [key]: value }), keepTyped);
+        autosave.queue(`settings.${key}`, saveSetting({ [key]: value }), keepTyped);
     };
 
     const numberField = (key: NumberKey, id: string, label: string, kind: keyof typeof NUMBER_KINDS) => (
@@ -154,7 +156,8 @@ function SettingsForm({ initial, queue }: { initial: SettingsResponse; queue: Qu
             max={NUMBER_KINDS[kind].max}
             step={NUMBER_KINDS[kind].step}
             check={NUMBER_KINDS[kind].check}
-            onValid={(value) => queue(`settings.${key}`, saveSetting({ [key]: value }), keepTyped)}
+            onValid={(value) => autosave.queue(`settings.${key}`, saveSetting({ [key]: value }), keepTyped)}
+            onInvalid={() => autosave.cancel(`settings.${key}`)}
         />
     );
 
@@ -206,18 +209,18 @@ function SettingsForm({ initial, queue }: { initial: SettingsResponse; queue: Qu
 
 export default function SettingsPage() {
     const settings = useApiQuery<SettingsResponse>('/settings');
-    const { state, queue } = useAutosave();
+    const autosave = useAutosave();
 
     return (
         <main>
             <div className="page-header">
                 <h1>Settings</h1>
-                {settings.status === 'ready' && <SaveStatus state={state} />}
+                {settings.status === 'ready' && <SaveStatus state={autosave.state} />}
             </div>
             <BackupBanner />
             {settings.status === 'loading' && <p className="muted">Loading…</p>}
             {settings.status === 'error' && <p role="alert">{settings.error.message}</p>}
-            {settings.status === 'ready' && <SettingsForm initial={settings.data} queue={queue} />}
+            {settings.status === 'ready' && <SettingsForm initial={settings.data} autosave={autosave} />}
             <TextSizeSetting />
         </main>
     );
