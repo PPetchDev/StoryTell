@@ -11,6 +11,7 @@ import {
     NoFailedExtractionError,
     NoFailedJudgeError,
     NoTurnToRetryError,
+    NotRegenerableError,
     StoryNotPlayableError,
     TurnInProgressError,
 } from '../../errors/chat.errors.js';
@@ -227,14 +228,12 @@ export class ChatManagerService {
 
         if (found.kind === MessageKind.User) {
             const chat = await this.requireSendable(story, loaded);
-            return this.writingTurn(chat.id, async () => {
-                const rolledBack = await this.ledger.rollbackFrom(chat.id, found.position + 1);
+            return this.writingTurn(chat.id, () =>
                 // The fresh reply is written to the identity worn now, so the edited text is stamped with it.
-                await this.chatModel.rewriteUserMessage(found, text, wornIdentity(story, chat));
-                // Reloaded: the rollback may have put the Chat back on an earlier Scene.
-                await this.writeTurn(story, await this.reload(chat.id));
-                return { ...(await this.getChat(storyId, chatId)), rolledBack };
-            });
+                this.rewindAndWrite(story, chat.id, found.position + 1, () =>
+                    this.chatModel.rewriteUserMessage(found, text, wornIdentity(story, chat)),
+                ),
+            );
         }
 
         if (this.inFlight.has(loaded.id)) throw new TurnInProgressError();
@@ -255,6 +254,47 @@ export class ChatManagerService {
             this.startBackground(story, chat.id, message.id);
         }
         return { ...(await this.getChat(storyId, chatId)), rolledBack };
+    }
+
+    /**
+     * Spec: "Regenerate". The newest AI Message is replaced with a freshly written one, under
+     * the same gate as a send. Its Memory, Bond, Arc and Scene changes are rolled back as an
+     * edit's are, its Snapshots leave it for the Gallery, and it is deleted; then the turn
+     * runs again: the User Message's turn when one comes before it, a Continue otherwise. On a
+     * failed turn the old reply is already gone, so a User Message before it awaits Retry, and
+     * otherwise the Chat simply ends at the AI Message before it. No version is kept.
+     */
+    async regenerateMessage(storyId: number, chatId: number, messageId: number): Promise<EditResult> {
+        const { story, chat: loaded } = await this.load(storyId, chatId);
+        // First: mid-turn, the Message may already be gone, deleted by the Regenerate under way.
+        if (this.inFlight.has(loaded.id)) throw new TurnInProgressError();
+        const message = loaded.messages.find((candidate) => candidate.id === messageId);
+        if (!message) throw new MessageNotFoundError();
+        const newest = loaded.messages[loaded.messages.length - 1];
+        if (message !== newest || message.kind !== MessageKind.Ai || message.model === AUTHOR_MODEL) {
+            throw new NotRegenerableError();
+        }
+        const chat = await this.requireSendable(story, loaded);
+
+        return this.writingTurn(chat.id, () =>
+            this.rewindAndWrite(story, chat.id, message.position, async () => {
+                await this.snapshotModel.clearMessageLinks([message.id]);
+                await this.chatModel.deleteMessage(message.id);
+            }),
+        );
+    }
+
+    /**
+     * Inside the turn lock: rolls back every change from `fromPosition` on, applies `change`
+     * to the Messages, then writes the turn, answering with what was rolled back. Shared by a
+     * User Message edit and Regenerate. A failed turn throws with the rollback and change kept.
+     */
+    private async rewindAndWrite(story: StoryEntity, chatId: number, fromPosition: number, change: () => Promise<void>): Promise<EditResult> {
+        const rolledBack = await this.ledger.rollbackFrom(chatId, fromPosition);
+        await change();
+        // Reloaded: the rollback may have put the Chat back on an earlier Scene.
+        await this.writeTurn(story, await this.reload(chatId));
+        return { ...(await this.getChat(story.id, chatId)), rolledBack };
     }
 
     /** Spec: "Start both background calls in parallel, with their status set to pending." */

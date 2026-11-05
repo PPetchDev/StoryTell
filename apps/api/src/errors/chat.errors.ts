@@ -96,3 +96,10 @@ export class AwaitingReplyError extends AppError {
         super('409.004.013', 'Your last message is still waiting for its reply. Retry it first.');
     }
 }
+
+/** A Regenerate on a Message other than the Chat's newest AI Message, or on the Opening. */
+export class NotRegenerableError extends AppError {
+    constructor() {
+        super('409.004.014', 'Only the newest reply can be written again, and never the Opening.');
+    }
+}

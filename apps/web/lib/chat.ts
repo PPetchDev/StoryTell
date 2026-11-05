@@ -82,7 +82,7 @@ export interface RollbackCounts {
     sceneAdvances: number;
 }
 
-/** An edit answers with the Chat plus what the rewind rolled back. */
+/** An edit, or ↺ Again, answers with the Chat plus what the rewind rolled back. */
 export interface EditedChat extends Chat {
     rolledBack: RollbackCounts;
 }
@@ -170,6 +170,12 @@ export const chatApi = {
      */
     edit: (storyId: number, chatId: number, messageId: number, text: string) =>
         apiSend<EditedChat>('PATCH', `/stories/${storyId}/chats/${chatId}/messages/${messageId}`, { text }),
+    /**
+     * ↺ Again: replaces the newest AI Message with a freshly written one, rolling back its
+     * changes like an edit. A failed turn has already removed the old reply.
+     */
+    regenerate: (storyId: number, chatId: number, messageId: number) =>
+        apiSend<EditedChat>('POST', `/stories/${storyId}/chats/${chatId}/messages/${messageId}/regenerate`),
     /** Wears a Persona, or the Story's Role for null, from the next User Message on. */
     swapIdentity: (storyId: number, chatId: number, personaId: number | null) =>
         apiSend<Chat>('PUT', `/stories/${storyId}/chats/${chatId}/identity`, { personaId }),
@@ -182,6 +188,11 @@ export const chatApi = {
     retryExtraction: (storyId: number, chatId: number, messageId: number) =>
         apiSend<ChatDashboard>('POST', `/stories/${storyId}/chats/${chatId}/messages/${messageId}/memory`),
 };
+
+/** The Opening's copy in a Chat: the AI Message the author wrote (model "author"), not a model. */
+export function isOpening(message: Message): boolean {
+    return message.kind === 'ai' && message.model === 'author';
+}
 
 /** The latest AI Message a model wrote, whose background calls may still be pending or have failed. */
 export function latestReply(chat: Chat): AiMessage | null {
