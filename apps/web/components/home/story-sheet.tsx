@@ -9,33 +9,38 @@ import { Sheet } from '@/components/sheet/sheet';
 import { ApiError, ApiUnreachableError } from '@/lib/api';
 import { chatApi } from '@/lib/chat';
 import { coverBackground, stillToFillIn } from '@/lib/home';
-import { StorySummary, storyTitle } from '@/lib/story';
+import { storyApi, StorySummary, storyTitle } from '@/lib/story';
 
 import styles from './story-sheet.module.css';
 
 /**
  * What tapping a Story's card offers (spec story 53): Continue its newest Chat, start a new
- * Chat, or edit it. A Draft says how much is missing instead of offering play.
+ * Chat, edit it, or Duplicate it into a copy that opens in the editor. A Draft says how much
+ * is missing instead of offering play.
  */
 export function StorySheet({ story, onClose }: { story: StorySummary; onClose(): void }) {
     const router = useRouter();
     const { reportUnreachable } = useConnection();
-    const [starting, setStarting] = useState(false);
+    const [busy, setBusy] = useState<'starting' | 'duplicating' | null>(null);
     const [error, setError] = useState<string | null>(null);
     const title = storyTitle(story);
 
-    const startChat = async () => {
-        setStarting(true);
+    /** Runs one of the sheet's writes, then goes where it leads; a failure shows here and frees the buttons. */
+    const run = async (kind: 'starting' | 'duplicating', write: () => Promise<string>, failed: string) => {
+        setBusy(kind);
         setError(null);
         try {
-            const chat = await chatApi.create(story.id);
-            router.push(`/stories/${story.id}/chats/${chat.id}`);
+            router.push(await write());
         } catch (caught) {
             if (caught instanceof ApiUnreachableError) reportUnreachable();
-            else setError(caught instanceof ApiError ? caught.message : "Couldn't start a Chat.");
-            setStarting(false);
+            else setError(caught instanceof ApiError ? caught.message : failed);
+            setBusy(null);
         }
     };
+    const startChat = () =>
+        run('starting', async () => `/stories/${story.id}/chats/${(await chatApi.create(story.id)).id}`, "Couldn't start a Chat.");
+    const duplicate = () =>
+        run('duplicating', async () => `/stories/${(await storyApi.duplicate(story.id)).id}`, "Couldn't duplicate the Story.");
 
     return (
         <Sheet label={title} onClose={onClose}>
@@ -55,15 +60,10 @@ export function StorySheet({ story, onClose }: { story: StorySummary; onClose():
                             type="button"
                             className={story.latestChat ? styles.secondary : styles.primary}
                             onClick={() => void startChat()}
-                            disabled={starting}
+                            disabled={busy !== null}
                         >
-                            {starting ? 'Starting…' : 'New Chat'}
+                            {busy === 'starting' ? 'Starting…' : 'New Chat'}
                         </button>
-                        {error && (
-                            <p role="alert" className={styles.error}>
-                                {error}
-                            </p>
-                        )}
                     </>
                 ) : (
                     <p className={styles.missing}>{stillToFillIn(story.missing.length)}</p>
@@ -76,6 +76,14 @@ export function StorySheet({ story, onClose }: { story: StorySummary; onClose():
                 <Link href={`/stories/${story.id}`} className={styles.quiet}>
                     Edit Story
                 </Link>
+                <button type="button" className={styles.quiet} onClick={() => void duplicate()} disabled={busy !== null}>
+                    {busy === 'duplicating' ? 'Duplicating…' : 'Duplicate'}
+                </button>
+                {error && (
+                    <p role="alert" className={styles.error}>
+                        {error}
+                    </p>
+                )}
             </div>
         </Sheet>
     );

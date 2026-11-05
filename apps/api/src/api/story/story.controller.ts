@@ -70,6 +70,17 @@ export class StoryApiController {
         return this.storyManager.updateStory(storyId, body);
     }
 
+    @Post(':storyId/duplicate')
+    @ApiCreatedResponse({
+        type: StoryResponseBodyDTO,
+        description:
+            'The new Story, "<title> (copy)", with everything the author wrote and its own copies of the image files. ' +
+            'Chats and Snapshots are not copied, so a Cover that is a Snapshot is dropped.',
+    })
+    duplicate(@Id('storyId') storyId: number): Promise<StoryResponseBodyDTO> {
+        return this.storyManager.duplicateStory(storyId);
+    }
+
     @Delete(':storyId')
     @HttpCode(204)
     @ApiNoContentResponse({ description: 'The Story and everything under it are gone.' })

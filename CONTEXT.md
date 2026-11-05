@@ -40,6 +40,10 @@ _Avoid_: Profile, avatar, user character
 The picture the author chooses for a Story, shown on its card on Home and at the top of its editor, cropped around a focus point the author taps. It is a Snapshot from the Story's Gallery, a Character's Reference image (which it follows when that is replaced), or a picture uploaded from the phone; only an uploaded one belongs to the Cover and is deleted with it. Without one, Home shows the newest Snapshot.
 _Avoid_: Thumbnail, banner, key art
 
+**Duplicate**:
+Making a new Story, "<title> (copy)", from everything the author wrote in another: its text, style, Role, Characters with their Reference images and Portraits, Scenes, Starting Bonds and Cover, each image in a file of its own. No Chats or Snapshots come along, so a Cover that is a Snapshot is dropped.
+_Avoid_: Clone, fork, template
+
 ## Playing
 
 **Chat**:
