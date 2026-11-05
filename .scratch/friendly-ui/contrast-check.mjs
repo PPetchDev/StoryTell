@@ -44,7 +44,7 @@ function flatten(layers) {
 }
 const lin = (v) => ((v /= 255) <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
 const lum = ([r, g, b]) => 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
-export function ratio(a, b) {
+function ratio(a, b) {
     const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
     return (x + 0.05) / (y + 0.05);
 }
@@ -71,7 +71,7 @@ pair('Warning text on page', '--warning', BG);
 pair('Warning text on surface', '--warning', SF);
 pair('Warning text on warning box', '--warning', ['--warning-surface']);
 pair('Danger text on surface (Reset Chat row)', '--danger', SF);
-pair('Danger link on surface (Delete Story)', '--danger', SF);
+pair('Danger link on the page (Delete Story)', '--danger', BG);
 pair('Danger button text on danger fill', '--danger-text', ['--danger-soft']);
 pair('Legacy .button-danger: white on #8a2d3b', '#ffffff', ['#8a2d3b'], 4.5, { after: { fg: '--danger-text', bg: ['--danger-soft'] } });
 pair('User bubble text on accent tint', '--text', ['--bg', '--accent-soft']);
@@ -112,7 +112,11 @@ pair('Danger text on raised surface (Reset row pressed)', '--danger', SR);
 pair('Warning text on raised surface', '--warning', SR);
 // Field rewrite ✨
 pair('Rewrite ✨ #c7b6ff on surface', '#c7b6ff', SF);
+pair('Links in a notice: accent on #2d2742', '--accent', ['#2d2742'], 4.5, { after: { fg: '--text' } });
+pair('Links in the rollback notice: accent on #23313a', '--accent', ['#23313a'], 4.5, { after: { fg: '--text' } });
+pair('Snapshot placeholder text at its faintest pulse (opacity .55)', '--muted', SF, 4.5, { op: 0.55, under: BG, after: { op: 0.75 } });
 // Icons and non-text (3:1)
+pair('Writing dots at rest under reduced motion (opacity .6)', '--accent', BG, 3, { op: 0.6, under: BG, after: { op: 0.75 } });
 pair('Disabled ⚡ icon (--line) on page', '--line', BG, 3, { after: { fg: '--faint' } });
 pair('Writing dots accent on page (icon)', '--accent', BG, 3);
 pair('Needs-attention dot warning on page (icon)', '--warning', BG, 3);

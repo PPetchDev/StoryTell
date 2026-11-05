@@ -52,28 +52,28 @@ export class BackgroundStillSavingError extends AppError {
     }
 }
 
-/** The names of the background calls, as the failed notice reads them. */
-export type BackgroundCallName = 'the Bond, Arc and Scene judge' | 'Memory extraction';
+/** The names of the background calls, in the plain words the failed notice reads them in. */
+export type BackgroundCallName = 'Bonds, Arcs and Scene' | 'Memories';
 
 /** A previous AI Message's background call failed; it must be retried before the next turn. */
 export class BackgroundFailedError extends AppError {
-    constructor(failed: BackgroundCallName[] = ['the Bond, Arc and Scene judge']) {
-        const what = failed.join(' and ');
-        super('409.004.008', `The previous turn's ${what} failed. Retry ${failed.length > 1 ? 'them' : 'it'} before sending.`);
+    constructor(failed: BackgroundCallName[] = ['Bonds, Arcs and Scene']) {
+        const what = failed.length > 1 ? 'Bonds, Arcs, Scene and Memories' : failed[0];
+        super('409.004.008', `The ${what} couldn't update after the previous turn. Retry before sending.`);
     }
 }
 
 /** A judge retry on a Message whose judge did not fail, or that is not the latest AI Message. */
 export class NoFailedJudgeError extends AppError {
     constructor() {
-        super('409.004.009', 'There is no failed judge call to retry on that Message.');
+        super('409.004.009', 'Nothing to retry on that Message: its Bonds, Arcs and Scene did not fail to update.');
     }
 }
 
 /** An extraction retry on a Message whose extraction did not fail, or that is not the latest AI Message. */
 export class NoFailedExtractionError extends AppError {
     constructor() {
-        super('409.004.010', 'There is no failed Memory extraction to retry on that Message.');
+        super('409.004.010', 'Nothing to retry on that Message: its Memories did not fail to update.');
     }
 }
 

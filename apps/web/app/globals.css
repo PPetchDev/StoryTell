@@ -406,6 +406,11 @@ a {
     font-size: 0.9375rem;
 }
 
+/* Accent links read only 4.1:1 on the notice tint; text-coloured ones read 11.8:1 (ticket 12). */
+.notice a {
+    color: var(--text);
+}
+
 .notice .button {
     margin-left: 0.5rem;
 }

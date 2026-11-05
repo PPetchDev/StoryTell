@@ -635,8 +635,8 @@ export class ChatManagerService {
     private async settleBackground(chat: ChatEntity): Promise<{ pending: boolean; failed: BackgroundCallName[]; waited: boolean }> {
         const [judge, extraction]: SettledBackground[] = await Promise.all([this.judge.settle(chat), this.extraction.settle(chat)]);
         const failed: BackgroundCallName[] = [];
-        if (judge.status === BackgroundStatus.Failed) failed.push('the Bond, Arc and Scene judge');
-        if (extraction.status === BackgroundStatus.Failed) failed.push('Memory extraction');
+        if (judge.status === BackgroundStatus.Failed) failed.push('Bonds, Arcs and Scene');
+        if (extraction.status === BackgroundStatus.Failed) failed.push('Memories');
         return {
             pending: judge.status === BackgroundStatus.Pending || extraction.status === BackgroundStatus.Pending,
             failed,

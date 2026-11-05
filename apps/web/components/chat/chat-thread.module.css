@@ -115,6 +115,7 @@
 @media (prefers-reduced-motion: reduce) {
     .dots i {
         animation: none;
-        opacity: 0.6;
+        /* 3.5:1 on the page: still an icon at rest (ticket 12). */
+        opacity: 0.75;
     }
 }

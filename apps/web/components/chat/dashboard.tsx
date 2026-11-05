@@ -96,15 +96,19 @@ function CharacterArc({ dashboard, character }: { dashboard: ChatDashboard; char
     );
 }
 
+/** How a reply's updates read on the Dashboard (spec: "Wording"). */
+const UPDATE_WORDS = { upToDate: 'Up to date', updating: 'Updating…', failed: "Couldn't update" } as const;
+type UpdateStatus = keyof typeof UPDATE_WORDS;
+
 /**
  * A reply's background calls (its Bond, Arc and Scene update, and its Memory update) as one
  * plain status: any failure wins, then anything still running.
  */
-function updateStatus(entry: DashboardBackground): 'failed' | 'updating' | 'up-to-date' {
+function updateStatusOf(entry: DashboardBackground): UpdateStatus {
     const statuses = [entry.judge.status, entry.memory?.status];
     if (statuses.includes('failed')) return 'failed';
     if (statuses.includes('pending')) return 'updating';
-    return 'up-to-date';
+    return 'upToDate';
 }
 
 /**
@@ -133,7 +137,8 @@ export function Dashboard({ initial }: { initial: ChatDashboard }) {
             }
         } catch (caught) {
             if (caught instanceof ApiUnreachableError) reportUnreachable();
-            else setError(caught instanceof ApiError ? caught.message : "Couldn't update. Try again in a moment.");
+            else if (caught instanceof ApiError) setError(caught.message);
+            else setError("Couldn't update. Try again in a moment.");
         } finally {
             setRetrying(null);
         }
@@ -188,24 +193,25 @@ export function Dashboard({ initial }: { initial: ChatDashboard }) {
 
             <section className="dashboard-background" aria-label="Updates">
                 <h2>Updates</h2>
-                <p className="muted small">After each reply, the feelings, changes, Scene and Memories above are brought up to date.</p>
+                <p className="muted small">
+                    After each reply, the feelings, changes, Scene and Memories above are brought up to date.
+                </p>
                 {dashboard.background.length === 0 ? (
                     <p className="muted">No replies yet.</p>
                 ) : (
                     <ul className="background-list">
                         {dashboard.background.map((entry) => {
-                            const status = updateStatus(entry);
+                            const status = updateStatusOf(entry);
                             return (
                                 <li key={entry.messageId}>
                                     <Link href={messageHref(dashboard.storyId, dashboard.chatId, entry.messageId)}>
                                         Reply {entry.position}
                                     </Link>
                                     {': '}
-                                    {status === 'up-to-date' && 'Up to date'}
-                                    {status === 'updating' && 'Updating…'}
+                                    {status !== 'failed' && UPDATE_WORDS[status]}
                                     {status === 'failed' && (
                                         <>
-                                            <span className="turn-error">Couldn&apos;t update</span>
+                                            <span className="turn-error">{UPDATE_WORDS.failed}</span>
                                             {' — '}
                                             <button
                                                 type="button"
