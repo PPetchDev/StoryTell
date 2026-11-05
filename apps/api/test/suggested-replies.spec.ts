@@ -216,6 +216,41 @@ describe('Suggested replies', () => {
             expect((await getChat(story.id, chat.id)).messages).toEqual(chat.messages);
         });
 
+        it('reads the flat shape the prompt asks for, one key per kind', async () => {
+            const story = await createStory();
+            const chat = await createChat(story.id);
+            t.gateway.scriptText(
+                'suggested_replies',
+                JSON.stringify({ action: 'I sit by the stove.', speech: '"Late again."', move: 'I open the logbook.' }),
+            );
+
+            const { body } = await suggest(story.id, chat.id).expect(200);
+
+            expect(body.suggestions as Suggestion[]).toEqual([
+                { kind: 'action', text: 'I sit by the stove.' },
+                { kind: 'speech', text: '"Late again."' },
+                { kind: 'move', text: 'I open the logbook.' },
+            ]);
+        });
+
+        it('recovers the three from one object with repeated kind and text keys, as GLM-5.3 wrote them', async () => {
+            const story = await createStory();
+            const chat = await createChat(story.id);
+            // Seen on 2026-11-05: JSON.parse keeps only the last pair of such an object.
+            t.gateway.scriptText(
+                'suggested_replies',
+                '{"suggestions": [{"kind": "action", "text": "I eat slowly.", "kind": "speech", "text": "I tell Nara, \\"Yes.\\"", "kind": "move", "text": "I ask Morra if I can stay."}]}',
+            );
+
+            const { body } = await suggest(story.id, chat.id).expect(200);
+
+            expect(body.suggestions as Suggestion[]).toEqual([
+                { kind: 'action', text: 'I eat slowly.' },
+                { kind: 'speech', text: 'I tell Nara, "Yes."' },
+                { kind: 'move', text: 'I ask Morra if I can stay.' },
+            ]);
+        });
+
         it('reads a JSON object wrapped in a code fence', async () => {
             const story = await createStory();
             const chat = await createChat(story.id);
@@ -300,7 +335,7 @@ describe('Suggested replies', () => {
 
             const turn = t.gateway.textCalls('turn')[0];
             const [call] = t.gateway.textCalls('suggested_replies');
-            expect(call).toMatchObject({ json: true, servedFor: { storyId: story.id, chatId: chat.id } });
+            expect(call).toMatchObject({ json: false, servedFor: { storyId: story.id, chatId: chat.id } });
             // The same system layers as the turn, so the two read the Chat the same way.
             expect(call.messages[0]).toEqual(turn.messages[0]);
             expect(call.messages[0].content).toContain(`${PROMPT_LAYERS.identity}\nAsh: The new keeper, arrived this morning.`);
@@ -367,7 +402,7 @@ describe('Suggested replies through the real gateway', () => {
         await t.close();
     });
 
-    it('asks the play model in JSON mode with no stop strings, and records the spend under its own kind in the text pool', async () => {
+    it('asks the play model without JSON mode or stop strings, and records the spend under its own kind in the text pool', async () => {
         const created = await t.http.post('/api/stories').send({ title: 'Real' }).expect(201);
         const storyId = created.body.id as number;
         await t.http.patch(`/api/stories/${storyId}`).send({ setting: 'An island.', opening: 'The lamp is out.' }).expect(200);
@@ -387,9 +422,10 @@ describe('Suggested replies through the real gateway', () => {
         expect(call.body).toMatchObject({
             model: 'z-ai/glm-5.3',
             provider: { only: ['deepinfra'], allow_fallbacks: false },
-            response_format: { type: 'json_object' },
             max_tokens: 400,
         });
+        // JSON mode made GLM-5.3 on DeepInfra pack or run on its three options: 1 of 5 readable, against 15 of 15 without it.
+        expect(call.body).not.toHaveProperty('response_format');
         expect(call.body).not.toHaveProperty('stop');
 
         const client = new pg.Client({ connectionString: t.databaseUrl });

@@ -23,7 +23,9 @@ export class SuggestedRepliesManagerService {
             kind: 'suggested_replies',
             messages: prompt.messages,
             maxTokens: prompt.maxTokens,
-            json: true,
+            // No JSON mode: with it, GLM-5.3 on DeepInfra packed or ran on its three options (1 of 5 readable,
+            // against 15 of 15 without it, 2026-11-05). The prompt still asks for JSON, and the parser finds it.
+            json: false,
             servedFor,
         });
         try {

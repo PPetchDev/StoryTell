@@ -47,8 +47,8 @@ export function suggestionsInstruction(input: PromptLayersInput): string {
 - "speech": a line ${identity} says aloud.
 - "move": a bold move by ${identity} that pushes the story forward.
 Each option is one or two sentences, and the three must be clearly different. Write only for ${identity}, never for the Characters.
-Answer with only this JSON object and nothing else:
-{"suggestions":[{"kind":"action","text":"..."},{"kind":"speech","text":"..."},{"kind":"move","text":"..."}]}`;
+Answer with only this JSON object and nothing else, one key per option:
+{"action":"...","speech":"...","move":"..."}`;
 }
 
 /** The turn's system layers and recent history, then the suggestions instruction. */
@@ -70,33 +70,75 @@ export function buildSuggestionsPrompt(input: SuggestionsPromptInput): Suggestio
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
 const isKind = (value: unknown): value is SuggestionKind => SUGGESTION_KINDS.includes(value as SuggestionKind);
 
+/** Exactly one of each kind, each with text, in the order action, speech, move; else the reason. */
+function oneOfEach(suggestions: SuggestedReply[]): SuggestedReply[] | string {
+    if (suggestions.some((suggestion) => suggestion.text.trim() === '')) return 'a suggestion with no text';
+    const ordered: SuggestedReply[] = [];
+    for (const kind of SUGGESTION_KINDS) {
+        const found = suggestions.filter((suggestion) => suggestion.kind === kind);
+        if (found.length !== 1) return `not one "${kind}"`;
+        ordered.push({ kind, text: found[0].text.trim() });
+    }
+    return ordered;
+}
+
+/** The asked-for shape: `{"action": "...", "speech": "...", "move": "..."}`. */
+function fromFlat(json: unknown): SuggestedReply[] | null {
+    if (!isObject(json) || !SUGGESTION_KINDS.every((kind) => typeof json[kind] === 'string')) return null;
+    return SUGGESTION_KINDS.map((kind) => ({ kind, text: json[kind] as string }));
+}
+
+/** The earlier shape, still accepted: `{"suggestions": [{"kind": "action", "text": "..."}, ...]}`. */
+function fromList(json: unknown): SuggestedReply[] | string {
+    const items = isObject(json) ? json.suggestions : undefined;
+    if (!Array.isArray(items) || items.length !== SUGGESTION_KINDS.length) return 'not three suggestions';
+    const suggestions: SuggestedReply[] = [];
+    for (const item of items) {
+        if (!isObject(item) || !isKind(item.kind) || typeof item.text !== 'string') return 'a suggestion with no kind or no text';
+        suggestions.push({ kind: item.kind, text: item.text });
+    }
+    return suggestions;
+}
+
 /**
- * Reads the model's JSON strictly: exactly three suggestions, one of each kind, each with
- * text. Anything else throws `UnreadableSuggestionsError`. Answers in the order action,
- * speech, move, whatever order the model wrote them in.
+ * The kind and text pairs in the order written, straight from the text. GLM-5.3 wrote the
+ * list shape as one object with the `kind` and `text` keys repeated, which `JSON.parse`
+ * collapses to its last pair (seen 2026-11-05); this reads all three back.
+ */
+function fromPairs(text: string): SuggestedReply[] {
+    const pairs = text.matchAll(/"kind"\s*:\s*"(action|speech|move)"\s*,\s*"text"\s*:\s*("(?:[^"\\]|\\.)*")/g);
+    const suggestions: SuggestedReply[] = [];
+    for (const [, kind, quoted] of pairs) {
+        try {
+            suggestions.push({ kind: kind as SuggestionKind, text: JSON.parse(quoted) as string });
+        } catch {
+            // A broken string is skipped; the count check below then refuses the answer.
+        }
+    }
+    return suggestions;
+}
+
+/**
+ * Reads the model's JSON: exactly three suggestions, one of each kind, each with text,
+ * answered in the order action, speech, move. Anything else throws
+ * `UnreadableSuggestionsError`, with the first reason found.
  */
 export function parseSuggestions(text: string): SuggestedReply[] {
     const match = text.match(/\{[\s\S]*\}/);
     if (!match) throw new UnreadableSuggestionsError('no JSON object');
     let json: unknown;
+    let reason: string;
     try {
         json = JSON.parse(match[0]);
+        const flat = fromFlat(json);
+        const read = flat ?? fromList(json);
+        const checked = typeof read === 'string' ? read : oneOfEach(read);
+        if (typeof checked !== 'string') return checked;
+        reason = checked;
     } catch (error) {
-        throw new UnreadableSuggestionsError((error as Error).message);
+        reason = (error as Error).message;
     }
-    const items = isObject(json) ? json.suggestions : undefined;
-    if (!Array.isArray(items) || items.length !== SUGGESTION_KINDS.length) {
-        throw new UnreadableSuggestionsError('not three suggestions');
-    }
-    const suggestions = items.map((item): SuggestedReply => {
-        if (!isObject(item) || !isKind(item.kind) || typeof item.text !== 'string' || item.text.trim() === '') {
-            throw new UnreadableSuggestionsError('a suggestion with no kind or no text');
-        }
-        return { kind: item.kind, text: item.text.trim() };
-    });
-    return SUGGESTION_KINDS.map((kind) => {
-        const found = suggestions.filter((suggestion) => suggestion.kind === kind);
-        if (found.length !== 1) throw new UnreadableSuggestionsError(`not one "${kind}"`);
-        return found[0];
-    });
+    const recovered = oneOfEach(fromPairs(match[0]));
+    if (typeof recovered !== 'string') return recovered;
+    throw new UnreadableSuggestionsError(reason);
 }
