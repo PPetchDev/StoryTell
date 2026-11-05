@@ -26,6 +26,9 @@ interface Toast {
     text: string;
 }
 
+/** How long the "Memory added" toasts stay before they go on their own; a tap before then opens the Memory. */
+const TOAST_MS = 3_000;
+
 /** How often the Chat is re-read while the last reply's background calls run. */
 const BACKGROUND_POLL_MS = 1_000;
 
@@ -97,6 +100,13 @@ export function ChatScreen({ initial, cast, portraits, scenes }: ChatScreenProps
             },
         );
     }, [chat]);
+
+    // The toasts announce, they don't wait to be dismissed: they go after TOAST_MS, and the drawer keeps the Memories.
+    useEffect(() => {
+        if (toasts.length === 0) return;
+        const timer = setTimeout(() => setToasts([]), TOAST_MS);
+        return () => clearTimeout(timer);
+    }, [toasts]);
 
     const blocked = !chat.playable || chat.textCreditOut;
 

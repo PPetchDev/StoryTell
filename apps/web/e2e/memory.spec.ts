@@ -92,3 +92,35 @@ test('a "Memory added" toast follows a turn and opens the Memory; a hand-added M
         await request.delete(`/api/stories/${storyId}`);
     }
 });
+
+test('the "Memory added" toast closes by itself after about 3 seconds, and the Memory stays in the drawer', async ({ page, request }) => {
+    const storyId = await createPlayableStory(request);
+    await request.delete('/api/testing/fake-gateway');
+    await request.post('/api/testing/fake-gateway/text', {
+        data: { kind: 'turn', replies: [{ text: 'Mira looks up at last.\n\n@Mira: In this weather?', model: 'glm-5.3' }] },
+    });
+    await request.post('/api/testing/fake-gateway/text', { data: { kind: 'judge', replies: [NO_CHANGE] } });
+    await request.post('/api/testing/fake-gateway/text', { data: { kind: 'memory_extraction', replies: [ADDS_ONE] } });
+
+    try {
+        await page.goto(`/stories/${storyId}/chats`);
+        await page.getByRole('button', { name: 'New Chat' }).click();
+        await expect(page).toHaveURL(new RegExp(`/stories/${storyId}/chats/\\d+$`));
+        await page.getByLabel('Write as Ash').fill('I climbed the cliff path in the storm.');
+        await page.getByRole('button', { name: 'Send' }).click();
+
+        const toast = page.getByRole('status').filter({ hasText: 'Memory added' });
+        await expect(toast).toBeVisible();
+        const shownAt = Date.now();
+        // Nobody taps it: it goes on its own, not before about 3 seconds.
+        await expect(toast).toHaveCount(0, { timeout: 6_000 });
+        expect(Date.now() - shownAt).toBeGreaterThan(2_000);
+
+        // The Memory itself is kept.
+        await page.getByRole('button', { name: 'Chat menu' }).click();
+        await page.getByRole('dialog', { name: 'Chat menu' }).getByRole('button', { name: /^Memory/ }).click();
+        await expect(page.getByRole('complementary', { name: 'Memory' }).getByRole('listitem').filter({ hasText: 'Ash climbed the cliff path' })).toBeVisible();
+    } finally {
+        await request.delete(`/api/stories/${storyId}`);
+    }
+});

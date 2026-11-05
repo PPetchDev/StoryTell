@@ -663,6 +663,29 @@ a {
     color: var(--text);
     cursor: pointer;
     font: inherit;
+    /* Fades in, stays, then fades out just before the Chat removes it (TOAST_MS, 3 s). */
+    animation: toast-life 3s ease forwards;
+}
+
+@keyframes toast-life {
+    0% {
+        opacity: 0;
+        transform: translateY(-0.25rem);
+    }
+    8%,
+    85% {
+        opacity: 1;
+        transform: none;
+    }
+    100% {
+        opacity: 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .toast {
+        animation: none;
+    }
 }
 
 .toast span {
