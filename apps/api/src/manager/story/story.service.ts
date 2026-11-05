@@ -28,6 +28,7 @@ import {
 import { StoryModelService } from '../../model/story/story.service.js';
 import { ImageData } from '../../service/model-gateway/model-gateway.js';
 import { ImageStoreService } from '../../store/image/image-store.service.js';
+import { parseReply, ReplyPart } from '../chat/turn/reply-parser.js';
 import { storyHook } from '../excerpt.js';
 import { MAX_CHARACTERS, playableStatus, PlayableStatus } from './playable.js';
 
@@ -155,6 +156,15 @@ export class StoryManagerService {
 
     async getStory(storyId: number): Promise<StoryDetail> {
         return this.detail(await this.load(storyId));
+    }
+
+    /**
+     * The stored Opening split by the same parser a new Chat uses for its first Message, so the
+     * editor can preview how every Chat begins. The guard is off: the author wrote the Opening.
+     */
+    async openingParts(storyId: number): Promise<ReplyPart[]> {
+        const story = await this.load(storyId);
+        return parseReply(story.opening, story.characters, story.role.name, { guard: false }).parts;
     }
 
     async updateStory(storyId: number, fields: StoryFields): Promise<StoryDetail> {

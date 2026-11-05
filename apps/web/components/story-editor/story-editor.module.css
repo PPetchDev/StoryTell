@@ -1,0 +1,176 @@
+/* The Story editor in tabs (Friendly UI ticket 09). */
+
+/* The header and tabs stick under the top edge as the page scrolls. */
+.top {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    margin: 0 -1rem 0.75rem;
+    padding: max(0.25rem, env(safe-area-inset-top)) 0.5rem 0;
+    background: var(--bg);
+    border-bottom: 1px solid var(--line);
+}
+
+.tabs {
+    display: flex;
+    gap: 0.25rem;
+    overflow-x: auto;
+    padding: 0.25rem 0.25rem 0.5rem;
+    scrollbar-width: none;
+}
+
+.tabs::-webkit-scrollbar {
+    display: none;
+}
+
+.tab {
+    position: relative;
+    flex: none;
+    min-height: 2.5rem;
+    padding: 0.45rem 0.9rem;
+    background: transparent;
+    border: 0;
+    border-radius: 999px;
+    font: inherit;
+    font-size: 0.875rem;
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--muted);
+    cursor: pointer;
+}
+
+.tab[aria-selected='true'] {
+    background: var(--accent-soft);
+    color: var(--text);
+}
+
+.tab:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+}
+
+/* A tab with a missing field. */
+.dot {
+    position: absolute;
+    top: 0.4rem;
+    right: 0.35rem;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--warning);
+}
+
+.card {
+    background: var(--surface);
+    border-radius: 1rem;
+    padding: 0.85rem;
+    margin: 0 0 0.75rem;
+}
+
+.cardHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.cardTitle {
+    margin: 0;
+    font-size: 1rem;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.note,
+.hint {
+    margin: 0 0 0.75rem;
+    font-size: 0.875rem;
+    color: var(--muted);
+}
+
+/* A dashed, quiet button for adding a Character or Scene, and for the Opening preview. */
+.add {
+    width: 100%;
+    min-height: 2.75rem;
+    margin: 0 0 0.75rem;
+    padding: 0.7rem;
+    background: transparent;
+    border: 1px dashed var(--line);
+    border-radius: 1rem;
+    font: inherit;
+    font-weight: 600;
+    color: var(--muted);
+    cursor: pointer;
+}
+
+.card .add {
+    margin: 1rem 0 0;
+    border-radius: 0.75rem;
+}
+
+.add:hover,
+.add:active {
+    border-color: var(--accent-line);
+    color: var(--text);
+}
+
+.add:focus-visible {
+    outline: 2px solid var(--accent);
+}
+
+.add:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.bond {
+    border-top: 1px solid var(--line);
+    padding-top: 0.75rem;
+    margin-top: 0.75rem;
+}
+
+.addBond {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+}
+
+.addBond label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--muted);
+}
+
+.addBond select {
+    font: inherit;
+    max-width: 100%;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 0.5rem;
+    padding: 0.4rem 0.5rem;
+}
+
+/* Delete Story: quiet, at the very bottom of the Story tab, and it asks first. */
+.deleteZone {
+    margin: 1.5rem 0 0.5rem;
+    text-align: center;
+}
+
+.deleteZone > :global(.button-danger) {
+    min-height: 2.75rem;
+    padding: 0.5rem 1rem;
+    background: transparent;
+    border: 0;
+    font-size: 0.875rem;
+    color: var(--danger);
+    text-decoration: underline;
+}
+
+.deleteZone :global(.confirm) {
+    justify-content: center;
+    text-align: left;
+}

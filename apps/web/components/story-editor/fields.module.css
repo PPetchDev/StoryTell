@@ -1,0 +1,187 @@
+/* The Story editor's fields (Friendly UI ticket 09): label row with ✨, one-line hint, grown boxes. */
+
+.field {
+    display: grid;
+    gap: 0.3rem;
+    margin: 0 0 1rem;
+    min-width: 0;
+    border-radius: 0.75rem;
+    transition:
+        box-shadow 0.3s,
+        background 0.3s;
+}
+
+.field:last-child {
+    margin-bottom: 0;
+}
+
+.head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2rem;
+}
+
+.label {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--muted);
+}
+
+.neededMark {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--warning);
+    background: rgba(255, 180, 84, 0.14);
+    border-radius: 999px;
+    padding: 0.05rem 0.5rem;
+}
+
+.changed {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.rewrite {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    margin: -0.25rem -0.25rem -0.25rem 0;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: #c7b6ff;
+    cursor: pointer;
+}
+
+.rewrite:hover,
+.rewrite:active {
+    background: var(--accent-soft);
+}
+
+.rewrite:focus-visible {
+    outline: 2px solid var(--accent);
+}
+
+.rewrite:disabled {
+    cursor: progress;
+}
+
+.busy svg {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.input {
+    box-sizing: border-box;
+    width: 100%;
+    font: inherit;
+    font-size: 1rem;
+    line-height: 1.5;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 0.65rem;
+    padding: 0.55rem 0.7rem;
+}
+
+textarea.input {
+    resize: none;
+    overflow: hidden;
+}
+
+.input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.input:read-only {
+    opacity: 0.6;
+}
+
+.needed .input {
+    border-color: #8a6326;
+    border-style: dashed;
+}
+
+.marked .input,
+.marked .segmented {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-line);
+}
+
+/* A field just jumped to or just rewritten: lit for a moment, then it fades. */
+.flash {
+    box-shadow: 0 0 0 6px var(--accent-line);
+    background: var(--accent-soft);
+}
+
+.hint {
+    margin: 0;
+    font-size: 0.8125rem;
+    color: var(--muted);
+}
+
+.error {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--warning);
+}
+
+.segmented {
+    display: flex;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 0.65rem;
+    padding: 3px;
+}
+
+.segmented button {
+    flex: 1;
+    min-height: 2.5rem;
+    background: transparent;
+    border: 0;
+    border-radius: 0.5rem;
+    padding: 0.4rem 0.25rem;
+    font: inherit;
+    font-size: 0.875rem;
+    color: var(--muted);
+    cursor: pointer;
+}
+
+.segmented button[aria-checked='true'] {
+    background: var(--accent);
+    color: var(--accent-text);
+    font-weight: 600;
+}
+
+.segmented button:focus-visible {
+    outline: 2px solid var(--text);
+    outline-offset: -2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .field {
+        transition: none;
+    }
+
+    .busy svg {
+        animation: none;
+    }
+}

@@ -1,0 +1,80 @@
+.box {
+    margin: 0 0 0.75rem;
+    background: #3a2a12;
+    border: 1px solid #8a6326;
+    border-radius: 0.9rem;
+}
+
+.ok {
+    background: #15301f;
+    border-color: #2f6b45;
+    color: #bfeccc;
+}
+
+.ok p {
+    margin: 0;
+    padding: 0.6rem 0.85rem;
+    font-size: 0.875rem;
+}
+
+.toggle {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    padding: 0.5rem 0.85rem;
+    background: transparent;
+    border: 0;
+    font: inherit;
+    font-size: 0.875rem;
+    text-align: left;
+    color: #ffe2b8;
+    cursor: pointer;
+}
+
+.toggle svg {
+    transition: transform 0.15s;
+}
+
+.turned svg {
+    transform: rotate(90deg);
+}
+
+.list {
+    list-style: none;
+    margin: 0;
+    padding: 0 0.5rem 0.5rem;
+}
+
+.list button {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    margin-top: 0.3rem;
+    padding: 0.5rem 0.6rem;
+    background: rgba(0, 0, 0, 0.2);
+    border: 0;
+    border-radius: 0.6rem;
+    font: inherit;
+    font-size: 0.875rem;
+    text-align: left;
+    color: var(--text);
+    cursor: pointer;
+}
+
+.list button:focus-visible,
+.toggle:focus-visible {
+    outline: 2px solid var(--warning);
+    outline-offset: -2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .toggle svg {
+        transition: none;
+    }
+}

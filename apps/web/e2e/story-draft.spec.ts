@@ -56,19 +56,33 @@ test('drafts a playable Story from an idea after one failed try, then rewrites a
     await expect(page).toHaveURL(/\/stories\/\d+$/);
     const storyUrl = page.url();
     await expect(page.getByRole('region', { name: 'Playable status' })).toContainText('Playable');
-    await expect(page.getByRole('region', { name: 'Playable status' })).not.toContainText('Not playable yet');
+    await expect(page.getByRole('region', { name: 'Playable status' })).not.toContainText('before you can play');
+    await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeEnabled();
     const storySection = page.getByRole('region', { name: 'Story' });
     await expect(storySection.getByLabel('Title')).toHaveValue('The Lighthouse');
     await expect(storySection.getByLabel('Setting')).toHaveValue(draft.setting);
     await expect(storySection.getByLabel('Opening')).toHaveValue(draft.opening);
-    await expect(page.getByRole('region', { name: 'Style' }).getByLabel('POV')).toHaveValue('first');
+    await page.getByRole('tab', { name: 'Style' }).click();
+    await expect(
+        page.getByRole('region', { name: 'Style' }).getByRole('radiogroup', { name: 'Point of view' }).getByRole('radio', { name: '1st person' }),
+    ).toBeChecked();
     await expect(page.getByRole('region', { name: 'Style' }).getByLabel('Image style')).toHaveValue('ink wash, muted');
+    await page.getByRole('tab', { name: 'Role' }).click();
     await expect(page.getByRole('region', { name: 'Role' }).getByLabel('Name')).toHaveValue('The new keeper');
+    await page.getByRole('tab', { name: 'Characters' }).click();
     const mira = page.getByRole('region', { name: 'Character 1' });
     await expect(mira.getByLabel('Name', { exact: true })).toHaveValue('Mira');
     await expect(mira.getByLabel('Secrets')).toHaveValue('She put the lamp out herself.');
-    await expect(mira.getByRole('group', { name: 'Bond toward The new keeper (the Role)' }).getByLabel('Label')).toHaveValue('wary');
+    await page.getByRole('tab', { name: 'Bonds' }).click();
+    await expect(
+        page
+            .getByRole('region', { name: 'Bonds from Mira' })
+            .getByRole('group', { name: 'Bond toward The new keeper (the Role)' })
+            .getByLabel('Label'),
+    ).toHaveValue('wary');
+    await page.getByRole('tab', { name: 'Scenes' }).click();
     await expect(page.getByRole('region', { name: 'Scene 1' }).getByLabel('Name')).toHaveValue('Arrival');
+    await page.getByRole('tab', { name: 'Story' }).click();
 
     // Both draft calls carried the idea, as story_draft calls in JSON mode.
     const calls = await (await request.get(`${FAKE}/calls`)).json();
@@ -99,8 +113,10 @@ test('drafts a playable Story from an idea after one failed try, then rewrites a
     await expect(rewriteFailed).toHaveCount(0);
     await expect(storySection.getByLabel('Title')).toHaveValue('The Lighthouse');
     await expect(storySection.getByLabel('Opening')).toHaveValue(draft.opening);
-    await expect(mira.getByLabel('Voice')).toHaveValue('Short sentences. Never says please.');
     await expect(page.getByRole('status').filter({ hasText: /Saved|Saving/ })).toHaveText('Saved');
+    await page.getByRole('tab', { name: 'Characters' }).click();
+    await expect(mira.getByLabel('Voice')).toHaveValue('Short sentences. Never says please.');
+    await page.getByRole('tab', { name: 'Story' }).click();
 
     // The rewrite is saved: it survives a reload, and Home shows the Story without the Draft badge.
     await page.reload();

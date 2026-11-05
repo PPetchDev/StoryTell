@@ -23,6 +23,7 @@ import {
     StartingBondRequestBodyDTO,
     StoryRequestBodyDTO,
 } from './dto/story.request.dto.js';
+import { OpeningPreviewResponseBodyDTO } from './dto/opening.response.dto.js';
 import { ListStoriesResponseBodyDTO, StoryResponseBodyDTO } from './dto/story.response.dto.js';
 
 const Id = (name: string) => Param(name, ParseIntPipe);
@@ -52,6 +53,12 @@ export class StoryApiController {
     @ApiOkResponse({ type: StoryResponseBodyDTO })
     get(@Id('storyId') storyId: number): Promise<StoryResponseBodyDTO> {
         return this.storyManager.getStory(storyId);
+    }
+
+    @Get(':storyId/opening')
+    @ApiOkResponse({ type: OpeningPreviewResponseBodyDTO })
+    async opening(@Id('storyId') storyId: number): Promise<OpeningPreviewResponseBodyDTO> {
+        return { parts: await this.storyManager.openingParts(storyId) };
     }
 
     @Patch(':storyId')

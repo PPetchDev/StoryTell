@@ -1,0 +1,28 @@
+.kicker {
+    margin: 0 0 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+.thread {
+    margin: 0 0 1rem;
+}
+
+.error {
+    color: var(--warning);
+}
+
+.waiting {
+    margin: 0 0 0.5rem;
+    font-size: 0.875rem;
+    color: var(--muted);
+    text-align: center;
+}
+
+.play {
+    width: 100%;
+    min-height: 2.75rem;
+}
