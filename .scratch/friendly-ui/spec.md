@@ -291,7 +291,7 @@ A phone-first redesign of the Chat screen, the Story editor and the app shell, i
 
 - Desktop-specific layouts: side panels, a two-column editor, a wide Chat. The phone design stays a centred column on wide screens for now.
 - Swipe (keeping and flipping between alternative replies), Branch, and Message version history.
-- Streaming replies.
+- Streaming replies. (Since brought in by [Spec: Streaming replies](../streaming/spec.md).)
 - Character avatars or profile pictures; Reference images stay out of play.
 - A light theme, a Thai UI, or user-chosen Character colours.
 - Bookmarks, a screenshot mode, and the narrator/character speaker prefixes (`@:`) that Zeta has.

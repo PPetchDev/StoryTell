@@ -335,7 +335,7 @@ Further gateway rules:
   7. Start both background calls in parallel, with their status set to pending.
   8. Update last played at.
 - **A failed turn** stores no AI Message. The User Message stays, with a Retry that runs the same turn again.
-- **No streaming in the MVP.** The client shows a "writing" indicator while it waits (7–10 s typical).
+- **No streaming in the MVP.** The client shows a "writing" indicator while it waits (7–10 s typical). (Superseded by [Spec: Streaming replies](../streaming/spec.md).)
 
 ### Prompt assembly
 
