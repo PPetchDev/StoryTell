@@ -55,10 +55,69 @@ export function useModalFocus(
 }
 
 /**
+ * The focus rules of a modeless panel, which leaves the page behind it in use: focus moves
+ * into it on open, Tab moves freely in and out, and Escape closes it while focus is inside.
+ * On close, focus goes back to the opener only if it was still in the panel, since by then
+ * the author may be typing in the page.
+ */
+function useModelessFocus(panel: RefObject<HTMLElement | null>, onClose: () => void) {
+    const close = useRef(onClose);
+
+    useEffect(() => {
+        close.current = onClose;
+    }, [onClose]);
+
+    useEffect(() => {
+        const node = panel.current;
+        const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        node?.focus();
+        const onKey = (event: KeyboardEvent) => {
+            if (event.key === 'Escape' && node?.contains(document.activeElement)) close.current();
+        };
+        document.addEventListener('keydown', onKey);
+        return () => {
+            document.removeEventListener('keydown', onKey);
+            // A focused element removed with the panel leaves focus on the body.
+            const active = document.activeElement;
+            if (!active || active === document.body || node?.contains(active)) opener?.focus();
+        };
+    }, [panel]);
+}
+
+function SheetTop({ onClose }: { onClose(): void }) {
+    return (
+        <div className={styles.top}>
+            <span className={styles.grip} aria-hidden="true" />
+            <button type="button" className={styles.close} aria-label="Close" onClick={onClose}>
+                <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <path d="M6 6l12 12M18 6L6 18" />
+                </svg>
+            </button>
+        </div>
+    );
+}
+
+interface SheetProps {
+    label: string;
+    onClose(): void;
+    children: ReactNode;
+    /**
+     * Half the screen tall, over a page that stays in use: no dimming, no focus trap, and a tap
+     * on the page doesn't close it. The page leaves `--sheet-half` of room at its end.
+     */
+    modeless?: boolean;
+}
+
+/**
  * A panel that slides up from the bottom of the screen over a dimmed page. Tapping the dimmed
  * page, the Close button or Escape closes it; focus moves into it on open and back on close.
+ * A `modeless` sheet leaves the page usable instead.
  */
-export function Sheet({ label, onClose, children }: { label: string; onClose(): void; children: ReactNode }) {
+export function Sheet({ modeless, ...props }: SheetProps) {
+    return modeless ? <ModelessSheet {...props} /> : <ModalSheet {...props} />;
+}
+
+function ModalSheet({ label, onClose, children }: Omit<SheetProps, 'modeless'>) {
     const panel = useRef<HTMLDivElement>(null);
     useModalFocus(panel, onClose);
 
@@ -73,14 +132,21 @@ export function Sheet({ label, onClose, children }: { label: string; onClose(): 
                 tabIndex={-1}
                 onClick={(event) => event.stopPropagation()}
             >
-                <div className={styles.top}>
-                    <span className={styles.grip} aria-hidden="true" />
-                    <button type="button" className={styles.close} aria-label="Close" onClick={onClose}>
-                        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                            <path d="M6 6l12 12M18 6L6 18" />
-                        </svg>
-                    </button>
-                </div>
+                <SheetTop onClose={onClose} />
+                {children}
+            </div>
+        </div>
+    );
+}
+
+function ModelessSheet({ label, onClose, children }: Omit<SheetProps, 'modeless'>) {
+    const panel = useRef<HTMLDivElement>(null);
+    useModelessFocus(panel, onClose);
+
+    return (
+        <div className={styles.dock}>
+            <div ref={panel} className={`${styles.panel} ${styles.modeless}`} role="dialog" aria-label={label} tabIndex={-1}>
+                <SheetTop onClose={onClose} />
                 {children}
             </div>
         </div>

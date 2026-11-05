@@ -181,3 +181,21 @@
     justify-content: center;
     text-align: left;
 }
+
+/* With the Assistant's sheet open: room at the end, so the last fields scroll above the sheet. */
+.underSheet {
+    padding-bottom: var(--sheet-half);
+}
+
+/* Set on <html> while the sheet is open: what scrolls into view lands between header and sheet. */
+.underSheetRoot {
+    scroll-padding-top: var(--editor-top, 0px);
+    scroll-padding-bottom: var(--sheet-half);
+}
+
+/* Example lines, just jumped to from the Assistant's link. */
+.linesFlash {
+    border-radius: 0.75rem;
+    box-shadow: 0 0 0 6px var(--accent-line);
+    background: var(--accent-soft);
+}

@@ -1,9 +1,10 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 
 import { rewriteKey } from '@/components/story-editor/rewrite';
-import { Story, storyApi } from '@/lib/story';
+import { RewriteRequest, Story, storyApi } from '@/lib/story';
 import { AppliedChange, assistantApi, AssistantResponse, changedField, PendingChangeSet } from '@/lib/story-assistant';
 
 /** What one applied change is in, as the panel shows it beside its Undo. */
@@ -34,6 +35,27 @@ interface Options {
     commit: Commit;
     /** The API's Story becomes the editor's, as after any structural change. */
     applyWhole(story: Story): void;
+    /** An answer's changes have landed and are rendered: the editor shows the first one. */
+    onApplied?(changes: AppliedChange[]): void;
+}
+
+/** The fields each kind of addition brings, the first one being where a link to it lands. */
+const ADDED_FIELDS: Record<Extract<AppliedChange, { kind: 'add' }>['target'], string[]> = {
+    character: ['name', 'appearance', 'personality', 'voice', 'background', 'secrets', 'arcDirections'],
+    scene: ['name', 'situation', 'moveOnCondition'],
+    startingBond: ['label', 'description'],
+};
+
+/** The field a change is shown at, as the editor's Rewrite buttons name it; none for a removal. */
+export function fieldOf(change: AppliedChange): RewriteRequest | null {
+    switch (change.kind) {
+        case 'set':
+            return changedField(change);
+        case 'add':
+            return { target: change.target, id: change.id, field: ADDED_FIELDS[change.target][0] };
+        case 'remove':
+            return null;
+    }
 }
 
 /** The field keys (as the editor's Rewrite buttons name them) a change lights up. */
@@ -41,14 +63,8 @@ function keysOf(change: AppliedChange): string[] {
     switch (change.kind) {
         case 'set':
             return [rewriteKey(changedField(change))];
-        case 'add': {
-            const fields: Record<typeof change.target, string[]> = {
-                character: ['name', 'appearance', 'personality', 'voice', 'background', 'secrets', 'arcDirections'],
-                scene: ['name', 'situation', 'moveOnCondition'],
-                startingBond: ['label', 'description'],
-            };
-            return fields[change.target].map((field) => rewriteKey({ target: change.target, id: change.id, field }));
-        }
+        case 'add':
+            return ADDED_FIELDS[change.target].map((field) => rewriteKey({ target: change.target, id: change.id, field }));
         case 'remove':
             return [];
     }
@@ -89,8 +105,12 @@ function removeAdded(storyId: number, change: Extract<AppliedChange, { kind: 'ad
  * records them, lights their fields up, and offers Undo from the old values the API answered.
  * Nothing here is persisted: closing the panel forgets the conversation and the Undos.
  */
-export function useStoryAssistant({ storyId, commit, applyWhole }: Options) {
+export function useStoryAssistant({ storyId, commit, applyWhole, onApplied }: Options) {
     const [open, setOpen] = useState(false);
+    const applied = useRef(onApplied);
+    useEffect(() => {
+        applied.current = onApplied;
+    }, [onApplied]);
     const [entries, setEntries] = useState<AssistantEntry[]>([]);
     const nextId = useRef(1);
     const newId = () => nextId.current++;
@@ -102,17 +122,21 @@ export function useStoryAssistant({ storyId, commit, applyWhole }: Options) {
     /** What an answer does when it lands: the Story is already changed, show the changes. */
     const land = useCallback(
         (busyId: number, result: AssistantResponse) => {
-            applyWhole(result.story);
-            if (result.pending) {
-                replace(busyId, { id: busyId, kind: 'pending', reply: result.reply, pending: result.pending, cancelled: false });
-            } else {
-                replace(busyId, {
-                    id: busyId,
-                    kind: 'answer',
-                    reply: result.reply,
-                    changes: result.changes.map((change) => ({ change, undo: { kind: 'applied' } })),
-                });
-            }
+            // Rendered at once, so the editor can scroll to a field the answer has just added.
+            flushSync(() => {
+                applyWhole(result.story);
+                if (result.pending) {
+                    replace(busyId, { id: busyId, kind: 'pending', reply: result.reply, pending: result.pending, cancelled: false });
+                } else {
+                    replace(busyId, {
+                        id: busyId,
+                        kind: 'answer',
+                        reply: result.reply,
+                        changes: result.changes.map((change) => ({ change, undo: { kind: 'applied' } })),
+                    });
+                }
+            });
+            if (!result.pending && result.changes.length > 0) applied.current?.(result.changes);
         },
         [applyWhole, replace],
     );

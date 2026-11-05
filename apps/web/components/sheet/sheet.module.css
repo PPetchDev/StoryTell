@@ -69,3 +69,30 @@
 .close:focus-visible {
     outline: 2px solid var(--accent);
 }
+
+/* A modeless sheet: nothing dims the page, and taps outside the panel reach the page. */
+.dock {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+}
+
+.panel.modeless {
+    pointer-events: auto;
+    display: flex;
+    flex-direction: column;
+    height: var(--sheet-half);
+    max-height: none;
+    overflow: hidden;
+    border-top: 1px solid var(--line);
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.55);
+}
+
+.modeless > .top {
+    flex: none;
+}

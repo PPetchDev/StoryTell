@@ -1,9 +1,10 @@
 'use client';
 
 import { Character, characterRemovalWarning, Story } from '@/lib/story';
+import { useFieldMarks } from './field-marks';
 import { ConfirmButton, OrderButtons, TextField, Toolbar } from './fields';
 import { ReferenceImage } from './reference-image';
-import { FieldRewrites, rewritableField } from './rewrite';
+import { fieldDomId, FieldRewrites, rewritableField } from './rewrite';
 import styles from './story-editor.module.css';
 
 type TextKey = 'name' | 'appearance' | 'personality' | 'voice' | 'background' | 'secrets' | 'arcDirections';
@@ -30,6 +31,8 @@ export function CharacterCard(props: CharacterCardProps) {
     const { character, index, count, rewrites } = props;
     const heading = character.name.trim() === '' ? `Character ${index + 1}` : character.name;
 
+    const linesId = fieldDomId({ target: 'character', id: character.id, field: 'exampleLines' });
+    const linesFlashed = useFieldMarks(linesId).flashed;
     const ofCharacter = (field: TextKey) => rewritableField({ target: 'character', id: character.id, field }, rewrites);
 
     const setLine = (lineIndex: number, value: string) => {
@@ -98,7 +101,7 @@ export function CharacterCard(props: CharacterCardProps) {
                 {...ofCharacter('voice')}
             />
 
-            <fieldset className="subsection">
+            <fieldset id={linesId} className={linesFlashed ? `subsection ${styles.linesFlash}` : 'subsection'}>
                 <legend>Example lines</legend>
                 <p className="hint">Optional. A few lines in their voice, in order.</p>
                 <ol className="line-list">

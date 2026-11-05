@@ -176,14 +176,25 @@ interface SegmentedFieldProps<T extends string> {
     onChange(value: T): void;
     hint?: string;
     highlighted?: boolean;
+    /** The field's id, so a link can land on it and light it. */
+    domId?: string;
 }
 
 /**
  * A choice of a few, as tap-to-pick segments (spec: story 64). It is a radio group, so the
  * arrow keys move the choice as in any radio group.
  */
-export function SegmentedField<T extends string>({ label, value, options, onChange, hint, highlighted }: SegmentedFieldProps<T>) {
+export function SegmentedField<T extends string>({
+    label,
+    value,
+    options,
+    onChange,
+    hint,
+    highlighted,
+    domId,
+}: SegmentedFieldProps<T>) {
     const id = useId();
+    const { flashed } = useFieldMarks(domId);
     const keys = Object.keys(options) as T[];
     const chosen = keys.indexOf(value);
     const group = useRef<HTMLDivElement>(null);
@@ -195,7 +206,7 @@ export function SegmentedField<T extends string>({ label, value, options, onChan
         focusChoice(group.current, '[role="radio"]', next);
     };
     return (
-        <div className={classes(styles.field, highlighted && styles.marked)}>
+        <div id={domId} className={classes(styles.field, highlighted && styles.marked, flashed && styles.flash)}>
             <div className={styles.head}>
                 <span id={`${id}-label`} className={styles.label}>
                     {label}
