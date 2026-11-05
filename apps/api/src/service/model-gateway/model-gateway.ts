@@ -51,7 +51,7 @@ export type PlayModel = (typeof PLAY_MODELS)[number];
 export const BACKGROUND_MODEL = 'deepseek-v4-flash';
 export type TextModel = PlayModel | typeof BACKGROUND_MODEL;
 
-export const SNAPSHOT_MODELS = ['seedream-v4-edit', 'qwen-edit-uncensored'] as const;
+export const SNAPSHOT_MODELS = ['seedream-v4-edit', 'seedream-v5-pro-edit', 'qwen-edit-uncensored'] as const;
 export type SnapshotModel = (typeof SNAPSHOT_MODELS)[number];
 export const REFERENCE_IMAGE_MODEL = 'qwen-image-3';
 /**
@@ -61,6 +61,7 @@ export const REFERENCE_IMAGE_MODEL = 'qwen-image-3';
  */
 export const TEXT_ONLY_SNAPSHOT_MODELS = {
     'seedream-v4-edit': 'seedream-v4',
+    'seedream-v5-pro-edit': 'seedream-v5-pro',
     'qwen-edit-uncensored': REFERENCE_IMAGE_MODEL,
 } as const satisfies Record<SnapshotModel, string>;
 export type ImageModel = SnapshotModel | typeof REFERENCE_IMAGE_MODEL | (typeof TEXT_ONLY_SNAPSHOT_MODELS)[SnapshotModel];

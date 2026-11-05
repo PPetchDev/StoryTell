@@ -93,6 +93,7 @@ describe('Venice contract', () => {
         for (const [imageModel, textOnly, price] of [
             ['seedream-v4-edit', 'seedream-v4', 0.05],
             ['qwen-edit-uncensored', 'qwen-image-3', 0.04],
+            ['seedream-v5-pro-edit', 'seedream-v5-pro', 0.06],
         ] as const) {
             const net = recordedFetch([...modelLists, { fixture: 'venice/generate.json' }]);
             const { gateway, records } = gatewayUnderTest(net.fetch, { settings: { imageModel } });
@@ -105,6 +106,24 @@ describe('Venice contract', () => {
             expect(result).toMatchObject({ model: textOnly, costUsd: price });
             expect(records[0]).toMatchObject({ kind: 'snapshot_image', pool: 'image', model: textOnly, costUsd: price });
         }
+    });
+
+    it('draws with Seedream V5 Pro edit, paying for each reference image past the first', async () => {
+        const net = recordedFetch([...modelLists, edited]);
+        const { gateway, records } = gatewayUnderTest(net.fetch, { settings: { imageModel: 'seedream-v5-pro-edit' } });
+
+        const result = await gateway.generateImage({
+            kind: 'snapshot_image',
+            prompt: 'A synthetic test scene.',
+            referenceImages: [FAKE_PNG, FAKE_PNG, FAKE_PNG],
+            servedFor: { chatId: 3 },
+        });
+
+        expect(net.requests[2].url).toBe(`${BASE}/image/multi-edit`);
+        expect(net.requests[2].body).toMatchObject({ modelId: 'seedream-v5-pro-edit', aspect_ratio: '2:3', safe_mode: false });
+        // $0.06 includes one input image; Venice lists $0.00345 for each further one.
+        expect(result).toMatchObject({ model: 'seedream-v5-pro-edit', costUsd: 0.0669 });
+        expect(records[0]).toMatchObject({ kind: 'snapshot_image', model: 'seedream-v5-pro-edit', costUsd: 0.0669 });
     });
 
     it('uses the Settings image model and its prompt limit from GET /models', async () => {

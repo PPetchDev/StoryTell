@@ -19,7 +19,7 @@ import {
     TextModel,
     TextStreamResult,
 } from '../model-gateway.js';
-import { IMAGE_MODELS, imageModelForKind, isPlayModelKind, TEXT_MODELS, VENICE_HOST } from './model-table.js';
+import { IMAGE_MODELS, imageModelForKind, ImageModelSpec, isPlayModelKind, TEXT_MODELS, VENICE_HOST } from './model-table.js';
 import { defaultSleep, SleepFn } from './http.js';
 import { OpenRouterChatRequest, OpenRouterClient, TextBill } from './openrouter-client.js';
 import { VeniceClient } from './venice-client.js';
@@ -168,6 +168,7 @@ export class RealModelGateway extends ModelGateway {
             prompt: request.prompt,
             referenceImages: request.referenceImages,
         });
+        const costUsd = imageListPrice(model, request.referenceImages?.length ?? 0);
 
         await this.deps.usage.record({
             kind: request.kind,
@@ -177,12 +178,12 @@ export class RealModelGateway extends ModelGateway {
             promptTokens: null,
             completionTokens: null,
             images: 1,
-            costUsd: model.listPriceUsd,
+            costUsd,
             storyId: request.servedFor?.storyId ?? null,
             chatId: request.servedFor?.chatId ?? null,
         });
 
-        return { image, model: modelName, costUsd: model.listPriceUsd };
+        return { image, model: modelName, costUsd };
     }
 
     async remainingCredit(): Promise<RemainingCredit> {
@@ -211,4 +212,11 @@ export class RealModelGateway extends ModelGateway {
             throw error;
         }
     }
+}
+
+/** An image's list price: the model's price, plus each input image past the first where the model charges for them. */
+function imageListPrice(model: ImageModelSpec, inputImages: number): number {
+    const extra = (model.extraInputImageUsd ?? 0) * Math.max(0, inputImages - 1);
+    // Whole millionths of a dollar, so $0.06 + 2 × $0.00345 records as 0.0669 and not 0.06690000000000001.
+    return Math.round((model.listPriceUsd + extra) * 1e6) / 1e6;
 }

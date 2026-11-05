@@ -66,6 +66,8 @@ export interface ImageModelSpec {
     endpoint: 'generate' | 'multi-edit';
     /** Venice reports no per-image cost, so UsageRecords carry the list price. */
     listPriceUsd: number;
+    /** The list price of each input image past the first, where Venice charges for them (`pricing.inputImages`). */
+    extraInputImageUsd?: number;
     /**
      * `GET /models` reports `constraints.promptCharacterLimit`; this is the value read on
      * 2026-11-04, used when that call fails.
@@ -80,6 +82,14 @@ export const IMAGE_MODELS: Record<ImageModel, ImageModelSpec> = {
         listPriceUsd: 0.05,
         fallbackPromptCharacterLimit: 10_000,
     },
+    // Venice's `GET /models` on 2026-11-05: $0.06 at 1K with one input image included, $0.00345 per further one.
+    'seedream-v5-pro-edit': {
+        id: 'seedream-v5-pro-edit',
+        endpoint: 'multi-edit',
+        listPriceUsd: 0.06,
+        extraInputImageUsd: 0.00345,
+        fallbackPromptCharacterLimit: 10_000,
+    },
     'qwen-edit-uncensored': {
         id: 'qwen-edit-uncensored',
         endpoint: 'multi-edit',
@@ -90,6 +100,12 @@ export const IMAGE_MODELS: Record<ImageModel, ImageModelSpec> = {
         id: 'seedream-v4',
         endpoint: 'generate',
         listPriceUsd: 0.05,
+        fallbackPromptCharacterLimit: 10_000,
+    },
+    'seedream-v5-pro': {
+        id: 'seedream-v5-pro',
+        endpoint: 'generate',
+        listPriceUsd: 0.06,
         fallbackPromptCharacterLimit: 10_000,
     },
     'qwen-image-3': {

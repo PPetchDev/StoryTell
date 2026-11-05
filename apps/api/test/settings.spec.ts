@@ -25,6 +25,7 @@ describe('Settings', () => {
         expect(body.playModels.map((m: { id: string }) => m.id)).toEqual(['glm-5.3', 'deepseek-v4-pro']);
         expect(body.imageModels.map((m: { id: string }) => m.id)).toEqual([
             'seedream-v4-edit',
+            'seedream-v5-pro-edit',
             'qwen-edit-uncensored',
         ]);
     });

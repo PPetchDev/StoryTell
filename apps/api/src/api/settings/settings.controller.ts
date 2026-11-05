@@ -12,7 +12,8 @@ const PLAY_MODEL_OPTIONS: ModelOptionDTO[] = [
 ];
 
 const IMAGE_MODEL_OPTIONS: ModelOptionDTO[] = [
-    { id: 'seedream-v4-edit', label: 'Seedream v4 edit (Venice, $0.05)' },
+    { id: 'seedream-v4-edit', label: 'Seedream V4.5 edit (Venice, $0.05)' },
+    { id: 'seedream-v5-pro-edit', label: 'Seedream V5 Pro edit (Venice, $0.06)' },
     { id: 'qwen-edit-uncensored', label: 'Qwen edit uncensored (Venice, $0.04)' },
 ];
 
