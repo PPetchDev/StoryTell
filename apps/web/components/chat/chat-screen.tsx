@@ -6,6 +6,7 @@ import { ChatComposer } from '@/components/chat/chat-composer';
 import { ChatThread, PendingLine } from '@/components/chat/chat-thread';
 import { ChatTopBar } from '@/components/chat/chat-top-bar';
 import { MemoryDrawer } from '@/components/chat/memory-drawer';
+import { SnapshotSheet } from '@/components/chat/snapshot-sheet';
 import { SnapshotViewer, useChatSnapshots } from '@/components/chat/snapshots';
 import { useConnection } from '@/components/connection';
 import { ApiError, apiFetch, ApiUnreachableError } from '@/lib/api';
@@ -32,9 +33,9 @@ const BACKGROUND_POLL_MS = 1_000;
  * Messages after it and rolls back their changes, with a short notice of what went; Reset
  * starts the Chat over from the Opening. Bonds and Arcs never show here: the dashboard link
  * leads to them. Memory does: the drawer lists it, and a "Memory added" toast appears for each
- * Memory the AI adds once a turn's extraction is done. The camera takes a Snapshot of the
- * latest AI Message while play goes on; Snapshots show under their Message, and a tap opens
- * one full screen.
+ * Memory the AI adds once a turn's extraction is done. 📷 in the newest reply's action row
+ * opens a sheet that takes a Snapshot of the latest AI Message while play goes on; Snapshots
+ * show under their Message, and a tap opens one full screen.
  */
 interface ChatScreenProps {
     initial: Chat;
@@ -56,6 +57,7 @@ export function ChatScreen({ initial, cast }: ChatScreenProps) {
     const [toasts, setToasts] = useState<Toast[]>([]);
     const snaps = useChatSnapshots(initial.storyId, initial.id);
     const [viewing, setViewing] = useState<Snapshot | null>(null);
+    const [snapshotSheet, setSnapshotSheet] = useState(false);
     /** The reply whose finished extraction was already announced, so a re-read never toasts twice. */
     const announcedRef = useRef<number | null>(latestReply(initial)?.id ?? null);
 
@@ -262,6 +264,7 @@ export function ChatScreen({ initial, cast }: ChatScreenProps) {
                 onEdit={setEditing}
                 onSave={saveEdit}
                 onCancelEdit={() => setEditing(null)}
+                onSnapshot={() => setSnapshotSheet(true)}
                 onOpenSnapshot={setViewing}
                 onRetrySnapshot={(job) => void snaps.retry(job)}
                 onDismissSnapshot={(job) => void snaps.dismiss(job)}
@@ -272,7 +275,6 @@ export function ChatScreen({ initial, cast }: ChatScreenProps) {
                 draft={draft}
                 writing={writing}
                 busy={busy}
-                editing={editing !== null}
                 blocked={blocked}
                 error={error}
                 rollback={rollback}
@@ -282,8 +284,15 @@ export function ChatScreen({ initial, cast }: ChatScreenProps) {
                 onRetry={() => void runTurn(() => chatApi.retry(chat.storyId, chat.id))}
                 onRetryJudge={retryJudge}
                 onRetryExtraction={retryExtraction}
-                onTakeSnapshot={(hint) => void snaps.take(hint)}
             />
+
+            {snapshotSheet && (
+                <SnapshotSheet
+                    imageCreditOut={chat.imageCreditOut}
+                    onTake={(hint) => void snaps.take(hint)}
+                    onClose={() => setSnapshotSheet(false)}
+                />
+            )}
 
             {viewing && (
                 <SnapshotViewer

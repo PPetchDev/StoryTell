@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { useConnection } from '@/components/connection';
 import { SnapshotViewer, snapshotAlt } from '@/components/snapshot/snapshot-viewer';
@@ -42,7 +42,7 @@ export function useChatSnapshots(storyId: number, chatId: number) {
         return () => clearTimeout(timer);
     }, [pending, state, refresh]);
 
-    /** Runs a write, then re-reads; a typed error shows by the camera. */
+    /** Runs a write, then re-reads; a typed error shows by the composer. */
     const run = async (write: () => Promise<unknown>) => {
         setError(null);
         try {
@@ -107,48 +107,6 @@ export function MessageSnapshots({ snapshots, jobs, onOpen, onRetry, onDismiss }
                 ),
             )}
         </div>
-    );
-}
-
-interface CameraProps {
-    /** Why the camera is off, or null when it works. */
-    disabledNote: string | null;
-    /** Off for a moment, with no note: a turn or an edit is being written. */
-    busy: boolean;
-    error: string | null;
-    onTake(hint: string): void;
-}
-
-/** Spec: stories 109–110. One press, one Snapshot of the latest AI Message, with an optional hint. */
-export function Camera({ disabledNote, busy, error, onTake }: CameraProps) {
-    const [hint, setHint] = useState('');
-    const take = (event: FormEvent) => {
-        event.preventDefault();
-        if (disabledNote || busy) return;
-        onTake(hint);
-        setHint('');
-    };
-    return (
-        <form className="camera" aria-label="Camera" onSubmit={take}>
-            <input
-                type="text"
-                aria-label="Snapshot hint"
-                placeholder="Hint (optional), e.g. close-up on her face"
-                maxLength={300}
-                value={hint}
-                disabled={disabledNote !== null}
-                onChange={(event) => setHint(event.target.value)}
-            />
-            <button type="submit" className="button button-quiet" disabled={disabledNote !== null || busy}>
-                📷 Snapshot
-            </button>
-            {disabledNote && <p className="muted small camera-note">{disabledNote}</p>}
-            {error && (
-                <p role="alert" className="camera-note">
-                    {error}
-                </p>
-            )}
-        </form>
     );
 }
 

@@ -910,30 +910,6 @@ a {
 }
 
 /* --- Snapshots and the Gallery (ticket 31) --- */
-.camera {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    align-items: center;
-    margin: 0.75rem 0 0.5rem;
-}
-
-.camera input {
-    flex: 1 1 12rem;
-    min-width: 0;
-    font: inherit;
-    background: var(--bg);
-    color: var(--text);
-    border: 1px solid #3a3150;
-    border-radius: 0.5rem;
-    padding: 0.375rem 0.5rem;
-}
-
-.camera-note {
-    flex-basis: 100%;
-    margin: 0;
-}
-
 .snapshot-thumb {
     display: block;
     padding: 0;

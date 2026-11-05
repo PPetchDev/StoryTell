@@ -1,9 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent } from 'react';
+import { FormEvent, useEffect, useLayoutEffect, useRef } from 'react';
 
-import { Camera } from '@/components/chat/snapshots';
 import { Chat, latestReply, modelLabel } from '@/lib/chat';
 
 import styles from './chat-composer.module.css';
@@ -58,6 +57,40 @@ function Notices({ chat, onRetryJudge, onRetryExtraction, retrying }: NoticesPro
     );
 }
 
+/** Sets the box's height to its text's, which the CSS max-height caps. */
+function fitToText(box: HTMLTextAreaElement) {
+    box.style.height = 'auto';
+    const borders = box.offsetHeight - box.clientHeight;
+    box.style.height = `${box.scrollHeight + borders}px`;
+}
+
+/**
+ * Fits the box to its text, from one row up to about five lines, past which it scrolls
+ * (spec: "Composer"). A new width (a turned phone) rewraps the text, so it fits again then.
+ */
+function useAutoGrow(value: string) {
+    const ref = useRef<HTMLTextAreaElement>(null);
+    useLayoutEffect(() => {
+        if (ref.current) fitToText(ref.current);
+    }, [value]);
+    useEffect(() => {
+        const refit = () => {
+            if (ref.current) fitToText(ref.current);
+        };
+        window.addEventListener('resize', refit);
+        return () => window.removeEventListener('resize', refit);
+    }, []);
+    return ref;
+}
+
+/**
+ * Enter sends on a physical keyboard (spec: "Composer"). A phone's on-screen keyboard has no
+ * Shift+Enter, so where no fine pointer is present, Enter is a new line and the button sends.
+ */
+function enterSends(): boolean {
+    return window.matchMedia('(any-pointer: fine)').matches;
+}
+
 interface ChatComposerProps {
     chat: Chat;
     draft: string;
@@ -65,8 +98,6 @@ interface ChatComposerProps {
     writing: boolean;
     /** A write that runs no turn is in flight (an edit, Reset, a retry). */
     busy: boolean;
-    /** A Message is being edited in place. */
-    editing: boolean;
     /** Sending is blocked: the Story isn't playable or text credit is out. */
     blocked: boolean;
     error: string | null;
@@ -77,16 +108,14 @@ interface ChatComposerProps {
     onRetry(): void;
     onRetryJudge(messageId: number): void;
     onRetryExtraction(messageId: number): void;
-    onTakeSnapshot(hint: string): void;
 }
 
-/** Under the thread: what blocks or failed, the camera, and the box the user writes in. */
+/** Under the thread: what blocks or failed, and the box the user writes in. */
 export function ChatComposer({
     chat,
     draft,
     writing,
     busy,
-    editing,
     blocked,
     error,
     rollback,
@@ -96,8 +125,8 @@ export function ChatComposer({
     onRetry,
     onRetryJudge,
     onRetryExtraction,
-    onTakeSnapshot,
 }: ChatComposerProps) {
+    const box = useAutoGrow(draft);
     const send = (event: FormEvent) => {
         event.preventDefault();
         onSend();
@@ -123,28 +152,34 @@ export function ChatComposer({
                     </button>
                 </p>
             )}
-            <Camera
-                disabledNote={chat.imageCreditOut ? 'Snapshots are off: image credit is used up. Play goes on.' : null}
-                busy={writing || busy || editing}
-                error={snapshotError}
-                onTake={onTakeSnapshot}
-            />
+            {snapshotError && (
+                <p role="alert" className="turn-error">
+                    {snapshotError}
+                </p>
+            )}
             <form className={styles.form} onSubmit={send} aria-label="Composer">
+                {/* Ticket 07's ⚡ Suggested replies button goes here, left of the box. */}
                 <textarea
+                    ref={box}
                     aria-label={`Write as ${chat.identityName}`}
                     placeholder={`Write as ${chat.identityName}…`}
                     value={draft}
-                    rows={3}
+                    rows={1}
                     disabled={writing || blocked}
                     onChange={(event) => onDraft(event.target.value)}
                     onKeyDown={(event) => {
-                        if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
-                            event.currentTarget.form?.requestSubmit();
-                        }
+                        if (event.key !== 'Enter' || event.shiftKey || !enterSends()) return;
+                        // An Enter that confirms an input method's word (Thai, say) only confirms it; Safari reports it as 229.
+                        if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+                        event.preventDefault();
+                        event.currentTarget.form?.requestSubmit();
                     }}
                 />
-                <button type="submit" className="button" disabled={writing || blocked || draft.trim() === ''}>
-                    {writing ? 'Writing…' : 'Send'}
+                {/* Ticket 05: while the box is empty or whitespace this becomes ▶ Continue. */}
+                <button type="submit" className={styles.send} aria-label="Send" disabled={writing || blocked || draft.trim() === ''}>
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+                        <path d="M3.4 20.4l17.4-7.5c.8-.4.8-1.5 0-1.8L3.4 3.6c-.7-.3-1.4.3-1.3 1l1.5 6.1c.1.4.5.7.9.8L12 12l-7.5.5c-.4 0-.8.4-.9.8l-1.5 6.1c-.1.7.6 1.3 1.3 1z" />
+                    </svg>
                 </button>
             </form>
         </footer>

@@ -1,5 +1,8 @@
 import { APIRequestContext, expect, test } from '@playwright/test';
 
+// Snapshots are taken during play, on a phone (spec: "Phone width"): 390px wide, with touch.
+test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
 const FAKE = '/api/testing/fake-gateway';
 const OPENING = 'Rain hammers the gallery windows.\n\n@Mira: Boots off, keeper.';
 
@@ -20,7 +23,7 @@ async function createChat(request: APIRequestContext): Promise<{ storyId: number
     return { storyId, chatId: (await chat.json()).id as number };
 }
 
-test('takes a Snapshot, sees the placeholder and then the image, resets, and finds it in the Gallery as from an earlier version', async ({
+test('takes a Snapshot from the action row with a hint, sees the placeholder and then the image, resets, and finds it in the Gallery as from an earlier version', async ({
     page,
     request,
 }) => {
@@ -37,8 +40,13 @@ test('takes a Snapshot, sees the placeholder and then the image, resets, and fin
         const opening = page.getByRole('article', { name: 'Opening' });
         await expect(opening).toContainText('Boots off, keeper.');
 
-        await page.getByRole('textbox', { name: 'Snapshot hint' }).fill('close-up on Mira');
-        await page.getByRole('button', { name: '📷 Snapshot' }).click();
+        // The composer has no camera any more; 📷 is in the newest reply's action row.
+        await expect(page.getByRole('form', { name: 'Composer' }).getByRole('textbox', { name: 'Snapshot hint' })).toHaveCount(0);
+        await opening.getByRole('group', { name: 'Message actions' }).getByRole('button', { name: 'Snapshot' }).tap();
+        const sheet = page.getByRole('dialog', { name: 'Take a Snapshot' });
+        await sheet.getByRole('textbox', { name: 'Snapshot hint' }).fill('close-up on Mira');
+        await sheet.getByRole('button', { name: 'Take Snapshot' }).tap();
+        await expect(sheet).toHaveCount(0);
 
         // The placeholder shows under the Message while play could go on, then the image replaces it.
         const placeholder = page.getByRole('status', { name: 'Snapshot being made' });
@@ -46,6 +54,9 @@ test('takes a Snapshot, sees the placeholder and then the image, resets, and fin
         const thumb = page.getByRole('region', { name: 'Messages' }).getByRole('img', { name: 'Snapshot with Mira' });
         await expect(thumb).toBeVisible({ timeout: 10_000 });
         await expect(placeholder).toHaveCount(0);
+        // The hint steered the picture: it reached the call that writes the image prompt.
+        const calls = await (await request.get(`${FAKE}/calls`)).json();
+        expect(JSON.stringify(calls)).toContain("The user's hint for this image, which you follow: close-up on Mira");
         await expect(thumb).toHaveAttribute('src', /^\/api\/images\/snapshots\/story-\d+\/chat-\d+-[0-9a-f]+\.png$/);
         await expect.poll(() => thumb.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
         // Shown whole in the thread, never cropped.
