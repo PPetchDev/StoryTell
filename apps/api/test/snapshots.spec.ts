@@ -94,8 +94,8 @@ const NO_CHANGE = '{"bond_changes":[],"arc_steps":[],"scene":{"move_on":false,"r
 const NO_OPS = '{"operations":[]}';
 
 /** What the prompt writer answers: who is in frame and the scene. */
-function written(inFrame: string[], scene = 'Mira stands at the rain-streaked window in a wet oilskin coat, lamp in hand.'): string {
-    return JSON.stringify({ in_frame: inFrame, scene });
+function written(inFrame: string[], scene = 'Mira stands at the rain-streaked window in a wet oilskin coat, lamp in hand.', drawing?: number[]): string {
+    return JSON.stringify({ in_frame: inFrame, scene, ...(drawing === undefined ? {} : { drawing }) });
 }
 
 function image(text: string) {
@@ -200,9 +200,9 @@ describe('Snapshots and the Gallery', () => {
     async function snap(
         storyId: number,
         chatId: number,
-        options: { hint?: string; inFrame?: string[]; scene?: string; bytes?: string; messageId?: number } = {},
+        options: { hint?: string; inFrame?: string[]; scene?: string; drawing?: number[]; bytes?: string; messageId?: number } = {},
     ): Promise<ChatSnapshots> {
-        t.gateway.scriptText('snapshot_prompt', written(options.inFrame ?? ['Mira'], options.scene));
+        t.gateway.scriptText('snapshot_prompt', written(options.inFrame ?? ['Mira'], options.scene, options.drawing));
         t.gateway.scriptImage('snapshot_image', image(options.bytes ?? 'snapshot-jpeg-bytes'));
         const { body } = await t.http
             .post(snapshotsPath(storyId, chatId))
@@ -279,6 +279,13 @@ describe('Snapshots and the Gallery', () => {
             expect(asked).toContain('I hang my coat by the stove.');
             expect(asked).toContain('@Mira: Took you long enough.');
             expect(asked).toContain("You're late. Boots off, keeper.");
+            // The layout, the light and a candid pose are asked for (a second door and stiff poses, seen 2026-11-05).
+            expect(asked).toContain('which way the camera looks');
+            expect(asked).toContain('frames the view or is behind the camera; never draw a second one');
+            expect(asked).toContain('The art style, in numbered pieces:\n1. ink wash\n2. muted');
+            expect(asked).toContain('Leave out every piece that names a place, a landscape, an object, a time of day, weather or a light');
+            expect(asked).toContain('the time of day');
+            expect(asked).toContain('natural, candid pose');
 
             // The image call: the stored prompt, Mira's Reference image only, the in-frame traits restated.
             const [call] = t.gateway.imageCalls('snapshot_image');
@@ -287,11 +294,11 @@ describe('Snapshots and the Gallery', () => {
             expect(call.referenceImages?.map((ref) => ref.bytes.toString())).toEqual([MIRA_REFERENCE.toString()]);
             expect(snapshot.prompt).toContain('First-person view through the eyes of Ash');
             expect(snapshot.prompt).toContain('Mira stands at the rain-streaked window in a wet oilskin coat');
-            expect(snapshot.prompt).toContain(`- Mira, the same person as in reference image 1, with the same face, build and art style. Appearance: ${CAST[0].appearance}`);
+            expect(snapshot.prompt).toContain(`- Mira, the same person as in reference image 1, with the same face, hair, build and art style, in the pose and clothing the scene gives (never the reference image's pose, clothing, framing or plain background). Appearance: ${CAST[0].appearance}`);
             expect(snapshot.prompt).toContain(`- Kai O'Rourke. Appearance: ${CAST[1].appearance}`);
             expect(snapshot.prompt).toContain(`- Tamsin. Appearance: ${CAST[2].appearance}`);
             expect(snapshot.prompt).not.toContain(CAST[3].appearance);
-            expect(snapshot.prompt).toContain('Art style: ink wash, muted.');
+            expect(snapshot.prompt).toContain('The art style below sets only how the image is drawn; the place, the time of day and the light come from the scene above.\nArt style: ink wash, muted.');
             expect(snapshot.prompt).toContain('Only fictional adults.');
 
             const items = await gallery(story.id);
@@ -329,6 +336,31 @@ describe('Snapshots and the Gallery', () => {
             expect(state.snapshots[0].characters.map((c) => c.name)).toEqual(['Tamsin']);
             expect(t.gateway.imageCalls('snapshot_image')[0].referenceImages).toEqual([]);
             expect(state.snapshots[0].prompt).toContain('Art style: realistic, natural lighting.');
+        });
+
+        it("draws in only the art style pieces the writer picked as drawing, so a place or light in the Story's style never overrides the scene", async () => {
+            const story = await createStory('Warm anime illustration, golden-hour light over open grassland, felt tents, soft painterly colour');
+            const chat = await createChat(story.id);
+
+            const state = await snap(story.id, chat.id, { drawing: [1, 4] });
+
+            const asked = t.gateway.textCalls('snapshot_prompt')[0].messages.map((message) => message.content).join('\n');
+            expect(asked).toContain('1. Warm anime illustration\n2. golden-hour light over open grassland\n3. felt tents\n4. soft painterly colour');
+            expect(state.snapshots[0].prompt).toContain('Art style: Warm anime illustration, soft painterly colour.');
+            expect(state.snapshots[0].prompt).not.toContain('grassland');
+        });
+
+        it.each([
+            ['no pick', undefined],
+            ['an empty pick', []],
+            ['numbers outside the pieces', [0, 9]],
+        ])('keeps the whole art style when the writer gives %s', async (_, drawing) => {
+            const story = await createStory('Warm anime illustration, golden-hour light over open grassland');
+            const chat = await createChat(story.id);
+
+            const state = await snap(story.id, chat.id, { drawing });
+
+            expect(state.snapshots[0].prompt).toContain('Art style: Warm anime illustration, golden-hour light over open grassland.');
         });
 
         it('keeps a failure out of the store and shows it with Retry, which then stores the Snapshot', async () => {

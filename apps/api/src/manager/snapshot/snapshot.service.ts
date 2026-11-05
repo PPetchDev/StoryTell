@@ -207,6 +207,7 @@ export class SnapshotManagerService {
             messages: snapshotPromptMessages({
                 identity,
                 setting: story.setting,
+                imageStyle: story.imageStyle,
                 cast: story.characters,
                 memories,
                 messages: chat.messages
@@ -236,6 +237,7 @@ export class SnapshotManagerService {
             identityName: identity.name,
             scene: scene.scene,
             imageStyle: story.imageStyle,
+            drawing: scene.drawing,
             inFrame: drawn,
         });
         const result = await this.gateway.generateImage({

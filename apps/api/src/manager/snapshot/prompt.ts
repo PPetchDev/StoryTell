@@ -25,6 +25,8 @@ export interface SnapshotPromptInput {
     /** The worn identity: whose eyes the camera is. Its description is the only user detail there is. */
     identity: { name: string; description: string };
     setting: string;
+    /** The Story's art style, which the writer strips down to how the image is drawn. */
+    imageStyle: string;
     cast: SnapshotCastMember[];
     /** Non-archived Memories with `{user}` already rendered. */
     memories: string[];
@@ -44,14 +46,20 @@ Rules:
 - Pick who is in frame: at most ${MAX_IN_FRAME} of the listed Characters, only ones present at this moment, by their exact names. An empty list is fine for a place with nobody in it.
 - Everyone shown is a fictional adult.
 - Describe the moment concretely: the place, the light, each Character's pose, expression and action, and what each one is wearing right now. Always name the clothing; take it from the story so far, else from the Appearance.
+- Say where ${name} stands, which way the camera looks, and what fills the background behind the Characters. Keep the place's layout as the story and the hint give it: indoors or out, walls, doors, windows and openings, and nothing they rule out. Whatever ${name} stands in or looks through (a doorway, a window, a gap) frames the view or is behind the camera; never draw a second one.
+- Say the time of day and where the light comes from, as the story has it at this moment.
+- Give each Character a natural, candid pose caught mid-movement: weight shifted, a turn of the body, a tilt of the head, hands busy with something. Never a stiff, arms-down stand, and never "frozen" or "still".
+- Where the hint says what should be seen, keep it in view: a Character whose front the hint wants seen faces the camera.
 - Lasting changes from the story (a new scar, a haircut) override the Appearance: mention them.
-- Do not describe the art style or quote dialogue; the style is added separately, and the image has no text or captions.
+- Do not describe the art style or quote dialogue in "scene"; the image has no text or captions.
+- "drawing": the numbers of the art style's pieces that say only how the image is drawn (medium, linework, shading, colour, rendering). Leave out every piece that names a place, a landscape, an object, a time of day, weather or a light, even one that suits this moment: the scene sets those.
 
 Reply with JSON only:
-{"in_frame":["Name"],"scene":"one paragraph of at most 120 words"}`;
+{"in_frame":["Name"],"scene":"one paragraph of at most 120 words","drawing":[1]}`;
 
     const sections = [
         `Setting:\n${input.setting.trim() || '(none)'}`,
+        `The art style, in numbered pieces:\n${stylePieces(input.imageStyle).map((piece, at) => `${at + 1}. ${piece}`).join('\n')}`,
         `Characters:\n${input.cast.map((member) => `- ${member.name}: ${member.appearance.trim() || '(no Appearance written)'}`).join('\n')}`,
         `${name} (never shown beyond glimpses): ${input.identity.description.trim() || '(no description)'}`,
         `Memory:\n${input.memories.length > 0 ? input.memories.map((text) => `- ${text}`).join('\n') : '(none)'}`,
@@ -69,9 +77,36 @@ Reply with JSON only:
     ];
 }
 
+/** The Story's art style, or the default when it has none. */
+function effectiveStyle(imageStyle: string): string {
+    return imageStyle.trim() === '' ? DEFAULT_IMAGE_STYLE : imageStyle.trim();
+}
+
+/** The art style cut at its commas and semicolons, which is how styles are written. */
+export function stylePieces(imageStyle: string): string[] {
+    return effectiveStyle(imageStyle)
+        .split(/[,;]/)
+        .map((piece) => piece.trim())
+        .filter((piece) => piece !== '');
+}
+
+/**
+ * The art style for one Snapshot: only the pieces the writer picked as saying how the image is
+ * drawn, in the Story's own words and order. A style can name a place or a light ("golden-hour
+ * light over open grassland"), and drawn literally that put daylight grassland behind a closed
+ * tent at night (seen 2026-11-05). With no usable pick, the whole style stays.
+ */
+export function drawingStyle(imageStyle: string, picked: number[] | null): string {
+    const pieces = stylePieces(imageStyle);
+    const kept = pieces.filter((_, at) => picked?.includes(at + 1));
+    return kept.length > 0 ? kept.join(', ') : effectiveStyle(imageStyle);
+}
+
 export interface SnapshotScene {
     inFrame: string[];
     scene: string;
+    /** The art style pieces, numbered from 1, the writer picked as drawing only; null when it gave none. */
+    drawing: number[] | null;
 }
 
 /** Reads the prompt writer's JSON. Throws `UnparseableOutputError` when there is no scene to draw. */
@@ -90,7 +125,10 @@ export function parseSnapshotScene(text: string): SnapshotScene {
     const inFrame = Array.isArray(record.in_frame)
         ? record.in_frame.filter((name): name is string => typeof name === 'string' && name.trim() !== '').map((name) => name.trim())
         : [];
-    return { inFrame, scene };
+    const drawing = Array.isArray(record.drawing)
+        ? record.drawing.filter((at): at is number => Number.isInteger(at))
+        : null;
+    return { inFrame, scene, drawing };
 }
 
 const fold = (name: string) => name.trim().toLocaleLowerCase();
@@ -134,9 +172,11 @@ export function snapshotImagePrompt(input: {
     identityName: string;
     scene: string;
     imageStyle: string;
+    /** The writer's pick of drawing-only style pieces; null or left out keeps the whole style. */
+    drawing?: number[] | null;
     inFrame: InFrameCharacter[];
 }): string {
-    const style = input.imageStyle.trim() === '' ? DEFAULT_IMAGE_STYLE : input.imageStyle.trim();
+    const style = drawingStyle(input.imageStyle, input.drawing ?? null);
     const lines = [
         `First-person view through the eyes of ${input.identityName}, who is never shown: at most a glimpse of hands or sleeves at the edge of the frame. ` +
             `The camera is at ${input.identityName}'s eyes, so no head, hair, back or shoulder of ${input.identityName} is in the foreground.`,
@@ -151,11 +191,17 @@ export function snapshotImagePrompt(input: {
                 const source =
                     character.referenceImage === null
                         ? ''
-                        : `, the same person as in reference image ${character.referenceImage}, with the same face, build and art style`;
+                        : `, the same person as in reference image ${character.referenceImage}, with the same face, hair, build and art style, ` +
+                          `in the pose and clothing the scene gives (never the reference image's pose, clothing, framing or plain background)`;
                 return `- ${character.name}${source}. Appearance: ${character.appearance.trim()}`;
             }),
         );
     }
-    lines.push(`Art style: ${style}.`, 'Only fictional adults. No text, no captions, no watermark.');
+    lines.push(
+        // Backs up `drawingStyle` for a style kept whole, or a place or light the writer missed.
+        'The art style below sets only how the image is drawn; the place, the time of day and the light come from the scene above.',
+        `Art style: ${style}.`,
+        'Only fictional adults. No text, no captions, no watermark.',
+    );
     return lines.join('\n');
 }
