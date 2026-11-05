@@ -1,12 +1,15 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { useApiQuery, useConnection } from '@/components/connection';
+import { ContinueRow } from '@/components/home/continue-row';
+import { StoryGrid } from '@/components/home/story-grid';
+import { StorySheet } from '@/components/home/story-sheet';
 import { ApiUnreachableError } from '@/lib/api';
-import { storyApi, StorySummary, storyTitle } from '@/lib/story';
+import { newestPlayed } from '@/lib/home';
+import { storyApi, StorySummary } from '@/lib/story';
 
 type NewStoryState =
     | { kind: 'closed' }
@@ -21,6 +24,9 @@ export default function HomePage() {
     const stories = useApiQuery<{ stories: StorySummary[] }>('/stories');
     const [newStory, setNewStory] = useState<NewStoryState>({ kind: 'closed' });
     const [idea, setIdea] = useState('');
+    const [openStory, setOpenStory] = useState<StorySummary | null>(null);
+    const closeSheet = useCallback(() => setOpenStory(null), []);
+    const continuable = stories.status === 'ready' ? newestPlayed(stories.data.stories) : null;
 
     const open = async (create: () => Promise<{ id: number }>, busy: NewStoryState) => {
         setNewStory(busy);
@@ -108,19 +114,12 @@ export default function HomePage() {
                 (stories.data.stories.length === 0 ? (
                     <p className="muted">No Stories yet.</p>
                 ) : (
-                    <ul className="story-list" aria-label="Stories">
-                        {stories.data.stories.map((story) => (
-                            <li key={story.id}>
-                                <Link href={`/stories/${story.id}`} className="story-link">
-                                    <span className="story-title">{storyTitle(story)}</span>
-                                    <span className={story.playable ? 'pill pill-ok' : 'pill'}>
-                                        {story.playable ? 'Playable' : 'Not playable yet'}
-                                    </span>
-                                </Link>
-                            </li>
-                        ))}
-                    </ul>
+                    <>
+                        {continuable && <ContinueRow story={continuable} />}
+                        <StoryGrid stories={stories.data.stories} onOpen={(story) => setOpenStory(story)} />
+                    </>
                 ))}
+            {openStory && <StorySheet story={openStory} onClose={closeSheet} />}
         </main>
     );
 }

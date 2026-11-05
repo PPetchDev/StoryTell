@@ -3,6 +3,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
     ChatDashboard,
     ChatDetail,
+    ChatListItem,
     DashboardBackground,
     DashboardBond,
     DashboardCharacter,
@@ -41,9 +42,19 @@ export class ChatSummaryDTO implements ChatSummary {
     lastPlayedAt: string;
 }
 
+export class ChatListItemDTO extends ChatSummaryDTO implements ChatListItem {
+    @ApiProperty({ type: String, nullable: true, description: 'The Scene the Chat is on; null for free play.' })
+    sceneName: string | null;
+
+    @ApiProperty({
+        description: 'The latest Message as one plain line of about 100 characters, speakers named, `*` marks dropped.',
+    })
+    latestLine: string;
+}
+
 export class ListChatsResponseBodyDTO {
-    @ApiProperty({ type: [ChatSummaryDTO], description: 'Most recently played first.' })
-    chats: ChatSummaryDTO[];
+    @ApiProperty({ type: [ChatListItemDTO], description: 'Most recently played first.' })
+    chats: ChatListItemDTO[];
 }
 
 export class MessagePartDTO {

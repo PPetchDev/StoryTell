@@ -1,12 +1,20 @@
 import { ApiProperty } from '@nestjs/swagger';
 
 import { MissingField } from '../../../manager/story/playable.js';
-import { StoryDetail, StoryListItem } from '../../../manager/story/story.service.js';
+import { LatestChat, StoryDetail, StoryListItem } from '../../../manager/story/story.service.js';
 import { CharacterResponse } from '../../../model/story/entities/character.entity.js';
 import { RoleResponse } from '../../../model/story/entities/role.entity.js';
 import { SceneResponse } from '../../../model/story/entities/scene.entity.js';
 import { StartingBondResponse } from '../../../model/story/entities/starting-bond.entity.js';
 import { Pov, ReplyLength, Tense } from '../../../model/story/entities/story.entity.js';
+
+export class LatestChatDTO implements LatestChat {
+    @ApiProperty({ description: 'Chat id.' })
+    id: number;
+
+    @ApiProperty({ type: String, nullable: true, description: 'The Scene the Chat is on; null for free play.' })
+    sceneName: string | null;
+}
 
 export class StorySummaryDTO implements StoryListItem {
     @ApiProperty({ description: 'Story id.', example: 1 })
@@ -23,6 +31,33 @@ export class StorySummaryDTO implements StoryListItem {
 
     @ApiProperty({ description: 'When the Story was last saved (ISO 8601).' })
     updatedAt: string;
+
+    @ApiProperty({ type: () => [MissingFieldDTO], description: 'Required fields still empty; empty when playable.' })
+    missing: MissingFieldDTO[];
+
+    @ApiProperty({
+        type: String,
+        nullable: true,
+        description: 'When its most recently played Chat was last played (ISO 8601); null when it has no Chats.',
+    })
+    lastPlayedAt: string | null;
+
+    @ApiProperty({
+        type: () => LatestChatDTO,
+        nullable: true,
+        description: 'Its most recently played Chat; null when it has no Chats.',
+    })
+    latestChat: LatestChatDTO | null;
+
+    @ApiProperty({
+        type: String,
+        nullable: true,
+        description: "The newest Snapshot's image, relative to the image folder; null when it has none.",
+    })
+    coverImagePath: string | null;
+
+    @ApiProperty({ description: "The Setting's first sentence, cut to about 120 characters; empty when there is none." })
+    hook: string;
 }
 
 export class ListStoriesResponseBodyDTO {

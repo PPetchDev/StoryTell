@@ -1,0 +1,55 @@
+.bar,
+.spacer {
+    --bar-height: 3.5rem;
+}
+
+.bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
+    background: var(--bg);
+    border-top: 1px solid var(--line);
+    padding-bottom: env(safe-area-inset-bottom);
+}
+
+.links {
+    display: flex;
+    max-width: 40rem;
+    margin: 0 auto;
+}
+
+.link {
+    flex: 1;
+    min-height: var(--bar-height);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.1rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--muted);
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.link[aria-current='page'] {
+    color: var(--text);
+}
+
+.link[aria-current='page'] svg {
+    color: var(--accent);
+}
+
+.link:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -4px;
+    border-radius: 0.75rem;
+}
+
+/* As tall as the bar, so the end of every page scrolls clear of it. */
+.spacer {
+    height: calc(var(--bar-height) + 1px + env(safe-area-inset-bottom));
+}

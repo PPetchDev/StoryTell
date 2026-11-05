@@ -39,6 +39,37 @@ export class ChatModelService {
         return this.chats.find({ where: { storyId }, order: { lastPlayedAt: 'DESC', id: 'DESC' } });
     }
 
+    /** Each Story's most recently played Chat, one per Story that has any. */
+    findNewestPlayedPerStory(): Promise<ChatEntity[]> {
+        return this.chats
+            .createQueryBuilder('chat')
+            .distinctOn(['chat.story_id'])
+            .orderBy('chat.story_id')
+            .addOrderBy('chat.last_played_at', 'DESC')
+            .addOrderBy('chat.id', 'DESC')
+            .getMany();
+    }
+
+    /** The newest Message of each given Chat, with its parts in order. */
+    async findLatestMessages(chatIds: number[]): Promise<MessageEntity[]> {
+        if (chatIds.length === 0) return [];
+        const latest = await this.messages
+            .createQueryBuilder('message')
+            .select(['message.id'])
+            .distinctOn(['message.chat_id'])
+            .where('message.chat_id IN (:...chatIds)', { chatIds })
+            .orderBy('message.chat_id')
+            .addOrderBy('message.position', 'DESC')
+            .getMany();
+        if (latest.length === 0) return [];
+        const messages = await this.messages.find({
+            where: { id: In(latest.map((message) => message.id)) },
+            relations: { parts: true },
+        });
+        for (const message of messages) message.parts = [...message.parts].sort((a, b) => a.position - b.position);
+        return messages;
+    }
+
     async findWithMessages(chatId: number): Promise<ChatEntity | null> {
         const chat = await this.chats.findOne({
             where: { id: chatId },

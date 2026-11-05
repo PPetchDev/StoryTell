@@ -28,11 +28,29 @@ import {
 import { StoryModelService } from '../../model/story/story.service.js';
 import { ImageData } from '../../service/model-gateway/model-gateway.js';
 import { ImageStoreService } from '../../store/image/image-store.service.js';
+import { storyHook } from '../excerpt.js';
 import { MAX_CHARACTERS, playableStatus, PlayableStatus } from './playable.js';
 
 /** A Story as the editor and the list read it: its fields plus the derived playable status. */
 export type StoryDetail = StoryResponse & PlayableStatus;
-export type StoryListItem = StorySummary & { playable: boolean };
+/** A Story's most recently played Chat, as Home's Continue row and card sheet open it. */
+export interface LatestChat {
+    id: number;
+    /** The Scene the Chat is on; null means free play. */
+    sceneName: string | null;
+}
+
+/** A Story as Home's cards read it (spec: "Lists and Home"). */
+export interface StoryListItem extends StorySummary, PlayableStatus {
+    /** When its most recently played Chat was last played; null when it has no Chats. */
+    lastPlayedAt: string | null;
+    /** That Chat; null when it has no Chats. */
+    latestChat: LatestChat | null;
+    /** The newest Snapshot's image, relative to the image folder; null when it has none. */
+    coverImagePath: string | null;
+    /** The Setting's first sentence, cut to about 120 characters. */
+    hook: string;
+}
 
 export interface StoryFields {
     title?: string;
@@ -108,11 +126,25 @@ export class StoryManagerService {
     ) {}
 
     async listStories(): Promise<StoryListItem[]> {
-        const stories = await this.storyModel.findAllFull();
-        return stories.map((story) => ({
-            ...story.toSummary(),
-            playable: playableStatus(story).playable,
-        }));
+        const [stories, newestChats, newestSnapshots] = await Promise.all([
+            this.storyModel.findAllFull(),
+            this.chatModel.findNewestPlayedPerStory(),
+            this.snapshotModel.findNewestPerStory(),
+        ]);
+        const chatOf = new Map(newestChats.map((chat) => [chat.storyId, chat]));
+        const coverOf = new Map(newestSnapshots.map((snapshot) => [snapshot.storyId, snapshot.imagePath]));
+        return stories.map((story) => {
+            const chat = chatOf.get(story.id);
+            const scene = chat && story.scenes.find((candidate) => candidate.id === chat.currentSceneId);
+            return {
+                ...story.toSummary(),
+                ...playableStatus(story),
+                lastPlayedAt: chat ? chat.lastPlayedAt.toISOString() : null,
+                latestChat: chat ? { id: chat.id, sceneName: scene?.name ?? null } : null,
+                coverImagePath: coverOf.get(story.id) ?? null,
+                hook: storyHook(story.setting),
+            };
+        });
     }
 
     async createStory(fields: StoryFields): Promise<StoryDetail> {

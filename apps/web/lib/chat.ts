@@ -11,6 +11,14 @@ export interface ChatSummary {
     lastPlayedAt: string;
 }
 
+/** A Chat as a Story's Chat list shows it (mirrors ChatListItemDTO). */
+export interface ChatListItem extends ChatSummary {
+    /** The Scene the Chat is on; null for free play. */
+    sceneName: string | null;
+    /** The latest Message as one plain line of about 100 characters. */
+    latestLine: string;
+}
+
 export type MessagePart =
     | { kind: 'narration'; text: string }
     | { kind: 'speech'; characterId: number | null; speakerName: string; text: string };
