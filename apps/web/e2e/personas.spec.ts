@@ -57,8 +57,14 @@ test('makes a Persona, swaps to it mid-Chat, and sees the next User Message unde
 
         // A turn as the Role.
         await page.goto(`/stories/${storyId}/chats/${chatId}`);
-        const swap = page.getByRole('combobox', { name: /Playing as/ });
+        // The identity swap lives in the top bar's ⋯ menu, and the bar names the worn identity.
+        const menu = page.getByRole('dialog', { name: 'Chat menu' });
+        const swap = menu.getByRole('combobox', { name: /Playing as/ });
+        await expect(page.getByText('as Ash', { exact: true })).toBeVisible();
+        await page.getByRole('button', { name: 'Chat menu' }).click();
         await expect(swap).toHaveValue('');
+        await menu.getByRole('button', { name: 'Close' }).click();
+        await expect(menu).toHaveCount(0);
         await scriptTurn(request, '@Mira: Took you long enough.');
         await page.getByLabel('Write as Ash').fill('I pull my boots off.');
         await page.getByRole('button', { name: 'Send' }).click();
@@ -66,7 +72,11 @@ test('makes a Persona, swaps to it mid-Chat, and sees the next User Message unde
         await expect(page.getByRole('article', { name: 'AI reply' })).toContainText('Took you long enough.');
 
         // Swap to the Persona mid-Chat: the next User Message goes under its name, the old one keeps Ash.
+        await page.getByRole('button', { name: 'Chat menu' }).click();
         await swap.selectOption({ label: 'Rin' });
+        // The menu stays open, so a keyboard user can arrow through the list; the bar follows.
+        await expect(page.getByText('as Rin', { exact: true })).toBeVisible();
+        await menu.getByRole('button', { name: 'Close' }).click();
         await expect(page.getByLabel('Write as Rin')).toBeVisible();
         await scriptTurn(request, '@Mira: And who are you, then?');
         await page.getByLabel('Write as Rin').fill('I shake the salt out of my hair.');
@@ -79,7 +89,8 @@ test('makes a Persona, swaps to it mid-Chat, and sees the next User Message unde
 
         // The swap is Chat state: it is still worn after a reload.
         await page.reload();
-        await expect(page.getByRole('combobox', { name: /Playing as/ })).toHaveValue(String(personaId));
+        await page.getByRole('button', { name: 'Chat menu' }).click();
+        await expect(swap).toHaveValue(String(personaId));
         await expect(page.getByLabel('Write as Rin')).toBeVisible();
     } finally {
         // Leaves the shared e2e database as it was found.

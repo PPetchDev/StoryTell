@@ -68,7 +68,7 @@ test('starts a Chat, sees the Opening, sends, and sees narration plus named spee
         await expect(page.getByText('Drift notice')).toHaveCount(0);
 
         // The Chat list shows it, with its times.
-        await page.getByRole('link', { name: '← Chats' }).click();
+        await page.getByRole('link', { name: 'Back to Chats' }).click();
         const listed = page.getByRole('list', { name: 'Chats' }).getByRole('link', { name: /Chat 1/ });
         await expect(listed).toContainText('Last played');
     } finally {

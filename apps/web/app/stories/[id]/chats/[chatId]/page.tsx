@@ -31,5 +31,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string; cha
     }
     // Without the Story every speaker gets the neutral colour; the Chat still reads.
     const cast = story.status === 'ready' ? story.data.characters.map((character) => character.id) : [];
-    return <ChatScreen initial={chat.data} cast={cast} />;
+    // The Scenes give the Scene strip each Scene's goal; without them it shows the name alone.
+    const scenes = story.status === 'ready' ? story.data.scenes : [];
+    return <ChatScreen initial={chat.data} cast={cast} scenes={scenes} />;
 }

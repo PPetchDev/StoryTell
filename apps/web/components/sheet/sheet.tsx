@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode, useEffect, useRef } from 'react';
+import { ReactNode, RefObject, useEffect, useRef } from 'react';
 
 import styles from './sheet.module.css';
 
@@ -23,11 +23,16 @@ export function keepFocusIn(panel: HTMLElement, event: KeyboardEvent) {
 }
 
 /**
- * A panel that slides up from the bottom of the screen over a dimmed page. Tapping the dimmed
- * page, the Close button or Escape closes it; focus moves into it on open and back on close.
+ * The focus rules of a modal panel: on open, focus moves to `initial` (or the panel itself),
+ * Tab stays inside, Escape closes it, and on close focus goes back to what had it before.
+ * Focus is moved in an effect rather than by autoFocus, since a sheet closing in the same
+ * commit hands focus back to its opener first.
  */
-export function Sheet({ label, onClose, children }: { label: string; onClose(): void; children: ReactNode }) {
-    const panel = useRef<HTMLDivElement>(null);
+export function useModalFocus(
+    panel: RefObject<HTMLElement | null>,
+    onClose: () => void,
+    initial?: RefObject<HTMLElement | null>,
+) {
     const close = useRef(onClose);
 
     useEffect(() => {
@@ -36,7 +41,7 @@ export function Sheet({ label, onClose, children }: { label: string; onClose(): 
 
     useEffect(() => {
         const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-        panel.current?.focus();
+        (initial?.current ?? panel.current)?.focus();
         const onKey = (event: KeyboardEvent) => {
             if (event.key === 'Escape') close.current();
             if (event.key === 'Tab' && panel.current) keepFocusIn(panel.current, event);
@@ -46,7 +51,16 @@ export function Sheet({ label, onClose, children }: { label: string; onClose(): 
             document.removeEventListener('keydown', onKey);
             opener?.focus();
         };
-    }, []);
+    }, [panel, initial]);
+}
+
+/**
+ * A panel that slides up from the bottom of the screen over a dimmed page. Tapping the dimmed
+ * page, the Close button or Escape closes it; focus moves into it on open and back on close.
+ */
+export function Sheet({ label, onClose, children }: { label: string; onClose(): void; children: ReactNode }) {
+    const panel = useRef<HTMLDivElement>(null);
+    useModalFocus(panel, onClose);
 
     return (
         <div className={styles.backdrop} onClick={onClose}>

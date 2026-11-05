@@ -1,0 +1,64 @@
+.backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    background: rgba(5, 3, 12, 0.6);
+}
+
+.dialog {
+    width: 100%;
+    max-width: 24rem;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 1rem;
+    padding: 1.25rem;
+}
+
+.dialog:focus {
+    outline: none;
+}
+
+.question {
+    margin: 0 0 1rem;
+    font-size: 1.0625rem;
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+.actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.cancel,
+.confirm {
+    font: inherit;
+    font-weight: 600;
+    min-height: 2.75rem;
+    padding: 0 1.1rem;
+    border-radius: 999px;
+    cursor: pointer;
+}
+
+.cancel {
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--text);
+}
+
+.confirm {
+    background: var(--danger-soft);
+    border: 1px solid var(--danger);
+    color: var(--danger-text);
+}
+
+.cancel:focus-visible,
+.confirm:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
