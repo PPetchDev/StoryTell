@@ -471,6 +471,62 @@ describe('Story authoring', () => {
         });
     });
 
+    describe('Opening preview', () => {
+        it('splits the stored Opening into narration and stamped speech, as a Chat would begin', async () => {
+            const story = await createPlayableStory();
+            await patch(`/api/stories/${story.id}`, {
+                opening: [
+                    'The lamp went out an hour ago.',
+                    '',
+                    '@mira: Who let you up here?',
+                    'She does not wait for an answer.',
+                    '',
+                    '@The Harbourmaster: Leave the keeper be.',
+                    '',
+                    'Rain finds the broken pane.',
+                ].join('\n'),
+            });
+
+            const response = await t.http.get(`/api/stories/${story.id}/opening`).expect(200);
+
+            const mira = story.characters[0].id;
+            expect(response.body).toEqual({
+                parts: [
+                    { kind: 'narration', text: 'The lamp went out an hour ago.' },
+                    {
+                        kind: 'speech',
+                        characterId: mira,
+                        speakerName: 'Mira',
+                        text: 'Who let you up here?\nShe does not wait for an answer.',
+                    },
+                    { kind: 'speech', characterId: null, speakerName: 'The Harbourmaster', text: 'Leave the keeper be.' },
+                    { kind: 'narration', text: 'Rain finds the broken pane.' },
+                ],
+            });
+        });
+
+        it('keeps a line written as the Role, since the author wrote the Opening', async () => {
+            const story = await createPlayableStory();
+            await patch(`/api/stories/${story.id}`, { opening: 'The door opens.\n\n@The new keeper: Hello?' });
+
+            const response = await t.http.get(`/api/stories/${story.id}/opening`).expect(200);
+
+            expect(response.body.parts).toEqual([
+                { kind: 'narration', text: 'The door opens.' },
+                { kind: 'speech', characterId: null, speakerName: 'The new keeper', text: 'Hello?' },
+            ]);
+        });
+
+        it('answers no parts for an empty Opening, and 404.003.001 for a missing Story', async () => {
+            const story = await createStory();
+
+            const empty = await t.http.get(`/api/stories/${story.id}/opening`).expect(200);
+            expect(empty.body).toEqual({ parts: [] });
+            const missing = await t.http.get('/api/stories/999999/opening').expect(404);
+            expect(missing.body.error.code).toBe('404.003.001');
+        });
+    });
+
     describe('delete', () => {
         it('removes the Story and everything under it, and nothing else', async () => {
             const keep = await createPlayableStory();

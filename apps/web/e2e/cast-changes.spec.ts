@@ -43,7 +43,7 @@ test('removing a Character warns first, and an existing Chat keeps its old speec
             })
             .toBe('done');
 
-        await page.goto(`/stories/${storyId}`);
+        await page.goto(`/stories/${storyId}?tab=characters`);
         const kai = page.getByRole('region', { name: 'Character 2' });
         await expect(kai.getByLabel('Name')).toHaveValue('Kai');
         await kai.getByRole('button', { name: 'Remove' }).click();

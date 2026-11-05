@@ -61,18 +61,21 @@ test('an instruction changes fields, lit up with Undo; a removal asks first; reo
     await failed.getByRole('button', { name: 'Retry' }).click();
 
     // The changes landed in the form, each field marked, and the answer lists them with Undo.
+    // The editor is in tabs; ticket 10 makes the Assistant switch to them itself.
+    const marked = 'changed by the assistant';
     const storySection = page.getByRole('region', { name: 'Story' });
     const mira = page.getByRole('region', { name: 'Character 1' });
     await expect(storySection.getByLabel('Setting')).toHaveValue('A lighthouse at the end of a drowned causeway, 1890s.');
-    await expect(mira.getByLabel('Voice')).toHaveValue('Clipped. Drops the subject when it hurts.');
     await expect(storySection.getByLabel('Title')).toHaveValue('The Lighthouse');
+    await expect(storySection.getByText(marked)).toHaveCount(1);
+    await page.getByRole('tab', { name: 'Characters' }).click();
+    await expect(mira.getByLabel('Voice')).toHaveValue('Clipped. Drops the subject when it hurts.');
     await expect(page.getByRole('region', { name: 'Character 2' }).getByLabel('Voice')).toHaveValue('Rambles.');
-    await expect(storySection.locator('.field-changed')).toHaveCount(1);
-    await expect(storySection.locator('.field-changed')).toContainText('changed by the assistant');
-    await expect(mira.locator('.field-changed')).toHaveCount(1);
+    await expect(mira.getByText(marked)).toHaveCount(1);
+    await page.getByRole('tab', { name: 'Scenes' }).click();
     const scene2 = page.getByRole('region', { name: 'Scene 2' });
     await expect(scene2.getByLabel('Name')).toHaveValue('The lamp');
-    await expect(scene2.locator('.field-changed')).toHaveCount(3);
+    await expect(scene2.getByText(marked)).toHaveCount(3);
     await expect(assistant).toContainText('The island is drowned now, and Mira is drier.');
     const changes = assistant.getByRole('list', { name: 'Changes' }).getByRole('listitem');
     await expect(changes).toHaveText([/Setting/, /Mira: Voice/, /Added Scene The lamp/]);
@@ -91,15 +94,18 @@ test('an instruction changes fields, lit up with Undo; a removal asks first; reo
     }
 
     // Undo the Setting: the old value is back, its mark gone, the others still lit.
+    await page.getByRole('tab', { name: 'Story' }).click();
     await changes.filter({ hasText: 'Setting' }).getByRole('button', { name: 'Undo' }).click();
     await expect(storySection.getByLabel('Setting')).toHaveValue(SETTING);
     await expect(changes.filter({ hasText: 'Setting' })).toContainText('Undone');
-    await expect(storySection.locator('.field-changed')).toHaveCount(0);
-    await expect(mira.locator('.field-changed')).toHaveCount(1);
+    await expect(storySection.getByText(marked)).toHaveCount(0);
+    await page.getByRole('tab', { name: 'Characters' }).click();
+    await expect(mira.getByText(marked)).toHaveCount(1);
     await changes.filter({ hasText: 'Mira: Voice' }).getByRole('button', { name: 'Undo' }).click();
     await expect(mira.getByLabel('Voice')).toHaveValue(VOICE);
-    await expect(mira.locator('.field-changed')).toHaveCount(0);
+    await expect(mira.getByText(marked)).toHaveCount(0);
     // Undo of an added Scene removes it again, after asking.
+    await page.getByRole('tab', { name: 'Scenes' }).click();
     await changes.filter({ hasText: 'Added Scene' }).getByRole('button', { name: 'Undo' }).click();
     await page.getByRole('group', { name: 'Remove Scene The lamp again?' }).getByRole('button', { name: 'Remove' }).click();
     await expect(scene2).toHaveCount(0);
@@ -107,9 +113,12 @@ test('an instruction changes fields, lit up with Undo; a removal asks first; reo
 
     // The undos are saved: a reload shows the old values.
     await page.reload();
-    await expect(page.getByRole('region', { name: 'Story' }).getByLabel('Setting')).toHaveValue(SETTING);
-    await expect(page.getByRole('region', { name: 'Character 1' }).getByLabel('Voice')).toHaveValue(VOICE);
+    await expect(page.getByRole('region', { name: 'Scene 1' })).toBeVisible();
     await expect(page.getByRole('region', { name: 'Scene 2' })).toHaveCount(0);
+    await page.getByRole('tab', { name: 'Story' }).click();
+    await expect(page.getByRole('region', { name: 'Story' }).getByLabel('Setting')).toHaveValue(SETTING);
+    await page.getByRole('tab', { name: 'Characters' }).click();
+    await expect(page.getByRole('region', { name: 'Character 1' }).getByLabel('Voice')).toHaveValue(VOICE);
 
     // A removal is not applied until confirmed; Cancel keeps Tomas, Apply removes him for good.
     await scriptText(request, 'story_assistant', [
@@ -150,6 +159,7 @@ test('an instruction changes fields, lit up with Undo; a removal asks first; reo
     await expect(page.getByRole('complementary', { name: 'Assistant' })).not.toContainText('Tomas');
 
     // Leave the shared database as it was found.
+    await page.getByRole('tab', { name: 'Story' }).click();
     await page.getByRole('button', { name: 'Delete Story' }).click();
     await page.getByRole('group', { name: 'Delete this Story and everything under it?' }).getByRole('button', { name: 'Delete' }).click();
     await expect(page.getByText('No Stories yet.')).toBeVisible();

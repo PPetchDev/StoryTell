@@ -13,6 +13,10 @@
     --accent-line: rgba(143, 115, 255, 0.35);
     --danger: #ff7a8a;
     --warning: #ffc46b;
+    /* Friendly UI ticket 09: what still needs filling in, as a box, a line and a soft tint. */
+    --warning-surface: #3a2a12;
+    --warning-line: #8a6326;
+    --warning-soft: rgba(255, 180, 84, 0.14);
     color-scheme: dark;
 }
 

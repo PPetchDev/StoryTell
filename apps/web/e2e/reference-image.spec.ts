@@ -38,7 +38,7 @@ test('generates 4 candidates, picks one, and sees the Reference image on the Cha
     expect(scripted.status()).toBe(204);
 
     try {
-        await page.goto(`/stories/${storyId}`);
+        await page.goto(`/stories/${storyId}?tab=characters`);
         const mira = page.getByRole('region', { name: 'Character 1' });
         await expect(mira.getByRole('img', { name: 'Reference image of Mira' })).toHaveCount(0);
 

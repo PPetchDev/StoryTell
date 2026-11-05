@@ -1,4 +1,5 @@
-import { apiSend } from './api';
+import { apiFetch, apiSend } from './api';
+import type { MessagePart } from './chat';
 
 // Mirrors the API's Story response DTOs (apps/api/src/api/story/dto/story.response.dto.ts).
 
@@ -173,6 +174,8 @@ export const storyApi = {
     update: (storyId: number, fields: StoryFields) =>
         apiSend<Story>('PATCH', `/stories/${storyId}`, fields),
     remove: (storyId: number) => apiSend<void>('DELETE', `/stories/${storyId}`),
+    /** The stored Opening split by the Chat's own parser, for the editor's preview (Friendly UI ticket 09). */
+    opening: (storyId: number) => apiFetch<{ parts: MessagePart[] }>(`/stories/${storyId}/opening`),
 
     updateRole: (storyId: number, fields: Partial<Omit<Role, 'id'>>) =>
         apiSend<Story>('PATCH', `/stories/${storyId}/role`, fields),
