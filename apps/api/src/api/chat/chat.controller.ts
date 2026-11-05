@@ -19,7 +19,7 @@ const Id = (name: string) => Param(name, ParseIntPipe);
 
 /**
  * Chats per Story: create, list, rename, reset, delete, swap the worn identity, send, retry,
- * continue, edit a Message, the read-only dashboard and a retry of either background call (spec: "API surface").
+ * continue, edit a Message, regenerate the newest reply, the read-only dashboard and a retry of either background call (spec: "API surface").
  */
 @ApiTags('Chats')
 @Controller('stories/:storyId/chats')
@@ -116,6 +116,23 @@ export class ChatApiController {
         @Body() body: EditMessageRequestBodyDTO,
     ): Promise<EditMessageResponseBodyDTO> {
         return this.chatManager.editMessage(storyId, chatId, messageId, body.text);
+    }
+
+    /**
+     * Spec: "Regenerate". Replaces the Chat's newest AI Message with a freshly written one:
+     * its changes are rolled back, it is deleted, and the turn runs again (the User Message's
+     * turn, or a Continue). Answers with the rollback counts like an edit. On a failed turn
+     * the error is the gateway's, and the old reply is already gone.
+     */
+    @Post(':chatId/messages/:messageId/regenerate')
+    @HttpCode(200)
+    @ApiOkResponse({ type: EditMessageResponseBodyDTO })
+    regenerate(
+        @Id('storyId') storyId: number,
+        @Id('chatId') chatId: number,
+        @Id('messageId') messageId: number,
+    ): Promise<EditMessageResponseBodyDTO> {
+        return this.chatManager.regenerateMessage(storyId, chatId, messageId);
     }
 
     /** Spec: "Dashboard (read-only)". Bonds with history, Arc steps, the Scene and background status. */

@@ -63,6 +63,8 @@ export function ChatScreen({ initial, cast, scenes }: ChatScreenProps) {
     const snaps = useChatSnapshots(initial.storyId, initial.id);
     const [viewing, setViewing] = useState<Snapshot | null>(null);
     const [snapshotSheet, setSnapshotSheet] = useState(false);
+    /** The reply ↺ Again is replacing, hidden from the thread while the new one is written. */
+    const [replacing, setReplacing] = useState<number | null>(null);
     /** The reply whose finished extraction was already announced, so a re-read never toasts twice. */
     const announcedRef = useRef<number | null>(latestReply(initial)?.id ?? null);
 
@@ -202,6 +204,26 @@ export function ChatScreen({ initial, cast, scenes }: ChatScreenProps) {
         void runTurn(() => chatApi.continue(chat.storyId, chat.id));
     };
 
+    /**
+     * ↺ Again (spec: "Regenerate"): the newest reply is replaced in place, with the writing
+     * indicator where it was, and the rollback notice notes what it had changed. A failed
+     * turn has already removed it, so the re-read Chat shows its User Message with Retry,
+     * or ends at the AI Message before it; the Memory and Snapshots re-read either way.
+     */
+    const again = (messageId: number) => {
+        if (writing || busy || blocked) return;
+        setReplacing(messageId);
+        // Shown again only once the turn has settled, so the old reply never flashes back first.
+        void runTurn(async () => {
+            try {
+                return refreshMemory(noteRollback(await chatApi.regenerate(chat.storyId, chat.id, messageId)));
+            } catch (caught) {
+                if (!(caught instanceof ApiUnreachableError)) refreshMemory(chat);
+                throw caught;
+            }
+        }).finally(() => setReplacing(null));
+    };
+
     const saveEdit = (message: Message, text: string) => {
         setEditing(null);
         const edit = async () => refreshMemory(noteRollback(await chatApi.edit(chat.storyId, chat.id, message.id, text)));
@@ -286,6 +308,8 @@ export function ChatScreen({ initial, cast, scenes }: ChatScreenProps) {
                 canEdit={!writing && !busy && editing === null}
                 blocked={blocked}
                 snapshots={snaps.state}
+                replacing={replacing}
+                onAgain={again}
                 onEdit={setEditing}
                 onSave={saveEdit}
                 onCancelEdit={() => setEditing(null)}

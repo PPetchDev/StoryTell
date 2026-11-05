@@ -6,7 +6,7 @@ import { MessageBody, UserLine } from '@/components/chat/message-body';
 import { MessageSnapshots } from '@/components/chat/snapshots';
 import { ConfirmButton } from '@/components/story-editor/fields';
 import { Cast } from '@/lib/character-colour';
-import { Message, messageText } from '@/lib/chat';
+import { isOpening, Message, messageText } from '@/lib/chat';
 import { ChatSnapshots, Snapshot, SnapshotJob } from '@/lib/snapshot';
 import { STORY_TEXT_SIZE, useTextSize } from '@/lib/text-size';
 
@@ -14,7 +14,7 @@ import styles from './chat-thread.module.css';
 
 function messageLabel(message: Message): string {
     if (message.kind === 'user') return `${message.identityName} said`;
-    return message.model === 'author' ? 'Opening' : 'AI reply';
+    return isOpening(message) ? 'Opening' : 'AI reply';
 }
 
 interface EditFormProps {
@@ -93,17 +93,24 @@ function EditAction({ onEdit }: { onEdit(): void }) {
 }
 
 interface ActionRowProps {
+    /** ↺ Again; null where it isn't offered (the Opening, an older reply, or sending blocked). */
+    onAgain: (() => void) | null;
     onEdit(): void;
     onSnapshot(): void;
 }
 
 /**
- * Under the newest AI Message while no turn is in flight (spec: "Action row"). Ticket 06's
- * ↺ Again goes first in this row, and never on the Opening.
+ * Under the newest AI Message while no turn is in flight (spec: "Action row"). ↺ Again goes
+ * first, and never on the Opening.
  */
-function ActionRow({ onEdit, onSnapshot }: ActionRowProps) {
+function ActionRow({ onAgain, onEdit, onSnapshot }: ActionRowProps) {
     return (
         <div className={styles.actions} role="group" aria-label="Message actions">
+            {onAgain && (
+                <button type="button" className={styles.action} onClick={onAgain}>
+                    <span aria-hidden="true">↺</span>Again
+                </button>
+            )}
             <EditAction onEdit={onEdit} />
             <button type="button" className={styles.action} onClick={onSnapshot}>
                 <span aria-hidden="true">📷</span>Snapshot
@@ -260,6 +267,10 @@ interface ChatThreadProps {
     /** User Messages can't be edited while sending is blocked, since an edit runs a turn. */
     blocked: boolean;
     snapshots: ChatSnapshots;
+    /** The reply ↺ Again is replacing: hidden while its replacement is written in its place. */
+    replacing: number | null;
+    /** ↺ Again on the newest reply. */
+    onAgain(messageId: number): void;
     onEdit(messageId: number): void;
     onSave(message: Message, text: string): void;
     onCancelEdit(): void;
@@ -280,6 +291,8 @@ export function ChatThread({
     canEdit,
     blocked,
     snapshots,
+    replacing,
+    onAgain,
     onEdit,
     onSave,
     onCancelEdit,
@@ -288,14 +301,16 @@ export function ChatThread({
     onRetrySnapshot,
     onDismissSnapshot,
 }: ChatThreadProps) {
-    const last = messages[messages.length - 1];
+    // ↺ Again replaces the reply in place: it leaves the thread while the writing indicator shows.
+    const shown = replacing === null ? messages : messages.filter((message) => message.id !== replacing);
+    const last = shown[shown.length - 1];
     // The newest Message's text is in the key too: an edit replaces it in place, under its id.
     const newest = last ? `${last.id}:${messageText(last)}` : '';
-    const { threadRef, contentRef } = useFollowEnd(`${messages.length}:${newest}:${pending !== null}:${writing}`);
+    const { threadRef, contentRef } = useFollowEnd(`${shown.length}:${newest}:${pending !== null}:${writing}`);
     const storySize = { '--story-size': STORY_TEXT_SIZE[useTextSize()] } as CSSProperties;
     const [tapped, setTapped] = useTappedMessage(canEdit);
     // The action row goes under the latest AI Message (the Opening counts), the one a Snapshot is taken of.
-    const newestAiMessage = messages.findLast((message) => message.kind === 'ai');
+    const newestAiMessage = shown.findLast((message) => message.kind === 'ai');
 
     const edit = (messageId: number) => {
         setTapped(null);
@@ -305,13 +320,21 @@ export function ChatThread({
     return (
         <section ref={threadRef} className={styles.thread} style={storySize} aria-label="Messages">
             <div ref={contentRef} className={styles.content}>
-                {messages.map((message, index) => {
+                {shown.map((message, index) => {
                     // A User Message edit runs a turn, so it waits while sending is blocked.
                     const editable = canEdit && (message.kind === 'ai' || !blocked);
                     const withRow = canEdit && message === newestAiMessage;
                     let tools: ReactNode = null;
                     if (withRow) {
-                        tools = <ActionRow onEdit={() => edit(message.id)} onSnapshot={onSnapshot} />;
+                        // ↺ Again runs a turn: only on a reply that is the newest Message, never the Opening.
+                        const again = message === last && !isOpening(message) && !blocked;
+                        tools = (
+                            <ActionRow
+                                onAgain={again ? () => onAgain(message.id) : null}
+                                onEdit={() => edit(message.id)}
+                                onSnapshot={onSnapshot}
+                            />
+                        );
                     } else if (editable && tapped === message.id) {
                         tools = (
                             <div className={styles.tools}>
@@ -324,7 +347,7 @@ export function ChatThread({
                             key={message.id}
                             message={message}
                             cast={cast}
-                            later={messages.length - index - 1}
+                            later={shown.length - index - 1}
                             editing={editing === message.id}
                             tools={tools}
                             snapshots={

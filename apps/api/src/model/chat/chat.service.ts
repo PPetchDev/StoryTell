@@ -194,6 +194,11 @@ export class ChatModelService {
         });
     }
 
+    /** Deletes one Message for good; its parts go through ON DELETE CASCADE. */
+    async deleteMessage(messageId: number): Promise<void> {
+        await this.messages.delete({ id: messageId });
+    }
+
     /** Deletes every Message of the Chat; their parts go through ON DELETE CASCADE. */
     async clearMessages(chatId: number): Promise<void> {
         await this.messages.delete({ chatId });

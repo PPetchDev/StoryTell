@@ -484,6 +484,28 @@ describe('Snapshots and the Gallery', () => {
             expect((await gallery(story.id)).map((item) => [item.chatId, item.messageId])).toEqual([[chat.id, null]]);
         });
 
+        it('clears the Message link of a regenerated reply, and the Gallery keeps the Snapshot', async () => {
+            const story = await createStory();
+            const chat = await createChat(story.id);
+            const played = await play(story.id, chat.id, 'Hello.', 'She nods.');
+            const taken = await snap(story.id, chat.id, { bytes: 'of-the-old-reply' });
+            expect(taken.snapshots.map((s) => s.messageId)).toEqual([played.messages[2].id]);
+
+            t.gateway.scriptText('turn', 'She frowns.');
+            t.gateway.scriptText('judge', NO_CHANGE);
+            t.gateway.scriptText('memory_extraction', NO_OPS);
+            const { body } = await t.http
+                .post(`/api/stories/${story.id}/chats/${chat.id}/messages/${played.messages[2].id}/regenerate`)
+                .expect(200);
+
+            expect(body.messages).toHaveLength(3);
+            expect((await chatSnapshots(story.id, chat.id)).snapshots).toEqual([]);
+            expect((await gallery(story.id)).map((item) => [item.id, item.chatId, item.messageId])).toEqual([
+                [taken.snapshots[0].id, chat.id, null],
+            ]);
+            expect(await filesUnder(path.join(t.imageDir, 'snapshots', `story-${story.id}`))).toHaveLength(1);
+        });
+
         it('clears every Message link on reset, keeping the Chat link', async () => {
             const story = await createStory();
             const chat = await createChat(story.id);
