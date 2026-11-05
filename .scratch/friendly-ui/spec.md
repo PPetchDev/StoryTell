@@ -3,7 +3,7 @@
 Status: ready-for-agent
 Builds on: [Spec: Storytell AI MVP](../storytell-mvp/spec.md)
 Decisions: [decisions.md](decisions.md) (four interview rounds, 2026-11-04)
-Prototype: branch `prototype/friendly-ui` (e9d88f1, 986772f), route `/prototype/friendly-ui`. The winners are Chat variant D on variant A's look, the Home picture cards, and Story editor variant D.
+Prototype: branch `prototype/friendly-ui` (e9d88f1, 986772f), route `/prototype/friendly-ui`; deleted on 2026-11-05 once all 12 tickets shipped. The winners are Chat variant D on variant A's look, the Home picture cards, and Story editor variant D.
 
 ## Problem Statement
 
@@ -301,7 +301,7 @@ A phone-first redesign of the Chat screen, the Story editor and the app shell, i
 
 ## Further Notes
 
-- **The prototype is the visual reference.** The throwaway route and its variants live on branch `prototype/friendly-ui` only, and never merge. Fold the look in properly, with tests and the project's patterns, rather than copying prototype code.
+- **The prototype is the visual reference.** The throwaway route and its variants lived on branch `prototype/friendly-ui` only and never merged; the branch was deleted on 2026-11-05 once all 12 tickets shipped. Fold the look in properly, with tests and the project's patterns, rather than copying prototype code.
 - **Cost:** a suggestion request costs about one turn (about $0.002 at the current play model), and only when asked. Continue and Regenerate cost one turn each. Heavy use of Again adds turns. All of it stays in the text pool and under the existing cap and low-credit warning.
 - **Risk: Continue acting for the user.** This is the most common complaint about Zeta. The instruction and the existing guard address it, but only the manual battery can show whether the play model obeys. If it doesn't, the instruction is the thing to tune, not the guard.
 

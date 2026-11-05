@@ -4,7 +4,7 @@ Type: task
 Status: done
 Blocked by: 09
 Part of: [Spec: Friendly UI](../spec.md)
-Visual reference: branch `prototype/friendly-ui`, route `/prototype/friendly-ui` (Story editor variants A and D: the Assistant button).
+Visual reference: the prototype on branch `prototype/friendly-ui` (Story editor variants A and D: the Assistant button), deleted on 2026-11-05 once all 12 tickets shipped.
 
 ## What to build
 

@@ -32,7 +32,7 @@ Interview notes, kept until the spec is written. Screenshots of the app before t
 
 ## Round 4: "as easy as Zeta"
 
-Research on Zeta's UX (Japanese guides, Korean community posts, store listings) found its ease comes mostly from one-tap turn controls on the Chat screen and picture-card discovery. A prototype variant D (branch `prototype/friendly-ui`, 986772f) showed them on our screens.
+Research on Zeta's UX (Japanese guides, Korean community posts, store listings) found its ease comes mostly from one-tap turn controls on the Chat screen and picture-card discovery. A prototype variant D (branch `prototype/friendly-ui`, 986772f, deleted on 2026-11-05 once the redesign shipped) showed them on our screens.
 
 - **Scope change:** Continue, Regenerate and suggested replies come into scope. The MVP spec listed Regenerate and Continue as Out of Scope ("Editing is the only way to change history"); that line changes. Swipe (keeping and flipping between alternative replies) and Branch stay out.
 

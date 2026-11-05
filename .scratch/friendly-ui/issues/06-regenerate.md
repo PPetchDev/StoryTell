@@ -4,7 +4,7 @@ Type: task
 Status: done
 Blocked by: 05
 Part of: [Spec: Friendly UI](../spec.md)
-Visual reference: branch `prototype/friendly-ui`, route `/prototype/friendly-ui` (Chat variant D: ↺ Again).
+Visual reference: the prototype on branch `prototype/friendly-ui` (Chat variant D: ↺ Again), deleted on 2026-11-05 once all 12 tickets shipped.
 
 ## What to build
 
