@@ -63,7 +63,8 @@
 }
 
 .play[aria-disabled='true'] {
-    opacity: 0.45;
+    background: var(--surface-raised);
+    color: var(--muted);
     cursor: not-allowed;
 }
 

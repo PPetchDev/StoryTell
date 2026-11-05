@@ -40,7 +40,7 @@
 
 .primary {
     border: 0;
-    background: var(--accent);
+    background: var(--accent-fill);
     color: var(--accent-text);
 }
 
@@ -56,9 +56,15 @@
     color: var(--muted);
 }
 
-.primary:disabled,
+.primary:disabled {
+    background: var(--surface-raised);
+    color: var(--muted);
+    cursor: progress;
+}
+
 .secondary:disabled {
-    opacity: 0.6;
+    border-color: var(--line);
+    color: var(--muted);
     cursor: progress;
 }
 

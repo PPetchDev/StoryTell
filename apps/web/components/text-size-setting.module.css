@@ -28,7 +28,7 @@
 }
 
 .segment:has(input:checked) {
-    background: var(--accent);
+    background: var(--accent-fill);
     color: var(--accent-text);
 }
 

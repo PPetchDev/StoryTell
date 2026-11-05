@@ -246,6 +246,7 @@ function MemoryView({ list, memory, highlighted, busy, autosave, sendEdit, onSav
                         )}
                         <ConfirmButton
                             label="Delete"
+                            danger
                             question="Delete this Memory? The Characters forget it for good."
                             confirmLabel="Delete"
                             onConfirm={onDelete}

@@ -186,6 +186,7 @@ export function SnapshotViewer<T extends Snapshot>({ snapshots, openId, onClose,
                     <ConfirmButton
                         key={snapshot.id}
                         label="Delete"
+                        danger
                         question="Delete this Snapshot and its image?"
                         confirmLabel="Delete"
                         onConfirm={() => onDelete(snapshot)}

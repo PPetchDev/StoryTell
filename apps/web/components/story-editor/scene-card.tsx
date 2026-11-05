@@ -31,6 +31,7 @@ export function SceneCard({ scene, index, count, rewrites, onText, onMove, onRem
                     <OrderButtons index={index} count={count} what={heading} onMove={onMove} />
                     <ConfirmButton
                         label="Remove"
+                        danger
                         question={`Remove ${heading}?`}
                         warning={SCENE_REMOVAL_WARNING}
                         confirmLabel="Remove"

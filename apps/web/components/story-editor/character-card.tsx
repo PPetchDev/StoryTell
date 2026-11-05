@@ -56,6 +56,7 @@ export function CharacterCard(props: CharacterCardProps) {
                     <OrderButtons index={index} count={count} what={heading} onMove={props.onMove} />
                     <ConfirmButton
                         label="Remove"
+                        danger
                         question={`Remove ${heading}?`}
                         warning={characterRemovalWarning(heading)}
                         confirmLabel="Remove"
