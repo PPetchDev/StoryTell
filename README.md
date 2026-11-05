@@ -36,7 +36,9 @@ frontend in watch mode. Open <http://localhost:3001>. A fresh install shows "Sto
 Stories. Ctrl+C stops all three.
 
 Dev data lives in `.data/dev/` (git-ignored): the database cluster in `postgres/` and the image
-folder in `images/`. Delete the folder to start from scratch.
+folder in `images/`. Delete the folder to start from scratch. The cluster is created UTF-8 whatever
+the machine's locale; one made before that (WIN1252 on Windows) is refused by migrations, so
+recreate it and copy the data over.
 
 To change ports or add provider keys, copy [.env.example](.env.example) to `.env`.
 
@@ -179,8 +181,12 @@ LIVE_HOME/            C:\StorytellLive by default; keep it outside this checkout
 
    ```sql
    CREATE ROLE storytell LOGIN PASSWORD '<a new password>';
-   CREATE DATABASE storytell_live OWNER storytell;
+   CREATE DATABASE storytell_live OWNER storytell ENCODING 'UTF8' TEMPLATE template0 LC_COLLATE 'C' LC_CTYPE 'C';
    ```
+
+   The encoding matters: on Windows the installer's own databases follow the machine's locale,
+   which is usually WIN1252, and that refuses Thai and emoji. `\l storytell_live` in `psql` should
+   show `UTF8`. Migrations, and so `npm run live:deploy`, refuse a database that isn't UTF-8.
 
    The installer also brings `pg_dump` and `psql`, which the backup and restore steps use.
 2. **`.env.live`.** Copy the "Live instance" block of `.env.example` into `.env.live` in this

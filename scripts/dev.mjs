@@ -28,6 +28,8 @@ const postgres = new EmbeddedPostgres({
     user: 'postgres',
     password: 'postgres',
     persistent: true,
+    // UTF-8 whatever the machine's locale: on Windows initdb otherwise picks WIN1252, which refuses Thai.
+    initdbFlags: ['--encoding=UTF8', '--locale=C'],
     // PostgreSQL 18's io_worker processes can outlive a stop on Windows; sync I/O has none.
     postgresFlags: ['-c', 'io_method=sync'],
     onLog: () => {},
