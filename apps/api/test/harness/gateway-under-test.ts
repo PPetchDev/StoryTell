@@ -54,6 +54,7 @@ export function gatewayUnderTest(
             },
         },
         creditCacheMs: 0,
+        sleep,
     });
     return { gateway, settings, records, sleeps };
 }

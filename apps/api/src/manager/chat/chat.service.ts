@@ -39,7 +39,7 @@ import { SnapshotModelService } from '../../model/snapshot/snapshot.service.js';
 import { SettingsModelService } from '../../model/settings/settings.service.js';
 import { StoryEntity } from '../../model/story/entities/story.entity.js';
 import { StoryModelService } from '../../model/story/story.service.js';
-import { ModelGateway } from '../../service/model-gateway/model-gateway.js';
+import { ModelGateway, TextCompletionRequest, TextCompletionResult } from '../../service/model-gateway/model-gateway.js';
 import { latestLine } from '../excerpt.js';
 import { exchangeUserText } from './exchange.js';
 import { MissingField, playableStatus } from '../story/playable.js';
@@ -49,7 +49,8 @@ import { latestExtracted, MemoryExtractionManagerService } from './memory/extrac
 import { SuggestedRepliesManagerService } from './suggestions/suggested-replies.service.js';
 import { SuggestedReply } from './suggestions/suggestions-prompt.js';
 import { buildTurnPrompt, PromptArc, PromptBond, PromptHistoryMessage, PromptLayersInput, PromptMemory } from './turn/prompt.js';
-import { parseReply, partsToText, ReplyPart } from './turn/reply-parser.js';
+import { CastName, parseReply, partsToText, releasedText, ReplyPart } from './turn/reply-parser.js';
+import { TurnStoppedError, TurnStream } from './turn/turn-stream.js';
 
 /** A Chat as a Story's Chat list shows it (spec: "Lists and Home"). */
 export interface ChatListItem extends ChatSummary {
@@ -223,7 +224,7 @@ export class ChatManagerService {
      * into parts from its `@Name:` text, and both background calls run again on it; the Chat
      * then waits for the user. The Opening copy is never judged or extracted from.
      */
-    async editMessage(storyId: number, chatId: number, messageId: number, text: string): Promise<EditResult> {
+    async editMessage(storyId: number, chatId: number, messageId: number, text: string, stream?: TurnStream): Promise<EditResult> {
         if (text.trim() === '') throw new EmptyMessageError();
         const { story, chat: loaded } = await this.load(storyId, chatId);
         const found = loaded.messages.find((message) => message.id === messageId);
@@ -233,8 +234,12 @@ export class ChatManagerService {
             const chat = await this.requireSendable(story, loaded);
             return this.writingTurn(chat.id, () =>
                 // The fresh reply is written to the identity worn now, so the edited text is stamped with it.
-                this.rewindAndWrite(story, chat.id, found.position + 1, () =>
-                    this.chatModel.rewriteUserMessage(found, text, wornIdentity(story, chat)),
+                this.rewindAndWrite(
+                    story,
+                    chat.id,
+                    found.position + 1,
+                    () => this.chatModel.rewriteUserMessage(found, text, wornIdentity(story, chat)),
+                    stream,
                 ),
             );
         }
@@ -267,7 +272,7 @@ export class ChatManagerService {
      * failed turn the old reply is already gone, so a User Message before it awaits Retry, and
      * otherwise the Chat simply ends at the AI Message before it. No version is kept.
      */
-    async regenerateMessage(storyId: number, chatId: number, messageId: number): Promise<EditResult> {
+    async regenerateMessage(storyId: number, chatId: number, messageId: number, stream?: TurnStream): Promise<EditResult> {
         const { story, chat: loaded } = await this.load(storyId, chatId);
         // First: mid-turn, the Message may already be gone, deleted by the Regenerate under way.
         if (this.inFlight.has(loaded.id)) throw new TurnInProgressError();
@@ -280,10 +285,16 @@ export class ChatManagerService {
         const chat = await this.requireSendable(story, loaded);
 
         return this.writingTurn(chat.id, () =>
-            this.rewindAndWrite(story, chat.id, message.position, async () => {
-                await this.snapshotModel.clearMessageLinks([message.id]);
-                await this.chatModel.deleteMessage(message.id);
-            }),
+            this.rewindAndWrite(
+                story,
+                chat.id,
+                message.position,
+                async () => {
+                    await this.snapshotModel.clearMessageLinks([message.id]);
+                    await this.chatModel.deleteMessage(message.id);
+                },
+                stream,
+            ),
         );
     }
 
@@ -292,11 +303,19 @@ export class ChatManagerService {
      * to the Messages, then writes the turn, answering with what was rolled back. Shared by a
      * User Message edit and Regenerate. A failed turn throws with the rollback and change kept.
      */
-    private async rewindAndWrite(story: StoryEntity, chatId: number, fromPosition: number, change: () => Promise<void>): Promise<EditResult> {
+    private async rewindAndWrite(
+        story: StoryEntity,
+        chatId: number,
+        fromPosition: number,
+        change: () => Promise<void>,
+        stream: TurnStream | undefined,
+    ): Promise<EditResult> {
+        // Stopped while the gate waited: nothing is rolled back or changed.
+        if (stream?.signal.aborted) throw new TurnStoppedError();
         const rolledBack = await this.ledger.rollbackFrom(chatId, fromPosition);
         await change();
         // Reloaded: the rollback may have put the Chat back on an earlier Scene.
-        await this.writeTurn(story, await this.reload(chatId));
+        await this.writeTurn(story, await this.reload(chatId), stream);
         return { ...(await this.getChat(story.id, chatId)), rolledBack };
     }
 
@@ -366,12 +385,14 @@ export class ChatManagerService {
     }
 
     /** Spec: "Send flow". */
-    async send(storyId: number, chatId: number, text: string): Promise<ChatDetail> {
+    async send(storyId: number, chatId: number, text: string, stream?: TurnStream): Promise<ChatDetail> {
         if (text.trim() === '') throw new EmptyMessageError();
         const { story, chat: loaded } = await this.load(storyId, chatId);
         const chat = await this.requireSendable(story, loaded);
 
         return this.writingTurn(chat.id, async () => {
+            // Stopped while the gate waited: nothing is stored, and the client keeps the text.
+            if (stream?.signal.aborted) throw new TurnStoppedError();
             const userMessage = await this.chatModel.addUserMessage(
                 chat.id,
                 chat.messages.length,
@@ -379,19 +400,19 @@ export class ChatManagerService {
                 wornIdentity(story, chat),
             );
             chat.messages.push(userMessage);
-            await this.writeTurn(story, chat);
+            await this.writeTurn(story, chat, stream);
             return this.getChat(storyId, chatId);
         });
     }
 
     /** Runs the same turn again for a User Message whose turn failed. */
-    async retry(storyId: number, chatId: number): Promise<ChatDetail> {
+    async retry(storyId: number, chatId: number, stream?: TurnStream): Promise<ChatDetail> {
         const { story, chat: loaded } = await this.load(storyId, chatId);
         if (!awaitingReply(loaded)) throw new NoTurnToRetryError();
         const chat = await this.requireSendable(story, loaded);
 
         return this.writingTurn(chat.id, async () => {
-            await this.writeTurn(story, chat);
+            await this.writeTurn(story, chat, stream);
             return this.getChat(storyId, chatId);
         });
     }
@@ -402,13 +423,13 @@ export class ChatManagerService {
      * from the last AI Message, the Opening included. A failed call stores nothing. (Not
      * named `continue`, beside `send` and `retry`, since that is a reserved word.)
      */
-    async continueChat(storyId: number, chatId: number): Promise<ChatDetail> {
+    async continueChat(storyId: number, chatId: number, stream?: TurnStream): Promise<ChatDetail> {
         const { story, chat: loaded } = await this.load(storyId, chatId);
         if (awaitingReply(loaded)) throw new AwaitingReplyError();
         const chat = await this.requireSendable(story, loaded);
 
         return this.writingTurn(chat.id, async () => {
-            await this.writeTurn(story, chat);
+            await this.writeTurn(story, chat, stream);
             return this.getChat(storyId, chatId);
         });
     }
@@ -523,8 +544,10 @@ export class ChatManagerService {
      * from the whole history with the continue instruction in place of user text (spec:
      * "Continue", and Regenerate's step 4). Throws the gateway's typed error on failure, with
      * nothing stored. On success both background calls start against the new AI Message.
+     * With a `stream`, the reply is streamed to it as it is written; a stopped stream throws
+     * `TurnStoppedError` with nothing stored.
      */
-    private async writeTurn(story: StoryEntity, chat: ChatEntity): Promise<void> {
+    private async writeTurn(story: StoryEntity, chat: ChatEntity, stream?: TurnStream): Promise<void> {
         const userText = exchangeUserText(chat.messages, chat.messages.length);
         const history: PromptHistoryMessage[] = (userText !== null ? chat.messages.slice(0, -1) : chat.messages)
             .map((message) => ({
@@ -553,13 +576,16 @@ export class ChatManagerService {
             this.logger.warn(`Chat ${chat.id}: left out the ${prompt.memoriesLeftOut} oldest unlocked Memories to keep the Memory layer under its cap`);
         }
 
-        const result = await this.gateway.completeText({
+        const request: TextCompletionRequest = {
             kind: 'turn',
             messages: prompt.messages,
             maxTokens: prompt.maxTokens,
             stop: prompt.stop,
             servedFor: { storyId: story.id, chatId: chat.id },
-        });
+        };
+        const result = stream
+            ? await this.streamReply(request, story.characters, identity.name, stream)
+            : await this.gateway.completeText(request);
 
         const reply = parseReply(result.text, story.characters, identity.name);
         for (const name of reply.unknownSpeakers) {
@@ -570,6 +596,8 @@ export class ChatManagerService {
         }
 
         const parts: ReplyPart[] = reply.parts;
+        // A Stop that came while the reply was parsed still stores nothing.
+        if (stream?.signal.aborted) throw new TurnStoppedError();
         const aiMessage = await this.chatModel.addAiMessage(
             chat.id,
             chat.messages.length,
@@ -577,8 +605,43 @@ export class ChatManagerService {
             parts,
             BackgroundStatus.Pending,
         );
+        // Last, and only once stored: the client's final parts are the stored Message.
+        stream?.onParts(parts);
         await this.chatModel.touchPlayed(chat.id);
         this.startBackground(story, chat.id, aiMessage.id);
+    }
+
+    /**
+     * The turn's call as a stream (spec: "The guard while streaming"). Each piece re-parses
+     * the released reply for `onParts`; text that could still become a line written as the
+     * worn identity is held back, and once such a line begins the call is aborted, leaving
+     * the text before it for the usual parse and cut. The user's Stop throws.
+     */
+    private async streamReply(
+        request: TextCompletionRequest,
+        cast: CastName[],
+        identityName: string,
+        stream: TurnStream,
+    ): Promise<TextCompletionResult> {
+        if (stream.signal.aborted) throw new TurnStoppedError();
+        const guard = new AbortController();
+        let text = '';
+        let released = '';
+        stream.onStart();
+        const result = await this.gateway.streamText(request, {
+            signal: AbortSignal.any([stream.signal, guard.signal]),
+            onText: (piece) => {
+                text += piece;
+                const release = releasedText(text, identityName);
+                if (release.userLine) guard.abort();
+                if (release.text !== released) {
+                    released = release.text;
+                    stream.onParts(parseReply(released, cast, identityName).parts);
+                }
+            },
+        });
+        if (stream.signal.aborted) throw new TurnStoppedError();
+        return result;
     }
 
     /**

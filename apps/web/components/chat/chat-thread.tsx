@@ -2,11 +2,11 @@
 
 import { CSSProperties, KeyboardEvent, MouseEvent, ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
-import { MessageBody, UserLine } from '@/components/chat/message-body';
+import { AiMessageParts, MessageBody, UserLine } from '@/components/chat/message-body';
 import { MessageSnapshots } from '@/components/chat/snapshots';
 import { ConfirmButton } from '@/components/story-editor/fields';
 import { Cast, Portraits } from '@/lib/character-colour';
-import { isOpening, Message, messageText } from '@/lib/chat';
+import { isOpening, Message, MessagePart, messageText } from '@/lib/chat';
 import { ChatSnapshots, Snapshot, SnapshotJob } from '@/lib/snapshot';
 import { STORY_TEXT_SIZE, useTextSize } from '@/lib/text-size';
 
@@ -200,18 +200,30 @@ const AT_END_SLACK = 48;
  * Keeps the thread at its end (spec: "Scrolling"). It opens at the end, or on the Message a
  * dashboard or Memory link names in the URL hash. It goes back to the end whenever `followKey`
  * changes (a Message added or replaced, the writing indicator shown or gone), and stays there
- * while the content or the thread itself changes size (a Snapshot loading, a notice showing),
- * unless the user has scrolled up to read.
+ * while the content or the thread itself changes size (a Snapshot loading, a notice showing,
+ * a streamed reply growing), unless the user has scrolled up to read. A streamed reply that
+ * finishes while the user reads further up leaves them where they are (spec: streaming
+ * replies, story 4).
  */
-function useFollowEnd(followKey: string) {
+function useFollowEnd(followKey: string, streaming: boolean, writing: boolean) {
     const threadRef = useRef<HTMLElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
     const atEndRef = useRef(true);
     const openedRef = useRef(false);
+    /** The turn being written has shown words, even if they are gone again (a Stop, a failure). */
+    const streamedRef = useRef(false);
+
+    useLayoutEffect(() => {
+        if (streaming) streamedRef.current = true;
+    }, [streaming]);
 
     useLayoutEffect(() => {
         const thread = threadRef.current;
         if (!thread) return;
+        const streamed = streamedRef.current;
+        if (!writing) streamedRef.current = false;
+        // A turn whose reply streamed is over: following it was the user's to stop.
+        if (streamed && !atEndRef.current) return;
         if (!openedRef.current) {
             openedRef.current = true;
             const hash = window.location.hash.slice(1);
@@ -225,6 +237,7 @@ function useFollowEnd(followKey: string) {
         }
         thread.scrollTop = thread.scrollHeight;
         atEndRef.current = true;
+        // `writing` is read here too, and it is part of `followKey`.
     }, [followKey]);
 
     useLayoutEffect(() => {
@@ -263,6 +276,8 @@ interface ChatThreadProps {
     pending: PendingLine | null;
     /** A turn is being written: the indicator shows where the reply will appear. */
     writing: boolean;
+    /** The reply so far while the turn streams, shown before the indicator. */
+    replySoFar: MessagePart[] | null;
     /** The Message being edited in place, if any. */
     editing: number | null;
     /** Edit is offered at all (no turn or write in flight, no other edit open). */
@@ -291,6 +306,7 @@ export function ChatThread({
     portraits,
     pending,
     writing,
+    replySoFar,
     editing,
     canEdit,
     blocked,
@@ -310,7 +326,9 @@ export function ChatThread({
     const last = shown[shown.length - 1];
     // The newest Message's text is in the key too: an edit replaces it in place, under its id.
     const newest = last ? `${last.id}:${messageText(last)}` : '';
-    const { threadRef, contentRef } = useFollowEnd(`${shown.length}:${newest}:${pending !== null}:${writing}`);
+    // A growing reply is followed by the size observer, and only while the user is at the end.
+    const streaming = writing && replySoFar !== null && replySoFar.length > 0;
+    const { threadRef, contentRef } = useFollowEnd(`${shown.length}:${newest}:${pending !== null}:${writing}`, streaming, writing);
     const storySize = { '--story-size': STORY_TEXT_SIZE[useTextSize()] } as CSSProperties;
     const [tapped, setTapped] = useTappedMessage(canEdit);
     // The action row goes under the latest AI Message (the Opening counts), the one a Snapshot is taken of.
@@ -375,6 +393,11 @@ export function ChatThread({
                 {pending && (
                     <article className={styles.message} aria-label={`${pending.identityName} said`} aria-busy="true">
                         <UserLine identityName={pending.identityName} text={pending.text} />
+                    </article>
+                )}
+                {streaming && (
+                    <article className={styles.message} aria-label="AI reply" aria-busy="true">
+                        <AiMessageParts parts={replySoFar} cast={cast} portraits={portraits} />
                     </article>
                 )}
                 {writing && (

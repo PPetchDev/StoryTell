@@ -87,9 +87,14 @@ interface MessageBodyProps {
  */
 export function MessageBody({ message, cast, portraits = {} }: MessageBodyProps) {
     if (message.kind === 'user') return <UserLine identityName={message.identityName} text={message.text} />;
+    return <AiMessageParts parts={message.parts} cast={cast} portraits={portraits} />;
+}
+
+/** An AI Message's parts in order, stored or still being written (spec: streaming replies). */
+export function AiMessageParts({ parts, cast, portraits = {} }: { parts: MessagePart[]; cast: Cast; portraits?: Portraits }) {
     return (
         <div className={styles.story}>
-            {message.parts.map((part, index) =>
+            {parts.map((part, index) =>
                 part.kind === 'narration' ? (
                     // One ≡ line per paragraph: the parser merges narration paragraphs into one part.
                     part.text

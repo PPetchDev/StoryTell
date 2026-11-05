@@ -1,5 +1,6 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, ParseIntPipe, Patch, Post, Put } from '@nestjs/common';
-import { ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Delete, Get, HttpCode, Param, ParseIntPipe, Patch, Post, Put, Req, Res } from '@nestjs/common';
+import { ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiProduces, ApiTags } from '@nestjs/swagger';
+import type { Request, Response } from 'express';
 
 import { ChatManagerService } from '../../manager/chat/chat.service.js';
 import {
@@ -15,12 +16,17 @@ import {
     ListChatsResponseBodyDTO,
 } from './dto/chat.response.dto.js';
 import { SuggestionsResponseBodyDTO } from './dto/suggestions.response.dto.js';
+import { answerTurn } from './turn-response.js';
 
 const Id = (name: string) => Param(name, ParseIntPipe);
 
 /**
  * Chats per Story: create, list, rename, reset, delete, swap the worn identity, send, retry,
  * continue, edit a Message, regenerate the newest reply, the read-only dashboard and a retry of either background call (spec: "API surface").
+ *
+ * The five turn endpoints (send, retry, continue, a User Message edit, regenerate) answer
+ * server-sent events instead when asked with `Accept: text/event-stream` (see turn-response.ts),
+ * so they write their own answer.
  */
 @ApiTags('Chats')
 @Controller('stories/:storyId/chats')
@@ -76,19 +82,31 @@ export class ChatApiController {
     /** Stores the User Message and writes the turn. On a failed turn the error is the gateway's. */
     @Post(':chatId/messages')
     @ApiCreatedResponse({ type: ChatResponseBodyDTO })
+    @ApiProduces('application/json', 'text/event-stream')
     send(
         @Id('storyId') storyId: number,
         @Id('chatId') chatId: number,
         @Body() body: SendMessageRequestBodyDTO,
-    ): Promise<ChatResponseBodyDTO> {
-        return this.chatManager.send(storyId, chatId, body.text);
+        @Req() request: Request,
+        @Res() response: Response,
+    ): Promise<void> {
+        return answerTurn<ChatResponseBodyDTO>(request, response, 201, (stream) =>
+            this.chatManager.send(storyId, chatId, body.text, stream),
+        );
     }
 
     @Post(':chatId/retry')
-    @HttpCode(200)
     @ApiOkResponse({ type: ChatResponseBodyDTO })
-    retry(@Id('storyId') storyId: number, @Id('chatId') chatId: number): Promise<ChatResponseBodyDTO> {
-        return this.chatManager.retry(storyId, chatId);
+    @ApiProduces('application/json', 'text/event-stream')
+    retry(
+        @Id('storyId') storyId: number,
+        @Id('chatId') chatId: number,
+        @Req() request: Request,
+        @Res() response: Response,
+    ): Promise<void> {
+        return answerTurn<ChatResponseBodyDTO>(request, response, 200, (stream) =>
+            this.chatManager.retry(storyId, chatId, stream),
+        );
     }
 
     /**
@@ -96,10 +114,17 @@ export class ChatApiController {
      * an AI Message and nothing else. A failed call stores nothing; the error is the gateway's.
      */
     @Post(':chatId/continue')
-    @HttpCode(200)
     @ApiOkResponse({ type: ChatResponseBodyDTO })
-    continue(@Id('storyId') storyId: number, @Id('chatId') chatId: number): Promise<ChatResponseBodyDTO> {
-        return this.chatManager.continueChat(storyId, chatId);
+    @ApiProduces('application/json', 'text/event-stream')
+    continue(
+        @Id('storyId') storyId: number,
+        @Id('chatId') chatId: number,
+        @Req() request: Request,
+        @Res() response: Response,
+    ): Promise<void> {
+        return answerTurn<ChatResponseBodyDTO>(request, response, 200, (stream) =>
+            this.chatManager.continueChat(storyId, chatId, stream),
+        );
     }
 
     /**
@@ -110,13 +135,18 @@ export class ChatApiController {
      */
     @Patch(':chatId/messages/:messageId')
     @ApiOkResponse({ type: EditMessageResponseBodyDTO })
+    @ApiProduces('application/json', 'text/event-stream')
     editMessage(
         @Id('storyId') storyId: number,
         @Id('chatId') chatId: number,
         @Id('messageId') messageId: number,
         @Body() body: EditMessageRequestBodyDTO,
-    ): Promise<EditMessageResponseBodyDTO> {
-        return this.chatManager.editMessage(storyId, chatId, messageId, body.text);
+        @Req() request: Request,
+        @Res() response: Response,
+    ): Promise<void> {
+        return answerTurn<EditMessageResponseBodyDTO>(request, response, 200, (stream) =>
+            this.chatManager.editMessage(storyId, chatId, messageId, body.text, stream),
+        );
     }
 
     /**
@@ -126,14 +156,18 @@ export class ChatApiController {
      * the error is the gateway's, and the old reply is already gone.
      */
     @Post(':chatId/messages/:messageId/regenerate')
-    @HttpCode(200)
     @ApiOkResponse({ type: EditMessageResponseBodyDTO })
+    @ApiProduces('application/json', 'text/event-stream')
     regenerate(
         @Id('storyId') storyId: number,
         @Id('chatId') chatId: number,
         @Id('messageId') messageId: number,
-    ): Promise<EditMessageResponseBodyDTO> {
-        return this.chatManager.regenerateMessage(storyId, chatId, messageId);
+        @Req() request: Request,
+        @Res() response: Response,
+    ): Promise<void> {
+        return answerTurn<EditMessageResponseBodyDTO>(request, response, 200, (stream) =>
+            this.chatManager.regenerateMessage(storyId, chatId, messageId, stream),
+        );
     }
 
     /** Spec: "Dashboard (read-only)". Bonds with history, Arc steps, the Scene and background status. */

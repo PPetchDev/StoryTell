@@ -12,6 +12,7 @@ import {
     FakeGatewayCall,
     FakeImageReply,
     FakeModelGateway,
+    FakeStreamOptions,
     FakeTextReply,
 } from '../service/model-gateway/fake-model-gateway.js';
 import {
@@ -30,9 +31,12 @@ export interface ScriptedErrorJson {
     message?: string;
 }
 
+/** A text reply; the stream options shape how `streamText` hands it out (see FakeStreamOptions). */
+export type ScriptedTextJson = Partial<TextCompletionResult> & Omit<FakeStreamOptions, 'failWith'> & { failWith?: ScriptedErrorJson };
+
 export interface ScriptTextBody {
     kind: TextCallKind;
-    replies: Array<string | Partial<TextCompletionResult> | ScriptedErrorJson>;
+    replies: Array<string | ScriptedTextJson | ScriptedErrorJson>;
 }
 
 export interface ScriptImageBody {
@@ -75,9 +79,11 @@ export class FakeGatewayControlController {
     @Post('text')
     @HttpCode(204)
     scriptText(@Body() body: ScriptTextBody): void {
-        const replies: FakeTextReply[] = body.replies.map((reply) =>
-            isScriptedError(reply) ? toError(reply) : reply,
-        );
+        const replies: FakeTextReply[] = body.replies.map((reply) => {
+            if (isScriptedError(reply)) return toError(reply);
+            if (typeof reply === 'string' || !reply.failWith) return reply as FakeTextReply;
+            return { ...reply, failWith: toError(reply.failWith) };
+        });
         this.fake.scriptText(body.kind, ...replies);
     }
 

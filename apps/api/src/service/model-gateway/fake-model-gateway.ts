@@ -1,4 +1,4 @@
-import { ModelGatewayError } from '../../errors/model-gateway.errors.js';
+import { ModelGatewayError, ProviderOutageError } from '../../errors/model-gateway.errors.js';
 import {
     ImageCallKind,
     ImageData,
@@ -10,15 +10,33 @@ import {
     TextCallKind,
     TextCompletionRequest,
     TextCompletionResult,
+    TextStream,
+    TextStreamResult,
 } from './model-gateway.js';
 
+/**
+ * How `streamText` hands a scripted reply out (`completeText` ignores it): in pieces of
+ * `pieceSize` characters, `pieceDelayMs` apart, failing with `failWith` (an outage by
+ * default) after `failAfterPieces` pieces when that is set.
+ */
+export interface FakeStreamOptions {
+    pieceSize?: number;
+    pieceDelayMs?: number;
+    failAfterPieces?: number;
+    failWith?: ModelGatewayError;
+}
+
+const DEFAULT_PIECE_SIZE = 12;
+
 /** A reply is plain text, a partial result to override defaults, or an error to reject with. */
-export type FakeTextReply = string | Partial<TextCompletionResult> | ModelGatewayError;
+export type FakeTextReply = string | (Partial<TextCompletionResult> & FakeStreamOptions) | ModelGatewayError;
 /** `delayMs` holds the reply back, so a browser test can see work in progress. */
 export type FakeImageReply = (Partial<ImageGenerationResult> & { delayMs?: number }) | ModelGatewayError;
 
 export type FakeGatewayCall =
     | { method: 'completeText'; request: TextCompletionRequest }
+    /** `stopped` turns true when the caller's signal ended the stream. */
+    | { method: 'streamText'; request: TextCompletionRequest; stopped: boolean }
     | { method: 'generateImage'; request: ImageGenerationRequest }
     | { method: 'remainingCredit' };
 
@@ -67,7 +85,7 @@ export class FakeModelGateway extends ModelGateway {
 
     textCalls(kind?: TextCallKind): TextCompletionRequest[] {
         return this.calls.flatMap((call) =>
-            call.method === 'completeText' && (!kind || call.request.kind === kind)
+            (call.method === 'completeText' || call.method === 'streamText') && (!kind || call.request.kind === kind)
                 ? [call.request]
                 : [],
         );
@@ -99,19 +117,45 @@ export class FakeModelGateway extends ModelGateway {
 
     async completeText(request: TextCompletionRequest): Promise<TextCompletionResult> {
         this.calls.push({ method: 'completeText', request });
+        return this.nextTextReply(request).result;
+    }
+
+    async streamText(request: TextCompletionRequest, stream: TextStream): Promise<TextStreamResult> {
+        const call = { method: 'streamText' as const, request, stopped: false };
+        this.calls.push(call);
+        const { result, options } = this.nextTextReply(request);
+        const { pieceDelayMs, failAfterPieces } = options;
+        const fail = () => options.failWith ?? new ProviderOutageError('The fake stream failed partway.');
+        const size = Math.max(1, options.pieceSize ?? DEFAULT_PIECE_SIZE);
+        let sent = '';
+        for (let at = 0, pieces = 0; at < result.text.length; at += size, pieces++) {
+            if (failAfterPieces !== undefined && pieces >= failAfterPieces) throw fail();
+            if (pieceDelayMs) await abortableDelay(pieceDelayMs, stream.signal);
+            if (stream.signal.aborted) {
+                call.stopped = true;
+                return { ...result, text: sent, usage: { promptTokens: 0, completionTokens: 0 }, costUsd: 0, stopped: true };
+            }
+            const piece = result.text.slice(at, at + size);
+            sent += piece;
+            stream.onText(piece);
+        }
+        // Set, and every piece is out: the stream fails before it completes.
+        if (failAfterPieces !== undefined) throw fail();
+        return { ...result, stopped: false };
+    }
+
+    /** The next scripted reply for the call's kind, split into its result and its stream options. */
+    private nextTextReply(request: TextCompletionRequest): { result: TextCompletionResult; options: FakeStreamOptions } {
         const reply = this.textReplies.get(request.kind)?.shift();
         if (reply === undefined) {
             throw new Error(`FakeModelGateway: no scripted reply for text call "${request.kind}"`);
         }
         if (reply instanceof ModelGatewayError) throw reply;
 
-        const partial = typeof reply === 'string' ? { text: reply } : reply;
+        const { pieceSize, pieceDelayMs, failAfterPieces, failWith, ...partial } = typeof reply === 'string' ? { text: reply } : reply;
         return {
-            text: '',
-            model: FAKE_TEXT_MODEL,
-            usage: { promptTokens: 0, completionTokens: 0 },
-            costUsd: 0,
-            ...partial,
+            result: { text: '', model: FAKE_TEXT_MODEL, usage: { promptTokens: 0, completionTokens: 0 }, costUsd: 0, ...partial },
+            options: { pieceSize, pieceDelayMs, failAfterPieces, failWith },
         };
     }
 
@@ -138,4 +182,18 @@ export class FakeModelGateway extends ModelGateway {
         this.calls.push({ method: 'remainingCredit' });
         return structuredClone(this.credit);
     }
+}
+
+/** Waits `ms`, or less when `signal` aborts first. */
+function abortableDelay(ms: number, signal: AbortSignal): Promise<void> {
+    return new Promise((resolve) => {
+        if (signal.aborted) return resolve();
+        const done = () => {
+            clearTimeout(timer);
+            signal.removeEventListener('abort', done);
+            resolve();
+        };
+        const timer = setTimeout(done, ms);
+        signal.addEventListener('abort', done);
+    });
 }

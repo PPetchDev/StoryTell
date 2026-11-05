@@ -587,7 +587,7 @@ Further gateway rules:
 - Automatic fallback between models or providers.
 - A summary ("Story so far") layer for Memory, author-set starting Memories, Message version history and Story version history.
 - Gallery albums, tags and favourites. Snapshot size settings and prompt preview.
-- Streaming replies.
+- Streaming replies. (Since brought in by [Spec: Streaming replies](../streaming/spec.md).)
 - 24/7 availability. The app is up only while the home PC is on.
 
 ## Further Notes
