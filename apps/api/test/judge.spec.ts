@@ -540,8 +540,10 @@ Ash: I take them off.
 
             expect(body.rolledBack).toEqual({ memoryChanges: 0, bondChanges: 3, arcSteps: 1, sceneAdvances: 1 });
             expect(body.messages).toHaveLength(3);
-            expect(body.messages[2]).toMatchObject({ id: firstReply.id, judge: { status: 'pending', error: null }, memory: { error: null } });
-            // The fake's extraction can finish before the edit answers; the judge, with more to read, cannot.
+            expect(body.messages[2]).toMatchObject({ id: firstReply.id, judge: { error: null }, memory: { error: null } });
+            // The fake's calls can finish before the edit answers, under a loaded full-suite run; that the
+            // judge runs again on the new text is checked below by its call count and the Bond it lands.
+            expect(['pending', 'done']).toContain(body.messages[2].judge.status);
             expect(['pending', 'done']).toContain(body.messages[2].memory.status);
             // Back on the first Scene: the advance this Message caused is undone.
             expect(body.currentScene).toEqual({ id: story.scenes[0].id, name: 'Arrival' });
