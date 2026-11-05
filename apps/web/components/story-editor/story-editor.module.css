@@ -187,9 +187,13 @@
     padding-bottom: var(--sheet-half);
 }
 
-/* Set on <html> while the sheet is open: what scrolls into view lands between header and sheet. */
-.underSheetRoot {
+/* Set on <html> by the editor: what scrolls into view lands under the sticky header... */
+.underHeaderRoot {
     scroll-padding-top: var(--editor-top, 0px);
+}
+
+/* ...and, while the Assistant's sheet is open, above it. */
+.underSheetRoot {
     scroll-padding-bottom: var(--sheet-half);
 }
 

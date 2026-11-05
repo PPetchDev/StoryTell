@@ -96,3 +96,13 @@
 .modeless > .top {
     flex: none;
 }
+
+/* A sheet's heading, in the grip row at the left, clear of Close. */
+.title {
+    position: absolute;
+    left: 0;
+    top: 0;
+    margin: 0;
+    font-size: 1rem;
+    line-height: 2.75rem;
+}

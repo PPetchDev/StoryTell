@@ -50,7 +50,7 @@ function useAutoGrow(value: string) {
 }
 
 /** The mark on a field the assistant changed. Text, so it reads without colour. */
-function ChangedMark() {
+export function ChangedMark() {
     return <span className={styles.changed}>changed by the assistant</span>;
 }
 

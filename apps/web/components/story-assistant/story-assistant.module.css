@@ -9,14 +9,6 @@
     gap: 0.5rem;
 }
 
-/* Sits in the grip row, beside the sheet's Close button. */
-.title {
-    flex: none;
-    margin: -2.25rem 3rem 0 0;
-    font-size: 1rem;
-    line-height: 2rem;
-}
-
 .hint {
     flex: none;
     margin: 0;

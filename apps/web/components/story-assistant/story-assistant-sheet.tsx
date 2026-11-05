@@ -166,9 +166,8 @@ export function StoryAssistantSheet({ assistant, onShow }: { assistant: StoryAss
     };
 
     return (
-        <Sheet label="Assistant" onClose={assistant.closePanel} modeless>
+        <Sheet label="Assistant" title="Assistant" onClose={assistant.closeSheet} modeless>
             <div className={styles.body}>
-                <h2 className={styles.title}>Assistant</h2>
                 {assistant.entries.length === 0 && (
                     <p className={styles.hint}>
                         Say what to change, e.g. &quot;give Mira a sister&quot; or &quot;add Scenes&quot;. Changes land in the

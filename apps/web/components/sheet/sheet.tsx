@@ -71,22 +71,28 @@ function useModelessFocus(panel: RefObject<HTMLElement | null>, onClose: () => v
         const node = panel.current;
         const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
         node?.focus();
+        // Where focus last went, the panel or the page. The panel is gone by cleanup, so it is kept here.
+        let inPanel = true;
+        const onFocusIn = (event: FocusEvent) => {
+            inPanel = !!node?.contains(event.target as Node);
+        };
         const onKey = (event: KeyboardEvent) => {
             if (event.key === 'Escape' && node?.contains(document.activeElement)) close.current();
         };
+        document.addEventListener('focusin', onFocusIn);
         document.addEventListener('keydown', onKey);
         return () => {
+            document.removeEventListener('focusin', onFocusIn);
             document.removeEventListener('keydown', onKey);
-            // A focused element removed with the panel leaves focus on the body.
-            const active = document.activeElement;
-            if (!active || active === document.body || node?.contains(active)) opener?.focus();
+            if (inPanel) opener?.focus();
         };
     }, [panel]);
 }
 
-function SheetTop({ onClose }: { onClose(): void }) {
+function SheetTop({ title, onClose }: { title?: string; onClose(): void }) {
     return (
         <div className={styles.top}>
+            {title && <h2 className={styles.title}>{title}</h2>}
             <span className={styles.grip} aria-hidden="true" />
             <button type="button" className={styles.close} aria-label="Close" onClick={onClose}>
                 <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -99,6 +105,8 @@ function SheetTop({ onClose }: { onClose(): void }) {
 
 interface SheetProps {
     label: string;
+    /** A heading in the grip row, beside Close. */
+    title?: string;
     onClose(): void;
     children: ReactNode;
     /**
@@ -117,7 +125,7 @@ export function Sheet({ modeless, ...props }: SheetProps) {
     return modeless ? <ModelessSheet {...props} /> : <ModalSheet {...props} />;
 }
 
-function ModalSheet({ label, onClose, children }: Omit<SheetProps, 'modeless'>) {
+function ModalSheet({ label, title, onClose, children }: Omit<SheetProps, 'modeless'>) {
     const panel = useRef<HTMLDivElement>(null);
     useModalFocus(panel, onClose);
 
@@ -132,21 +140,21 @@ function ModalSheet({ label, onClose, children }: Omit<SheetProps, 'modeless'>) 
                 tabIndex={-1}
                 onClick={(event) => event.stopPropagation()}
             >
-                <SheetTop onClose={onClose} />
+                <SheetTop title={title} onClose={onClose} />
                 {children}
             </div>
         </div>
     );
 }
 
-function ModelessSheet({ label, onClose, children }: Omit<SheetProps, 'modeless'>) {
+function ModelessSheet({ label, title, onClose, children }: Omit<SheetProps, 'modeless'>) {
     const panel = useRef<HTMLDivElement>(null);
     useModelessFocus(panel, onClose);
 
     return (
         <div className={styles.dock}>
             <div ref={panel} className={`${styles.panel} ${styles.modeless}`} role="dialog" aria-label={label} tabIndex={-1}>
-                <SheetTop onClose={onClose} />
+                <SheetTop title={title} onClose={onClose} />
                 {children}
             </div>
         </div>

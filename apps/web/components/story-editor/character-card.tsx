@@ -2,9 +2,9 @@
 
 import { Character, characterRemovalWarning, Story } from '@/lib/story';
 import { useFieldMarks } from './field-marks';
-import { ConfirmButton, OrderButtons, TextField, Toolbar } from './fields';
+import { ChangedMark, ConfirmButton, OrderButtons, TextField, Toolbar } from './fields';
 import { ReferenceImage } from './reference-image';
-import { fieldDomId, FieldRewrites, rewritableField } from './rewrite';
+import { fieldDomId, FieldRewrites, rewritableField, rewriteKey } from './rewrite';
 import styles from './story-editor.module.css';
 
 type TextKey = 'name' | 'appearance' | 'personality' | 'voice' | 'background' | 'secrets' | 'arcDirections';
@@ -33,6 +33,7 @@ export function CharacterCard(props: CharacterCardProps) {
 
     const linesId = fieldDomId({ target: 'character', id: character.id, field: 'exampleLines' });
     const linesFlashed = useFieldMarks(linesId).flashed;
+    const linesChanged = rewrites.highlights.has(rewriteKey({ target: 'character', id: character.id, field: 'exampleLines' }));
     const ofCharacter = (field: TextKey) => rewritableField({ target: 'character', id: character.id, field }, rewrites);
 
     const setLine = (lineIndex: number, value: string) => {
@@ -102,7 +103,7 @@ export function CharacterCard(props: CharacterCardProps) {
             />
 
             <fieldset id={linesId} className={linesFlashed ? `subsection ${styles.linesFlash}` : 'subsection'}>
-                <legend>Example lines</legend>
+                <legend>Example lines {linesChanged && <ChangedMark />}</legend>
                 <p className="hint">Optional. A few lines in their voice, in order.</p>
                 <ol className="line-list">
                     {character.exampleLines.map((line, lineIndex) => (
