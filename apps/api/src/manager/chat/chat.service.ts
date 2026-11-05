@@ -586,7 +586,7 @@ export class ChatManagerService {
             this.logger.log(`Chat ${chat.id}: left out the ${prompt.trimmed} oldest Messages to fit the prompt budget`);
         }
         if (prompt.memoriesLeftOut > 0) {
-            this.logger.warn(`Chat ${chat.id}: left out the ${prompt.memoriesLeftOut} oldest unlocked Memories to keep the Memory layer under its cap`);
+            this.logger.warn(`Chat ${chat.id}: left out ${prompt.memoriesLeftOut} unlocked Memories, the least relevant, to keep the Memory layer under its cap`);
         }
 
         const request: TextCompletionRequest = {
@@ -671,6 +671,7 @@ export class ChatManagerService {
             ...promptLayers(story, state),
             memories: promptMemories(story, memories),
             storySoFar: promptStorySoFar(chat),
+            present: inLatestExchange(story, chat, null),
         };
     }
 

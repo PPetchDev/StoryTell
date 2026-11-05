@@ -1,4 +1,5 @@
 import { CastName, ReplyPart } from '../turn/reply-parser.js';
+import { USER_PLACEHOLDER } from './render-user.js';
 
 /**
  * Which Characters were present in an exchange (spec: "which Characters were present"). The
@@ -16,6 +17,16 @@ export function charactersInExchange(cast: CastName[], userText: string, reply: 
     const spoke = new Set(reply.flatMap((part) => (part.kind === 'speech' && part.characterId !== null ? [part.characterId] : [])));
     const text = `${userText}\n${reply.map((part) => part.text).join('\n')}`.toLowerCase();
     return cast.filter((character) => spoke.has(character.id) || mentions(text, character.name));
+}
+
+/**
+ * Whether a Memory's text is about one of `names` or about the worn identity: it names them, or
+ * carries `{user}`. The API side of the Memory graph's "about", read the way this file reads names.
+ */
+export function memoryIsAbout(text: string, names: string[], identityName: string): boolean {
+    if (text.includes(USER_PLACEHOLDER)) return true;
+    const lower = text.toLowerCase();
+    return [identityName, ...names].some((name) => mentions(lower, name));
 }
 
 /** Whether `text` (lower-cased) names the Character as a whole word, by full name or first name. */
