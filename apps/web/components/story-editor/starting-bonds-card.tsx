@@ -2,32 +2,28 @@
 
 import { useState } from 'react';
 
-import { Character, RewriteRequest, Role, StartingBond } from '@/lib/story';
-import { fieldDomId } from './editor-tabs';
+import { Character, Role, StartingBond } from '@/lib/story';
 import { TextField } from './fields';
-import { rewriteKey, RewriteStates } from './rewrite';
+import { FieldRewrites, rewritableField } from './rewrite';
 import styles from './story-editor.module.css';
 
-interface BondsCardProps {
+interface StartingBondsCardProps {
     /** The Character the Bonds go from. */
     character: Character;
     index: number;
     cast: Character[];
     role: Role;
     bonds: StartingBond[];
-    rewrites: RewriteStates;
-    onRewrite(request: RewriteRequest): void;
+    rewrites: FieldRewrites;
     onAdd(toCharacterId: number | null): void;
     onText(bondId: number, field: 'label' | 'description', value: string): void;
     onRemove(bondId: number): void;
-    /** Fields the assistant changed, by their rewrite key (ticket 23). */
-    highlights?: ReadonlySet<string>;
 }
 
 const ROLE_TARGET = 'role';
 
-/** One Character's starting Bonds, on the Bonds tab: where they stand with the others at the start. */
-export function BondsCard(props: BondsCardProps) {
+/** One Character's StartingBonds, on the Bonds tab: where they stand with the others at the start. */
+export function StartingBondsCard(props: StartingBondsCardProps) {
     const { character, index, cast, role, bonds, rewrites } = props;
     const name = character.name.trim() === '' ? `Character ${index + 1}` : character.name;
     const [target, setTarget] = useState<string>(ROLE_TARGET);
@@ -46,20 +42,13 @@ export function BondsCard(props: BondsCardProps) {
     ].filter((option) => !taken.has(option.value));
     const chosen = targets.some((option) => option.value === target) ? target : (targets[0]?.value ?? '');
 
-    const rewritable = (bondId: number, field: 'label' | 'description') => {
-        const request: RewriteRequest = { target: 'startingBond', id: bondId, field };
-        return {
-            domId: fieldDomId(request),
-            rewrite: rewrites[rewriteKey(request)],
-            onRewrite: () => props.onRewrite(request),
-            highlighted: props.highlights?.has(rewriteKey(request)),
-        };
-    };
+    const rewritable = (bondId: number, field: 'label' | 'description') =>
+        rewritableField({ target: 'startingBond', id: bondId, field }, rewrites);
 
     return (
-        <section className={styles.card} aria-label={`Bonds from ${name}`}>
+        <section className={styles.card} aria-label={`Starting Bonds from ${name}`}>
             <h3 className={styles.cardTitle}>From {name}</h3>
-            {bonds.length === 0 && <p className={styles.hint}>Optional. With none, {name} starts as a stranger to everyone.</p>}
+            {bonds.length === 0 && <p className={styles.note}>Optional. With none, {name} starts as a stranger to everyone.</p>}
             {bonds.map((bond) => (
                 <div className={styles.bond} key={bond.id} role="group" aria-label={`Bond toward ${targetName(bond.toCharacterId)}`}>
                     <div className={styles.cardHeader}>

@@ -69,7 +69,7 @@ test('writes a Story by hand, sees it become playable, and the edits survive a r
 
     // Starting Bonds have a tab of their own.
     await openTab(page, 'Bonds');
-    const miraBonds = page.getByRole('region', { name: 'Bonds from Mira' });
+    const miraBonds = page.getByRole('region', { name: 'Starting Bonds from Mira' });
     await miraBonds.getByRole('button', { name: 'Add Bond' }).click();
     const bond = miraBonds.getByRole('group', { name: 'Bond toward The new keeper (the Role)' });
     await bond.getByLabel('Label').fill('wary');
@@ -111,7 +111,7 @@ test('writes a Story by hand, sees it become playable, and the edits survive a r
     await expect(reloaded.getByLabel('Example line 1', { exact: true })).toHaveValue('Go away.');
     await openTab(page, 'Bonds');
     await expect(
-        page.getByRole('region', { name: 'Bonds from Mira' }).getByRole('group', { name: /Bond toward/ }).getByLabel('Label'),
+        page.getByRole('region', { name: 'Starting Bonds from Mira' }).getByRole('group', { name: /Bond toward/ }).getByLabel('Label'),
     ).toHaveValue('wary');
     await expect(page.getByRole('region', { name: 'Playable status' })).toContainText('Playable');
 

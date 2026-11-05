@@ -2,8 +2,10 @@
 
 import { KeyboardEvent, ReactNode, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 
+import { focusChoice, movedIndex } from './arrow-keys';
 import { useFieldMarks } from './field-marks';
 import { RewriteState } from './rewrite';
+import { SparkleIcon } from './sparkle-icon';
 import styles from './fields.module.css';
 
 function classes(...names: Array<string | false | undefined>): string {
@@ -64,9 +66,7 @@ function RewriteButton({ label, busy, onRewrite }: { label: string; busy: boolea
             disabled={busy}
             onClick={onRewrite}
         >
-            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="currentColor">
-                <path d="M12 2l1.8 5.4L19 9l-5.2 1.6L12 16l-1.8-5.4L5 9l5.2-1.6L12 2zm7 12l.9 2.6 2.6.9-2.6.9L19 21l-.9-2.6-2.6-.9 2.6-.9L19 14zM5 15l.7 1.8 1.8.7-1.8.7L5 20l-.7-1.8-1.8-.7 1.8-.7L5 15z" />
-            </svg>
+            <SparkleIcon size={18} />
         </button>
     );
 }
@@ -169,8 +169,6 @@ export function TextField({
     );
 }
 
-const ARROW_STEPS: Record<string, number> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
-
 interface SegmentedFieldProps<T extends string> {
     label: string;
     value: T;
@@ -187,14 +185,14 @@ interface SegmentedFieldProps<T extends string> {
 export function SegmentedField<T extends string>({ label, value, options, onChange, hint, highlighted }: SegmentedFieldProps<T>) {
     const id = useId();
     const keys = Object.keys(options) as T[];
+    const chosen = keys.indexOf(value);
     const group = useRef<HTMLDivElement>(null);
     const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-        const step = ARROW_STEPS[event.key];
-        if (!step) return;
+        const next = movedIndex(event, chosen, keys.length);
+        if (next === null) return;
         event.preventDefault();
-        const next = (keys.indexOf(value) + step + keys.length) % keys.length;
         onChange(keys[next]);
-        group.current?.querySelectorAll<HTMLButtonElement>('[role="radio"]')[next]?.focus();
+        focusChoice(group.current, '[role="radio"]', next);
     };
     return (
         <div className={classes(styles.field, highlighted && styles.marked)}>
@@ -212,13 +210,14 @@ export function SegmentedField<T extends string>({ label, value, options, onChan
                 aria-describedby={hint ? `${id}-hint` : undefined}
                 onKeyDown={onKeyDown}
             >
-                {keys.map((key) => (
+                {keys.map((key, index) => (
                     <button
                         key={key}
                         type="button"
                         role="radio"
                         aria-checked={key === value}
-                        tabIndex={key === value ? 0 : -1}
+                        // One stop in the Tab order: the chosen segment, or the first if none is.
+                        tabIndex={index === Math.max(chosen, 0) ? 0 : -1}
                         onClick={() => onChange(key)}
                     >
                         {options[key]}

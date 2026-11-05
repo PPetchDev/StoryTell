@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { SAVE_LABELS, SaveState } from './autosave';
 import styles from './editor-header.module.css';
+import { SparkleIcon } from './sparkle-icon';
 
 interface EditorHeaderProps {
     title: string;
@@ -55,9 +56,7 @@ export function EditorHeader({ title, save, playable, missingCount, onAssistant,
                 </p>
             </div>
             <button type="button" className={styles.icon} aria-label="Assistant" title="Story assistant" onClick={onAssistant}>
-                <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="currentColor">
-                    <path d="M12 2l1.8 5.4L19 9l-5.2 1.6L12 16l-1.8-5.4L5 9l5.2-1.6L12 2zm7 12l.9 2.6 2.6.9-2.6.9L19 21l-.9-2.6-2.6-.9 2.6-.9L19 14zM5 15l.7 1.8 1.8.7-1.8.7L5 20l-.7-1.8-1.8-.7 1.8-.7L5 15z" />
-                </svg>
+                <SparkleIcon size={22} />
             </button>
             <div className={styles.playWrap}>
                 {/* aria-disabled, not disabled, so a tap or long-press can still say why. */}

@@ -76,7 +76,7 @@ test('drafts a playable Story from an idea after one failed try, then rewrites a
     await page.getByRole('tab', { name: 'Bonds' }).click();
     await expect(
         page
-            .getByRole('region', { name: 'Bonds from Mira' })
+            .getByRole('region', { name: 'Starting Bonds from Mira' })
             .getByRole('group', { name: 'Bond toward The new keeper (the Role)' })
             .getByLabel('Label'),
     ).toHaveValue('wary');

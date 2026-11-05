@@ -19,16 +19,17 @@ import {
     storyTitle,
     TENSE_LABELS,
 } from '@/lib/story';
+import { focusChoice, movedIndex } from './arrow-keys';
 import { useAutosave } from './autosave';
-import { BondsCard } from './bonds-card';
 import { CharacterCard } from './character-card';
 import { EditorHeader } from './editor-header';
-import { ADD_CHARACTER_ID, fieldDomId, neededIds, placeOf, TabKey, tabFrom, TABS, tabsWithMissing } from './editor-tabs';
+import { ADD_CHARACTER_ID, neededIds, placeOf, TabKey, tabFrom, TABS, tabsWithMissing } from './editor-tabs';
 import { FieldMarksContext } from './field-marks';
 import { ConfirmButton, SegmentedField, TextField } from './fields';
 import { OpeningPreview } from './opening-preview';
-import { rewriteKey, RewriteStates } from './rewrite';
+import { fieldDomId, FieldRewrites, rewritableField, rewriteKey, RewriteStates } from './rewrite';
 import { SceneCard } from './scene-card';
+import { StartingBondsCard } from './starting-bonds-card';
 import { StatusBox } from './status-box';
 import styles from './story-editor.module.css';
 
@@ -132,7 +133,7 @@ export function StoryEditor({ initial }: { initial: Story }) {
     };
 
     const marks = useMemo(() => ({ needed: neededIds(story.missing, story), flashed }), [story, flashed]);
-    const dotted = useMemo(() => tabsWithMissing(story.missing, story), [story]);
+    const tabsMissing = useMemo(() => tabsWithMissing(story.missing, story), [story]);
 
     const setStoryText = (field: StoryText, value: string) => {
         setStory((current) => ({ ...current, [field]: value }));
@@ -199,13 +200,8 @@ export function StoryEditor({ initial }: { initial: Story }) {
             (message) => setRewrites((current) => ({ ...current, [key]: { kind: 'error', message } })),
         );
     };
-    /** The props a text field needs to offer ✨, to be jumped to, and to show the assistant's mark. */
-    const rewritable = (request: RewriteRequest) => ({
-        domId: fieldDomId(request),
-        rewrite: rewrites[rewriteKey(request)],
-        onRewrite: () => rewrite(request),
-        highlighted: highlights.has(rewriteKey(request)),
-    });
+    const fieldRewrites: FieldRewrites = { states: rewrites, highlights, onRewrite: rewrite };
+    const rewritable = (request: RewriteRequest) => rewritableField(request, fieldRewrites);
     const styleHighlighted = (field: StyleKey) => highlights.has(rewriteKey({ target: 'story', field }));
 
     const play = () => router.push(`/stories/${storyId}/chats`);
@@ -221,14 +217,13 @@ export function StoryEditor({ initial }: { initial: Story }) {
         }
     };
 
-    /** The arrow keys move along the tab bar, as in any tab list. */
+    /** The arrow keys, Home and End move along the tab bar, as in any tab list. */
     const onTabKey = (event: KeyboardEvent<HTMLDivElement>) => {
-        const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
-        if (!step) return;
+        const index = movedIndex(event, TABS.findIndex((t) => t.key === tab), TABS.length);
+        if (index === null) return;
         event.preventDefault();
-        const index = (TABS.findIndex((t) => t.key === tab) + step + TABS.length) % TABS.length;
         selectTab(TABS[index].key);
-        tabList.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[index]?.focus();
+        focusChoice(tabList.current, '[role="tab"]', index);
     };
 
     return (
@@ -253,12 +248,12 @@ export function StoryEditor({ initial }: { initial: Story }) {
                             aria-controls="editor-panel"
                             tabIndex={tab === t.key ? 0 : -1}
                             // The dot is said in words too, for a screen reader.
-                            aria-label={dotted.has(t.key) ? `${t.label}, has missing fields` : undefined}
+                            aria-label={tabsMissing.has(t.key) ? `${t.label}, has missing fields` : undefined}
                             className={styles.tab}
                             onClick={() => selectTab(t.key)}
                         >
                             {t.label}
-                            {dotted.has(t.key) && <span className={styles.dot} aria-hidden="true" />}
+                            {tabsMissing.has(t.key) && <span className={styles.dot} aria-hidden="true" />}
                         </button>
                     ))}
                 </div>
@@ -387,9 +382,7 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                     commit={(run, onError) => commit(run, applyWhole, onError)}
                                     index={index}
                                     count={story.characters.length}
-                                    rewrites={rewrites}
-                                    highlights={highlights}
-                                    onRewrite={rewrite}
+                                    rewrites={fieldRewrites}
                                     onText={(field, value) => setCharacterField(character.id, field, value)}
                                     onExampleLines={(lines) => setCharacterField(character.id, 'exampleLines', lines)}
                                     onMove={(direction) =>
@@ -404,7 +397,7 @@ export function StoryEditor({ initial }: { initial: Story }) {
                             <button
                                 type="button"
                                 id={ADD_CHARACTER_ID}
-                                className={styles.add}
+                                className={flashed === ADD_CHARACTER_ID ? `${styles.add} ${styles.flash}` : styles.add}
                                 disabled={story.characters.length >= MAX_CHARACTERS}
                                 onClick={() => void commit(() => storyApi.addCharacter(storyId), applyWhole)}
                             >
@@ -423,16 +416,14 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                 <p className={styles.note}>Add a Character first, on the Characters tab.</p>
                             )}
                             {story.characters.map((character, index) => (
-                                <BondsCard
+                                <StartingBondsCard
                                     key={character.id}
                                     character={character}
                                     index={index}
                                     cast={story.characters}
                                     role={story.role}
                                     bonds={story.startingBonds.filter((bond) => bond.fromCharacterId === character.id)}
-                                    rewrites={rewrites}
-                                    highlights={highlights}
-                                    onRewrite={rewrite}
+                                    rewrites={fieldRewrites}
                                     onAdd={(toCharacterId) =>
                                         void commit(
                                             () => storyApi.addStartingBond(storyId, { fromCharacterId: character.id, toCharacterId }),
@@ -457,9 +448,7 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                     scene={scene}
                                     index={index}
                                     count={story.scenes.length}
-                                    rewrites={rewrites}
-                                    highlights={highlights}
-                                    onRewrite={rewrite}
+                                    rewrites={fieldRewrites}
                                     onText={(field, value) => setSceneText(scene.id, field, value)}
                                     onMove={(direction) =>
                                         void commit(() => storyApi.reorderScenes(storyId, moved(story.scenes, scene.id, direction)), applyWhole)

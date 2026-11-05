@@ -1,7 +1,7 @@
 .box {
     margin: 0 0 0.75rem;
-    background: #3a2a12;
-    border: 1px solid #8a6326;
+    background: var(--warning-surface);
+    border: 1px solid var(--warning-line);
     border-radius: 0.9rem;
 }
 

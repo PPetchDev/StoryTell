@@ -1,10 +1,9 @@
 'use client';
 
-import { Character, characterRemovalWarning, RewriteRequest, Story } from '@/lib/story';
-import { fieldDomId } from './editor-tabs';
+import { Character, characterRemovalWarning, Story } from '@/lib/story';
 import { ConfirmButton, OrderButtons, TextField, Toolbar } from './fields';
 import { ReferenceImage } from './reference-image';
-import { rewriteKey, RewriteStates } from './rewrite';
+import { FieldRewrites, rewritableField } from './rewrite';
 import styles from './story-editor.module.css';
 
 type TextKey = 'name' | 'appearance' | 'personality' | 'voice' | 'background' | 'secrets' | 'arcDirections';
@@ -16,8 +15,7 @@ interface CharacterCardProps {
     imageStyle: string;
     index: number;
     count: number;
-    rewrites: RewriteStates;
-    onRewrite(request: RewriteRequest): void;
+    rewrites: FieldRewrites;
     onText(field: TextKey, value: string): void;
     onExampleLines(lines: string[]): void;
     onMove(direction: -1 | 1): void;
@@ -25,8 +23,6 @@ interface CharacterCardProps {
     /** For the Reference image: send pending edits, and run a whole-Story write after them. */
     flush(): Promise<void>;
     commit(run: () => Promise<Story>, onError: (message: string) => void): Promise<Story | undefined>;
-    /** Fields the assistant changed, by their rewrite key (ticket 23). */
-    highlights?: ReadonlySet<string>;
 }
 
 /** One Character on the Characters tab. Their starting Bonds are on the Bonds tab. */
@@ -34,16 +30,7 @@ export function CharacterCard(props: CharacterCardProps) {
     const { character, index, count, rewrites } = props;
     const heading = character.name.trim() === '' ? `Character ${index + 1}` : character.name;
 
-    /** The props a text field of this Character needs to offer ✨ and to be jumped to. */
-    const ofCharacter = (field: TextKey) => {
-        const request: RewriteRequest = { target: 'character', id: character.id, field };
-        return {
-            domId: fieldDomId(request),
-            rewrite: rewrites[rewriteKey(request)],
-            onRewrite: () => props.onRewrite(request),
-            highlighted: props.highlights?.has(rewriteKey(request)),
-        };
-    };
+    const ofCharacter = (field: TextKey) => rewritableField({ target: 'character', id: character.id, field }, rewrites);
 
     const setLine = (lineIndex: number, value: string) => {
         const lines = [...character.exampleLines];

@@ -1,9 +1,8 @@
 'use client';
 
-import { RewriteRequest, Scene, SCENE_REMOVAL_WARNING } from '@/lib/story';
-import { fieldDomId } from './editor-tabs';
+import { Scene, SCENE_REMOVAL_WARNING } from '@/lib/story';
 import { ConfirmButton, OrderButtons, TextField, Toolbar } from './fields';
-import { rewriteKey, RewriteStates } from './rewrite';
+import { FieldRewrites, rewritableField } from './rewrite';
 import styles from './story-editor.module.css';
 
 type TextKey = 'name' | 'situation' | 'moveOnCondition';
@@ -12,28 +11,16 @@ interface SceneCardProps {
     scene: Scene;
     index: number;
     count: number;
-    rewrites: RewriteStates;
-    onRewrite(request: RewriteRequest): void;
+    rewrites: FieldRewrites;
     onText(field: TextKey, value: string): void;
     onMove(direction: -1 | 1): void;
     onRemove(): void;
-    /** Fields the assistant changed, by their rewrite key (ticket 23). */
-    highlights?: ReadonlySet<string>;
 }
 
-export function SceneCard({ scene, index, count, rewrites, onRewrite, onText, onMove, onRemove, highlights }: SceneCardProps) {
+export function SceneCard({ scene, index, count, rewrites, onText, onMove, onRemove }: SceneCardProps) {
     const heading = scene.name.trim() === '' ? `Scene ${index + 1}` : scene.name;
     const last = index === count - 1;
-    const rewritable = (field: TextKey) => {
-        const request: RewriteRequest = { target: 'scene', id: scene.id, field };
-        const key = rewriteKey(request);
-        return {
-            domId: fieldDomId(request),
-            rewrite: rewrites[key],
-            onRewrite: () => onRewrite(request),
-            highlighted: highlights?.has(key),
-        };
-    };
+    const rewritable = (field: TextKey) => rewritableField({ target: 'scene', id: scene.id, field }, rewrites);
     return (
         <section className={styles.card} aria-label={`Scene ${index + 1}`}>
             <div className={styles.cardHeader}>

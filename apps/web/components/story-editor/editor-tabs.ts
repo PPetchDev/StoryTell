@@ -1,5 +1,5 @@
-import { MissingField, RewriteRequest, Story } from '@/lib/story';
-import { rewriteKey } from './rewrite';
+import { MissingField, Story } from '@/lib/story';
+import { fieldDomId } from './rewrite';
 
 /** The editor's sections, one tab panel at a time (spec: "Story editor", Tabs). */
 export const TABS = [
@@ -16,11 +16,6 @@ export type TabKey = (typeof TABS)[number]['key'];
 /** The tab named by the URL's `?tab=`; anything else is the Story tab. */
 export function tabFrom(value: string | null): TabKey {
     return TABS.find((tab) => tab.key === value)?.key ?? 'story';
-}
-
-/** The DOM id of a field's input, by the field's rewrite key, so a link can focus it. */
-export function fieldDomId(request: RewriteRequest): string {
-    return `field-${rewriteKey(request)}`;
 }
 
 /** Where "Add Character" is, the target of the "At least one Character" item. */

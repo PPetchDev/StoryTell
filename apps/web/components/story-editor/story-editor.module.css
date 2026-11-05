@@ -82,8 +82,7 @@
     overflow-wrap: anywhere;
 }
 
-.note,
-.hint {
+.note {
     margin: 0 0 0.75rem;
     font-size: 0.875rem;
     color: var(--muted);
@@ -117,6 +116,14 @@
 
 .add:focus-visible {
     outline: 2px solid var(--accent);
+}
+
+/* Add Character, just jumped to from "At least one Character". */
+.add.flash {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 6px var(--accent-line);
+    background: var(--accent-soft);
+    color: var(--text);
 }
 
 .add:disabled {

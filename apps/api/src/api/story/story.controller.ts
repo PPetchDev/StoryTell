@@ -57,7 +57,7 @@ export class StoryApiController {
 
     @Get(':storyId/opening')
     @ApiOkResponse({ type: OpeningPreviewResponseBodyDTO })
-    async opening(@Id('storyId') storyId: number): Promise<OpeningPreviewResponseBodyDTO> {
+    async openingPreview(@Id('storyId') storyId: number): Promise<OpeningPreviewResponseBodyDTO> {
         return { parts: await this.storyManager.openingParts(storyId) };
     }
 

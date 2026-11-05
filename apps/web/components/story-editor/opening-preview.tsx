@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { MessageBody } from '@/components/chat/message-body';
 import { useConnection } from '@/components/connection';
@@ -35,14 +35,18 @@ function asMessage(parts: MessagePart[]): AiMessage {
 export function OpeningPreview({ storyId, cast, playable, flush, onPlay, onClose }: OpeningPreviewProps) {
     const { reportUnreachable } = useConnection();
     const [preview, setPreview] = useState<Preview>({ kind: 'loading' });
+    /** Counts loads; only the latest one's answer is shown, and none after the sheet closes. */
+    const latest = useRef(0);
 
     const load = useCallback(async () => {
+        const attempt = ++latest.current;
         setPreview({ kind: 'loading' });
         try {
             await flush();
             const { parts } = await storyApi.opening(storyId);
-            setPreview({ kind: 'ready', parts });
+            if (attempt === latest.current) setPreview({ kind: 'ready', parts });
         } catch (error) {
+            if (attempt !== latest.current) return;
             if (error instanceof ApiUnreachableError) reportUnreachable();
             else setPreview({ kind: 'error', message: error instanceof ApiError ? error.message : 'Something went wrong.' });
         }
@@ -50,6 +54,9 @@ export function OpeningPreview({ storyId, cast, playable, flush, onPlay, onClose
 
     useEffect(() => {
         void load();
+        return () => {
+            latest.current += 1;
+        };
     }, [load]);
 
     return (

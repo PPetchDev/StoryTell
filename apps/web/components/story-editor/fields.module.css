@@ -38,7 +38,7 @@
     font-size: 0.75rem;
     font-weight: 600;
     color: var(--warning);
-    background: rgba(255, 180, 84, 0.14);
+    background: var(--warning-soft);
     border-radius: 999px;
     padding: 0.05rem 0.5rem;
 }
@@ -116,7 +116,7 @@ textarea.input {
 }
 
 .needed .input {
-    border-color: #8a6326;
+    border-color: var(--warning-line);
     border-style: dashed;
 }
 
