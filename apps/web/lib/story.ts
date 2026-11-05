@@ -62,7 +62,7 @@ export interface Character {
     background: string;
     secrets: string;
     arcDirections: string;
-    /** Relative path of the Reference image (ticket 30); null while there is none. In play only its Portrait shows. */
+    /** Relative path of the Reference image (ticket 30); null while there is none. In play its Portrait shows, and the whole image only in the Character profile. */
     referenceImagePath: string | null;
     /** The square of the Reference image shown beside their lines in a Chat; null while none is chosen. */
     portraitCrop: PortraitCrop | null;

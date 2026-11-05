@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { use } from 'react';
 
+import { CharacterProfiles } from '@/components/chat/character-profile';
 import { ChatScreen } from '@/components/chat/chat-screen';
 import { useApiQuery } from '@/components/connection';
 import { portraitsOf } from '@/lib/character-colour';
@@ -36,5 +37,11 @@ export default function ChatPage({ params }: { params: Promise<{ id: string; cha
     const portraits = story.status === 'ready' ? portraitsOf(story.data.characters) : {};
     // The Scenes give the Scene strip each Scene's goal; without them it shows the name alone.
     const scenes = story.status === 'ready' ? story.data.scenes : [];
-    return <ChatScreen initial={chat.data} cast={cast} portraits={portraits} scenes={scenes} />;
+    // A tap on a Character's Portrait opens their profile; without the Story there are none to open.
+    const characters = story.status === 'ready' ? story.data.characters : [];
+    return (
+        <CharacterProfiles characters={characters}>
+            <ChatScreen initial={chat.data} cast={cast} portraits={portraits} scenes={scenes} />
+        </CharacterProfiles>
+    );
 }
