@@ -312,6 +312,9 @@ The user plays Ash (refer to them as "user").
 # Current Scene
 Arrival. Move-on condition: Mira lets Ash up the stairs.
 
+# Time of day
+not yet known
+
 # Recent story (context)
 ${OPENING}
 

@@ -1,6 +1,8 @@
 import { Pov, ReplyLength, Tense } from '../../../model/story/entities/story.entity.js';
+import type { TimeOfDay } from '../../../model/chat/entities/chat.entity.js';
 import { PromptMessage } from '../../../service/model-gateway/model-gateway.js';
 import { MEMORY_CAP_TOKENS, memoryLine } from '../memory/memory-prompt.js';
+import { memoryIsAbout } from '../memory/present.js';
 import { renderUser } from '../memory/render-user.js';
 
 /**
@@ -104,9 +106,14 @@ export interface TurnPromptInput {
     userText: string | null;
     /** Total prompt budget in tokens; recent Messages are trimmed from the oldest to fit. */
     tokenBudget?: number;
-    /** The Characters in the latest exchange, named in the reminder near the end; left out, the reminder names none. */
+    /**
+     * The Characters in the latest exchange, named in the reminder near the end; left out, the
+     * reminder names none. Past the Memory cap, Memories about them are kept before others.
+     */
     present?: string[];
-    /** The Memory layer's cap in tokens (spec: "about 2k tokens"); the oldest unlocked Memories are left out past it. */
+    /** The Chat's Time of day, stated in the reminder near the end; null or left out while there is none. */
+    timeOfDay?: TimeOfDay | null;
+    /** The Memory layer's cap in tokens (spec: "about 2k tokens"); past it, Memories are left out in `memoryLeaveOutOrder`. */
     memoryCapTokens?: number;
 }
 
@@ -116,7 +123,7 @@ export interface TurnPrompt {
     maxTokens: number;
     /** How many of the oldest history Messages were left out to fit the budget. */
     trimmed: number;
-    /** How many of the oldest unlocked Memories were left out to keep the Memory layer under its cap. */
+    /** How many unlocked Memories were left out to keep the Memory layer under its cap. */
     memoriesLeftOut: number;
 }
 
@@ -237,19 +244,26 @@ function arcsLayer(arcs: PromptArc[]): string {
  * Spec: "Memory block": every non-archived Memory with its Known-by tags, under the
  * instruction that a Character knows only the Memories it is tagged on while the Narrator
  * knows all. `{user}` is rendered as the worn identity's name. Extraction keeps the list
- * under the cap by merging and archiving; should it fall behind, the oldest unlocked
- * Memories are left out here so the prompt stays bounded, and the caller logs how many.
+ * under the cap by merging and archiving; should it fall behind, Memories are left out here
+ * in `memoryLeaveOutOrder` so the prompt stays bounded, and the caller logs how many.
  */
-function memoryLayer(memories: PromptMemory[], identity: string, cap: number): { text: string; leftOut: number } {
-    const fits = (kept: PromptMemory[]) => estimateTokens(kept.map((memory) => memoryLine(memory)).join('\n')) <= cap;
-    const kept = [...memories];
-    let leftOut = 0;
-    while (!fits(kept)) {
-        const oldestUnlocked = kept.findIndex((memory) => !memory.locked);
-        if (oldestUnlocked < 0) break;
-        kept.splice(oldestUnlocked, 1);
-        leftOut++;
+function memoryLayer(
+    memories: PromptMemory[],
+    identity: string,
+    present: string[],
+    cap: number,
+): { text: string; leftOut: number } {
+    const fits = (memoryList: PromptMemory[]) => estimateTokens(memoryList.map((memory) => memoryLine(memory)).join('\n')) <= cap;
+    const leftOutIndexes = new Set<number>();
+    const keptNow = () => memories.filter((_, index) => !leftOutIndexes.has(index));
+    if (!fits(memories)) {
+        for (const index of memoryLeaveOutOrder(memories, present, identity)) {
+            leftOutIndexes.add(index);
+            if (fits(keptNow())) break;
+        }
     }
+    const kept = keptNow();
+    const leftOut = leftOutIndexes.size;
     const lines =
         kept.length === 0
             ? ['Nothing has been established in this Chat yet.']
@@ -260,6 +274,17 @@ ${lines.join('\n')}
 A Character knows only the Memories it is tagged on and acts as if the rest never happened; the Narrator knows them all.`,
         leftOut,
     };
+}
+
+/**
+ * The order in which Memories are left out once the Memory layer is over its cap, as indexes
+ * into `memories` (oldest first). A locked Memory is never left out. Memories about a Character
+ * in the latest exchange or about the worn identity go last; within each group, oldest first.
+ */
+export function memoryLeaveOutOrder(memories: PromptMemory[], present: string[], identity: string): number[] {
+    const unlocked = memories.flatMap((memory, index) => (memory.locked ? [] : [index]));
+    const relevant = (index: number) => memoryIsAbout(memories[index].text, present, identity);
+    return [...unlocked.filter((index) => !relevant(index)), ...unlocked.filter(relevant)];
 }
 
 /** Spec: "Prompt layer": the Story so far stands in for the Messages it covers, which the history then leaves out. */
@@ -298,7 +323,7 @@ export type PromptLayersInput = Omit<TurnPromptInput, 'history' | 'userText' | '
 export function systemPrompt(input: PromptLayersInput): { text: string; memoriesLeftOut: number } {
     const identity = input.identity.name;
     const castNames = input.story.characters.map((character) => character.name);
-    const memory = memoryLayer(input.memories, identity, input.memoryCapTokens ?? MEMORY_CAP_TOKENS);
+    const memory = memoryLayer(input.memories, identity, input.present ?? [], input.memoryCapTokens ?? MEMORY_CAP_TOKENS);
     const text = [
         rulesLayer(identity, castNames),
         `${PROMPT_LAYERS.setting}\n${input.story.setting}`,
@@ -339,11 +364,13 @@ export function turnFinalInstruction(identity: string): string {
 
 /**
  * A short restatement of where things stand, read last, just before the final instruction:
- * the Scene, who was in the latest exchange, and the point of view. Instructions far up a long
- * prompt fade (docs/research/keeping-characters-in-character.md); this keeps the essentials close.
+ * the Scene, the Time of day, who was in the latest exchange, and the point of view. Instructions
+ * far up a long prompt fade (docs/research/keeping-characters-in-character.md); this keeps the
+ * essentials close.
  */
-export function stateReminder(input: Pick<TurnPromptInput, 'story' | 'identity' | 'scene' | 'present'>): string {
+export function stateReminder(input: Pick<TurnPromptInput, 'story' | 'identity' | 'scene' | 'present' | 'timeOfDay'>): string {
     const lines = [input.scene ? `Scene: ${input.scene.name}.` : 'No Scene: the story unfolds freely.'];
+    if (input.timeOfDay) lines.push(`Time: ${input.timeOfDay}.`);
     if (input.present && input.present.length > 0) lines.push(`In the latest exchange: ${input.present.join(', ')}.`);
     lines.push(`Narrate in ${povAndTense(input.story, input.identity.name)}, and keep each Character as their card describes.`);
     lines.push(`Gender ${input.identity.name} only as their description or the user's own messages do, whatever earlier turns said.`);

@@ -2,7 +2,7 @@
 
 import { useId } from 'react';
 
-import { Chat } from '@/lib/chat';
+import { Chat, TimeOfDay } from '@/lib/chat';
 import { Scene } from '@/lib/story';
 
 import styles from './scene-strip.module.css';
@@ -10,19 +10,32 @@ import styles from './scene-strip.module.css';
 interface SceneStripProps {
     /** The Chat's current Scene; null in free play. */
     current: Chat['currentScene'];
+    /** The Chat's Time of day; null while the story has not made one clear. */
+    timeOfDay: TimeOfDay | null;
     /** The Story's Scenes, which hold each one's goal; empty while the Story can't be read. */
     scenes: Scene[];
     onHide(): void;
 }
 
+const TIME_OF_DAY: Record<TimeOfDay, { icon: string; label: string }> = {
+    dawn: { icon: '🌅', label: 'Dawn' },
+    morning: { icon: '🌤️', label: 'Morning' },
+    noon: { icon: '☀️', label: 'Noon' },
+    afternoon: { icon: '🌇', label: 'Afternoon' },
+    evening: { icon: '🌆', label: 'Evening' },
+    night: { icon: '🌙', label: 'Night' },
+};
+
 /**
- * A thin strip under the top bar (spec: "Scene strip"): the current Scene's name and its goal
- * (the Scene's situation), or "Free play". The Chat re-reads until each turn's background calls
- * settle, so a Scene the judge moved on to shows then. A tap hides it; ⋯ brings it back.
+ * A thin strip under the top bar (spec: "Scene strip"): the current Scene's name, the Time of day
+ * once there is one (spec: "Story clock"), and the Scene's goal (its situation), or "Free play".
+ * The Chat re-reads until each turn's background calls settle, so a Scene or time the judge moved
+ * on to shows then. A tap hides it; ⋯ brings it back.
  */
-export function SceneStrip({ current, scenes, onHide }: SceneStripProps) {
+export function SceneStrip({ current, timeOfDay, scenes, onHide }: SceneStripProps) {
     const hintId = useId();
     const goal = current ? (scenes.find((scene) => scene.id === current.id)?.situation ?? '') : '';
+    const time = timeOfDay ? TIME_OF_DAY[timeOfDay] : null;
     return (
         <button type="button" className={styles.strip} aria-describedby={hintId} onClick={onHide}>
             <span className={styles.name}>
@@ -30,6 +43,13 @@ export function SceneStrip({ current, scenes, onHide }: SceneStripProps) {
                 <span aria-hidden="true">📍 </span>
                 {current ? current.name : 'Free play'}
             </span>
+            {time && (
+                <span className={styles.time}>
+                    <span className="visually-hidden">Time: </span>
+                    <span aria-hidden="true">{time.icon} </span>
+                    {time.label}
+                </span>
+            )}
             {goal !== '' && (
                 <span className={styles.goal}>
                     <span className="visually-hidden">Goal: </span>

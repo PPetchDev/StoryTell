@@ -551,6 +551,25 @@ A Character knows only the Memories it is tagged on`);
             // The extraction still sees the whole list, so it can merge and archive it down.
             expect(lastCall('memory_extraction').messages[1].content).toContain(`${line} (0)`);
         });
+
+        it('past the cap keeps an old Memory about a Character in the latest exchange, in the turn and the Suggested replies', async () => {
+            const story = await createStory();
+            const chat = await createChat(story.id);
+            const line = 'A crate of candles sits in the store room under the stairs, unopened since the spring storms came through.';
+            const needed = Math.ceil((MEMORY_CAP_TOKENS * 4) / (line.length + 20)) + 1;
+            await play(story.id, chat.id, 'One.', 'Reply one.', extraction([add('Kai buried a tin box by the well.')]));
+            await play(story.id, chat.id, 'Two.', 'Reply two.', extraction(Array.from({ length: needed }, (_, i) => add(`${line} (${i})`))));
+
+            await play(story.id, chat.id, 'Kai, come here.', '@Kai: Coming!');
+            expect(systemPrompt(lastCall('turn'))).toContain('Kai buried a tin box by the well.');
+            expect(systemPrompt(lastCall('turn'))).not.toContain(`${line} (0)`);
+            expect(systemPrompt(lastCall('turn'))).toContain(`${line} (${needed - 1})`);
+
+            t.gateway.scriptText('suggested_replies', '{"action":"I wave.","speech":"Hello.","move":"I run."}');
+            await t.http.post(`/api/stories/${story.id}/chats/${chat.id}/suggestions`).expect(200);
+            const suggestions = t.gateway.textCalls('suggested_replies');
+            expect(suggestions[suggestions.length - 1].messages[0].content).toContain('Kai buried a tin box by the well.');
+        });
     });
 
     describe('reset', () => {

@@ -318,6 +318,7 @@ export function ChatScreen({ initial, cast, portraits, scenes }: ChatScreenProps
             {!stripHidden && (
                 <SceneStrip
                     current={chat.currentScene}
+                    timeOfDay={chat.timeOfDay}
                     scenes={scenes}
                     onHide={() => setSceneStripHidden(true)}
                 />

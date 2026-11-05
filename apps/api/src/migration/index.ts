@@ -11,6 +11,7 @@ import { PortraitCrop1763500000000 } from './1763500000000-PortraitCrop.js';
 import { StoryCover1763600000000 } from './1763600000000-StoryCover.js';
 import { StorySoFar1763700000000 } from './1763700000000-StorySoFar.js';
 import { ReplyVersions1763810000000 } from './1763810000000-ReplyVersions.js';
+import { TimeOfDay1763850000000 } from './1763850000000-TimeOfDay.js';
 
 // Listed by hand, oldest first, so migrations load the same way from compiled JS, the
 // TypeORM CLI and Vitest. Add every new migration here.
@@ -28,4 +29,5 @@ export const migrations = [
     StoryCover1763600000000,
     StorySoFar1763700000000,
     ReplyVersions1763810000000,
+    TimeOfDay1763850000000,
 ];
