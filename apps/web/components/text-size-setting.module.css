@@ -39,7 +39,6 @@
 
 .sample {
     margin: 0.75rem 0 0;
-    font-family: var(--font-book), Georgia, 'Times New Roman', serif;
     font-size: var(--story-size);
-    line-height: 1.7;
+    line-height: 1.5;
 }

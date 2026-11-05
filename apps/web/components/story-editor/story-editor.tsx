@@ -8,6 +8,7 @@ import { useConnection } from '@/components/connection';
 import { StoryAssistantSheet } from '@/components/story-assistant/story-assistant-sheet';
 import { fieldOf, useStoryAssistant } from '@/components/story-assistant/use-story-assistant';
 import { ApiUnreachableError } from '@/lib/api';
+import { portraitsOf } from '@/lib/character-colour';
 import { AppliedChange } from '@/lib/story-assistant';
 import {
     MAX_CHARACTERS,
@@ -545,6 +546,7 @@ export function StoryEditor({ initial }: { initial: Story }) {
                 <OpeningPreview
                     storyId={storyId}
                     cast={story.characters.map((character) => character.id)}
+                    portraits={portraitsOf(story.characters)}
                     playable={story.playable}
                     flush={flush}
                     onPlay={play}

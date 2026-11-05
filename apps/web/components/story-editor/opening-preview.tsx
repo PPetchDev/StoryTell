@@ -6,7 +6,7 @@ import { MessageBody } from '@/components/chat/message-body';
 import { useConnection } from '@/components/connection';
 import { Sheet } from '@/components/sheet/sheet';
 import { ApiError, ApiUnreachableError } from '@/lib/api';
-import { Cast } from '@/lib/character-colour';
+import { Cast, Portraits } from '@/lib/character-colour';
 import { AiMessage, MessagePart } from '@/lib/chat';
 import { storyApi } from '@/lib/story';
 import styles from './opening-preview.module.css';
@@ -16,6 +16,7 @@ type Preview = { kind: 'loading' } | { kind: 'error'; message: string } | { kind
 interface OpeningPreviewProps {
     storyId: number;
     cast: Cast;
+    portraits: Portraits;
     playable: boolean;
     /** Sends the author's pending edits first, so the preview shows what they just typed. */
     flush(): Promise<void>;
@@ -32,7 +33,7 @@ function asMessage(parts: MessagePart[]): AiMessage {
  * The Opening preview (spec: "Story editor", Opening preview): the stored Opening, split by the
  * Chat's parser on the API and drawn by the Chat's Message rendering, plus Play.
  */
-export function OpeningPreview({ storyId, cast, playable, flush, onPlay, onClose }: OpeningPreviewProps) {
+export function OpeningPreview({ storyId, cast, portraits, playable, flush, onPlay, onClose }: OpeningPreviewProps) {
     const { reportUnreachable } = useConnection();
     const [preview, setPreview] = useState<Preview>({ kind: 'loading' });
     /** Counts loads; only the latest one's answer is shown, and none after the sheet closes. */
@@ -76,7 +77,7 @@ export function OpeningPreview({ storyId, cast, playable, flush, onPlay, onClose
                     <p className="muted">The Opening is empty. Write it on the Story tab.</p>
                 ) : (
                     <div className={styles.thread}>
-                        <MessageBody message={asMessage(preview.parts)} cast={cast} />
+                        <MessageBody message={asMessage(preview.parts)} cast={cast} portraits={portraits} />
                     </div>
                 ))}
             {!playable && <p className={styles.waiting}>Fill in the missing fields to play.</p>}

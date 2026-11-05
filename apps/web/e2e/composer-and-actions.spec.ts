@@ -175,3 +175,31 @@ test.describe('on a physical keyboard', () => {
         }
     });
 });
+
+test('* opens an action pair at the caret, wraps a selection, and the sent line shows it in italics', async ({ page, request }) => {
+    const { storyId, chatId } = await createPlayedChat(request, []);
+    await scriptTurns(request, ['@Mira: Sit, then.']);
+    try {
+        await page.goto(`/stories/${storyId}/chats/${chatId}`);
+        const box = page.getByRole('textbox', { name: 'Write as Ash' });
+        const action = page.getByRole('button', { name: 'Write an action' });
+
+        // Nothing selected: an empty pair, with the caret inside it.
+        await box.fill('');
+        await action.click();
+        await box.pressSequentially('nods');
+        await expect(box).toHaveValue('*nods*');
+
+        // A selection: wrapped, with the caret after it.
+        await box.fill('I sit down. Thanks.');
+        await box.evaluate((element: HTMLTextAreaElement) => element.setSelectionRange(0, 11));
+        await action.click();
+        await expect(box).toHaveValue('*I sit down.* Thanks.');
+
+        await page.getByRole('button', { name: 'Send' }).click();
+        const line = page.getByRole('article', { name: 'Ash said' });
+        await expect(line.locator('em')).toHaveText('I sit down.');
+    } finally {
+        await request.delete(`/api/stories/${storyId}`);
+    }
+});

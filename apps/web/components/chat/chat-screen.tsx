@@ -11,7 +11,7 @@ import { SnapshotSheet } from '@/components/chat/snapshot-sheet';
 import { SnapshotViewer, useChatSnapshots } from '@/components/chat/snapshots';
 import { useConnection } from '@/components/connection';
 import { ApiError, apiFetch, ApiUnreachableError } from '@/lib/api';
-import { Cast } from '@/lib/character-colour';
+import { Cast, Portraits } from '@/lib/character-colour';
 import { backgroundPending, Chat, chatApi, EditedChat, latestReply, Message, rollbackNotice } from '@/lib/chat';
 import { Memory, memoryApi, renderUser } from '@/lib/memory';
 import { setSceneStripHidden, useSceneStripHidden } from '@/lib/scene-strip';
@@ -43,11 +43,13 @@ const BACKGROUND_POLL_MS = 1_000;
 interface ChatScreenProps {
     initial: Chat;
     cast: Cast;
+    /** The cast's Reference images, beside their lines. */
+    portraits: Portraits;
     /** The Story's Scenes, for the goals in the Scene strip; empty if the Story can't be read. */
     scenes: Scene[];
 }
 
-export function ChatScreen({ initial, cast, scenes }: ChatScreenProps) {
+export function ChatScreen({ initial, cast, portraits, scenes }: ChatScreenProps) {
     const { reportUnreachable } = useConnection();
     const [chat, setChat] = useState(initial);
     const [draft, setDraft] = useState('');
@@ -302,6 +304,7 @@ export function ChatScreen({ initial, cast, scenes }: ChatScreenProps) {
             <ChatThread
                 messages={chat.messages}
                 cast={cast}
+                portraits={portraits}
                 pending={pending}
                 writing={writing}
                 editing={editing}

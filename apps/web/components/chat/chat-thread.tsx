@@ -5,7 +5,7 @@ import { CSSProperties, KeyboardEvent, MouseEvent, ReactNode, useEffect, useLayo
 import { MessageBody, UserLine } from '@/components/chat/message-body';
 import { MessageSnapshots } from '@/components/chat/snapshots';
 import { ConfirmButton } from '@/components/story-editor/fields';
-import { Cast } from '@/lib/character-colour';
+import { Cast, Portraits } from '@/lib/character-colour';
 import { isOpening, Message, messageText } from '@/lib/chat';
 import { ChatSnapshots, Snapshot, SnapshotJob } from '@/lib/snapshot';
 import { STORY_TEXT_SIZE, useTextSize } from '@/lib/text-size';
@@ -122,6 +122,7 @@ function ActionRow({ onAgain, onEdit, onSnapshot }: ActionRowProps) {
 interface MessageViewProps {
     message: Message;
     cast: Cast;
+    portraits: Portraits;
     later: number;
     editing: boolean;
     /** What shows under the Message: its Edit once tapped, or the action row. */
@@ -134,7 +135,7 @@ interface MessageViewProps {
     onCancel(): void;
 }
 
-function MessageView({ message, cast, later, editing, tools, snapshots, onTap, onSave, onCancel }: MessageViewProps) {
+function MessageView({ message, cast, portraits, later, editing, tools, snapshots, onTap, onSave, onCancel }: MessageViewProps) {
     const tap = (event: MouseEvent<HTMLElement>) => {
         // A drag that selects text is reading, not a tap.
         const selecting = (window.getSelection()?.toString() ?? '') !== '';
@@ -159,7 +160,7 @@ function MessageView({ message, cast, later, editing, tools, snapshots, onTap, o
             {editing ? (
                 <EditForm message={message} later={later} onSave={onSave} onCancel={onCancel} />
             ) : (
-                <MessageBody message={message} cast={cast} />
+                <MessageBody message={message} cast={cast} portraits={portraits} />
             )}
             {snapshots}
             {!editing && tools}
@@ -257,6 +258,8 @@ export interface PendingLine {
 interface ChatThreadProps {
     messages: Message[];
     cast: Cast;
+    /** The cast's Reference images, beside their lines. */
+    portraits: Portraits;
     pending: PendingLine | null;
     /** A turn is being written: the indicator shows where the reply will appear. */
     writing: boolean;
@@ -285,6 +288,7 @@ interface ChatThreadProps {
 export function ChatThread({
     messages,
     cast,
+    portraits,
     pending,
     writing,
     editing,
@@ -347,6 +351,7 @@ export function ChatThread({
                             key={message.id}
                             message={message}
                             cast={cast}
+                            portraits={portraits}
                             later={shown.length - index - 1}
                             editing={editing === message.id}
                             tools={tools}

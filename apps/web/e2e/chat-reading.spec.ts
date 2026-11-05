@@ -117,13 +117,13 @@ test('after Send the composer is empty and the line shows before the reply, whic
     }
 });
 
-/** The colour of a speech line's bar and of its stamped name, which must match. */
+/** The colour of a speech line's stamped name and of its initial's circle, which must match. */
 async function speakerColour(speech: Locator): Promise<string> {
     await expect(speech).toBeVisible();
-    const bar = await speech.evaluate((element) => getComputedStyle(element).borderLeftColor);
+    const avatar = await speech.locator('span[aria-hidden="true"]').first().evaluate((element) => getComputedStyle(element).backgroundColor);
     const name = await speech.locator('p').first().evaluate((element) => getComputedStyle(element).color);
-    expect(name).toBe(bar);
-    return bar;
+    expect(name).toBe(avatar);
+    return name;
 }
 
 test("each Character's speech has its own colour, the same in every Chat of the Story", async ({ page, request }) => {

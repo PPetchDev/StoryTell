@@ -2,7 +2,6 @@
 
 import { CSSProperties, useId } from 'react';
 
-import { bookFace } from '@/lib/book-face';
 import { setTextSize, STORY_TEXT_SIZE, TEXT_SIZES, useTextSize } from '@/lib/text-size';
 
 import styles from './text-size-setting.module.css';
@@ -30,7 +29,7 @@ export function TextSizeSetting() {
                     </label>
                 ))}
             </div>
-            <p className={`${styles.sample} ${bookFace.variable}`} style={{ '--story-size': STORY_TEXT_SIZE[size] } as CSSProperties}>
+            <p className={styles.sample} style={{ '--story-size': STORY_TEXT_SIZE[size] } as CSSProperties}>
                 The lamp went out an hour ago, and the sea kept talking.
             </p>
         </section>

@@ -5,6 +5,7 @@ import { use } from 'react';
 
 import { ChatScreen } from '@/components/chat/chat-screen';
 import { useApiQuery } from '@/components/connection';
+import { portraitsOf } from '@/lib/character-colour';
 import { Chat } from '@/lib/chat';
 import { Story } from '@/lib/story';
 
@@ -31,7 +32,9 @@ export default function ChatPage({ params }: { params: Promise<{ id: string; cha
     }
     // Without the Story every speaker gets the neutral colour; the Chat still reads.
     const cast = story.status === 'ready' ? story.data.characters.map((character) => character.id) : [];
+    // Each Character's Reference image goes beside their lines; without one, their initial does.
+    const portraits = story.status === 'ready' ? portraitsOf(story.data.characters) : {};
     // The Scenes give the Scene strip each Scene's goal; without them it shows the name alone.
     const scenes = story.status === 'ready' ? story.data.scenes : [];
-    return <ChatScreen initial={chat.data} cast={cast} scenes={scenes} />;
+    return <ChatScreen initial={chat.data} cast={cast} portraits={portraits} scenes={scenes} />;
 }

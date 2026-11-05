@@ -1,64 +1,118 @@
 /*
- * Story text reads like a book (spec: "The Chat reads like a novel"). Its size comes from
- * --story-size, which the text-size preference sets on an ancestor; M is the fallback.
+ * Story text as chat lines (spec: "Message rendering", revised for the chat-bubble look). Its
+ * size comes from --story-size, which the text-size preference sets on an ancestor; M is the
+ * fallback.
  */
 .story,
 .user {
-    --story-font: var(--font-book), Georgia, 'Times New Roman', serif;
     font-size: var(--story-size, 1.0625rem);
 }
 
-.narration,
-.text {
+.story {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+}
+
+/* Narration: an italic line marked with ≡, outside any bubble. */
+.narration {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    padding: 0 0.25rem;
+}
+
+.mark {
+    flex: none;
+    /* Sits on the first line of text. */
+    margin-top: 0.3em;
+    color: var(--muted);
+}
+
+.narrationText {
     margin: 0;
-    font-family: var(--story-font);
-    line-height: 1.7;
+    font-style: italic;
+    line-height: 1.55;
+    color: var(--muted);
     white-space: pre-wrap;
+    overflow-wrap: anywhere;
 }
 
-.narration + .narration,
-.narration + .speech,
-.speech + .narration,
-.speech + .speech {
-    margin-top: 0.85rem;
-}
-
+/* A Character's line: picture on the left, name above a bubble. */
 .speech {
-    border-left: 3px solid var(--speaker-colour);
-    padding: 0.1rem 0 0.1rem 0.85rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.55rem;
+}
+
+.avatar {
+    flex: none;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 999px;
+    object-fit: cover;
+    display: grid;
+    place-items: center;
+    font-size: 0.9375rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.column {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    max-width: calc(100% - 2.8rem);
 }
 
 .speaker {
-    margin: 0 0 0.125rem;
-    font-size: 0.75rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+    margin: 0.1rem 0 0.25rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
     color: var(--speaker-colour);
 }
 
+.bubble,
+.userBubble {
+    margin: 0;
+    padding: 0.55rem 0.85rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.bubble {
+    align-self: flex-start;
+    background: var(--surface-raised);
+    color: var(--text);
+    border-radius: 0.3rem 1.1rem 1.1rem 1.1rem;
+}
+
+.bubble em {
+    color: var(--muted);
+}
+
+/* What the user wrote: name above a purple bubble on the right, picture beside it. */
 .user {
     display: flex;
-    flex-direction: column;
+    justify-content: flex-end;
+    align-items: flex-start;
+    gap: 0.55rem;
+}
+
+.user .column {
     align-items: flex-end;
 }
 
 .identity {
-    margin: 0 0.25rem 0.25rem 0;
-    font-size: 0.75rem;
+    margin: 0.1rem 0 0.25rem;
+    font-size: 0.8125rem;
     font-weight: 600;
-    color: var(--muted);
+    color: var(--accent);
 }
 
-.bubble {
-    margin: 0;
-    max-width: 85%;
-    padding: 0.55rem 0.9rem;
-    background: var(--accent-soft);
-    border: 1px solid var(--accent-line);
-    border-radius: 1.1rem 1.1rem 0.3rem 1.1rem;
-    font-family: var(--story-font);
-    line-height: 1.6;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
+.userBubble {
+    background: var(--accent-fill);
+    color: var(--accent-text);
+    border-radius: 1.1rem 0.3rem 1.1rem 1.1rem;
 }

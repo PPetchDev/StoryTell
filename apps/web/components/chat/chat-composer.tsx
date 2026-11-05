@@ -168,6 +168,16 @@ function useAutoGrow(value: string) {
 }
 
 /**
+ * The * button: the selected text becomes `*text*` with the caret after it; with nothing
+ * selected, an empty `**` pair opens with the caret inside.
+ */
+export function wrapAction(text: string, start: number, end: number): { next: string; caret: number } {
+    const selected = text.slice(start, end);
+    const next = `${text.slice(0, start)}*${selected}*${text.slice(end)}`;
+    return { next, caret: selected === '' ? start + 1 : end + 2 };
+}
+
+/**
  * Enter sends on a physical keyboard (spec: "Composer"). A phone's on-screen keyboard has no
  * Shift+Enter, so where no fine pointer is present, Enter is a new line and the button sends.
  */
@@ -282,6 +292,30 @@ export function ChatComposer({
                         event.currentTarget.form?.requestSubmit();
                     }}
                 />
+                {/* Wraps the selection in *…* (an action, shown in italics), or opens an empty pair at the caret. */}
+                <button
+                    type="button"
+                    className={styles.action}
+                    aria-label="Write an action"
+                    title="Action: *like this*"
+                    disabled={writing || blocked}
+                    // Keep the box's focus and selection: a tap on a button would otherwise take them.
+                    onPointerDown={(event) => event.preventDefault()}
+                    onClick={() => {
+                        const el = box.current;
+                        if (!el) return;
+                        const { next, caret } = wrapAction(draft, el.selectionStart, el.selectionEnd);
+                        onDraft(next);
+                        requestAnimationFrame(() => {
+                            el.focus();
+                            el.setSelectionRange(caret, caret);
+                        });
+                    }}
+                >
+                    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                        <path d="M12 4v16M5.1 8l13.8 8M5.1 16l13.8-8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    </svg>
+                </button>
                 {empty ? (
                     // Spec: "Continue". Refused while a User Message awaits its reply: Retry is the way on.
                     <button

@@ -1,38 +1,74 @@
 import { CSSProperties, ReactNode, useId } from 'react';
 
-import { bookFace } from '@/lib/book-face';
-import { Cast, characterColour } from '@/lib/character-colour';
+import { Cast, characterColour, Portraits } from '@/lib/character-colour';
 import { Message, MessagePart } from '@/lib/chat';
 
 import styles from './message-body.module.css';
 
-/** `*…*` spans in a user's line as italics (spec: story 9); the stored text is unchanged. */
+/** `*…*` spans as italics, in the user's lines and in Characters' speech; the stored text is unchanged. */
 function withActions(text: string): ReactNode[] {
     return text.split(/(\*[^*\n]+\*)/g).map((piece, index) =>
         index % 2 === 1 ? <em key={index}>{piece.slice(1, -1)}</em> : piece,
     );
 }
 
-/** What the user wrote, under the identity they wore: a tinted bubble on the right. */
+/** A round picture beside a line: the Character's Reference image, or their initial on their colour. */
+function Avatar({ name, colour, src, light = false }: { name: string; colour: string; src?: string; light?: boolean }) {
+    const initial = name.trim().charAt(0).toUpperCase() || '?';
+    return src ? (
+        // eslint-disable-next-line @next/next/no-img-element -- served by the API, not a static asset
+        <img className={styles.avatar} src={src} alt="" aria-hidden="true" />
+    ) : (
+        // The Character colours are light, so their initial is dark; the user's accent fill takes white.
+        <span
+            className={styles.avatar}
+            style={{ background: colour, color: light ? 'var(--accent-text)' : 'var(--bg)' } as CSSProperties}
+            aria-hidden="true"
+        >
+            {initial}
+        </span>
+    );
+}
+
+/** What the user wrote, under the identity they wore: a purple bubble on the right. */
 export function UserLine({ identityName, text }: { identityName: string; text: string }) {
     return (
-        <div className={`${styles.user} ${bookFace.variable}`}>
-            <p className={styles.identity}>{identityName}</p>
-            <p className={styles.bubble}>{withActions(text)}</p>
+        <div className={styles.user}>
+            <div className={styles.column}>
+                <p className={styles.identity}>{identityName}</p>
+                <p className={styles.userBubble}>{withActions(text)}</p>
+            </div>
+            <Avatar name={identityName} colour="var(--accent-fill)" light />
         </div>
     );
 }
 
-/** A Character's line: the stamped name and the text inside a bar, both in the Character's colour. */
-function Speech({ part, cast }: { part: Extract<MessagePart, { kind: 'speech' }>; cast: Cast }) {
+/** A Character's line: their picture, their name in their colour, and the line in a bubble. */
+function Speech({ part, cast, portraits }: { part: Extract<MessagePart, { kind: 'speech' }>; cast: Cast; portraits: Portraits }) {
     const nameId = useId();
-    const colour = { '--speaker-colour': characterColour(part.characterId, cast) } as CSSProperties;
+    const colour = characterColour(part.characterId, cast);
+    const src = part.characterId === null ? undefined : portraits[part.characterId];
     return (
-        <div className={styles.speech} style={colour} role="group" aria-labelledby={nameId}>
-            <p id={nameId} className={styles.speaker}>
-                {part.speakerName}
-            </p>
-            <p className={styles.text}>{part.text}</p>
+        <div className={styles.speech} style={{ '--speaker-colour': colour } as CSSProperties} role="group" aria-labelledby={nameId}>
+            <Avatar name={part.speakerName} colour={colour} src={src} />
+            <div className={styles.column}>
+                <p id={nameId} className={styles.speaker}>
+                    {part.speakerName}
+                </p>
+                <p className={styles.bubble}>{withActions(part.text)}</p>
+            </div>
+        </div>
+    );
+}
+
+/** Narration: an italic line marked with ≡, outside any bubble. */
+function Narration({ text }: { text: string }) {
+    return (
+        <div className={styles.narration}>
+            <svg className={styles.mark} viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+                <path d="M2 4h12M2 8h12M2 12h8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+            <p className={styles.narrationText}>{text}</p>
         </div>
     );
 }
@@ -40,24 +76,28 @@ function Speech({ part, cast }: { part: Extract<MessagePart, { kind: 'speech' }>
 interface MessageBodyProps {
     message: Message;
     cast: Cast;
+    /** The cast's Reference images by Character id; a Character without one shows their initial. */
+    portraits?: Portraits;
 }
 
 /**
- * A Message's story text in the book face (spec: "Message rendering"): an AI Message as its
- * parts in order, narration as plain paragraphs and speech with its speaker's colour; a User
- * Message as a bubble.
+ * A Message's story text as chat lines (spec: "Message rendering", revised for the chat-bubble
+ * look): an AI Message as its parts in order, narration as italic lines and each speech part as
+ * its speaker's bubble; a User Message as a bubble on the right.
  */
-export function MessageBody({ message, cast }: MessageBodyProps) {
+export function MessageBody({ message, cast, portraits = {} }: MessageBodyProps) {
     if (message.kind === 'user') return <UserLine identityName={message.identityName} text={message.text} />;
     return (
-        <div className={`${styles.story} ${bookFace.variable}`}>
+        <div className={styles.story}>
             {message.parts.map((part, index) =>
                 part.kind === 'narration' ? (
-                    <p key={index} className={styles.narration}>
-                        {part.text}
-                    </p>
+                    // One ≡ line per paragraph: the parser merges narration paragraphs into one part.
+                    part.text
+                        .split(/\n\s*\n/)
+                        .filter((paragraph) => paragraph.trim() !== '')
+                        .map((paragraph, line) => <Narration key={`${index}-${line}`} text={paragraph.trim()} />)
                 ) : (
-                    <Speech key={index} part={part} cast={cast} />
+                    <Speech key={index} part={part} cast={cast} portraits={portraits} />
                 ),
             )}
         </div>

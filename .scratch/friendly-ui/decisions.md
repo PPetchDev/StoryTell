@@ -47,6 +47,19 @@ Research on Zeta's UX (Japanese guides, Korean community posts, store listings) 
 - **Home cards:** the cover is the Story's newest Snapshot, else a gradient picked from its title; the hook is the Setting's first sentence. `*text*` in the user's lines shows in italics (display only).
 - **Variant verdict:** Chat D with A's look; Home picture cards; Story editor D (tabs, a one-line hint on every field, the Opening preview).
 
+## After trying it on the phone (2026-11-05)
+
+The user tried the merged UI on a phone and asked for Zeta's chat look instead of the book style. This replaces round 2's "book style" and round 3's serif face for story text:
+
+- **Chat bubbles:**
+  - Each line of speech is a bubble with the speaker's picture on the left and their name above it. The picture is the Character's Reference image, or their initial on their Character colour if they have none.
+  - Narration is an italic, muted line marked ≡, outside any bubble, one per paragraph.
+  - The user's line is a purple bubble on the right, with the identity's name above it and its initial beside it.
+  - `*text*` shows in italics in speech as well as in the user's lines.
+- **Font:** story text uses the app's sans face. The bundled serif face is gone. The S / M / L text size still applies.
+- **Composer:** a * button beside send. With nothing selected it opens an empty `**` pair at the caret; with text selected it wraps the selection.
+- **Kept:** Character colours (now on the name and the initial's circle), the action row, tap-to-Edit, Snapshots under their Message.
+
 ## Fixes that need no decision
 
 - The Chat opens at the newest reply, and the composer never covers it.

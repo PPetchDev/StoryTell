@@ -60,6 +60,30 @@
     outline-offset: 2px;
 }
 
+/* * (write an action): a quiet round button between the box and send. */
+.action {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 2.5rem;
+    height: 2.75rem;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+}
+
+.action:disabled {
+    color: var(--faint);
+    cursor: default;
+}
+
+.action:focus-visible {
+    outline: 2px solid var(--text);
+    outline-offset: 2px;
+}
+
 /* ⚡ (spec: "Suggested replies"): a quiet round button left of the box, tinted while its cards are open. */
 .suggest {
     flex: none;
