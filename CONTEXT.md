@@ -83,5 +83,9 @@ The collection of every Snapshot taken in any of a Story's Chats.
 _Avoid_: Album, library
 
 **Reference image**:
-A hidden image of a Character, chosen by the author, that keeps the Character looking the same in every Snapshot; unlike an avatar it is never shown during play.
-_Avoid_: Avatar, portrait, profile picture
+An image of a Character, chosen by the author, that keeps the Character looking the same in every Snapshot; in play only its Portrait is shown.
+_Avoid_: Avatar, profile picture
+
+**Portrait**:
+The square of a Character's Reference image that the author picks to show beside the Character's lines in a Chat; until one is picked, a square near the top middle stands in, and without a Reference image, the Character's initial.
+_Avoid_: Avatar, profile picture, icon

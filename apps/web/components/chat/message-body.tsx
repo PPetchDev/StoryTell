@@ -1,6 +1,7 @@
 import { CSSProperties, ReactNode, useId } from 'react';
 
-import { Cast, characterColour, Portraits } from '@/lib/character-colour';
+import { PortraitImage } from '@/components/portrait/portrait-image';
+import { Cast, characterColour, Portrait, Portraits } from '@/lib/character-colour';
 import { Message, MessagePart } from '@/lib/chat';
 
 import styles from './message-body.module.css';
@@ -12,12 +13,11 @@ function withActions(text: string): ReactNode[] {
     );
 }
 
-/** A round picture beside a line: the Character's Reference image, or their initial on their colour. */
-function Avatar({ name, colour, src, light = false }: { name: string; colour: string; src?: string; light?: boolean }) {
+/** A round picture beside a line: the Character's Portrait, or their initial on their colour. */
+function Avatar({ name, colour, portrait, light = false }: { name: string; colour: string; portrait?: Portrait; light?: boolean }) {
     const initial = name.trim().charAt(0).toUpperCase() || '?';
-    return src ? (
-        // eslint-disable-next-line @next/next/no-img-element -- served by the API, not a static asset
-        <img className={styles.avatar} src={src} alt="" aria-hidden="true" />
+    return portrait ? (
+        <PortraitImage portrait={portrait} className={styles.avatar} />
     ) : (
         // The Character colours are light, so their initial is dark; the user's accent fill takes white.
         <span
@@ -47,10 +47,10 @@ export function UserLine({ identityName, text }: { identityName: string; text: s
 function Speech({ part, cast, portraits }: { part: Extract<MessagePart, { kind: 'speech' }>; cast: Cast; portraits: Portraits }) {
     const nameId = useId();
     const colour = characterColour(part.characterId, cast);
-    const src = part.characterId === null ? undefined : portraits[part.characterId];
+    const portrait = part.characterId === null ? undefined : portraits[part.characterId];
     return (
         <div className={styles.speech} style={{ '--speaker-colour': colour } as CSSProperties} role="group" aria-labelledby={nameId}>
-            <Avatar name={part.speakerName} colour={colour} src={src} />
+            <Avatar name={part.speakerName} colour={colour} portrait={portrait} />
             <div className={styles.column}>
                 <p id={nameId} className={styles.speaker}>
                     {part.speakerName}

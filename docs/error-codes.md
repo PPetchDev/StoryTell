@@ -46,6 +46,7 @@ as "the API can't be reached" and shows the can't-connect screen (`apps/web/lib/
 | `409.003.006` | `DuplicateStartingBondError` | That Character already has a StartingBond in that direction. |
 | `422.003.007` | `SelfStartingBondError` | A StartingBond from a Character toward itself. |
 | `422.003.008` | `InvalidOrderError` | A reorder that does not list every Character (or Scene) of the Story exactly once. |
+| `409.003.009` | `NoReferenceImageError` | A Portrait crop for a Character with no Reference image. Add one first. |
 | `404.004.001` | `ChatNotFoundError` | No Chat with that id in this Story. |
 | `422.004.002` | `StoryNotPlayableError` | The Story has a required field empty. The message names the missing fields. Blocks starting a Chat, sending, Continue and Regenerate. |
 | `409.004.003` | `NoTurnToRetryError` | Retry when the Chat is not waiting for a reply to a User Message. |

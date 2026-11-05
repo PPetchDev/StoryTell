@@ -10,7 +10,13 @@ import { startTestApp, TestApp } from './harness/test-app.js';
 
 interface Story {
     id: number;
-    characters: Array<{ id: number; name: string; appearance: string; referenceImagePath: string | null }>;
+    characters: Array<{
+        id: number;
+        name: string;
+        appearance: string;
+        referenceImagePath: string | null;
+        portraitCrop: { x: number; y: number; size: number } | null;
+    }>;
 }
 
 interface Round {
@@ -177,6 +183,65 @@ describe('Reference images', () => {
         expect(await filesUnder(t.imageDir)).toEqual([secondPath]);
         expect((await readFile(path.join(t.imageDir, secondPath))).toString()).toBe('second-4-jpeg-bytes');
         await t.http.get(`/api/images/${firstPath}`).expect(404);
+    });
+
+    describe('the Portrait crop', () => {
+        function portraitPath(story: Story): string {
+            return `${referenceImagePath(story)}/portrait`;
+        }
+
+        async function withImage(): Promise<Story> {
+            const story = await createStoryWithMira();
+            t.gateway.scriptImage('reference_image', ...fourImages());
+            await pick(story, (await generate(story)).candidates[0].id);
+            return story;
+        }
+
+        it('stores the face square, reads back with the Story, and can be cleared', async () => {
+            const story = await withImage();
+            const crop = { x: 0.25, y: 0.1, size: 0.5 };
+
+            const set = await t.http.put(portraitPath(story)).send(crop).expect(200);
+            expect(set.body.characters[0].portraitCrop).toEqual(crop);
+            const read = await t.http.get(`/api/stories/${story.id}`).expect(200);
+            expect(read.body.characters[0].portraitCrop).toEqual(crop);
+
+            const cleared = await t.http.delete(portraitPath(story)).expect(200);
+            expect(cleared.body.characters[0].portraitCrop).toBeNull();
+        });
+
+        it('starts empty, and a new Reference image or its removal clears it', async () => {
+            const story = await withImage();
+            const read = await t.http.get(`/api/stories/${story.id}`).expect(200);
+            expect(read.body.characters[0].portraitCrop).toBeNull();
+
+            await t.http.put(portraitPath(story)).send({ x: 0, y: 0, size: 1 }).expect(200);
+            t.gateway.scriptImage('reference_image', ...fourImages('second'));
+            const replaced = await pick(story, (await generate(story)).candidates[1].id);
+            expect(replaced.characters[0].portraitCrop).toBeNull();
+
+            await t.http.put(portraitPath(story)).send({ x: 0, y: 0, size: 1 }).expect(200);
+            const removed = await t.http.delete(referenceImagePath(story)).expect(200);
+            expect(removed.body.characters[0].portraitCrop).toBeNull();
+        });
+
+        it('needs a Reference image to crop from', async () => {
+            const story = await createStoryWithMira();
+            const refused = await t.http.put(portraitPath(story)).send({ x: 0, y: 0, size: 1 }).expect(409);
+            expect(refused.body.error.code).toBe('409.003.009');
+        });
+
+        it.each([
+            [{ x: -0.1, y: 0, size: 0.5 }],
+            [{ x: 0.6, y: 0, size: 0.5 }],
+            [{ x: 0, y: 0, size: 0 }],
+            [{ x: 0, y: 0, size: 1.2 }],
+            [{ x: 0, y: -1, size: 0.5 }],
+            [{ x: 0, size: 0.5 }],
+        ])('refuses a square outside the image: %o', async (crop) => {
+            const story = await withImage();
+            await t.http.put(portraitPath(story)).send(crop).expect(400);
+        });
     });
 
     it('a newer round discards the older one, and a candidate belongs to its Character', async () => {

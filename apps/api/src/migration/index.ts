@@ -7,6 +7,7 @@ import { JudgeAndLedger1763000000000 } from './1763000000000-JudgeAndLedger.js';
 import { MemoryAndExtraction1763100000000 } from './1763100000000-MemoryAndExtraction.js';
 import { Personas1763300000000 } from './1763300000000-Personas.js';
 import { Snapshots1763400000000 } from './1763400000000-Snapshots.js';
+import { PortraitCrop1763500000000 } from './1763500000000-PortraitCrop.js';
 
 // Listed by hand, oldest first, so migrations load the same way from compiled JS, the
 // TypeORM CLI and Vitest. Add every new migration here.
@@ -20,4 +21,5 @@ export const migrations = [
     MemoryAndExtraction1763100000000,
     Personas1763300000000,
     Snapshots1763400000000,
+    PortraitCrop1763500000000,
 ];

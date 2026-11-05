@@ -5,7 +5,7 @@
  * Presentation only: nothing is stored.
  */
 
-import { referenceImageUrl } from './story';
+import { PortraitCrop, referenceImageUrl } from './story';
 
 /** The Story's Character ids in their authored order, which pick each Character's colour. */
 export type Cast = readonly number[];
@@ -23,14 +23,24 @@ export const CHARACTER_COLOURS = [
 /** For a speaker with no Character link: an unknown speaker, or a Character since removed. */
 export const NEUTRAL_SPEAKER_COLOUR = '#c4bdd6';
 
-/** Each Character's Reference image URL by Character id, for the picture beside their lines. */
-export type Portraits = Readonly<Record<number, string>>;
+/** What shows beside a Character's lines: their Reference image and the square of it they chose. */
+export interface Portrait {
+    src: string;
+    crop: PortraitCrop | null;
+}
+
+/** Each Character's Portrait by Character id. */
+export type Portraits = Readonly<Record<number, Portrait>>;
 
 /** The Portraits of a Story's Characters; one without a Reference image is left out. */
-export function portraitsOf(characters: readonly { id: number; referenceImagePath: string | null }[]): Portraits {
-    const portraits: Record<number, string> = {};
+export function portraitsOf(
+    characters: readonly { id: number; referenceImagePath: string | null; portraitCrop: PortraitCrop | null }[],
+): Portraits {
+    const portraits: Record<number, Portrait> = {};
     for (const character of characters) {
-        if (character.referenceImagePath) portraits[character.id] = referenceImageUrl(character.referenceImagePath);
+        if (character.referenceImagePath) {
+            portraits[character.id] = { src: referenceImageUrl(character.referenceImagePath), crop: character.portraitCrop };
+        }
     }
     return portraits;
 }

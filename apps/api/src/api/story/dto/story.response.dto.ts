@@ -2,7 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 
 import { MissingField } from '../../../manager/story/playable.js';
 import { LatestChat, StoryDetail, StoryListItem } from '../../../manager/story/story.service.js';
-import { CharacterResponse } from '../../../model/story/entities/character.entity.js';
+import { CharacterResponse, PortraitCrop } from '../../../model/story/entities/character.entity.js';
 import { RoleResponse } from '../../../model/story/entities/role.entity.js';
 import { SceneResponse } from '../../../model/story/entities/scene.entity.js';
 import { StartingBondResponse } from '../../../model/story/entities/starting-bond.entity.js';
@@ -93,6 +93,17 @@ export class RoleDTO implements RoleResponse {
     description: string;
 }
 
+export class PortraitCropDTO implements PortraitCrop {
+    @ApiProperty({ description: "Left edge, as a fraction of the image's width." })
+    x: number;
+
+    @ApiProperty({ description: "Top edge, as a fraction of the image's width." })
+    y: number;
+
+    @ApiProperty({ description: "Side of the square, as a fraction of the image's width." })
+    size: number;
+}
+
 export class CharacterDTO implements CharacterResponse {
     @ApiProperty()
     id: number;
@@ -126,9 +137,16 @@ export class CharacterDTO implements CharacterResponse {
         nullable: true,
         description:
             'Path of the Reference image relative to the image folder, served at `GET /api/images/{path}`; ' +
-            'null while there is none. Shown only on the Character page, never in play.',
+            'null while there is none. Shown on the Character page and, cropped to the Portrait, in a Chat.',
     })
     referenceImagePath: string | null;
+
+    @ApiProperty({
+        type: PortraitCropDTO,
+        nullable: true,
+        description: 'The square of the Reference image shown beside their lines in a Chat; null while none is chosen.',
+    })
+    portraitCrop: PortraitCrop | null;
 }
 
 export class StartingBondDTO implements StartingBondResponse {

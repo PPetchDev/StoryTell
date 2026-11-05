@@ -1,0 +1,71 @@
+/* The Reference image with the face square on top. */
+.stage {
+    position: relative;
+    width: min(100%, 22rem);
+    margin: 0.5rem auto 0.75rem;
+    overflow: hidden;
+    border-radius: 0.6rem;
+    touch-action: none;
+    user-select: none;
+}
+
+.image {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 0.6rem;
+}
+
+.square {
+    position: absolute;
+    box-sizing: border-box;
+    border: 2px solid #fff;
+    border-radius: 999px;
+    /* Dims everything outside the circle. */
+    box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.55);
+    cursor: grab;
+    touch-action: none;
+}
+
+.square:active {
+    cursor: grabbing;
+}
+
+.square:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.zoom {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.875rem;
+    color: var(--muted);
+}
+
+.zoom input {
+    width: 100%;
+    accent-color: var(--accent);
+}
+
+.preview {
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.previewImage {
+    width: 3.5rem;
+    height: 3.5rem;
+}

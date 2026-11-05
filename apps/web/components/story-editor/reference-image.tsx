@@ -3,9 +3,12 @@
 import { useState } from 'react';
 
 import { useConnection } from '@/components/connection';
+import { PortraitImage } from '@/components/portrait/portrait-image';
 import { ApiError, ApiUnreachableError } from '@/lib/api';
-import { candidateImageUrl, Character, referenceImageUrl, ReferenceCandidate, Story, storyApi } from '@/lib/story';
+import { candidateImageUrl, Character, PortraitCrop, referenceImageUrl, ReferenceCandidate, Story, storyApi } from '@/lib/story';
 import { ConfirmButton } from './fields';
+import { PortraitCropper } from './portrait-cropper';
+import styles from './reference-image.module.css';
 
 /** The error code of an image pool that is used up (docs/error-codes.md). */
 const OUT_OF_IMAGE_CREDIT = '402.001.004';
@@ -53,6 +56,9 @@ export function ReferenceImage({ storyId, character, imageStyle, flush, commit }
     // so the offer appears only after the author changes something here.
     const [madeFrom, setMadeFrom] = useState<Look>({ appearance: character.appearance, imageStyle });
     const [offerDismissed, setOfferDismissed] = useState(false);
+    const [cropping, setCropping] = useState(false);
+    const [savingCrop, setSavingCrop] = useState(false);
+    const [cropError, setCropError] = useState<string | null>(null);
 
     const heading = character.name.trim() === '' ? 'this Character' : character.name;
     const hasImage = character.referenceImagePath !== null;
@@ -97,6 +103,26 @@ export function ReferenceImage({ storyId, character, imageStyle, flush, commit }
         });
     };
 
+    const saveCrop = (crop: PortraitCrop) => {
+        setSavingCrop(true);
+        setCropError(null);
+        void commit(
+            () => storyApi.setPortraitCrop(storyId, character.id, crop),
+            (message) => setCropError(message),
+        ).then((saved) => {
+            setSavingCrop(false);
+            if (saved) setCropping(false);
+        });
+    };
+
+    const clearCrop = () => {
+        setCropError(null);
+        void commit(
+            () => storyApi.clearPortraitCrop(storyId, character.id),
+            (message) => setCropError(message),
+        );
+    };
+
     const remove = () => {
         void commit(
             () => storyApi.removeReferenceImage(storyId, character.id),
@@ -108,8 +134,8 @@ export function ReferenceImage({ storyId, character, imageStyle, flush, commit }
         <fieldset className="subsection reference-image">
             <legend>Reference image</legend>
             <p className="hint">
-                Keeps {heading} looking the same in every Snapshot. Never shown in play. Drawn from Appearance in the
-                Story&apos;s Image style.
+                Keeps {heading} looking the same in every Snapshot. In a Chat, the face you pick shows beside their
+                lines. Drawn from Appearance in the Story&apos;s Image style.
             </p>
 
             {hasImage && (
@@ -121,6 +147,48 @@ export function ReferenceImage({ storyId, character, imageStyle, flush, commit }
                         height={300}
                     />
                 </figure>
+            )}
+
+            {hasImage && (
+                <div className={styles.portraitRow} role="group" aria-label={`Chat picture of ${heading}`}>
+                    <PortraitImage
+                        portrait={{ src: referenceImageUrl(character.referenceImagePath!), crop: character.portraitCrop }}
+                        className={styles.portraitThumb}
+                    />
+                    <div className={styles.portraitText}>
+                        <span className={styles.portraitLabel}>Chat picture</span>
+                        <span className="hint">
+                            {character.portraitCrop ? 'The face you picked.' : 'A guess at the face, until you pick it.'}
+                        </span>
+                    </div>
+                    <button type="button" className="button button-small" disabled={busy} onClick={() => setCropping(true)}>
+                        {character.portraitCrop ? 'Change' : 'Pick the face'}
+                    </button>
+                    {character.portraitCrop && (
+                        <button type="button" className="button button-quiet button-small" disabled={busy} onClick={clearCrop}>
+                            Reset
+                        </button>
+                    )}
+                </div>
+            )}
+            {cropError && !cropping && (
+                <p className="field-error" role="alert">
+                    Couldn&apos;t save the chat picture: {cropError}
+                </p>
+            )}
+            {cropping && hasImage && (
+                <PortraitCropper
+                    name={heading}
+                    src={referenceImageUrl(character.referenceImagePath!)}
+                    initial={character.portraitCrop}
+                    saving={savingCrop}
+                    error={cropError}
+                    onSave={saveCrop}
+                    onClose={() => {
+                        setCropping(false);
+                        setCropError(null);
+                    }}
+                />
             )}
 
             {offerRegenerate && (

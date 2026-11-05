@@ -6,6 +6,7 @@ import {
     CharacterNotFoundError,
     DuplicateStartingBondError,
     InvalidOrderError,
+    NoReferenceImageError,
     SceneNotFoundError,
     SelfStartingBondError,
     StartingBondNotFoundError,
@@ -14,7 +15,7 @@ import {
 import { ChatModelService } from '../../model/chat/chat.service.js';
 import { LedgerModelService } from '../../model/ledger/ledger.service.js';
 import { SnapshotModelService } from '../../model/snapshot/snapshot.service.js';
-import { CharacterEntity } from '../../model/story/entities/character.entity.js';
+import { CharacterEntity, PortraitCrop } from '../../model/story/entities/character.entity.js';
 import { SceneEntity } from '../../model/story/entities/scene.entity.js';
 import { StartingBondEntity } from '../../model/story/entities/starting-bond.entity.js';
 import {
@@ -278,6 +279,7 @@ export class StoryManagerService {
 
         const previous = character.referenceImagePath;
         character.referenceImagePath = relativePath;
+        character.portraitCrop = null;
         await this.storyModel.saveCharacter(character);
         if (previous) await this.removeFile(previous);
         return this.saved(storyId);
@@ -288,8 +290,19 @@ export class StoryManagerService {
         const character = this.findCharacter(story, characterId);
         const previous = character.referenceImagePath;
         character.referenceImagePath = null;
+        character.portraitCrop = null;
         await this.storyModel.saveCharacter(character);
         if (previous) await this.removeFile(previous);
+        return this.saved(storyId);
+    }
+
+    /** Sets or clears the square of the Reference image shown beside the Character's lines in a Chat. */
+    async setPortraitCrop(storyId: number, characterId: number, crop: PortraitCrop | null): Promise<StoryDetail> {
+        const story = await this.load(storyId);
+        const character = this.findCharacter(story, characterId);
+        if (crop && !character.referenceImagePath) throw new NoReferenceImageError();
+        character.portraitCrop = crop ? { x: crop.x, y: crop.y, size: crop.size } : null;
+        await this.storyModel.saveCharacter(character);
         return this.saved(storyId);
     }
 

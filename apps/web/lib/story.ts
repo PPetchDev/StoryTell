@@ -45,6 +45,13 @@ export interface Role {
     description: string;
 }
 
+/** A square of the Reference image, in fractions of the image's width: left edge, top edge, side. */
+export interface PortraitCrop {
+    x: number;
+    y: number;
+    size: number;
+}
+
 export interface Character {
     id: number;
     name: string;
@@ -55,8 +62,10 @@ export interface Character {
     background: string;
     secrets: string;
     arcDirections: string;
-    /** Relative path of the Reference image (ticket 30); null while there is none. Never shown in play. */
+    /** Relative path of the Reference image (ticket 30); null while there is none. In play only its Portrait shows. */
     referenceImagePath: string | null;
+    /** The square of the Reference image shown beside their lines in a Chat; null while none is chosen. */
+    portraitCrop: PortraitCrop | null;
 }
 
 export interface StartingBond {
@@ -97,7 +106,7 @@ export interface Story {
 }
 
 export type StoryFields = Partial<Pick<Story, 'title' | 'setting' | 'opening'> & Style>;
-export type CharacterFields = Partial<Omit<Character, 'id' | 'referenceImagePath'>>;
+export type CharacterFields = Partial<Omit<Character, 'id' | 'referenceImagePath' | 'portraitCrop'>>;
 export type SceneFields = Partial<Omit<Scene, 'id'>>;
 export type StartingBondFields = Partial<Pick<StartingBond, 'label' | 'description'>>;
 
@@ -215,4 +224,8 @@ export const storyApi = {
         apiSend<Story>('PUT', `/stories/${storyId}/characters/${characterId}/reference-image`, { candidateId }),
     removeReferenceImage: (storyId: number, characterId: number) =>
         apiSend<Story>('DELETE', `/stories/${storyId}/characters/${characterId}/reference-image`),
+    setPortraitCrop: (storyId: number, characterId: number, crop: PortraitCrop) =>
+        apiSend<Story>('PUT', `/stories/${storyId}/characters/${characterId}/reference-image/portrait`, crop),
+    clearPortraitCrop: (storyId: number, characterId: number) =>
+        apiSend<Story>('DELETE', `/stories/${storyId}/characters/${characterId}/reference-image/portrait`),
 };

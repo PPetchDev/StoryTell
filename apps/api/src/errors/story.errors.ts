@@ -51,3 +51,10 @@ export class InvalidOrderError extends AppError {
         super('422.003.008', `The order must list every one of the Story's ${what} exactly once.`);
     }
 }
+
+/** A Portrait crop for a Character that has no Reference image to crop. */
+export class NoReferenceImageError extends AppError {
+    constructor() {
+        super('409.003.009', 'Add a Reference image first: the chat picture is cropped from it.');
+    }
+}

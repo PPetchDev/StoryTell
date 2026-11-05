@@ -10,6 +10,13 @@ import type { Relation } from 'typeorm';
 
 import type { StoryEntity } from './story.entity.js';
 
+/** A square of the Reference image, in fractions of the image's width: left edge, top edge, side. */
+export interface PortraitCrop {
+    x: number;
+    y: number;
+    size: number;
+}
+
 export interface CharacterResponse {
     id: number;
     name: string;
@@ -22,6 +29,8 @@ export interface CharacterResponse {
     arcDirections: string;
     /** Path of the Reference image relative to the image folder; null while there is none. */
     referenceImagePath: string | null;
+    /** The square of the Reference image shown beside their lines in a Chat; null while none is chosen. */
+    portraitCrop: PortraitCrop | null;
 }
 
 /** An AI-played figure in one Story's cast. Ordered by `position` within the Story. */
@@ -65,10 +74,14 @@ export class CharacterEntity {
     @Column({ name: 'arc_directions', type: 'text', default: '' })
     arcDirections: string;
 
-    // Shown only on the Character page, never in play (spec: "Reference image"). The file is
+    // Shown on the Character page and, as the Portrait, beside their lines in a Chat. The file is
     // written and deleted by the Reference image module and by Story and Character deletion.
     @Column({ name: 'reference_image_path', type: 'text', nullable: true })
     referenceImagePath: string | null;
+
+    // Cleared whenever the Reference image changes, since it frames that image.
+    @Column({ name: 'portrait_crop', type: 'jsonb', nullable: true })
+    portraitCrop: PortraitCrop | null;
 
     toResponse(): CharacterResponse {
         return {
@@ -82,6 +95,7 @@ export class CharacterEntity {
             secrets: this.secrets,
             arcDirections: this.arcDirections,
             referenceImagePath: this.referenceImagePath,
+            portraitCrop: this.portraitCrop ? { ...this.portraitCrop } : null,
         };
     }
 }

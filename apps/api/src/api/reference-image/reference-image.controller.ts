@@ -5,6 +5,7 @@ import type { Response } from 'express';
 import { ReferenceImageManagerService } from '../../manager/reference-image/reference-image.service.js';
 import { StoryManagerService } from '../../manager/story/story.service.js';
 import { StoryResponseBodyDTO } from '../story/dto/story.response.dto.js';
+import { PortraitCropRequestBodyDTO } from './dto/portrait-crop.request.dto.js';
 import { PickReferenceImageRequestBodyDTO } from './dto/reference-image.request.dto.js';
 import { GenerateReferenceCandidatesResponseBodyDTO } from './dto/reference-image.response.dto.js';
 
@@ -67,5 +68,21 @@ export class ReferenceImageApiController {
     @ApiOkResponse({ type: StoryResponseBodyDTO, description: 'The Character has no Reference image again.' })
     remove(@Id('storyId') storyId: number, @Id('characterId') characterId: number): Promise<StoryResponseBodyDTO> {
         return this.storyManager.removeReferenceImage(storyId, characterId);
+    }
+
+    @Put('portrait')
+    @ApiOkResponse({ type: StoryResponseBodyDTO, description: 'The square of the Reference image shown beside their lines in a Chat.' })
+    setPortrait(
+        @Id('storyId') storyId: number,
+        @Id('characterId') characterId: number,
+        @Body() body: PortraitCropRequestBodyDTO,
+    ): Promise<StoryResponseBodyDTO> {
+        return this.storyManager.setPortraitCrop(storyId, characterId, body);
+    }
+
+    @Delete('portrait')
+    @ApiOkResponse({ type: StoryResponseBodyDTO, description: 'No square is chosen; the Chat centres the Reference image.' })
+    clearPortrait(@Id('storyId') storyId: number, @Id('characterId') characterId: number): Promise<StoryResponseBodyDTO> {
+        return this.storyManager.setPortraitCrop(storyId, characterId, null);
     }
 }
