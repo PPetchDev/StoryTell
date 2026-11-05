@@ -3,9 +3,15 @@
     --bg: #16131f;
     --surface: #221d30;
     --text: #ece8f6;
-    --muted: #a59cbd;
+    /* Friendly UI ticket 12: raised from #a59cbd so muted text clears 4.5:1 with room on every surface. */
+    --muted: #b4abcb;
+    /* Disabled text and icons: dimmer than --muted, still 4.5:1 on the page and the surface. */
+    --faint: #8e85a8;
     --accent: #8f73ff;
     --accent-text: #ffffff;
+    /* The fill under --accent-text (buttons, the send button, selected segments): --accent itself is
+       too light for white text, and stays the colour of accent text and icons on the dark surfaces. */
+    --accent-fill: #7357ec;
     /* Friendly UI: a raised surface, hairlines, a soft accent tint, and the danger and warning colours. */
     --surface-raised: #2c2540;
     --line: #3a3150;
@@ -62,7 +68,7 @@ h1 {
 .button {
     font: inherit;
     font-weight: 600;
-    background: var(--accent);
+    background: var(--accent-fill);
     color: var(--accent-text);
     border: 0;
     border-radius: 999px;
@@ -70,8 +76,10 @@ h1 {
     cursor: pointer;
 }
 
+/* Disabled: a raised fill with muted text, not a fade, so its label still reads (ticket 12). */
 .button:disabled {
-    opacity: 0.6;
+    background: var(--surface-raised);
+    color: var(--muted);
     cursor: progress;
 }
 
@@ -332,8 +340,11 @@ a {
     font-weight: 500;
 }
 
+/* Destructive actions: the danger fill, quieter than the accent button, and always asking first. */
 .button-danger {
-    background: #8a2d3b;
+    background: var(--danger-soft);
+    color: var(--danger-text);
+    font-weight: 500;
 }
 
 .danger-zone {
@@ -393,6 +404,11 @@ a {
     padding: 0.625rem 0.75rem;
     margin: 0 0 0.75rem;
     font-size: 0.9375rem;
+}
+
+/* Accent links read only 4.1:1 on the notice tint; text-coloured ones read 11.8:1 (ticket 12). */
+.notice a {
+    color: var(--text);
 }
 
 .notice .button {

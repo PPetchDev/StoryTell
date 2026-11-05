@@ -71,6 +71,7 @@ function PersonaCard({ persona, autosave, justCreated, onSaved, onDelete }: Pers
             <div className="toolbar">
                 <ConfirmButton
                     label="Delete"
+                    danger
                     question={`Delete "${persona.name}"? Chats wearing it go back to their Role; Messages keep the name.`}
                     confirmLabel="Delete"
                     onConfirm={onDelete}

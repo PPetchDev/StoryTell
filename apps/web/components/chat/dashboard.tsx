@@ -5,7 +5,16 @@ import { useState } from 'react';
 
 import { useConnection } from '@/components/connection';
 import { ApiError, ApiUnreachableError } from '@/lib/api';
-import { BondChange, chatApi, ChatDashboard, DashboardBond, DashboardCharacter, formatWhen, messageHref } from '@/lib/chat';
+import {
+    BondChange,
+    chatApi,
+    ChatDashboard,
+    DashboardBackground,
+    DashboardBond,
+    DashboardCharacter,
+    formatWhen,
+    messageHref,
+} from '@/lib/chat';
 
 /** "the Message" link to the causing Message, or the seed note when nothing caused it. */
 function Cause({ dashboard, messageId }: { dashboard: ChatDashboard; messageId: number | null }) {
@@ -46,11 +55,11 @@ function BondView({ dashboard, bond, from }: { dashboard: ChatDashboard; bond: D
     );
 }
 
-function CharacterView({ dashboard, character }: { dashboard: ChatDashboard; character: DashboardCharacter }) {
+/** One Character's Bonds, under "How the Characters feel". */
+function CharacterBonds({ dashboard, character }: { dashboard: ChatDashboard; character: DashboardCharacter }) {
     return (
-        <section className="dashboard-character" aria-label={character.name}>
-            <h2>{character.name}</h2>
-            <h3>Bonds</h3>
+        <section aria-label={character.name}>
+            <h3>{character.name}</h3>
             {character.bonds.length === 0 ? (
                 <p className="muted">A stranger to everyone so far.</p>
             ) : (
@@ -58,7 +67,15 @@ function CharacterView({ dashboard, character }: { dashboard: ChatDashboard; cha
                     <BondView key={`${bond.toward.characterId ?? 'user'}`} dashboard={dashboard} bond={bond} from={character.name} />
                 ))
             )}
-            <h3>Arc</h3>
+        </section>
+    );
+}
+
+/** One Character's Arc, under "How they've changed". */
+function CharacterArc({ dashboard, character }: { dashboard: ChatDashboard; character: DashboardCharacter }) {
+    return (
+        <section aria-label={character.name}>
+            <h3>{character.name}</h3>
             {character.arcDirection && <p className="muted small">Author&apos;s direction: {character.arcDirection}</p>}
             {character.arcSteps.length === 0 ? (
                 <p className="muted">Unchanged from the core definition.</p>
@@ -79,13 +96,27 @@ function CharacterView({ dashboard, character }: { dashboard: ChatDashboard; cha
     );
 }
 
-const STATUS_WORDS = { pending: 'Pending', done: 'Done', failed: 'Failed' } as const;
+/** How a reply's updates read on the Dashboard (spec: "Wording"). */
+const UPDATE_WORDS = { upToDate: 'Up to date', updating: 'Updating…', failed: "Couldn't update" } as const;
+type UpdateStatus = keyof typeof UPDATE_WORDS;
 
 /**
- * The read-only dashboard (spec: "Dashboard"): each Character's Bonds with their history,
- * its Arc steps, the current Scene and the event that advanced it, and the background
- * status of recent AI Messages with Retry. Nothing here is editable; every item links to
- * the Message that caused it, which is where a bad judgement is rewound.
+ * A reply's background calls (its Bond, Arc and Scene update, and its Memory update) as one
+ * plain status: any failure wins, then anything still running.
+ */
+function updateStatusOf(entry: DashboardBackground): UpdateStatus {
+    const statuses = [entry.judge.status, entry.memory?.status];
+    if (statuses.includes('failed')) return 'failed';
+    if (statuses.includes('pending')) return 'updating';
+    return 'upToDate';
+}
+
+/**
+ * The read-only dashboard (spec: "Dashboard"), in plain words: how the Characters feel (their
+ * Bonds with history), how they've changed (their Arc steps), where the story is (the current
+ * Scene and the event that moved it on), and whether each recent reply's updates finished,
+ * with Retry. Nothing here is editable; every item links to the Message that caused it, which
+ * is where a bad change is rewound.
  */
 export function Dashboard({ initial }: { initial: ChatDashboard }) {
     const { reportUnreachable } = useConnection();
@@ -93,15 +124,21 @@ export function Dashboard({ initial }: { initial: ChatDashboard }) {
     const [retrying, setRetrying] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
 
-    const retry = async (messageId: number, call: 'judge' | 'memory') => {
-        setRetrying(messageId);
+    /** Runs each of the reply's failed calls again, the Bond, Arc and Scene update first. */
+    const retry = async (entry: DashboardBackground) => {
+        setRetrying(entry.messageId);
         setError(null);
         try {
-            const run = call === 'judge' ? chatApi.retryJudge : chatApi.retryExtraction;
-            setDashboard(await run(dashboard.storyId, dashboard.chatId, messageId));
+            if (entry.judge.status === 'failed') {
+                setDashboard(await chatApi.retryJudge(dashboard.storyId, dashboard.chatId, entry.messageId));
+            }
+            if (entry.memory?.status === 'failed') {
+                setDashboard(await chatApi.retryExtraction(dashboard.storyId, dashboard.chatId, entry.messageId));
+            }
         } catch (caught) {
             if (caught instanceof ApiUnreachableError) reportUnreachable();
-            else setError(caught instanceof ApiError ? caught.message : 'The retry failed.');
+            else if (caught instanceof ApiError) setError(caught.message);
+            else setError("Couldn't update. Try again in a moment.");
         } finally {
             setRetrying(null);
         }
@@ -118,8 +155,22 @@ export function Dashboard({ initial }: { initial: ChatDashboard }) {
                 edit the Message that caused it.
             </p>
 
-            <section className="dashboard-scene" aria-label="Scene">
-                <h2>Scene</h2>
+            <section className="dashboard-character" aria-label="How the Characters feel">
+                <h2>How the Characters feel</h2>
+                {dashboard.characters.map((character) => (
+                    <CharacterBonds key={character.id} dashboard={dashboard} character={character} />
+                ))}
+            </section>
+
+            <section className="dashboard-character" aria-label="How they've changed">
+                <h2>How they&apos;ve changed</h2>
+                {dashboard.characters.map((character) => (
+                    <CharacterArc key={character.id} dashboard={dashboard} character={character} />
+                ))}
+            </section>
+
+            <section className="dashboard-scene" aria-label="Where the story is">
+                <h2>Where the story is</h2>
                 <p className="message-text">
                     {dashboard.scene.current ? dashboard.scene.current.name : 'Free play'}
                 </p>
@@ -140,51 +191,41 @@ export function Dashboard({ initial }: { initial: ChatDashboard }) {
                 )}
             </section>
 
-            {dashboard.characters.map((character) => (
-                <CharacterView key={character.id} dashboard={dashboard} character={character} />
-            ))}
-
-            <section className="dashboard-background" aria-label="Background calls">
-                <h2>Background calls</h2>
+            <section className="dashboard-background" aria-label="Updates">
+                <h2>Updates</h2>
+                <p className="muted small">
+                    After each reply, the feelings, changes, Scene and Memories above are brought up to date.
+                </p>
                 {dashboard.background.length === 0 ? (
-                    <p className="muted">No AI reply has been judged yet.</p>
+                    <p className="muted">No replies yet.</p>
                 ) : (
                     <ul className="background-list">
-                        {dashboard.background.map((entry) => (
-                            <li key={entry.messageId}>
-                                <Link href={messageHref(dashboard.storyId, dashboard.chatId, entry.messageId)}>
-                                    Reply {entry.position}
-                                </Link>
-                                : judge {STATUS_WORDS[entry.judge.status]}
-                                {entry.judge.error && <span className="turn-error"> — {entry.judge.error}</span>}
-                                {entry.judge.status === 'failed' && (
-                                    <button
-                                        type="button"
-                                        className="button button-quiet button-small"
-                                        disabled={retrying !== null}
-                                        onClick={() => void retry(entry.messageId, 'judge')}
-                                    >
-                                        {retrying === entry.messageId ? 'Retrying…' : 'Retry'}
-                                    </button>
-                                )}
-                                {entry.memory && (
-                                    <>
-                                        {' · '}memory {STATUS_WORDS[entry.memory.status]}
-                                        {entry.memory.error && <span className="turn-error"> — {entry.memory.error}</span>}
-                                        {entry.memory.status === 'failed' && (
+                        {dashboard.background.map((entry) => {
+                            const status = updateStatusOf(entry);
+                            return (
+                                <li key={entry.messageId}>
+                                    <Link href={messageHref(dashboard.storyId, dashboard.chatId, entry.messageId)}>
+                                        Reply {entry.position}
+                                    </Link>
+                                    {': '}
+                                    {status !== 'failed' && UPDATE_WORDS[status]}
+                                    {status === 'failed' && (
+                                        <>
+                                            <span className="turn-error">{UPDATE_WORDS.failed}</span>
+                                            {' — '}
                                             <button
                                                 type="button"
                                                 className="button button-quiet button-small"
                                                 disabled={retrying !== null}
-                                                onClick={() => void retry(entry.messageId, 'memory')}
+                                                onClick={() => void retry(entry)}
                                             >
                                                 {retrying === entry.messageId ? 'Retrying…' : 'Retry'}
                                             </button>
-                                        )}
-                                    </>
-                                )}
-                            </li>
-                        ))}
+                                        </>
+                                    )}
+                                </li>
+                            );
+                        })}
                     </ul>
                 )}
                 {error && (

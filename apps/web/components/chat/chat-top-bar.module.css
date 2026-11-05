@@ -90,8 +90,9 @@
     outline-offset: -2px;
 }
 
-.item:disabled {
-    opacity: 0.5;
+.item:disabled,
+.item:disabled .itemSub {
+    color: var(--faint);
     cursor: not-allowed;
 }
 

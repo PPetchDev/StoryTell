@@ -616,7 +616,7 @@ A Character knows only the Memories it is tagged on`);
 
             t.gateway.scriptText('turn', 'Reply two.');
             const blocked = await t.http.post(`/api/stories/${story.id}/chats/${chat.id}/messages`).send({ text: 'Two.' }).expect(409);
-            expect(blocked.body.error).toEqual({ code: '409.004.008', message: "The previous turn's Memory extraction failed. Retry it before sending." });
+            expect(blocked.body.error).toEqual({ code: '409.004.008', message: "The Memories couldn't update after the previous turn. Retry before sending." });
             expect(t.gateway.textCalls('turn')).toHaveLength(1);
 
             // A judge retry is refused: the judge did not fail.
@@ -653,7 +653,7 @@ A Character knows only the Memories it is tagged on`);
 
             const blocked = await t.http.post(`/api/stories/${story.id}/chats/${chat.id}/messages`).send({ text: 'Two.' }).expect(409);
 
-            expect(blocked.body.error.message).toBe("The previous turn's the Bond, Arc and Scene judge and Memory extraction failed. Retry them before sending.");
+            expect(blocked.body.error.message).toBe("The Bonds, Arcs, Scene and Memories couldn't update after the previous turn. Retry before sending.");
         });
     });
 });

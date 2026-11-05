@@ -215,6 +215,7 @@ export function ReferenceImage({ storyId, character, imageStyle, flush, commit }
                     {hasImage && !busy && (
                         <ConfirmButton
                             label="Remove Reference image"
+                            danger
                             question="Remove the Reference image?"
                             confirmLabel="Remove"
                             onConfirm={remove}

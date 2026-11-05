@@ -41,7 +41,8 @@
 
 @keyframes pulse {
     50% {
-        opacity: 0.55;
+        /* Its faintest, the muted text still reads at 4.8:1 (ticket 12). */
+        opacity: 0.75;
     }
 }
 

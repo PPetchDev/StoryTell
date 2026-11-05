@@ -23,7 +23,7 @@ function Notices({ chat, onRetryJudge, onRetryExtraction, retrying }: NoticesPro
         <>
             {reply?.judge?.status === 'failed' && (
                 <p className="notice" role="status">
-                    Sending is blocked: the last reply&apos;s Bond, Arc and Scene judge failed ({reply.judge.error}).{' '}
+                    Sending is paused: the Characters&apos; feelings and the Scene couldn&apos;t update after the last reply.{' '}
                     <button type="button" className="button button-quiet" disabled={retrying} onClick={() => onRetryJudge(reply.id)}>
                         {retrying ? 'Retrying…' : 'Retry'}
                     </button>
@@ -31,7 +31,7 @@ function Notices({ chat, onRetryJudge, onRetryExtraction, retrying }: NoticesPro
             )}
             {reply?.memory?.status === 'failed' && (
                 <p className="notice" role="status">
-                    Sending is blocked: the last reply&apos;s Memory extraction failed ({reply.memory.error}).{' '}
+                    Sending is paused: Memories couldn&apos;t update after the last reply.{' '}
                     <button type="button" className="button button-quiet" disabled={retrying} onClick={() => onRetryExtraction(reply.id)}>
                         {retrying ? 'Retrying…' : 'Retry'}
                     </button>

@@ -166,7 +166,7 @@ textarea.input {
 }
 
 .segmented button[aria-checked='true'] {
-    background: var(--accent);
+    background: var(--accent-fill);
     color: var(--accent-text);
     font-weight: 600;
 }

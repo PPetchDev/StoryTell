@@ -87,6 +87,7 @@ export function ChatList({ storyId, initial }: { storyId: number; initial: ChatL
                             </button>
                             <ConfirmButton
                                 label="Delete"
+                                danger
                                 question={`Delete "${chat.title}" and everything in it?`}
                                 confirmLabel="Delete"
                                 onConfirm={() => void remove(chat.id)}
