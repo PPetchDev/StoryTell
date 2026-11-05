@@ -189,6 +189,12 @@ export function ChatScreen({ initial, cast }: ChatScreenProps) {
         );
     };
 
+    /** ▶ (spec: "Continue"): a turn with no User Message. A failed one stores nothing, so ▶ again is the way on. */
+    const continueStory = () => {
+        if (writing || busy || blocked || chat.awaitingReply) return;
+        void runTurn(() => chatApi.continue(chat.storyId, chat.id));
+    };
+
     const saveEdit = (message: Message, text: string) => {
         setEditing(null);
         const edit = async () => refreshMemory(noteRollback(await chatApi.edit(chat.storyId, chat.id, message.id, text)));
@@ -281,6 +287,7 @@ export function ChatScreen({ initial, cast }: ChatScreenProps) {
                 snapshotError={snaps.error}
                 onDraft={setDraft}
                 onSend={send}
+                onContinue={continueStory}
                 onRetry={() => void runTurn(() => chatApi.retry(chat.storyId, chat.id))}
                 onRetryJudge={retryJudge}
                 onRetryExtraction={retryExtraction}

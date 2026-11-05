@@ -162,6 +162,8 @@ export const chatApi = {
     send: (storyId: number, chatId: number, text: string) =>
         apiSend<Chat>('POST', `/stories/${storyId}/chats/${chatId}/messages`, { text }),
     retry: (storyId: number, chatId: number) => apiSend<Chat>('POST', `/stories/${storyId}/chats/${chatId}/retry`),
+    /** Lets the story go on without a line from the user: the Narrator writes the next reply. */
+    continue: (storyId: number, chatId: number) => apiSend<Chat>('POST', `/stories/${storyId}/chats/${chatId}/continue`),
     /**
      * Rewrites a Message, discards every Message after it and rolls back their changes; a
      * User Message gets a new reply, an AI Message is judged again.

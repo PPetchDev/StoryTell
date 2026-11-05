@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 import {
+    AwaitingReplyError,
     BackgroundCallName,
     BackgroundFailedError,
     BackgroundStillSavingError,
@@ -39,6 +40,7 @@ import { StoryEntity } from '../../model/story/entities/story.entity.js';
 import { StoryModelService } from '../../model/story/story.service.js';
 import { ModelGateway } from '../../service/model-gateway/model-gateway.js';
 import { latestLine } from '../excerpt.js';
+import { exchangeUserText } from './exchange.js';
 import { MissingField, playableStatus } from '../story/playable.js';
 import { WornIdentity, wornIdentity } from './identity.js';
 import { currentBonds, JudgeManagerService, latestJudged, SettledBackground } from './judge/judge.service.js';
@@ -352,6 +354,23 @@ export class ChatManagerService {
     }
 
     /**
+     * Spec: "Continue". The same gate as a send, and refused while a User Message awaits its
+     * reply (Retry is the way on there). No User Message is stored: the turn is written on
+     * from the last AI Message, the Opening included. A failed call stores nothing. (Not
+     * named `continue`, beside `send` and `retry`, since that is a reserved word.)
+     */
+    async continueChat(storyId: number, chatId: number): Promise<ChatDetail> {
+        const { story, chat: loaded } = await this.load(storyId, chatId);
+        if (awaitingReply(loaded)) throw new AwaitingReplyError();
+        const chat = await this.requireSendable(story, loaded);
+
+        return this.writingTurn(chat.id, async () => {
+            await this.writeTurn(story, chat);
+            return this.getChat(storyId, chatId);
+        });
+    }
+
+    /**
      * Spec: "Retry re-runs only the failed call." Allowed on the latest judged AI Message
      * when its judge failed; it runs to the end before answering with the dashboard.
      */
@@ -441,14 +460,15 @@ export class ChatManagerService {
     }
 
     /**
-     * One play-model call for the last User Message of the Chat. Throws the gateway's typed
-     * error on failure, leaving the User Message in place with nothing stored after it. On
-     * success both background calls start against the new AI Message.
+     * One play-model call for the Chat's next turn. When the last Message is a User Message
+     * it is that Message's turn; when it is an AI Message it is a Continue turn, written on
+     * from the whole history with the continue instruction in place of user text (spec:
+     * "Continue", and Regenerate's step 4). Throws the gateway's typed error on failure, with
+     * nothing stored. On success both background calls start against the new AI Message.
      */
     private async writeTurn(story: StoryEntity, chat: ChatEntity): Promise<void> {
-        const userMessage = chat.messages[chat.messages.length - 1];
-        const history: PromptHistoryMessage[] = chat.messages
-            .slice(0, -1)
+        const userText = exchangeUserText(chat.messages, chat.messages.length);
+        const history: PromptHistoryMessage[] = (userText !== null ? chat.messages.slice(0, -1) : chat.messages)
             .map((message) => ({
                 role: message.kind === MessageKind.User ? 'user' : 'assistant',
                 text:
@@ -466,7 +486,7 @@ export class ChatManagerService {
             ...promptLayers(story, state),
             memories: promptMemories(story, memories),
             history,
-            userText: userMessage.text ?? '',
+            userText,
         });
         if (prompt.trimmed > 0) {
             this.logger.log(`Chat ${chat.id}: left out the ${prompt.trimmed} oldest Messages to fit the prompt budget`);

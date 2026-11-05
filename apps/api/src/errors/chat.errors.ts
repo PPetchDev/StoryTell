@@ -89,3 +89,10 @@ export class EmptyMemoryError extends AppError {
         super('422.004.012', 'Write what to remember.');
     }
 }
+
+/** A Continue while the last User Message still awaits its reply: Retry is the way on. */
+export class AwaitingReplyError extends AppError {
+    constructor() {
+        super('409.004.013', 'Your last message is still waiting for its reply. Retry it first.');
+    }
+}

@@ -19,7 +19,7 @@ const Id = (name: string) => Param(name, ParseIntPipe);
 
 /**
  * Chats per Story: create, list, rename, reset, delete, swap the worn identity, send, retry,
- * edit a Message, the read-only dashboard and a retry of either background call (spec: "API surface").
+ * continue, edit a Message, the read-only dashboard and a retry of either background call (spec: "API surface").
  */
 @ApiTags('Chats')
 @Controller('stories/:storyId/chats')
@@ -88,6 +88,17 @@ export class ChatApiController {
     @ApiOkResponse({ type: ChatResponseBodyDTO })
     retry(@Id('storyId') storyId: number, @Id('chatId') chatId: number): Promise<ChatResponseBodyDTO> {
         return this.chatManager.retry(storyId, chatId);
+    }
+
+    /**
+     * Spec: "Continue". The Narrator writes on without a User Message: the reply is stored as
+     * an AI Message and nothing else. A failed call stores nothing; the error is the gateway's.
+     */
+    @Post(':chatId/continue')
+    @HttpCode(200)
+    @ApiOkResponse({ type: ChatResponseBodyDTO })
+    continue(@Id('storyId') storyId: number, @Id('chatId') chatId: number): Promise<ChatResponseBodyDTO> {
+        return this.chatManager.continueChat(storyId, chatId);
     }
 
     /**

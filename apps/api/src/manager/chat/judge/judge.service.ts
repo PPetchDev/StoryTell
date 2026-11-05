@@ -9,6 +9,7 @@ import { BondChangeEntity } from '../../../model/ledger/entities/bond-change.ent
 import { LedgerModelService } from '../../../model/ledger/ledger.service.js';
 import { StoryEntity } from '../../../model/story/entities/story.entity.js';
 import { ModelGateway } from '../../../service/model-gateway/model-gateway.js';
+import { exchangeUserText } from '../exchange.js';
 import { exchangeIdentityName } from '../identity.js';
 import { partsToText } from '../turn/reply-parser.js';
 import { applyJudgement } from './apply-judgement.js';
@@ -102,8 +103,8 @@ export class JudgeManagerService {
             if (!chat || index < 0) return;
             const message = chat.messages[index];
             const before = chat.messages.slice(0, index);
-            const userMessage = before[before.length - 1]?.kind === MessageKind.User ? before[before.length - 1] : null;
-            const context = (userMessage ? before.slice(0, -1) : before).slice(-JUDGE_CONTEXT_MESSAGES);
+            const userText = exchangeUserText(chat.messages, index);
+            const context = (userText !== null ? before.slice(0, -1) : before).slice(-JUDGE_CONTEXT_MESSAGES);
             const identityName = exchangeIdentityName(story, chat, index);
             const nameOf = (characterId: number | null): string | null =>
                 characterId === null ? null : (story.characters.find((c) => c.id === characterId)?.name ?? null);
@@ -131,7 +132,7 @@ export class JudgeManagerService {
                 })),
                 scene: scene ? { name: scene.name, moveOnCondition: scene.moveOnCondition } : null,
                 recent: context.map((entry) => messageLine(entry, identityName)),
-                userText: userMessage?.text ?? '',
+                userText,
                 aiText: partsToText(message.parts.map((part) => part.toResponse())),
             });
 

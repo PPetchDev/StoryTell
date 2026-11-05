@@ -162,6 +162,21 @@ describe('Chats', () => {
         return last;
     }
 
+    /**
+     * Holds every text call until `finish` gives its reply, so a test can act while a turn is
+     * being written. `restore` puts the scripted fake back.
+     */
+    function holdTextCalls(): { finish(text: string): void; restore(): void } {
+        let finish: (text: string) => void = () => {};
+        const slow = new Promise<string>((resolve) => (finish = resolve));
+        const original = t.gateway.completeText;
+        t.gateway.completeText = async (request) => {
+            t.gateway.calls.push({ method: 'completeText', request });
+            return { text: await slow, model: FAKE_TEXT_MODEL, usage: { promptTokens: 0, completionTokens: 0 }, costUsd: 0 };
+        };
+        return { finish: (text) => finish(text), restore: () => (t.gateway.completeText = original) };
+    }
+
     function lastTurnCall() {
         const calls = t.gateway.textCalls('turn');
         return calls[calls.length - 1];
@@ -616,13 +631,7 @@ A Character knows only the Memories it is tagged on and acts as if the rest neve
         it('refuses a second send while the turn is being written', async () => {
             const story = await createStory();
             const chat = await createChat(story.id);
-            let finish: (text: string) => void = () => {};
-            const slow = new Promise<string>((resolve) => (finish = resolve));
-            const original = t.gateway.completeText;
-            t.gateway.completeText = async (request) => {
-                t.gateway.calls.push({ method: 'completeText', request });
-                return { text: await slow, model: FAKE_TEXT_MODEL, usage: { promptTokens: 0, completionTokens: 0 }, costUsd: 0 };
-            };
+            const held = holdTextCalls();
             try {
                 // Supertest sends only once awaited: `.then` starts the first request now.
                 const first = t.http
@@ -636,12 +645,12 @@ A Character knows only the Memories it is tagged on and acts as if the rest neve
                     .expect(409);
                 expect(second.body.error.code).toBe('409.004.004');
 
-                finish('Mira nods.');
+                held.finish('Mira nods.');
                 const done = await first;
                 expect(done.status).toBe(201);
                 expect(done.body.messages).toHaveLength(3);
             } finally {
-                t.gateway.completeText = original;
+                held.restore();
             }
         });
     });
@@ -815,6 +824,189 @@ A Character knows only the Memories it is tagged on and acts as if the rest neve
             expect(body.messages).toHaveLength(5);
             expect(body.messages[4].parts).toEqual([{ kind: 'narration', text: 'Mira says nothing.' }]);
             await awaitJudge(t.http, story.id, played.id);
+        });
+    });
+
+    describe('Continue', () => {
+        function continueTurn(storyId: number, chatId: number) {
+            return t.http.post(`/api/stories/${storyId}/chats/${chatId}/continue`);
+        }
+
+        /** A Continue whose judge and extraction change nothing, read once both have settled. */
+        async function continued(storyId: number, chatId: number, reply: string): Promise<Chat> {
+            t.gateway.scriptText('turn', reply);
+            t.gateway.scriptText('judge', NO_CHANGE);
+            t.gateway.scriptText('memory_extraction', NO_OPS);
+            await continueTurn(storyId, chatId).expect(200);
+            return awaitJudge(t.http, storyId, chatId);
+        }
+
+        it('right after the Opening stores one AI Message and no User Message', async () => {
+            const story = await createStory();
+            const chat = await createChat(story.id);
+
+            const played = await continued(story.id, chat.id, '@Mira: Well? Are you staying or not?');
+
+            expect(played.messages.map((message) => message.kind)).toEqual(['ai', 'ai']);
+            expect(lastAi(played)).toMatchObject({ model: FAKE_TEXT_MODEL });
+            expect(lastAi(played).parts).toEqual([
+                { kind: 'speech', characterId: story.characters[0].id, speakerName: 'Mira', text: 'Well? Are you staying or not?' },
+            ]);
+            expect(played.awaitingReply).toBe(false);
+            expect(Date.parse(played.lastPlayedAt)).toBeGreaterThan(Date.parse(chat.lastPlayedAt));
+            expect(await countRows(countSql('message', "chat_id = $1 AND kind = 'user'"), [chat.id])).toBe(0);
+        });
+
+        it('after another AI Message, sends the whole history and ends on the continue instruction', async () => {
+            const story = await createStory();
+            const chat = await createChat(story.id);
+            await send(story.id, chat.id, 'I take my boots off.', 'Mira grunts.');
+            await continued(story.id, chat.id, '@Mira: The lamp, then.');
+
+            const played = await continued(story.id, chat.id, 'Mira climbs the stairs without waiting.');
+
+            expect(played.messages.map((message) => message.kind)).toEqual(['ai', 'user', 'ai', 'ai', 'ai']);
+            expect(lastAi(played).parts).toEqual([{ kind: 'narration', text: 'Mira climbs the stairs without waiting.' }]);
+
+            const call = lastTurnCall();
+            expect(call.kind).toBe('turn');
+            expect(call.stop).toEqual(['\nAsh:', '\n@Ash:', '\nYou:']);
+            expect(call.messages.slice(1)).toEqual([
+                { role: 'assistant', content: OPENING },
+                { role: 'user', content: 'I take my boots off.' },
+                { role: 'assistant', content: 'Mira grunts.' },
+                { role: 'assistant', content: '@Mira: The lamp, then.' },
+                {
+                    role: 'user',
+                    content:
+                        '(Ash does nothing new this turn and waits.) Continue the story from exactly where it stands: let the Characters and the world move it forward. Do not write anything Ash says, thinks, feels, decides or does, and stop where Ash can respond.',
+                },
+                {
+                    role: 'system',
+                    content: 'Write the next turn now. Do not write anything Ash says, thinks or does. Use @Name: lines for Character speech.',
+                },
+            ]);
+            // The rule against writing the worn identity still holds in the system message.
+            expect(call.messages[0].content).toContain("NEVER write Ash's words, thoughts, feelings, decisions or actions");
+        });
+
+        it('runs the judge and Memory extraction on the reply, with no user line in the exchange', async () => {
+            const story = await createStory();
+            const chat = await createChat(story.id);
+
+            const played = await continued(story.id, chat.id, '@Mira: Well?');
+
+            expect(lastAi(played).judge).toEqual({ status: 'done', error: null });
+            expect(lastAi(played).memory).toEqual({ status: 'done', error: null });
+            for (const kind of ['judge', 'memory_extraction'] as const) {
+                const calls = t.gateway.textCalls(kind);
+                expect(calls).toHaveLength(1);
+                const exchange = calls[0].messages[calls[0].messages.length - 1].content.split('# LATEST EXCHANGE')[1];
+                expect(exchange).toContain('(Ash did nothing new; the story went on.)\n\n@Mira: Well?');
+                expect(exchange).not.toMatch(/^Ash:/m);
+            }
+        });
+
+        it('cuts a line the reply wrote as the worn identity', async () => {
+            const story = await createStory();
+            const chat = await createChat(story.id);
+
+            const played = await continued(story.id, chat.id, 'Mira waits.\n\n@Ash: I follow her up.\n\n@Mira: Good.');
+
+            expect(lastAi(played).parts).toEqual([{ kind: 'narration', text: 'Mira waits.' }]);
+        });
+
+        it('stores nothing when the call fails, and can be tapped again', async () => {
+            const story = await createStory();
+            const chat = await createChat(story.id);
+            t.gateway.scriptText('turn', new ProviderOutageError());
+
+            const failed = await continueTurn(story.id, chat.id).expect(502);
+
+            expect(failed.body.error.code).toBe('502.001.001');
+            const after = await getChat(story.id, chat.id);
+            expect(after.messages).toHaveLength(1);
+            expect(after.awaitingReply).toBe(false);
+            expect(Date.parse(after.lastPlayedAt)).toBe(Date.parse(chat.lastPlayedAt));
+
+            const played = await continued(story.id, chat.id, 'Mira sighs.');
+            expect(played.messages.map((message) => message.kind)).toEqual(['ai', 'ai']);
+        });
+
+        it('is refused while a User Message awaits its reply, with nothing stored', async () => {
+            const story = await createStory();
+            const chat = await createChat(story.id);
+            t.gateway.scriptText('turn', new ProviderOutageError());
+            await t.http.post(`/api/stories/${story.id}/chats/${chat.id}/messages`).send({ text: 'Hello?' }).expect(502);
+
+            const { body } = await continueTurn(story.id, chat.id).expect(409);
+
+            expect(body.error.code).toBe('409.004.013');
+            expect(t.gateway.textCalls('turn')).toHaveLength(1);
+            const after = await getChat(story.id, chat.id);
+            expect(after.awaitingReply).toBe(true);
+            expect(after.messages).toHaveLength(2);
+        });
+
+        it('is refused with text credit out and on a Story that is not playable, without a call', async () => {
+            const story = await createStory();
+            const chat = await createChat(story.id);
+
+            t.gateway.setRemainingCredit({ text: { remainingUsd: 0, limitUsd: 22 } });
+            expect((await continueTurn(story.id, chat.id).expect(402)).body.error.code).toBe('402.001.003');
+            t.gateway.setRemainingCredit({ text: { remainingUsd: null, limitUsd: null } });
+
+            await t.http.patch(`/api/stories/${story.id}/characters/${story.characters[0].id}`).send({ voice: ' ' }).expect(200);
+            const blocked = await continueTurn(story.id, chat.id).expect(422);
+            expect(blocked.body.error.code).toBe('422.004.002');
+            expect(blocked.body.error.message).toContain('Mira: Voice');
+
+            expect(t.gateway.textCalls()).toHaveLength(0);
+            expect((await getChat(story.id, chat.id)).messages).toHaveLength(1);
+        });
+
+        it('is refused while a turn is being written', async () => {
+            const story = await createStory();
+            const chat = await createChat(story.id);
+            const held = holdTextCalls();
+            try {
+                // Supertest sends only once awaited: `.then` starts the first request now.
+                const first = continueTurn(story.id, chat.id).then((response) => response);
+                await new Promise((resolve) => setTimeout(resolve, 200));
+                const second = await continueTurn(story.id, chat.id).expect(409);
+                const send = await t.http.post(`/api/stories/${story.id}/chats/${chat.id}/messages`).send({ text: 'Hi.' }).expect(409);
+                expect(second.body.error.code).toBe('409.004.004');
+                expect(send.body.error.code).toBe('409.004.004');
+
+                held.finish('Mira nods.');
+                const done = await first;
+                expect(done.status).toBe(200);
+                expect(done.body.messages.map((message: Message) => message.kind)).toEqual(['ai', 'ai']);
+            } finally {
+                held.restore();
+            }
+        });
+
+        it('is refused while the previous reply\'s background call has failed, until it is retried', async () => {
+            const story = await createStory();
+            const chat = await createChat(story.id);
+            t.gateway.scriptText('turn', 'Mira nods.');
+            t.gateway.scriptText('judge', new ProviderOutageError('DeepInfra answered 503.'));
+            t.gateway.scriptText('memory_extraction', NO_OPS);
+            await t.http.post(`/api/stories/${story.id}/chats/${chat.id}/messages`).send({ text: 'Hello?' }).expect(201);
+            const failed = await awaitJudge(t.http, story.id, chat.id);
+            expect(lastAi(failed).judge?.status).toBe('failed');
+
+            const { body } = await continueTurn(story.id, chat.id).expect(409);
+
+            expect(body.error.code).toBe('409.004.008');
+            expect(t.gateway.textCalls('turn')).toHaveLength(1);
+            expect((await getChat(story.id, chat.id)).messages).toHaveLength(3);
+
+            t.gateway.scriptText('judge', NO_CHANGE);
+            await t.http.post(`/api/stories/${story.id}/chats/${chat.id}/messages/${lastAi(failed).id}/judge`).expect(200);
+            const played = await continued(story.id, chat.id, 'Mira turns to the stairs.');
+            expect(played.messages.map((message) => message.kind)).toEqual(['ai', 'user', 'ai', 'ai']);
         });
     });
 
