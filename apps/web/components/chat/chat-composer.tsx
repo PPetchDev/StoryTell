@@ -105,6 +105,8 @@ interface ChatComposerProps {
     snapshotError: string | null;
     onDraft(text: string): void;
     onSend(): void;
+    /** ▶ on an empty box: the story goes on without a line from the user. */
+    onContinue(): void;
     onRetry(): void;
     onRetryJudge(messageId: number): void;
     onRetryExtraction(messageId: number): void;
@@ -122,14 +124,17 @@ export function ChatComposer({
     snapshotError,
     onDraft,
     onSend,
+    onContinue,
     onRetry,
     onRetryJudge,
     onRetryExtraction,
 }: ChatComposerProps) {
     const box = useAutoGrow(draft);
+    const empty = draft.trim() === '';
     const send = (event: FormEvent) => {
         event.preventDefault();
-        onSend();
+        // Enter on an empty box does nothing; only a tap on ▶ lets the story go on.
+        if (!empty) onSend();
     };
     return (
         <footer className={styles.composer}>
@@ -175,12 +180,27 @@ export function ChatComposer({
                         event.currentTarget.form?.requestSubmit();
                     }}
                 />
-                {/* Ticket 05: while the box is empty or whitespace this becomes ▶ Continue. */}
-                <button type="submit" className={styles.send} aria-label="Send" disabled={writing || blocked || draft.trim() === ''}>
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
-                        <path d="M3.4 20.4l17.4-7.5c.8-.4.8-1.5 0-1.8L3.4 3.6c-.7-.3-1.4.3-1.3 1l1.5 6.1c.1.4.5.7.9.8L12 12l-7.5.5c-.4 0-.8.4-.9.8l-1.5 6.1c-.1.7.6 1.3 1.3 1z" />
-                    </svg>
-                </button>
+                {empty ? (
+                    // Spec: "Continue". Refused while a User Message awaits its reply: Retry is the way on.
+                    <button
+                        type="button"
+                        className={styles.send}
+                        aria-label="Continue"
+                        title="Let the story go on"
+                        disabled={writing || busy || blocked || chat.awaitingReply}
+                        onClick={onContinue}
+                    >
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+                            <path d="M8 5.1v13.8c0 .8.9 1.3 1.6.8l10.4-6.9c.6-.4.6-1.2 0-1.6L9.6 4.3C8.9 3.8 8 4.3 8 5.1z" />
+                        </svg>
+                    </button>
+                ) : (
+                    <button type="submit" className={styles.send} aria-label="Send" disabled={writing || blocked}>
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+                            <path d="M3.4 20.4l17.4-7.5c.8-.4.8-1.5 0-1.8L3.4 3.6c-.7-.3-1.4.3-1.3 1l1.5 6.1c.1.4.5.7.9.8L12 12l-7.5.5c-.4 0-.8.4-.9.8l-1.5 6.1c-.1.7.6 1.3 1.3 1z" />
+                        </svg>
+                    </button>
+                )}
             </form>
         </footer>
     );

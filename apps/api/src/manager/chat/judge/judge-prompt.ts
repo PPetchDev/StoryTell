@@ -1,5 +1,6 @@
 import { UnparseableOutputError } from '../../../errors/model-gateway.errors.js';
 import { PromptMessage } from '../../../service/model-gateway/model-gateway.js';
+import { exchangeUserLine } from '../exchange.js';
 
 /**
  * The Bond, Arc and Scene judge's prompt and output (spec: "Background judge"), from the turn
@@ -35,8 +36,8 @@ export interface JudgePromptInput {
     scene: { name: string; moveOnCondition: string } | null;
     /** The Messages before the exchange, oldest first, as `Name: text` or the AI's `@Name:` text. */
     recent: string[];
-    /** The exchange to judge: what the user wrote and the AI's reply as `@Name:` text. */
-    userText: string;
+    /** The exchange to judge: what the user wrote (null after a Continue) and the AI's reply as `@Name:` text. */
+    userText: string | null;
     aiText: string;
 }
 
@@ -102,7 +103,7 @@ ${input.scene ? `${input.scene.name}. Move-on condition: ${input.scene.moveOnCon
 ${input.recent.join('\n\n') || '(start)'}
 
 # LATEST EXCHANGE (judge this)
-${input.identityName}: ${input.userText}
+${exchangeUserLine(input.identityName, input.userText)}
 
 ${input.aiText}`;
     return {

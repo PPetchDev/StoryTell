@@ -9,6 +9,7 @@ import { LedgerModelService } from '../../../model/ledger/ledger.service.js';
 import { MemoryModelService } from '../../../model/memory/memory.service.js';
 import { StoryEntity } from '../../../model/story/entities/story.entity.js';
 import { ModelGateway } from '../../../service/model-gateway/model-gateway.js';
+import { exchangeUserText } from '../exchange.js';
 import { exchangeIdentityName } from '../identity.js';
 import { SettledBackground, sleep } from '../judge/judge.service.js';
 import { partsToText } from '../turn/reply-parser.js';
@@ -84,8 +85,7 @@ export class MemoryExtractionManagerService {
             const index = chat?.messages.findIndex((message) => message.id === messageId) ?? -1;
             if (!chat || index < 0) return;
             const message = chat.messages[index];
-            const previous = chat.messages[index - 1];
-            const userMessage = previous?.kind === MessageKind.User ? previous : null;
+            const userText = exchangeUserText(chat.messages, index);
             const identityName = exchangeIdentityName(story, chat, index);
             const cast = story.characters.map((character) => ({ id: character.id, name: character.name }));
             const nameOf = (characterId: number): string | null => cast.find((member) => member.id === characterId)?.name ?? null;
@@ -104,9 +104,9 @@ export class MemoryExtractionManagerService {
             const prompt = buildExtractionPrompt({
                 cast: cast.map((member) => member.name),
                 identityName,
-                present: presentCharacters(cast, userMessage?.text ?? '', parts).map((member) => member.name),
+                present: presentCharacters(cast, userText ?? '', parts).map((member) => member.name),
                 memories: lines,
-                userText: userMessage?.text ?? '',
+                userText,
                 aiText: partsToText(parts),
                 overCap,
             });

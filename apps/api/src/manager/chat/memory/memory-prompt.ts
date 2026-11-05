@@ -1,5 +1,6 @@
 import { UnparseableOutputError } from '../../../errors/model-gateway.errors.js';
 import { PromptMessage } from '../../../service/model-gateway/model-gateway.js';
+import { exchangeUserLine } from '../exchange.js';
 import { estimateTokens } from '../turn/prompt.js';
 
 /**
@@ -23,7 +24,8 @@ export interface ExtractionPromptInput {
     present: string[];
     /** Every non-archived Memory, in the stable order. */
     memories: ExtractionMemory[];
-    userText: string;
+    /** What the user wrote; null after a Continue, which has no User Message. */
+    userText: string | null;
     aiText: string;
     /** True when the Memory list is over the cap: the call is asked to merge and archive. */
     overCap: boolean;
@@ -99,7 +101,7 @@ ${input.present.join(', ') || '(none)'}
 ${memories}
 
 # LATEST EXCHANGE (extract from this)
-${input.identityName}: ${input.userText}
+${exchangeUserLine(input.identityName, input.userText)}
 
 ${input.aiText}`;
     return {

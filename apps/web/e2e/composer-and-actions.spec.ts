@@ -105,10 +105,11 @@ test('the composer is one row that grows, Enter on the phone is a new line, and 
         const send = composer.getByRole('button', { name: 'Send' });
         await expect(page.getByRole('group', { name: 'Message actions' })).toBeVisible();
 
-        // One row, naming the worn identity, with nothing to send yet.
+        // One row, naming the worn identity, with nothing to send yet: the button is ▶ Continue (ticket 05).
         await expect(box).toHaveAttribute('placeholder', /Ash/);
         await expect(composer.getByRole('textbox')).toHaveCount(1);
-        await expect(send).toBeDisabled();
+        await expect(send).toHaveCount(0);
+        await expect(composer.getByRole('button', { name: 'Continue' })).toBeVisible();
         const oneRow = (await box.boundingBox())!.height;
         expect(oneRow).toBeLessThan(56);
 

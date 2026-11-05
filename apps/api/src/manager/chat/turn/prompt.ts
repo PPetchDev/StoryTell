@@ -13,6 +13,8 @@ import { renderUser } from '../memory/render-user.js';
  *  3. worn identity       7. Feelings (Bonds)       11. the user's message
  *  4. Style               8. Arcs                   12. the final instruction
  *
+ * On a Continue turn, layer 11 is the continue instruction in place of the user's message.
+ *
  * Layers 1–9 form one system message with a `# Heading` per layer; 10–11 are chat turns;
  * 12 is a trailing system message, as in the prototype. The identity is the worn one: the
  * Story's Role or a Persona; its name also drives the stop strings and the final instruction.
@@ -89,7 +91,8 @@ export interface TurnPromptInput {
     memories: PromptMemory[];
     /** Every Message of the Chat before the new one, oldest first. */
     history: PromptHistoryMessage[];
-    userText: string;
+    /** The user's message; null for a Continue turn, whose user-role message is the continue instruction. */
+    userText: string | null;
     /** Total prompt budget in tokens; recent Messages are trimmed from the oldest to fit. */
     tokenBudget?: number;
     /** The Memory layer's cap in tokens (spec: "about 2k tokens"); the oldest unlocked Memories are left out past it. */
@@ -251,8 +254,18 @@ export function stopStrings(identityName: string): string[] {
     return [`\n${identityName}:`, `\n@${identityName}:`, '\nYou:'];
 }
 
+/**
+ * Spec: "Continue". Stands in for the user's message on a turn the user asked to go on
+ * without one: the story moves on, and the worn identity does nothing new. Only the manual
+ * battery shows whether the play model obeys; if it doesn't, this is the thing to tune.
+ */
+export function continueInstruction(identity: string): string {
+    return `(${identity} does nothing new this turn and waits.) Continue the story from exactly where it stands: let the Characters and the world move it forward. Do not write anything ${identity} says, thinks, feels, decides or does, and stop where ${identity} can respond.`;
+}
+
 export function buildTurnPrompt(input: TurnPromptInput): TurnPrompt {
     const identity = input.identity.name;
+    const userText = input.userText ?? continueInstruction(identity);
     const castNames = input.story.characters.map((character) => character.name);
     const memory = memoryLayer(input.memories, identity, input.memoryCapTokens ?? MEMORY_CAP_TOKENS);
     const system = [
@@ -269,7 +282,7 @@ export function buildTurnPrompt(input: TurnPromptInput): TurnPrompt {
     const finalInstruction = `Write the next turn now. Do not write anything ${identity} says, thinks or does. Use @Name: lines for Character speech.`;
 
     const budget = input.tokenBudget ?? TURN_PROMPT_TOKEN_BUDGET;
-    const fixed = estimateTokens(system) + estimateTokens(input.userText) + estimateTokens(finalInstruction);
+    const fixed = estimateTokens(system) + estimateTokens(userText) + estimateTokens(finalInstruction);
     let remaining = budget - fixed;
     const kept: PromptHistoryMessage[] = [];
     for (let i = input.history.length - 1; i >= 0; i--) {
@@ -283,7 +296,7 @@ export function buildTurnPrompt(input: TurnPromptInput): TurnPrompt {
         messages: [
             { role: 'system', content: system },
             ...kept.map((message) => ({ role: message.role, content: message.text })),
-            { role: 'user', content: input.userText },
+            { role: 'user', content: userText },
             { role: 'system', content: finalInstruction },
         ],
         stop: stopStrings(identity),
