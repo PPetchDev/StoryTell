@@ -134,14 +134,14 @@ export class SnapshotManagerService {
     /** Spec: "Snapshots inline under their Message"; the ones whose Message is gone live only in the Gallery. */
     async forChat(storyId: number, chatId: number): Promise<ChatSnapshots> {
         const { chat } = await this.load(storyId, chatId);
+        // Read the jobs before the Snapshots. A job is removed only after its Snapshot is stored, so this order
+        // never misses both. The other order can: the job finishes during the query and the poll sees neither.
+        const jobs = [...this.jobs.values()].filter((job) => job.chatId === chat.id).map((job) => ({ ...job }));
         const snapshots = await this.snapshotModel.findLinkedByChat(
             chat.id,
             chat.messages.map((message) => message.id),
         );
-        return {
-            snapshots: snapshots.map((snapshot) => snapshot.toResponse()),
-            jobs: [...this.jobs.values()].filter((job) => job.chatId === chat.id).map((job) => ({ ...job })),
-        };
+        return { snapshots: snapshots.map((snapshot) => snapshot.toResponse()), jobs };
     }
 
     /** Spec: "Gallery: per Story, newest first, filterable by Chat". */
