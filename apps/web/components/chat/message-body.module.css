@@ -1,0 +1,64 @@
+/*
+ * Story text reads like a book (spec: "The Chat reads like a novel"). Its size comes from
+ * --story-size, which the text-size preference sets on an ancestor; M is the fallback.
+ */
+.story,
+.user {
+    --story-font: var(--font-book), Georgia, 'Times New Roman', serif;
+    font-size: var(--story-size, 1.0625rem);
+}
+
+.narration,
+.text {
+    margin: 0;
+    font-family: var(--story-font);
+    line-height: 1.7;
+    white-space: pre-wrap;
+}
+
+.narration + .narration,
+.narration + .speech,
+.speech + .narration,
+.speech + .speech {
+    margin-top: 0.85rem;
+}
+
+.speech {
+    border-left: 3px solid var(--speaker-colour);
+    padding: 0.1rem 0 0.1rem 0.85rem;
+}
+
+.speaker {
+    margin: 0 0 0.125rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--speaker-colour);
+}
+
+.user {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+.identity {
+    margin: 0 0.25rem 0.25rem 0;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--muted);
+}
+
+.bubble {
+    margin: 0;
+    max-width: 85%;
+    padding: 0.55rem 0.9rem;
+    background: var(--accent-soft);
+    border: 1px solid var(--accent-line);
+    border-radius: 1.1rem 1.1rem 0.3rem 1.1rem;
+    font-family: var(--story-font);
+    line-height: 1.6;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}

@@ -1,219 +1,20 @@
 'use client';
 
-import Link from 'next/link';
-import { FormEvent, Fragment, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
+import { ChatComposer } from '@/components/chat/chat-composer';
+import { ChatThread, PendingLine } from '@/components/chat/chat-thread';
+import { ChatTopBar } from '@/components/chat/chat-top-bar';
 import { MemoryDrawer } from '@/components/chat/memory-drawer';
-import { Camera, MessageSnapshots, SnapshotViewer, useChatSnapshots } from '@/components/chat/snapshots';
-import { useApiQuery, useConnection } from '@/components/connection';
-import { ConfirmButton } from '@/components/story-editor/fields';
+import { SnapshotViewer, useChatSnapshots } from '@/components/chat/snapshots';
+import { useConnection } from '@/components/connection';
 import { ApiError, apiFetch, ApiUnreachableError } from '@/lib/api';
-import { backgroundPending, Chat, chatApi, EditedChat, latestReply, Message, messageText, modelLabel, rollbackNotice } from '@/lib/chat';
+import { Cast } from '@/lib/character-colour';
+import { backgroundPending, Chat, chatApi, EditedChat, latestReply, Message, rollbackNotice } from '@/lib/chat';
 import { Memory, memoryApi, renderUser } from '@/lib/memory';
-import { PersonaList } from '@/lib/persona';
 import { Snapshot } from '@/lib/snapshot';
 
-function messageLabel(message: Message): string {
-    if (message.kind === 'user') return `${message.identityName} said`;
-    return message.model === 'author' ? 'Opening' : 'AI reply';
-}
-
-function MessageBody({ message }: { message: Message }) {
-    if (message.kind === 'user') {
-        return (
-            <>
-                <p className="speaker">{message.identityName}</p>
-                <p className="message-text">{message.text}</p>
-            </>
-        );
-    }
-    return message.parts.map((part, index) =>
-        part.kind === 'narration' ? (
-            <p key={index} className="narration message-text">
-                {part.text}
-            </p>
-        ) : (
-            <div key={index} className="speech">
-                <p className="speaker">{part.speakerName}</p>
-                <p className="message-text">{part.text}</p>
-            </div>
-        ),
-    );
-}
-
-interface EditFormProps {
-    message: Message;
-    /** How many Messages come after this one; they are discarded on save, after confirming. */
-    later: number;
-    onSave(text: string): void;
-    onCancel(): void;
-}
-
-/**
- * The in-place edit box. A User Message is edited as plain text; an AI Message as narration
- * paragraphs and `@Name:` speech lines, which the API re-splits. Saving with later Messages
- * asks first, since they go for good.
- */
-function EditForm({ message, later, onSave, onCancel }: EditFormProps) {
-    const [value, setValue] = useState(() => messageText(message));
-    const empty = value.trim() === '';
-    const what = message.kind === 'user' ? 'and the AI replies afresh' : 'and the Chat waits for you';
-    return (
-        <form
-            className="message-edit"
-            aria-label={`Edit ${messageLabel(message)}`}
-            onSubmit={(event) => {
-                event.preventDefault();
-                if (!empty && later === 0) onSave(value);
-            }}
-        >
-            <textarea
-                aria-label="Message text"
-                value={value}
-                rows={Math.min(12, Math.max(3, value.split('\n').length + 1))}
-                autoFocus
-                onChange={(event) => setValue(event.target.value)}
-            />
-            {message.kind === 'ai' && (
-                <p className="muted edit-hint">Speech goes on `@Name:` lines; a blank line starts narration.</p>
-            )}
-            <div className="toolbar">
-                {later === 0 ? (
-                    <button type="submit" className="button" disabled={empty}>
-                        Save
-                    </button>
-                ) : (
-                    <ConfirmButton
-                        label="Save"
-                        question={`This discards the ${later === 1 ? 'Message' : `${later} Messages`} after it ${what}.`}
-                        confirmLabel="Save and rewind"
-                        onConfirm={() => onSave(value)}
-                        disabled={empty}
-                    />
-                )}
-                <button type="button" className="button button-quiet" onClick={onCancel}>
-                    Cancel
-                </button>
-            </div>
-        </form>
-    );
-}
-
-interface MessageViewProps {
-    message: Message;
-    later: number;
-    editing: boolean;
-    /** Edit is hidden while a turn is written or another Message is being edited. */
-    canEdit: boolean;
-    onEdit(): void;
-    onSave(text: string): void;
-    onCancel(): void;
-}
-
-function MessageView({ message, later, editing, canEdit, onEdit, onSave, onCancel }: MessageViewProps) {
-    return (
-        <article
-            id={`message-${message.id}`}
-            className={message.kind === 'user' ? 'message message-user' : 'message message-ai'}
-            aria-label={messageLabel(message)}
-        >
-            {editing ? (
-                <EditForm message={message} later={later} onSave={onSave} onCancel={onCancel} />
-            ) : (
-                <>
-                    <MessageBody message={message} />
-                    {canEdit && (
-                        <div className="message-tools">
-                            <button type="button" className="button button-quiet button-small" onClick={onEdit}>
-                                Edit
-                            </button>
-                        </div>
-                    )}
-                </>
-            )}
-        </article>
-    );
-}
-
-interface NoticesProps {
-    chat: Chat;
-    onRetryJudge(messageId: number): void;
-    onRetryExtraction(messageId: number): void;
-    retrying: boolean;
-}
-
-/** What stands between the user and the next turn, if anything. */
-function Notices({ chat, onRetryJudge, onRetryExtraction, retrying }: NoticesProps) {
-    const reply = latestReply(chat);
-    return (
-        <>
-            {reply?.judge?.status === 'failed' && (
-                <p className="notice" role="status">
-                    Sending is blocked: the last reply&apos;s Bond, Arc and Scene judge failed ({reply.judge.error}).{' '}
-                    <button type="button" className="button button-quiet" disabled={retrying} onClick={() => onRetryJudge(reply.id)}>
-                        {retrying ? 'Retrying…' : 'Retry'}
-                    </button>
-                </p>
-            )}
-            {reply?.memory?.status === 'failed' && (
-                <p className="notice" role="status">
-                    Sending is blocked: the last reply&apos;s Memory extraction failed ({reply.memory.error}).{' '}
-                    <button type="button" className="button button-quiet" disabled={retrying} onClick={() => onRetryExtraction(reply.id)}>
-                        {retrying ? 'Retrying…' : 'Retry'}
-                    </button>
-                </p>
-            )}
-            {!chat.playable && (
-                <p className="notice" role="status">
-                    Sending is blocked: the Story has empty fields. Still to fill in:{' '}
-                    {chat.missing.map((field) => field.label).join(', ')}.{' '}
-                    <Link href={`/stories/${chat.storyId}`}>Edit Story</Link>
-                </p>
-            )}
-            {chat.textCreditOut && (
-                <p className="notice" role="status">
-                    Sending is blocked: text credit is used up. <Link href="/usage">See usage</Link>
-                </p>
-            )}
-            {chat.drift && (
-                <p className="notice" role="status">
-                    Drift notice: the last reply came from {modelLabel(chat.drift.lastModel)}; the play model is now{' '}
-                    {modelLabel(chat.drift.playModel)}. Characters may sound different from here on.
-                </p>
-            )}
-        </>
-    );
-}
-
-/**
- * The worn identity (spec: stories 44–45): the Story's Role or any Persona, swappable at any
- * time. The next User Message is written as it; earlier ones keep the name they were sent under.
- */
-function IdentitySwap({ chat, disabled, onSwap }: { chat: Chat; disabled: boolean; onSwap(personaId: number | null): void }) {
-    const personas = useApiQuery<PersonaList>('/personas');
-    const options = personas.status === 'ready' ? personas.data.personas.map(({ id, name }) => ({ id, name })) : [];
-    // The worn Persona stays selectable while the list loads.
-    if (chat.personaId !== null && !options.some((option) => option.id === chat.personaId)) {
-        options.unshift({ id: chat.personaId, name: chat.identityName });
-    }
-    return (
-        <label className="identity-swap">
-            <span className="muted">Playing as</span>
-            <select
-                value={chat.personaId ?? ''}
-                disabled={disabled}
-                onChange={(event) => onSwap(event.target.value === '' ? null : Number(event.target.value))}
-            >
-                <option value="">{chat.roleName} (Role)</option>
-                {options.map((option) => (
-                    <option key={option.id} value={option.id}>
-                        {option.name}
-                    </option>
-                ))}
-            </select>
-        </label>
-    );
-}
+import styles from './chat-screen.module.css';
 
 /** A "Memory added" toast (spec: story 83): one per Memory the AI added in the latest turn. */
 interface Toast {
@@ -225,20 +26,27 @@ interface Toast {
 const BACKGROUND_POLL_MS = 1_000;
 
 /**
- * The Chat screen (spec: "Chat screen"): narration and named speech in order, a composer,
- * and the notice line. No streaming: a "writing" indicator shows while the turn is written,
- * and a failed turn leaves the User Message with Retry. Any Message can be edited in place,
- * which discards the Messages after it and rolls back their changes, with a short notice of
- * what went; Reset starts the Chat over from the Opening. Bonds and Arcs never show here:
- * the dashboard link leads to them. Memory does: the drawer lists it, and a "Memory added"
- * toast appears for each Memory the AI adds once a turn's extraction is done. The camera
- * takes a Snapshot of the latest AI Message while play goes on; Snapshots show under their
- * Message, and a tap opens one full screen.
+ * The Chat screen (spec: "Chat screen"): a top bar, the thread and the composer. No
+ * streaming: a "writing" indicator shows while the turn is written, and a failed turn leaves
+ * the User Message with Retry. Any Message can be edited in place, which discards the
+ * Messages after it and rolls back their changes, with a short notice of what went; Reset
+ * starts the Chat over from the Opening. Bonds and Arcs never show here: the dashboard link
+ * leads to them. Memory does: the drawer lists it, and a "Memory added" toast appears for each
+ * Memory the AI adds once a turn's extraction is done. The camera takes a Snapshot of the
+ * latest AI Message while play goes on; Snapshots show under their Message, and a tap opens
+ * one full screen.
  */
-export function ChatScreen({ initial }: { initial: Chat }) {
+interface ChatScreenProps {
+    initial: Chat;
+    cast: Cast;
+}
+
+export function ChatScreen({ initial, cast }: ChatScreenProps) {
     const { reportUnreachable } = useConnection();
     const [chat, setChat] = useState(initial);
     const [draft, setDraft] = useState('');
+    /** The line just sent, shown in the thread until the turn settles. */
+    const [pending, setPending] = useState<PendingLine | null>(null);
     const [writing, setWriting] = useState(false);
     const [busy, setBusy] = useState(false);
     const [editing, setEditing] = useState<number | null>(null);
@@ -248,22 +56,8 @@ export function ChatScreen({ initial }: { initial: Chat }) {
     const [toasts, setToasts] = useState<Toast[]>([]);
     const snaps = useChatSnapshots(initial.storyId, initial.id);
     const [viewing, setViewing] = useState<Snapshot | null>(null);
-    const endRef = useRef<HTMLDivElement>(null);
-    const jumpedRef = useRef(false);
     /** The reply whose finished extraction was already announced, so a re-read never toasts twice. */
     const announcedRef = useRef<number | null>(latestReply(initial)?.id ?? null);
-
-    useEffect(() => {
-        // A dashboard link lands on its Message once; after that, follow the newest Message.
-        const target = jumpedRef.current ? null : document.getElementById(window.location.hash.slice(1) || '');
-        jumpedRef.current = true;
-        if (target) {
-            target.scrollIntoView({ block: 'center' });
-            target.classList.add('message-target');
-            return;
-        }
-        endRef.current?.scrollIntoView({ block: 'end' });
-    }, [chat.messages.length, writing]);
 
     // While the last reply's background calls run, re-read the Chat until they settle.
     useEffect(() => {
@@ -330,27 +124,35 @@ export function ChatScreen({ initial }: { initial: Chat }) {
         return edited;
     };
 
-    const runTurn = async (turn: () => Promise<Chat>) => {
+    /**
+     * Runs a turn with the writing indicator up. A failed turn shows its error and re-reads
+     * the Chat, since the User Message may have been stored before the turn failed: it then
+     * shows with Retry. `unsent` is called when it wasn't stored, so its text isn't lost.
+     */
+    const runTurn = async (turn: () => Promise<Chat>, unsent?: () => void) => {
         setWriting(true);
         setError(null);
         setRollback(null);
         try {
             setChat(await turn());
-            setDraft('');
         } catch (caught) {
             if (caught instanceof ApiUnreachableError) {
+                unsent?.();
                 reportUnreachable();
                 return;
             }
             setError(caught instanceof ApiError ? caught.message : 'The turn failed.');
-            // The User Message may have been stored before the turn failed: show it with Retry.
             try {
-                setChat(await apiFetch<Chat>(`/stories/${chat.storyId}/chats/${chat.id}`));
+                const reread = await apiFetch<Chat>(`/stories/${chat.storyId}/chats/${chat.id}`);
+                setChat(reread);
+                if (!reread.awaitingReply) unsent?.();
             } catch {
                 // The error above already tells the user; a reload shows the rest.
+                unsent?.();
             }
         } finally {
             setWriting(false);
+            setPending(null);
         }
     };
 
@@ -369,10 +171,20 @@ export function ChatScreen({ initial }: { initial: Chat }) {
         }
     };
 
-    const send = (event: FormEvent) => {
-        event.preventDefault();
+    /**
+     * Sends at once (spec: "Send feedback"): the composer clears and the line shows in the
+     * thread while the reply is written. If the API never stored it, the text goes back in
+     * the composer.
+     */
+    const send = () => {
         if (draft.trim() === '' || writing || blocked) return;
-        void runTurn(() => chatApi.send(chat.storyId, chat.id, draft));
+        const text = draft;
+        setDraft('');
+        setPending({ text, identityName: chat.identityName });
+        void runTurn(
+            () => chatApi.send(chat.storyId, chat.id, text),
+            () => setDraft((current) => (current === '' ? text : current)),
+        );
     };
 
     const saveEdit = (message: Message, text: string) => {
@@ -407,29 +219,14 @@ export function ChatScreen({ initial }: { initial: Chat }) {
         });
 
     return (
-        <main className="chat">
-            <nav className="breadcrumbs">
-                <Link href={`/stories/${chat.storyId}/chats`}>← Chats</Link>
-                <span className="muted">
-                    {chat.currentScene ? `Scene: ${chat.currentScene.name}` : 'Free play'}
-                </span>
-                <Link href={`/stories/${chat.storyId}/gallery?chat=${chat.id}`}>Gallery</Link>
-                <Link href={`/stories/${chat.storyId}/chats/${chat.id}/dashboard`}>Dashboard →</Link>
-            </nav>
-            <div className="chat-head">
-                <h1>{chat.title}</h1>
-                <IdentitySwap chat={chat} disabled={writing || busy || editing !== null} onSwap={swapIdentity} />
-                <button type="button" className="button button-quiet" onClick={() => openMemory()}>
-                    Memory
-                </button>
-                <ConfirmButton
-                    label="Reset"
-                    question="Clear every Message and start this Chat over from the Opening?"
-                    confirmLabel="Reset"
-                    onConfirm={() => void runWrite(async () => refreshMemory(await chatApi.reset(chat.storyId, chat.id)))}
-                    disabled={writing || busy || editing !== null || !chat.playable}
-                />
-            </div>
+        <main className={`chat ${styles.screen}`}>
+            <ChatTopBar
+                chat={chat}
+                busy={writing || busy || editing !== null}
+                onSwapIdentity={swapIdentity}
+                onOpenMemory={() => openMemory()}
+                onReset={() => void runWrite(async () => refreshMemory(await chatApi.reset(chat.storyId, chat.id)))}
+            />
 
             {toasts.length > 0 && (
                 <div className="toasts" aria-label="Memory added">
@@ -453,61 +250,40 @@ export function ChatScreen({ initial }: { initial: Chat }) {
                 />
             )}
 
-            <section className="messages" aria-label="Messages">
-                {chat.messages.map((message, index) => (
-                    <Fragment key={message.id}>
-                        <MessageView
-                            message={message}
-                            later={chat.messages.length - index - 1}
-                            editing={editing === message.id}
-                            canEdit={!writing && !busy && editing === null && (message.kind === 'ai' || !blocked)}
-                            onEdit={() => setEditing(message.id)}
-                            onSave={(text) => saveEdit(message, text)}
-                            onCancel={() => setEditing(null)}
-                        />
-                        {message.kind === 'ai' && (
-                            <MessageSnapshots
-                                snapshots={snaps.state.snapshots.filter((snapshot) => snapshot.messageId === message.id)}
-                                jobs={snaps.state.jobs.filter((job) => job.messageId === message.id)}
-                                onOpen={setViewing}
-                                onRetry={(job) => void snaps.retry(job)}
-                                onDismiss={(job) => void snaps.dismiss(job)}
-                            />
-                        )}
-                    </Fragment>
-                ))}
-                {writing && (
-                    <p className="writing muted" role="status">
-                        Writing…
-                    </p>
-                )}
-                <div ref={endRef} />
-            </section>
+            <ChatThread
+                messages={chat.messages}
+                cast={cast}
+                pending={pending}
+                writing={writing}
+                editing={editing}
+                canEdit={!writing && !busy && editing === null}
+                blocked={blocked}
+                snapshots={snaps.state}
+                onEdit={setEditing}
+                onSave={saveEdit}
+                onCancelEdit={() => setEditing(null)}
+                onOpenSnapshot={setViewing}
+                onRetrySnapshot={(job) => void snaps.retry(job)}
+                onDismissSnapshot={(job) => void snaps.dismiss(job)}
+            />
 
-            {rollback && (
-                <p className="notice rollback-notice" role="status">
-                    {rollback}
-                </p>
-            )}
-            <Notices chat={chat} onRetryJudge={retryJudge} onRetryExtraction={retryExtraction} retrying={busy} />
-            {error && (
-                <p role="alert" className="turn-error">
-                    {error}
-                </p>
-            )}
-            {chat.awaitingReply && !writing && (
-                <p className="notice" role="status">
-                    The last turn failed. Your message is kept.{' '}
-                    <button
-                        type="button"
-                        className="button button-quiet"
-                        disabled={blocked}
-                        onClick={() => void runTurn(() => chatApi.retry(chat.storyId, chat.id))}
-                    >
-                        Retry
-                    </button>
-                </p>
-            )}
+            <ChatComposer
+                chat={chat}
+                draft={draft}
+                writing={writing}
+                busy={busy}
+                editing={editing !== null}
+                blocked={blocked}
+                error={error}
+                rollback={rollback}
+                snapshotError={snaps.error}
+                onDraft={setDraft}
+                onSend={send}
+                onRetry={() => void runTurn(() => chatApi.retry(chat.storyId, chat.id))}
+                onRetryJudge={retryJudge}
+                onRetryExtraction={retryExtraction}
+                onTakeSnapshot={(hint) => void snaps.take(hint)}
+            />
 
             {viewing && (
                 <SnapshotViewer
@@ -527,30 +303,6 @@ export function ChatScreen({ initial }: { initial: Chat }) {
                     }
                 />
             )}
-            <Camera
-                disabledNote={chat.imageCreditOut ? 'Snapshots are off: image credit is used up. Play goes on.' : null}
-                busy={writing || busy || editing !== null}
-                error={snaps.error}
-                onTake={(hint) => void snaps.take(hint)}
-            />
-            <form className="composer" onSubmit={send} aria-label="Composer">
-                <textarea
-                    aria-label={`Write as ${chat.identityName}`}
-                    placeholder={`Write as ${chat.identityName}…`}
-                    value={draft}
-                    rows={3}
-                    disabled={writing || blocked}
-                    onChange={(event) => setDraft(event.target.value)}
-                    onKeyDown={(event) => {
-                        if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
-                            event.currentTarget.form?.requestSubmit();
-                        }
-                    }}
-                />
-                <button type="submit" className="button" disabled={writing || blocked || draft.trim() === ''}>
-                    {writing ? 'Writing…' : 'Send'}
-                </button>
-            </form>
         </main>
     );
 }

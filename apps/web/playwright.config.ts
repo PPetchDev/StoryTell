@@ -27,6 +27,8 @@ export default defineConfig({
             API_ORIGIN: `http://127.0.0.1:${E2E_API_PORT}`,
             // Its own build folder, so E2E can run while `npm run dev` is up.
             NEXT_DIST_DIR: '.next-e2e',
+            // Start cold each run; see next.config.ts.
+            NEXT_DEV_FS_CACHE: 'off',
         },
     },
 });

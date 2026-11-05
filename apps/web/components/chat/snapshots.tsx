@@ -7,6 +7,8 @@ import { SnapshotViewer, snapshotAlt } from '@/components/snapshot/snapshot-view
 import { ApiError, apiFetch, ApiUnreachableError } from '@/lib/api';
 import { ChatSnapshots, chatSnapshotsPath, Snapshot, snapshotApi, snapshotImageUrl, SnapshotJob } from '@/lib/snapshot';
 
+import styles from './message-snapshots.module.css';
+
 /** How often the Chat's Snapshots are re-read while one is being made. */
 const SNAPSHOT_POLL_MS = 1_500;
 
@@ -78,20 +80,20 @@ interface MessageSnapshotsProps {
 export function MessageSnapshots({ snapshots, jobs, onOpen, onRetry, onDismiss }: MessageSnapshotsProps) {
     if (snapshots.length === 0 && jobs.length === 0) return null;
     return (
-        <div className="message-snapshots" aria-label="Snapshots">
+        <div className={styles.snapshots} aria-label="Snapshots">
             {snapshots.map((snapshot) => (
-                <button key={snapshot.id} type="button" className="snapshot-thumb" onClick={() => onOpen(snapshot)}>
+                <button key={snapshot.id} type="button" className={styles.thumb} onClick={() => onOpen(snapshot)}>
                     {/* eslint-disable-next-line @next/next/no-img-element -- served by the API from the image folder */}
                     <img src={snapshotImageUrl(snapshot)} alt={snapshotAlt(snapshot)} />
                 </button>
             ))}
             {jobs.map((job) =>
                 job.status === 'pending' ? (
-                    <div key={job.id} className="snapshot-placeholder" role="status" aria-label="Snapshot being made">
+                    <div key={job.id} className={styles.placeholder} role="status" aria-label="Snapshot being made">
                         <span>Making a Snapshot…</span>
                     </div>
                 ) : (
-                    <div key={job.id} className="snapshot-failed" role="alert">
+                    <div key={job.id} className={styles.failed} role="alert">
                         <span>The Snapshot failed: {job.error?.message ?? 'unknown error'}</span>
                         <span className="toolbar">
                             <button type="button" className="button button-quiet button-small" onClick={() => onRetry(job)}>

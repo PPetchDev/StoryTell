@@ -54,8 +54,7 @@ test('starts a Chat, sees the Opening, sends, and sees narration plus named spee
         // The Opening is Message 1, split into narration and Mira's speech.
         const opening = page.getByRole('article', { name: 'Opening' });
         await expect(opening).toContainText('The lamp went out an hour ago.');
-        await expect(opening.locator('.speaker')).toHaveText('Mira');
-        await expect(opening).toContainText('Boots off, keeper.');
+        await expect(opening.getByRole('group', { name: 'Mira', exact: true })).toContainText('Boots off, keeper.');
 
         await page.getByLabel('Write as Ash').fill('I pull my boots off and set them by the door.');
         await page.getByRole('button', { name: 'Send' }).click();
@@ -64,8 +63,7 @@ test('starts a Chat, sees the Opening, sends, and sees narration plus named spee
         await expect(said).toContainText('I pull my boots off and set them by the door.');
         const reply = page.getByRole('article', { name: 'AI reply' });
         await expect(reply).toContainText('Rain drips from your hat onto the floorboards.');
-        await expect(reply.locator('.speaker')).toHaveText('Mira');
-        await expect(reply).toContainText('Took you long enough.');
+        await expect(reply.getByRole('group', { name: 'Mira', exact: true })).toContainText('Took you long enough.');
         await expect(reply).toContainText('She does not look up.');
         await expect(page.getByText('Drift notice')).toHaveCount(0);
 

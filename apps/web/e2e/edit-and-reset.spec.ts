@@ -74,8 +74,7 @@ test('edits an earlier User Message, sees the later Messages gone and a new repl
         await expect(said).toContainText('I keep my boots on.');
         await expect(replies).toHaveCount(1);
         await expect(replies).toContainText('Rain drips from your coat.');
-        await expect(replies.locator('.speaker')).toHaveText('Mira');
-        await expect(replies).toContainText('Leave them on, then.');
+        await expect(replies.getByRole('group', { name: 'Mira', exact: true })).toContainText('Leave them on, then.');
         await expect(page.getByText('Where is the lamp room?')).toHaveCount(0);
 
         // Reset clears everything but the Opening and keeps the title.

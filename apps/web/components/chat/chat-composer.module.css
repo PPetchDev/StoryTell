@@ -1,0 +1,27 @@
+.composer {
+    flex: none;
+    padding: 0.5rem 0 max(0.75rem, env(safe-area-inset-bottom));
+    border-top: 1px solid var(--line);
+    background: var(--bg);
+}
+
+.form {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.form textarea {
+    font: inherit;
+    width: 100%;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+    padding: 0.625rem 0.75rem;
+    resize: vertical;
+    min-width: 0;
+}
+
+.form :global(.button) {
+    justify-self: end;
+}

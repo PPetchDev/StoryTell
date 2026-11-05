@@ -64,10 +64,11 @@ test('removing a Character warns first, and an existing Chat keeps its old speec
 
         await page.goto(`/stories/${storyId}/chats/${chatId}`);
         const reply = page.getByRole('article', { name: 'AI reply' });
-        const kaiLine = reply.locator('.speech').filter({ hasText: 'Welcome, keeper!' });
-        await expect(kaiLine.locator('.speaker')).toHaveText('Kai');
+        // Each line of speech is a group named by its speaker.
+        const kaiLine = reply.getByRole('group', { name: 'Kai', exact: true }).filter({ hasText: 'Welcome, keeper!' });
+        await expect(kaiLine).toBeVisible();
         await expect(kaiLine).toContainText('Mind the third step.');
-        await expect(reply.locator('.speech').filter({ hasText: 'Hush.' }).locator('.speaker')).toHaveText('Mira');
+        await expect(reply.getByRole('group', { name: 'Mira', exact: true })).toContainText('Hush.');
     } finally {
         // Leaves the shared e2e database as it was found, Chats included.
         await request.delete(`/api/stories/${storyId}`);
