@@ -18,6 +18,10 @@
     padding: 1.25rem;
 }
 
+.dialog:focus {
+    outline: none;
+}
+
 .question {
     margin: 0 0 1rem;
     font-size: 1.0625rem;

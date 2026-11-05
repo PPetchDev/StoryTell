@@ -5,8 +5,8 @@ import { useEffect, useRef, useState } from 'react';
 import { ChatComposer } from '@/components/chat/chat-composer';
 import { ChatThread, PendingLine } from '@/components/chat/chat-thread';
 import { ChatTopBar } from '@/components/chat/chat-top-bar';
-import { SceneStrip } from '@/components/chat/scene-strip';
 import { MemoryDrawer } from '@/components/chat/memory-drawer';
+import { SceneStrip } from '@/components/chat/scene-strip';
 import { SnapshotSheet } from '@/components/chat/snapshot-sheet';
 import { SnapshotViewer, useChatSnapshots } from '@/components/chat/snapshots';
 import { useConnection } from '@/components/connection';
@@ -43,7 +43,7 @@ const BACKGROUND_POLL_MS = 1_000;
 interface ChatScreenProps {
     initial: Chat;
     cast: Cast;
-    /** The Story's Scenes, whose goals the Scene strip shows; empty while the Story can't be read. */
+    /** The Story's Scenes, for the goals in the Scene strip; empty if the Story can't be read. */
     scenes: Scene[];
 }
 
@@ -96,12 +96,7 @@ export function ChatScreen({ initial, cast, scenes }: ChatScreenProps) {
 
     const blocked = !chat.playable || chat.textCreditOut;
 
-    /** The Scene strip, hidden per device; its goal is the Scene's situation from the Story. */
     const stripHidden = useSceneStripHidden();
-    const scene = chat.currentScene && {
-        name: chat.currentScene.name,
-        goal: scenes.find((candidate) => candidate.id === chat.currentScene?.id)?.situation ?? '',
-    };
 
     const openMemory = (memoryId: number | null = null) => {
         setDrawer((current) => ({ open: true, focus: memoryId, version: current.version }));
@@ -241,10 +236,18 @@ export function ChatScreen({ initial, cast, scenes }: ChatScreenProps) {
                 onShowStrip={() => setSceneStripHidden(false)}
                 onSwapIdentity={swapIdentity}
                 onOpenMemory={() => openMemory()}
-                onRename={(title) => void runWrite(() => chatApi.rename(chat.storyId, chat.id, title))}
+                onRename={(title) =>
+                    void runWrite(() => chatApi.rename(chat.storyId, chat.id, title))
+                }
                 onReset={() => void runWrite(async () => refreshMemory(await chatApi.reset(chat.storyId, chat.id)))}
             />
-            {!stripHidden && <SceneStrip scene={scene} onHide={() => setSceneStripHidden(true)} />}
+            {!stripHidden && (
+                <SceneStrip
+                    current={chat.currentScene}
+                    scenes={scenes}
+                    onHide={() => setSceneStripHidden(true)}
+                />
+            )}
 
             {toasts.length > 0 && (
                 <div className="toasts" aria-label="Memory added">

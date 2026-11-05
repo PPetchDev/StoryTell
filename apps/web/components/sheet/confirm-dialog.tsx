@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useId, useRef } from 'react';
+import { useId, useRef } from 'react';
 
-import { keepFocusIn } from './sheet';
 import styles from './confirm-dialog.module.css';
+import { useModalFocus } from './sheet';
 
 interface ConfirmDialogProps {
     /** The question, which is also the dialog's name. */
@@ -22,26 +22,8 @@ interface ConfirmDialogProps {
 export function ConfirmDialog({ question, confirmLabel, onCancel, onConfirm }: ConfirmDialogProps) {
     const panel = useRef<HTMLDivElement>(null);
     const cancel = useRef<HTMLButtonElement>(null);
-    const onCancelRef = useRef(onCancel);
     const titleId = useId();
-
-    useEffect(() => {
-        onCancelRef.current = onCancel;
-    }, [onCancel]);
-
-    useEffect(() => {
-        const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-        cancel.current?.focus();
-        const onKey = (event: KeyboardEvent) => {
-            if (event.key === 'Escape') onCancelRef.current();
-            if (event.key === 'Tab' && panel.current) keepFocusIn(panel.current, event);
-        };
-        document.addEventListener('keydown', onKey);
-        return () => {
-            document.removeEventListener('keydown', onKey);
-            opener?.focus();
-        };
-    }, []);
+    useModalFocus(panel, onCancel, cancel);
 
     return (
         <div className={styles.backdrop} onClick={onCancel}>
@@ -51,6 +33,7 @@ export function ConfirmDialog({ question, confirmLabel, onCancel, onConfirm }: C
                 role="alertdialog"
                 aria-modal="true"
                 aria-labelledby={titleId}
+                tabIndex={-1}
                 onClick={(event) => event.stopPropagation()}
             >
                 <h2 id={titleId} className={styles.question}>

@@ -5,11 +5,15 @@ test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true
 
 const OPENING = 'The lamp went out an hour ago.\n\n@Mira: Boots off, keeper.';
 const NO_CHANGE = '{"bond_changes":[],"arc_steps":[],"scene":{"move_on":false}}';
-const MOVE_ON = '{"bond_changes":[],"arc_steps":[],"scene":{"move_on":true,"reason":"Mira let Ash up."}}';
+const MOVE_ON =
+    '{"bond_changes":[],"arc_steps":[],"scene":{"move_on":true,"reason":"Mira let Ash up."}}';
 const NO_OPS = '{"operations":[]}';
 
 /** A playable Story through the API, with the given Scenes in order. */
-async function createStory(request: APIRequestContext, scenes: { name: string; situation: string; moveOnCondition: string }[] = []) {
+async function createStory(
+    request: APIRequestContext,
+    scenes: { name: string; situation: string; moveOnCondition: string }[] = [],
+) {
     const created = await request.post('/api/stories', { data: { title: 'The Lighthouse' } });
     expect(created.ok()).toBe(true);
     const storyId = (await created.json()).id as number;
@@ -20,10 +24,17 @@ async function createStory(request: APIRequestContext, scenes: { name: string; s
         data: { name: 'Ash', description: 'The new keeper, arrived this morning.' },
     });
     await request.post(`/api/stories/${storyId}/characters`, {
-        data: { name: 'Mira', appearance: 'Tall, grey eyes.', personality: 'Guarded and dry.', voice: 'Short sentences.' },
+        data: {
+            name: 'Mira',
+            appearance: 'Tall, grey eyes.',
+            personality: 'Guarded and dry.',
+            voice: 'Short sentences.',
+        },
     });
     for (const scene of scenes) {
-        expect((await request.post(`/api/stories/${storyId}/scenes`, { data: scene })).ok()).toBe(true);
+        expect((await request.post(`/api/stories/${storyId}/scenes`, { data: scene })).ok()).toBe(
+            true,
+        );
     }
     return storyId;
 }
@@ -34,8 +45,12 @@ async function scriptTurns(request: APIRequestContext, replies: string[], judgem
     await request.post('/api/testing/fake-gateway/text', {
         data: { kind: 'turn', replies: replies.map((text) => ({ text, model: 'glm-5.3' })) },
     });
-    await request.post('/api/testing/fake-gateway/text', { data: { kind: 'judge', replies: judgements } });
-    await request.post('/api/testing/fake-gateway/text', { data: { kind: 'memory_extraction', replies: replies.map(() => NO_OPS) } });
+    await request.post('/api/testing/fake-gateway/text', {
+        data: { kind: 'judge', replies: judgements },
+    });
+    await request.post('/api/testing/fake-gateway/text', {
+        data: { kind: 'memory_extraction', replies: replies.map(() => NO_OPS) },
+    });
 }
 
 async function createChat(request: APIRequestContext, storyId: number) {
@@ -44,18 +59,32 @@ async function createChat(request: APIRequestContext, storyId: number) {
     return (await chat.json()).id as number;
 }
 
-test('the top bar is one thin row, and Reset through ⋯ asks first: Cancel keeps the Messages, Reset clears them', async ({ page, request }) => {
+test('the top bar is one thin row, and Reset through ⋯ asks first: Cancel keeps the Messages, Reset clears them', async ({
+    page,
+    request,
+}) => {
     const storyId = await createStory(request);
     await scriptTurns(request, ['@Mira: Took you long enough.'], [NO_CHANGE]);
     const chatId = await createChat(request, storyId);
-    expect((await request.post(`/api/stories/${storyId}/chats/${chatId}/messages`, { data: { text: 'I set my boots by the door.' } })).ok()).toBe(true);
+    expect(
+        (
+            await request.post(`/api/stories/${storyId}/chats/${chatId}/messages`, {
+                data: { text: 'I set my boots by the door.' },
+            })
+        ).ok(),
+    ).toBe(true);
 
     try {
         await page.goto(`/stories/${storyId}/chats/${chatId}`);
-        const bar = page.locator('header').filter({ has: page.getByRole('heading', { name: 'Chat 1' }) });
+        const bar = page
+            .locator('header')
+            .filter({ has: page.getByRole('heading', { name: 'Chat 1' }) });
         await expect(bar.getByRole('heading', { name: 'Chat 1' })).toBeVisible();
         await expect(bar).toContainText('as Ash');
-        await expect(bar.getByRole('link', { name: 'Back to Chats' })).toHaveAttribute('href', `/stories/${storyId}/chats`);
+        await expect(bar.getByRole('link', { name: 'Back to Chats' })).toHaveAttribute(
+            'href',
+            `/stories/${storyId}/chats`,
+        );
         const box = await bar.boundingBox();
         expect(box?.height).toBeLessThanOrEqual(56);
 
@@ -67,7 +96,11 @@ test('the top bar is one thin row, and Reset through ⋯ asks first: Cancel keep
         const menu = page.getByRole('dialog', { name: 'Chat menu' });
         await menu.getByRole('button', { name: /Reset/ }).tap();
         await expect(menu).toHaveCount(0);
-        const confirm = page.getByRole('alertdialog', { name: 'Clear every Message and start this Chat over from the Opening?' });
+        const confirm = page.getByRole('alertdialog', {
+            name: 'Clear every Message and start this Chat over from the Opening?',
+        });
+        // Focus starts on Cancel, the safe choice.
+        await expect(confirm.getByRole('button', { name: 'Cancel' })).toBeFocused();
         await confirm.getByRole('button', { name: 'Cancel' }).tap();
         await expect(confirm).toHaveCount(0);
         await expect(said).toHaveCount(1);
@@ -78,7 +111,9 @@ test('the top bar is one thin row, and Reset through ⋯ asks first: Cancel keep
         await confirm.getByRole('button', { name: 'Reset' }).tap();
         await expect(said).toHaveCount(0);
         await expect(page.getByRole('article', { name: 'AI reply' })).toHaveCount(0);
-        await expect(page.getByRole('article', { name: 'Opening' })).toContainText('Boots off, keeper.');
+        await expect(page.getByRole('article', { name: 'Opening' })).toContainText(
+            'Boots off, keeper.',
+        );
         await expect(bar.getByRole('heading', { name: 'Chat 1' })).toBeVisible();
     } finally {
         await request.delete(`/api/stories/${storyId}`);
@@ -90,8 +125,16 @@ test('the Scene strip shows the Scene and its goal, moves on after a turn the ju
     request,
 }) => {
     const storyId = await createStory(request, [
-        { name: 'The stair', situation: 'Get past Mira to the lamp room.', moveOnCondition: 'Mira lets Ash up.' },
-        { name: 'The lamp', situation: 'Light the lamp before the ship passes.', moveOnCondition: '' },
+        {
+            name: 'The stair',
+            situation: 'Get past Mira to the lamp room.',
+            moveOnCondition: 'Mira lets Ash up.',
+        },
+        {
+            name: 'The lamp',
+            situation: 'Light the lamp before the ship passes.',
+            moveOnCondition: '',
+        },
     ]);
     await scriptTurns(request, ['@Mira: Fine. Go up.'], [MOVE_ON]);
     const chatId = await createChat(request, storyId);
@@ -118,10 +161,17 @@ test('the Scene strip shows the Scene and its goal, moves on after a turn the ju
 
         // The ⋯ menu brings it back, and offers it only while it is hidden.
         await page.getByRole('button', { name: 'Chat menu' }).tap();
-        await page.getByRole('dialog', { name: 'Chat menu' }).getByRole('button', { name: /Show Scene strip/ }).tap();
+        await page
+            .getByRole('dialog', { name: 'Chat menu' })
+            .getByRole('button', { name: /Show Scene strip/ })
+            .tap();
         await expect(strip).toContainText('The lamp');
         await page.getByRole('button', { name: 'Chat menu' }).tap();
-        await expect(page.getByRole('dialog', { name: 'Chat menu' }).getByRole('button', { name: /Show Scene strip/ })).toHaveCount(0);
+        await expect(
+            page
+                .getByRole('dialog', { name: 'Chat menu' })
+                .getByRole('button', { name: /Show Scene strip/ }),
+        ).toHaveCount(0);
     } finally {
         await request.delete(`/api/stories/${storyId}`);
     }
@@ -138,17 +188,29 @@ test('the Scene strip reads "Free play" in a Story with no Scenes', async ({ pag
     }
 });
 
-test('Rename from the ⋯ menu changes the title in the top bar and keeps it after a reload', async ({ page, request }) => {
+test('Rename from the ⋯ menu changes the title in the top bar and keeps it after a reload', async ({
+    page,
+    request,
+}) => {
     const storyId = await createStory(request);
     const chatId = await createChat(request, storyId);
     try {
         await page.goto(`/stories/${storyId}/chats/${chatId}`);
         await page.getByRole('button', { name: 'Chat menu' }).tap();
-        await page.getByRole('dialog', { name: 'Chat menu' }).getByRole('button', { name: /^Rename/ }).tap();
-        const title = page.getByRole('dialog', { name: 'Rename Chat' }).getByRole('textbox', { name: 'Chat title' });
+        await page
+            .getByRole('dialog', { name: 'Chat menu' })
+            .getByRole('button', { name: /^Rename/ })
+            .tap();
+        const title = page
+            .getByRole('dialog', { name: 'Rename Chat' })
+            .getByRole('textbox', { name: 'Chat title' });
         await expect(title).toHaveValue('Chat 1');
+        await expect(title).toBeFocused();
         await title.fill('The night of the storm');
-        await page.getByRole('dialog', { name: 'Rename Chat' }).getByRole('button', { name: 'Save' }).tap();
+        await page
+            .getByRole('dialog', { name: 'Rename Chat' })
+            .getByRole('button', { name: 'Save' })
+            .tap();
         await expect(page.getByRole('dialog', { name: 'Rename Chat' })).toHaveCount(0);
         await expect(page.getByRole('heading', { name: 'The night of the storm' })).toBeVisible();
         await page.reload();

@@ -74,9 +74,10 @@ test('makes a Persona, swaps to it mid-Chat, and sees the next User Message unde
         // Swap to the Persona mid-Chat: the next User Message goes under its name, the old one keeps Ash.
         await page.getByRole('button', { name: 'Chat menu' }).click();
         await swap.selectOption({ label: 'Rin' });
-        await expect(menu).toHaveCount(0);
-        await expect(page.getByLabel('Write as Rin')).toBeVisible();
+        // The menu stays open, so a keyboard user can arrow through the list; the bar follows.
         await expect(page.getByText('as Rin', { exact: true })).toBeVisible();
+        await menu.getByRole('button', { name: 'Close' }).click();
+        await expect(page.getByLabel('Write as Rin')).toBeVisible();
         await scriptTurn(request, '@Mira: And who are you, then?');
         await page.getByLabel('Write as Rin').fill('I shake the salt out of my hair.');
         await page.getByRole('button', { name: 'Send' }).click();

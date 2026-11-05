@@ -16,6 +16,7 @@ const RESET_QUESTION = 'Clear every Message and start this Chat over from the Op
 /**
  * The worn identity (spec: stories 44–45): the Story's Role or any Persona, swappable at any
  * time. The next User Message is written as it; earlier ones keep the name they were sent under.
+ * The menu stays open after a swap, so arrowing through the list by keyboard never closes it.
  */
 function IdentitySwap({
     chat,
@@ -36,7 +37,7 @@ function IdentitySwap({
         options.unshift({ id: chat.personaId, name: chat.identityName });
     }
     return (
-        <label className={styles.item}>
+        <label className={`${styles.item} ${styles.swap}`}>
             <span className={styles.itemLabel}>Playing as</span>
             <select
                 className={styles.select}
@@ -57,6 +58,7 @@ function IdentitySwap({
     );
 }
 
+/** Rename in place of the menu's rows; the sheet stays open, so the box can take focus at once. */
 function RenameForm({ title, onSave }: { title: string; onSave(title: string): void }) {
     const [value, setValue] = useState(title);
     const save = (event: FormEvent) => {
@@ -96,17 +98,14 @@ function MenuText({ label, sub }: { label: string; sub: string }) {
     );
 }
 
-function MenuButton({
-    onClick,
-    disabled,
-    danger,
-    children,
-}: {
+interface MenuButtonProps {
     onClick(): void;
     disabled?: boolean;
     danger?: boolean;
     children: ReactNode;
-}) {
+}
+
+function MenuButton({ onClick, disabled, danger, children }: MenuButtonProps) {
     return (
         <button
             type="button"
@@ -158,112 +157,104 @@ export function ChatTopBar({
 
     return (
         <>
-        <header className={styles.bar}>
-            <Link
-                href={`/stories/${chat.storyId}/chats`}
-                className={styles.icon}
-                aria-label="Back to Chats"
-            >
-                <svg
-                    viewBox="0 0 24 24"
-                    width="22"
-                    height="22"
-                    aria-hidden="true"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
+            <header className={styles.bar}>
+                <Link
+                    href={`/stories/${chat.storyId}/chats`}
+                    className={styles.icon}
+                    aria-label="Back to Chats"
                 >
-                    <path d="M15 18l-6-6 6-6" />
-                </svg>
-            </Link>
-            <div className={styles.title}>
-                <h1 className={styles.name}>{chat.title}</h1>
-                <span className={styles.identity}>as {chat.identityName}</span>
-            </div>
-            <button
-                type="button"
-                className={styles.icon}
-                aria-label="Chat menu"
-                aria-haspopup="dialog"
-                onClick={() => setMenu('menu')}
-            >
-                <svg
-                    viewBox="0 0 24 24"
-                    width="22"
-                    height="22"
-                    aria-hidden="true"
-                    fill="currentColor"
+                    <svg
+                        viewBox="0 0 24 24"
+                        width="22"
+                        height="22"
+                        aria-hidden="true"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    >
+                        <path d="M15 18l-6-6 6-6" />
+                    </svg>
+                </Link>
+                <div className={styles.title}>
+                    <h1 className={styles.name}>{chat.title}</h1>
+                    <span className={styles.identity}>as {chat.identityName}</span>
+                </div>
+                <button
+                    type="button"
+                    className={styles.icon}
+                    aria-label="Chat menu"
+                    aria-haspopup="dialog"
+                    aria-expanded={menu !== 'closed'}
+                    onClick={() => setMenu('menu')}
                 >
-                    <circle cx="5" cy="12" r="2" />
-                    <circle cx="12" cy="12" r="2" />
-                    <circle cx="19" cy="12" r="2" />
-                </svg>
-            </button>
-        </header>
+                    <svg
+                        viewBox="0 0 24 24"
+                        width="22"
+                        height="22"
+                        aria-hidden="true"
+                        fill="currentColor"
+                    >
+                        <circle cx="5" cy="12" r="2" />
+                        <circle cx="12" cy="12" r="2" />
+                        <circle cx="19" cy="12" r="2" />
+                    </svg>
+                </button>
+            </header>
 
-            {menu === 'menu' && (
-                <Sheet label="Chat menu" onClose={close}>
-                    <div className={styles.menu}>
-                        <MenuButton onClick={choose(onOpenMemory)}>
-                            <MenuText label="Memory" sub="What the story remembers" />
-                        </MenuButton>
-                        <Link
-                            href={`/stories/${chat.storyId}/chats/${chat.id}/dashboard`}
-                            className={styles.item}
-                        >
-                            <MenuText
-                                label="Dashboard"
-                                sub="The Scene and how the Characters feel"
-                            />
-                        </Link>
-                        <Link
-                            href={`/stories/${chat.storyId}/gallery?chat=${chat.id}`}
-                            className={styles.item}
-                        >
-                            <MenuText label="Gallery" sub="Every Snapshot of this Chat" />
-                        </Link>
-                        <MenuButton onClick={() => setMenu('rename')} disabled={busy}>
-                            <MenuText label="Rename" sub={chat.title} />
-                        </MenuButton>
-                        <IdentitySwap
-                            chat={chat}
-                            disabled={busy}
-                            onSwap={(personaId) => {
+            {menu !== 'closed' && (
+                <Sheet label={menu === 'rename' ? 'Rename Chat' : 'Chat menu'} onClose={close}>
+                    {menu === 'rename' ? (
+                        <RenameForm
+                            title={chat.title}
+                            onSave={(title) => {
                                 close();
-                                onSwapIdentity(personaId);
+                                onRename(title);
                             }}
                         />
-                        {stripHidden && (
-                            <MenuButton onClick={choose(onShowStrip)}>
-                                <MenuText
-                                    label="Show Scene strip"
-                                    sub="The current Scene and its goal"
-                                />
+                    ) : (
+                        <div className={styles.menu}>
+                            <MenuButton onClick={choose(onOpenMemory)}>
+                                <MenuText label="Memory" sub="What the story remembers" />
                             </MenuButton>
-                        )}
-                        <hr className={styles.rule} />
-                        <MenuButton
-                            danger
-                            onClick={choose(() => setConfirming(true))}
-                            disabled={busy || !chat.playable}
-                        >
-                            <MenuText label="Reset Chat" sub="Start again from the Opening" />
-                        </MenuButton>
-                    </div>
-                </Sheet>
-            )}
-
-            {menu === 'rename' && (
-                <Sheet label="Rename Chat" onClose={close}>
-                    <RenameForm
-                        title={chat.title}
-                        onSave={(title) => {
-                            close();
-                            onRename(title);
-                        }}
-                    />
+                            <Link
+                                href={`/stories/${chat.storyId}/chats/${chat.id}/dashboard`}
+                                className={styles.item}
+                            >
+                                <MenuText
+                                    label="Dashboard"
+                                    sub="The Scene and how the Characters feel"
+                                />
+                            </Link>
+                            <Link
+                                href={`/stories/${chat.storyId}/gallery?chat=${chat.id}`}
+                                className={styles.item}
+                            >
+                                <MenuText label="Gallery" sub="Every Snapshot of this Chat" />
+                            </Link>
+                            <MenuButton onClick={() => setMenu('rename')} disabled={busy}>
+                                <MenuText label="Rename" sub={chat.title} />
+                            </MenuButton>
+                            <IdentitySwap chat={chat} disabled={busy} onSwap={onSwapIdentity} />
+                            {stripHidden && (
+                                <MenuButton onClick={choose(onShowStrip)}>
+                                    <MenuText
+                                        label="Show Scene strip"
+                                        sub="The current Scene and its goal"
+                                    />
+                                </MenuButton>
+                            )}
+                            <hr className={styles.rule} />
+                            <MenuButton
+                                danger
+                                onClick={choose(() => setConfirming(true))}
+                                disabled={busy || !chat.playable}
+                            >
+                                <MenuText label="Reset Chat" sub="Start again from the Opening" />
+                            </MenuButton>
+                        </div>
+                    )}
                 </Sheet>
             )}
 

@@ -5,6 +5,7 @@
     gap: 0.9rem;
     width: calc(100% + 1rem);
     min-height: 2rem;
+    /* Half-way into the page's 1rem side padding, like the top bar; the width adds both halves. */
     margin: 0 -0.5rem;
     padding: 0.375rem 0.5rem;
     overflow: hidden;
