@@ -88,4 +88,47 @@ describe('Fake Model Gateway', () => {
             request: { kind: 'story_draft' },
         });
     });
+
+    it('streams a scripted reply in pieces, slowed and failing as scripted over HTTP', async () => {
+        await t.http
+            .post('/api/testing/fake-gateway/text')
+            .send({
+                kind: 'turn',
+                replies: [
+                    { text: 'Rain on the glass.', pieceSize: 5, pieceDelayMs: 20 },
+                    { text: 'Rain on the glass.', pieceSize: 5, failAfterPieces: 2, failWith: { error: 'refusal' } },
+                ],
+            })
+            .expect(204);
+        const open = new AbortController().signal;
+
+        const pieces: string[] = [];
+        const startedAt = Date.now();
+        const result = await t.gateway.streamText({ kind: 'turn', messages: [] }, { onText: (piece) => pieces.push(piece), signal: open });
+        expect(Date.now() - startedAt).toBeGreaterThanOrEqual(60);
+        expect(pieces).toEqual(['Rain ', 'on th', 'e gla', 'ss.']);
+        expect(result).toMatchObject({ text: 'Rain on the glass.', stopped: false });
+
+        const failed: string[] = [];
+        await expect(
+            t.gateway.streamText({ kind: 'turn', messages: [] }, { onText: (piece) => failed.push(piece), signal: open }),
+        ).rejects.toBeInstanceOf(ModelRefusalError);
+        expect(failed).toEqual(['Rain ', 'on th']);
+
+        const { body } = await t.http.get('/api/testing/fake-gateway/calls').expect(200);
+        expect(body.calls.map((call: { method: string }) => call.method)).toEqual(['streamText', 'streamText']);
+    });
+
+    it('ends a stream early when its signal aborts, resolving with the text so far', async () => {
+        t.gateway.scriptText('turn', { text: 'Rain on the glass.', pieceSize: 5, pieceDelayMs: 10 });
+        const stop = new AbortController();
+
+        const result = await t.gateway.streamText(
+            { kind: 'turn', messages: [] },
+            { onText: (piece) => piece === 'on th' && stop.abort(), signal: stop.signal },
+        );
+
+        expect(result).toMatchObject({ text: 'Rain on th', stopped: true });
+        expect(t.gateway.calls[0]).toMatchObject({ method: 'streamText', stopped: true });
+    });
 });

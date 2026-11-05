@@ -310,6 +310,165 @@ describe('OpenRouter contract', () => {
         });
     });
 
+    // Spec: streaming replies. Recorded, synthetic streams in the shape
+    // https://openrouter.ai/docs/api-reference/streaming documents: comment lines, one chunk
+    // per piece, a last chunk carrying `usage`, then [DONE].
+    describe('streamed turns', () => {
+        const open = () => new AbortController().signal;
+
+        async function eventually(check: () => boolean): Promise<void> {
+            const deadline = Date.now() + 2_000;
+            while (!check()) {
+                if (Date.now() > deadline) throw new Error('Never happened');
+                await new Promise((resolve) => setTimeout(resolve, 5));
+            }
+        }
+
+        it('asks for a stream, hands each piece over in order, and records the usage from the last chunk', async () => {
+            const net = recordedFetch([{ sse: 'openrouter/stream-turn.sse' }]);
+            const { gateway, records } = gatewayUnderTest(net.fetch, { settings: { playModel: 'glm-5.3' } });
+            const pieces: string[] = [];
+
+            const result = await gateway.streamText(
+                { kind: 'turn', messages, maxTokens: 600, stop: ['\n@You:'], servedFor: { storyId: 3, chatId: 4 } },
+                { onText: (piece) => pieces.push(piece), signal: open() },
+            );
+
+            expect(net.requests[0].url).toBe(CHAT_URL);
+            expect(net.requests[0].body).toMatchObject({
+                model: 'z-ai/glm-5.3',
+                provider: { only: ['deepinfra'], allow_fallbacks: false },
+                stop: ['\n@You:'],
+                stream: true,
+            });
+            expect(pieces).toEqual(['The keeper', ' nods once', ' and goes back', ' to the lens.']);
+            expect(result).toEqual({
+                text: 'The keeper nods once and goes back to the lens.',
+                model: 'glm-5.3',
+                usage: { promptTokens: 1234, completionTokens: 14 },
+                costUsd: 0.000432,
+                stopped: false,
+            });
+            expect(records).toEqual([
+                {
+                    kind: 'turn',
+                    pool: 'text',
+                    model: 'glm-5.3',
+                    host: 'deepinfra',
+                    promptTokens: 1234,
+                    completionTokens: 14,
+                    images: null,
+                    costUsd: 0.000432,
+                    storyId: 3,
+                    chatId: 4,
+                },
+            ]);
+        });
+
+        it('retries a 429 before the first piece, on the pinned host', async () => {
+            const net = recordedFetch([
+                { status: 429, fixture: 'openrouter/error-overloaded.json' },
+                { sse: 'openrouter/stream-turn.sse' },
+            ]);
+            const { gateway, sleeps } = gatewayUnderTest(net.fetch);
+
+            const result = await gateway.streamText({ kind: 'turn', messages }, { onText: () => {}, signal: open() });
+
+            expect(net.requests).toHaveLength(2);
+            expect(net.requests[1].body.provider).toEqual({ only: ['deepinfra'], allow_fallbacks: false });
+            expect(sleeps).toHaveLength(1);
+            expect(result.text).toBe('The keeper nods once and goes back to the lens.');
+        });
+
+        it('maps an error chunk after some pieces to its typed error, and records nothing', async () => {
+            const net = recordedFetch([{ sse: 'openrouter/stream-error.sse' }]);
+            const { gateway, records } = gatewayUnderTest(net.fetch);
+            const pieces: string[] = [];
+
+            await expect(
+                gateway.streamText({ kind: 'turn', messages }, { onText: (piece) => pieces.push(piece), signal: open() }),
+            ).rejects.toThrow(ProviderOutageError);
+            expect(pieces).toEqual(['The keeper', ' nods']);
+            expect(records).toEqual([]);
+        });
+
+        it('maps a content_filter finish to a refusal', async () => {
+            const net = recordedFetch([{ sse: 'openrouter/stream-content-filter.sse' }]);
+            const { gateway } = gatewayUnderTest(net.fetch);
+
+            await expect(gateway.streamText({ kind: 'turn', messages }, { onText: () => {}, signal: open() })).rejects.toThrow(
+                ModelRefusalError,
+            );
+        });
+
+        it('maps an error status before the stream as a whole call does', async () => {
+            const net = recordedFetch([{ status: 402, fixture: 'openrouter/error-credits.json' }]);
+            const { gateway } = gatewayUnderTest(net.fetch);
+
+            await expect(gateway.streamText({ kind: 'turn', messages }, { onText: () => {}, signal: open() })).rejects.toThrow(
+                OutOfCreditError,
+            );
+        });
+
+        it('stops when aborted, with the text so far, then records what the generation billed once OpenRouter reports it', async () => {
+            const net = recordedFetch([
+                { sse: 'openrouter/stream-turn.sse', hangAfter: 3 },
+                { status: 404, fixture: 'openrouter/generation-not-found.json' },
+                { fixture: 'openrouter/generation-stopped.json' },
+            ]);
+            const { gateway, records } = gatewayUnderTest(net.fetch);
+            const stop = new AbortController();
+            const pieces: string[] = [];
+
+            const result = await gateway.streamText(
+                { kind: 'turn', messages, servedFor: { storyId: 3, chatId: 4 } },
+                {
+                    onText: (piece) => {
+                        pieces.push(piece);
+                        if (pieces.length === 2) stop.abort();
+                    },
+                    signal: stop.signal,
+                },
+            );
+
+            expect(result).toMatchObject({ text: 'The keeper nods once', stopped: true, costUsd: 0 });
+            await eventually(() => records.length > 0);
+            // A cancelled stream stops billing on hosts that support it (DeepInfra does), and
+            // sends no usage chunk: the generation endpoint reports what was billed.
+            expect(net.requests.slice(1).map((request) => request.url)).toEqual([
+                'https://openrouter.ai/api/v1/generation?id=gen-synthetic-stream-0001',
+                'https://openrouter.ai/api/v1/generation?id=gen-synthetic-stream-0001',
+            ]);
+            expect(records).toEqual([
+                {
+                    kind: 'turn',
+                    pool: 'text',
+                    model: 'glm-5.3',
+                    host: 'deepinfra',
+                    promptTokens: 1234,
+                    completionTokens: 3,
+                    images: null,
+                    costUsd: 0.000187,
+                    storyId: 3,
+                    chatId: 4,
+                },
+            ]);
+        });
+
+        it('makes no call and records nothing when already aborted', async () => {
+            const net = recordedFetch([]);
+            const { gateway, records } = gatewayUnderTest(net.fetch);
+            const stop = new AbortController();
+            stop.abort();
+
+            const result = await gateway.streamText({ kind: 'turn', messages }, { onText: () => {}, signal: stop.signal });
+
+            expect(result).toMatchObject({ text: '', stopped: true });
+            expect(net.requests).toHaveLength(0);
+            expect(records).toEqual([]);
+        });
+    });
+
     describe('remaining credit', () => {
         it('reads it from the credits endpoint', async () => {
             const net = recordedFetch([

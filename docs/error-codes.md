@@ -8,6 +8,15 @@ contract: the frontend routes on it, never on the message. Defined in
 A response that is not JSON, or has no code, did not come from the API. The frontend reads it
 as "the API can't be reached" and shows the can't-connect screen (`apps/web/lib/api.ts`).
 
+## Streamed turns
+
+A turn asked for with `Accept: text/event-stream` (send, Retry, Continue, Regenerate, a User
+Message edit) answers an error found before the turn starts (the send gate, a turn in
+progress, a bad Message) as above: plain JSON with its status. Once the stream has begun, a
+failure arrives as its last event, `event: error`, whose data is the same body and code; the
+HTTP status is the endpoint's success status, already sent. A turn the user stops sends
+nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
+
 ## Domains
 
 | `YYY` | Domain |

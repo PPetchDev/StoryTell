@@ -1,0 +1,8 @@
+data: {"id":"gen-synthetic-stream-0001","provider":"DeepInfra","model":"z-ai/glm-5.3","object":"chat.completion.chunk","created":1762300000,"choices":[{"index":0,"delta":{"role":"assistant","content":"The keeper"},"finish_reason":null,"native_finish_reason":null,"logprobs":null}]}
+
+data: {"id":"gen-synthetic-stream-0001","provider":"DeepInfra","model":"z-ai/glm-5.3","object":"chat.completion.chunk","created":1762300000,"choices":[{"index":0,"delta":{"role":"assistant","content":" nods"},"finish_reason":null,"native_finish_reason":null,"logprobs":null}]}
+
+data: {"id":"gen-synthetic-stream-0001","provider":"DeepInfra","model":"z-ai/glm-5.3","object":"chat.completion.chunk","created":1762300000,"error":{"code":502,"message":"Provider returned error","metadata":{"provider_name":"DeepInfra","raw":"upstream connect error"}},"choices":[{"index":0,"delta":{"content":""},"finish_reason":"error"}]}
+
+data: [DONE]
+

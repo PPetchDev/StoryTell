@@ -10,6 +10,14 @@
 export abstract class ModelGateway {
     abstract completeText(request: TextCompletionRequest): Promise<TextCompletionResult>;
 
+    /**
+     * The same call as `completeText`, with the text handed to `stream.onText` piece by piece
+     * as the model writes it (spec: streaming replies). It resolves once the reply is
+     * complete. Aborting `stream.signal` ends the call early: it then resolves with
+     * `stopped: true` and the text that had arrived. Turns only.
+     */
+    abstract streamText(request: TextCompletionRequest, stream: TextStream): Promise<TextStreamResult>;
+
     abstract generateImage(request: ImageGenerationRequest): Promise<ImageGenerationResult>;
 
     abstract remainingCredit(): Promise<RemainingCredit>;
@@ -88,6 +96,22 @@ export interface TextCompletionResult {
     model: string;
     usage: { promptTokens: number; completionTokens: number };
     costUsd: number;
+}
+
+export interface TextStream {
+    /** Each new piece of text, in order. Never called after the call settles. */
+    onText(piece: string): void;
+    /** Aborting it stops the model call, as the user's Stop or the guard does. */
+    signal: AbortSignal;
+}
+
+export interface TextStreamResult extends TextCompletionResult {
+    /**
+     * True when the signal ended the call before the model finished; `text` is what had
+     * arrived. A stopped stream reports no usage of its own, so `usage` and `costUsd` are 0:
+     * the real gateway records what the provider bills for it once the provider reports it.
+     */
+    stopped: boolean;
 }
 
 export interface ImageData {
