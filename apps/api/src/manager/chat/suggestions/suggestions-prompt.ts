@@ -60,7 +60,8 @@ export function buildSuggestionsPrompt(input: SuggestionsPromptInput): Suggestio
         messages: [
             { role: 'system', content: system.text },
             ...kept.map((message) => ({ role: message.role, content: message.text })),
-            { role: 'system', content: instruction },
+            // A user message, not a trailing system one: GLM-5.3 on DeepInfra answered that with an empty {"": ""}.
+            { role: 'user', content: instruction },
         ],
         maxTokens: SUGGESTIONS_MAX_TOKENS,
     };

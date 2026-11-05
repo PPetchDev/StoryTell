@@ -310,7 +310,8 @@ describe('Suggested replies', () => {
                 { role: 'assistant', content: '@Mira: Took your time.' },
             ]);
             const instruction = call.messages[call.messages.length - 1];
-            expect(instruction.role).toBe('system');
+            // A user message: GLM-5.3 on DeepInfra answered a trailing system instruction with an empty {"": ""}.
+            expect(instruction.role).toBe('user');
             expect(instruction.content).toContain('written as Ash in second person for Ash ("you"), past tense');
             expect(instruction.content).toContain('"action"');
             expect(instruction.content).toContain('"speech"');

@@ -1,4 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+
+import { UnreadableSuggestionsError } from '../../../errors/chat.errors.js';
 
 import { ModelGateway, ServedFor } from '../../../service/model-gateway/model-gateway.js';
 import { buildSuggestionsPrompt, parseSuggestions, SuggestedReply, SuggestionsPromptInput } from './suggestions-prompt.js';
@@ -10,6 +12,8 @@ import { buildSuggestionsPrompt, parseSuggestions, SuggestedReply, SuggestionsPr
  */
 @Injectable()
 export class SuggestedRepliesManagerService {
+    private readonly logger = new Logger(SuggestedRepliesManagerService.name);
+
     constructor(private readonly gateway: ModelGateway) {}
 
     /** Throws the gateway's typed error, or `UnreadableSuggestionsError` for output that isn't three of the three kinds. */
@@ -22,6 +26,14 @@ export class SuggestedRepliesManagerService {
             json: true,
             servedFor,
         });
-        return parseSuggestions(result.text);
+        try {
+            return parseSuggestions(result.text);
+        } catch (error) {
+            // The raw answer, kept short, so an unreadable one can be told apart from a refusal or a cut-off.
+            if (error instanceof UnreadableSuggestionsError) {
+                this.logger.warn(`Unreadable suggestions (${result.model}, ${result.text.length} chars): ${JSON.stringify(result.text.slice(0, 600))}`);
+            }
+            throw error;
+        }
     }
 }
