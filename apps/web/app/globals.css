@@ -806,6 +806,148 @@ a {
     color: var(--muted);
 }
 
+/* The Memory graph: List or Graph, the picture, and what is picked under it. */
+
+.memory-view-switch {
+    display: flex;
+    margin: 0.75rem 0;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 0.65rem;
+    padding: 3px;
+}
+
+.memory-view-switch button {
+    flex: 1;
+    min-height: 2.5rem;
+    background: transparent;
+    border: 0;
+    border-radius: 0.5rem;
+    font: inherit;
+    font-size: 0.875rem;
+    color: var(--muted);
+    cursor: pointer;
+}
+
+.memory-view-switch button[aria-checked='true'] {
+    background: var(--accent-fill);
+    color: var(--accent-text);
+    font-weight: 600;
+}
+
+.memory-view-switch button:focus-visible {
+    outline: 2px solid var(--text);
+    outline-offset: -2px;
+}
+
+.memory-graph {
+    display: block;
+    width: 100%;
+    height: auto;
+    margin: 0.5rem 0 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+}
+
+.memory-graph-link {
+    stroke-width: 1.25;
+    stroke-opacity: 0.4;
+}
+
+.memory-graph-link[data-dim='true'] {
+    stroke-opacity: 0.08;
+}
+
+.memory-graph-link-lit {
+    stroke-width: 2;
+    stroke-opacity: 0.95;
+}
+
+.memory-graph-dot,
+.memory-graph-person {
+    cursor: pointer;
+    outline: none;
+}
+
+.memory-graph-hit {
+    fill: transparent;
+}
+
+.memory-graph-dot circle:not(.memory-graph-hit) {
+    fill: var(--muted);
+    stroke: var(--surface);
+    stroke-width: 1.5;
+}
+
+/* A Memory the user wrote or touched: hollow, like the lock in the list. */
+.memory-graph-dot circle.memory-graph-dot-own {
+    fill: var(--surface);
+    stroke: var(--muted);
+    stroke-width: 2;
+}
+
+.memory-graph-dot[data-state='about'] circle:not(.memory-graph-hit),
+.memory-graph-dot[data-state='selected'] circle:not(.memory-graph-hit) {
+    fill: var(--text);
+}
+
+.memory-graph-dot[data-state='selected'] circle:not(.memory-graph-hit) {
+    stroke: var(--accent);
+    stroke-width: 3;
+}
+
+.memory-graph-dot[data-state='other'] {
+    opacity: 0.35;
+}
+
+.memory-graph-dot[data-state='unknown'] {
+    opacity: 0.12;
+}
+
+.memory-graph-person-ring {
+    stroke-width: 2.5;
+}
+
+.memory-graph-person[data-lit='false'] {
+    opacity: 0.4;
+}
+
+.memory-graph-person[aria-pressed='true'] .memory-graph-person-ring {
+    stroke-width: 4;
+}
+
+.memory-graph-dot:focus-visible circle:not(.memory-graph-hit),
+.memory-graph-person:focus-visible .memory-graph-person-ring {
+    stroke: var(--text);
+    stroke-width: 3;
+}
+
+.memory-graph-initial {
+    font-size: 1.1rem;
+    font-weight: 700;
+    text-anchor: middle;
+    pointer-events: none;
+}
+
+.memory-graph-name {
+    fill: var(--text);
+    font-size: 0.75rem;
+    text-anchor: middle;
+    paint-order: stroke;
+    stroke: var(--surface);
+    stroke-width: 3px;
+    pointer-events: none;
+}
+
+.memory-graph-pick h3 {
+    margin: 0 0 0.25rem;
+    font-size: 1rem;
+}
+
 /* --- Personas and the identity swap (ticket 26) --- */
 
 .persona-list {

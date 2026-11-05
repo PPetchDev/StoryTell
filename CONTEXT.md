@@ -62,6 +62,10 @@ _Avoid_: Smart reply, quick reply, hint
 A fact established during one Chat — an event that happened, a detail of the world, something learned about the user, or an open promise or plan — that the Chat carries forward; it is known only to the Characters who witnessed or learned of it, never records feelings (a Bond) or a change of personality (an Arc), and the user can see, add, edit and delete it. A Chat starts with no Memories.
 _Avoid_: Note, lorebook entry, context, summary
 
+**Memory graph**:
+A picture of a Chat's Memories, shown in place of their list when the user chooses it: the identity the user wears and the Characters as people, and each Memory as a dot linked to the people it is about. Who a Memory is about is read from its text (`{user}` or a name), or failing that is the Characters who know it; it is not stored, and it is a different thing from who knows the Memory.
+_Avoid_: Mind map, knowledge graph, relationship map
+
 **Bond**:
 A Character's feelings toward the user or toward another Character within one Chat, which change as the story unfolds; in play they show only through how the Character behaves, and the user can look at them but never edit them.
 _Avoid_: Affection, affinity, relationship, love meter

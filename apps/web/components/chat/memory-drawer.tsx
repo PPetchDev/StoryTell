@@ -2,12 +2,61 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 
+import { GraphSelection, MemoryGraph, memoriesAbout, personName } from '@/components/chat/memory-graph';
 import { useConnection } from '@/components/connection';
 import { Autosave, useAutosave } from '@/components/story-editor/autosave';
 import { ConfirmButton } from '@/components/story-editor/fields';
 import { SaveStatus } from '@/components/story-editor/save-status';
 import { ApiError, ApiUnreachableError } from '@/lib/api';
+import { devicePreference } from '@/lib/device-preference';
 import { Memory, memoryApi, MemoryList, renderUser } from '@/lib/memory';
+
+/** How the drawer shows the Memories: the list, or the Memory graph. A per-device preference. */
+type MemoryViewKind = 'list' | 'graph';
+
+const memoryViewKind = devicePreference<MemoryViewKind>({
+    key: 'storytell.memoryView',
+    fallback: 'list',
+    parse: (stored) => (stored === 'list' || stored === 'graph' ? stored : null),
+    serialise: (kind) => kind,
+});
+
+const VIEW_KINDS: readonly { kind: MemoryViewKind; label: string }[] = [
+    { kind: 'list', label: 'List' },
+    { kind: 'graph', label: 'Graph' },
+];
+
+/** List or Graph, as a two-choice radio group; arrow keys move between them. */
+function MemoryViewSwitch({ value, onChange }: { value: MemoryViewKind; onChange(kind: MemoryViewKind): void }) {
+    return (
+        <div
+            className="memory-view-switch"
+            role="radiogroup"
+            aria-label="Show Memories as"
+            onKeyDown={(event) => {
+                if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+                event.preventDefault();
+                const next = value === 'list' ? 'graph' : 'list';
+                onChange(next);
+                event.currentTarget.querySelector<HTMLElement>(`[data-kind="${next}"]`)?.focus();
+            }}
+        >
+            {VIEW_KINDS.map(({ kind, label }) => (
+                <button
+                    key={kind}
+                    type="button"
+                    role="radio"
+                    data-kind={kind}
+                    aria-checked={kind === value}
+                    tabIndex={kind === value ? 0 : -1}
+                    onClick={() => onChange(kind)}
+                >
+                    {label}
+                </button>
+            ))}
+        </div>
+    );
+}
 
 interface KnownByPickerProps {
     cast: MemoryList['cast'];
@@ -287,6 +336,20 @@ export function MemoryDrawer({ storyId, chatId, focusMemoryId, version, onClose,
     /** The Memory the open "new" form has added, kept out of the list until the form closes. */
     const [addedId, setAddedId] = useState<number | null>(null);
     const focusedRef = useRef<number | null>(null);
+    const viewKind = memoryViewKind.useValue();
+    const [selection, setSelection] = useState<GraphSelection>(null);
+    /**
+     * The Memories about the picked person when they were picked. They stay under the graph while
+     * that person is picked, so editing a name out of a Memory does not close it mid-edit.
+     */
+    const [pickedAbout, setPickedAbout] = useState<ReadonlySet<number>>(new Set());
+    const select = (next: GraphSelection) => {
+        setSelection(next);
+        if (next?.kind === 'person' && list) {
+            const active = list.memories.filter((memory) => !memory.archived);
+            setPickedAbout(new Set(memoriesAbout(active, list, next.person).map((memory) => memory.id)));
+        }
+    };
 
     useEffect(() => {
         let cancelled = false;
@@ -306,6 +369,8 @@ export function MemoryDrawer({ storyId, chatId, focusMemoryId, version, onClose,
     useEffect(() => {
         if (!list || focusMemoryId === null || focusedRef.current === focusMemoryId) return;
         focusedRef.current = focusMemoryId;
+        // In the graph, a "Memory added" toast lands on that Memory's dot, its card open below.
+        setSelection({ kind: 'memory', id: focusMemoryId });
         document.getElementById(`memory-${focusMemoryId}`)?.scrollIntoView({ block: 'center' });
     }, [list, focusMemoryId]);
 
@@ -363,6 +428,43 @@ export function MemoryDrawer({ storyId, chatId, focusMemoryId, version, onClose,
         />
     );
 
+    /** What shows under the graph: the picked Memory's card, the Memories about the picked person, or a hint. */
+    const graphPick = (shownList: MemoryList) => {
+        const picked = selection?.kind === 'memory' ? active.find((memory) => memory.id === selection.id) : undefined;
+        if (picked) {
+            return (
+                <ul className="memory-list" aria-label="Picked Memory">
+                    {view(shownList)(picked)}
+                </ul>
+            );
+        }
+        if (selection?.kind === 'person') {
+            const name = personName(shownList, selection.person);
+            const aboutNow = new Set(memoriesAbout(active, shownList, selection.person).map((memory) => memory.id));
+            const about = active.filter((memory) => aboutNow.has(memory.id) || pickedAbout.has(memory.id));
+            const unknown =
+                selection.person === 'user' ? 0 : active.filter((memory) => !memory.knownBy.includes(selection.person as number)).length;
+            return (
+                <section className="memory-graph-pick" aria-label={`Memories about ${name}`}>
+                    <h3>
+                        About {name} ({about.length})
+                    </h3>
+                    {unknown > 0 && (
+                        <p className="muted small">
+                            Faded dots are the {unknown === 1 ? 'Memory' : `${unknown} Memories`} {name} doesn’t know.
+                        </p>
+                    )}
+                    {about.length === 0 ? (
+                        <p className="muted">No Memory names {name} yet.</p>
+                    ) : (
+                        <ul className="memory-list">{about.map(view(shownList))}</ul>
+                    )}
+                </section>
+            );
+        }
+        return <p className="muted small">Tap a person to see the Memories about them, or a dot to open one Memory.</p>;
+    };
+
     return (
         <aside className="memory-drawer" aria-label="Memory">
             <div className="memory-drawer-head">
@@ -400,14 +502,25 @@ export function MemoryDrawer({ storyId, chatId, focusMemoryId, version, onClose,
                             Add a Memory
                         </button>
                     )}
+                    <MemoryViewSwitch value={viewKind} onChange={memoryViewKind.set} />
                     {active.length === 0 ? (
                         <p className="muted">Nothing remembered yet.</p>
+                    ) : viewKind === 'graph' ? (
+                        <>
+                            <MemoryGraph list={list} memories={active} selected={selection} onSelect={select} />
+                            {graphPick(list)}
+                        </>
                     ) : (
                         <ul className="memory-list" aria-label="Memories">
                             {active.map(view(list))}
                         </ul>
                     )}
-                    {archived.length > 0 && (
+                    {viewKind === 'graph' && archived.length > 0 && (
+                        <p className="muted small">
+                            Archived Memories ({archived.length}) are left out of the graph. List shows them.
+                        </p>
+                    )}
+                    {viewKind === 'list' && archived.length > 0 && (
                         <details className="memory-archived">
                             <summary>Archived ({archived.length})</summary>
                             <ul className="memory-list" aria-label="Archived Memories">
