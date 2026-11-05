@@ -8,9 +8,15 @@ import { Autosave, useAutosave } from '@/components/story-editor/autosave';
 import { SaveStatus } from '@/components/story-editor/save-status';
 import { TextSizeSetting } from '@/components/text-size-setting';
 import { apiSend } from '@/lib/api';
-import { ModelOption, Settings, SettingsResponse } from '@/lib/types';
+import { ImageModelOption, ModelOption, Settings, SettingsResponse, SnapshotSize } from '@/lib/types';
 
 type ModelKey = 'playModel' | 'imageModel';
+
+/** The size kept when the Snapshot model changes: the same one if the new model has it, else its smallest. */
+function sizeFor(option: ImageModelOption | undefined, size: SnapshotSize): SnapshotSize {
+    if (!option || option.sizes.some((entry) => entry.size === size)) return size;
+    return option.sizes[0]?.size ?? '1K';
+}
 type NumberKey = 'textCreditCapUsd' | 'textLowCreditPercent' | 'imageCreditCapUsd' | 'imageLowCreditPercent';
 
 /** Sends one changed setting; the API changes only the fields it is sent. */
@@ -141,10 +147,22 @@ function SettingsForm({ initial, autosave }: { initial: SettingsResponse; autosa
         playModel: initial.settings.playModel,
         imageModel: initial.settings.imageModel,
     });
+    const [snapshotSize, setSnapshotSize] = useState<SnapshotSize>(initial.settings.snapshotSize);
+    const imageOption = initial.imageModels.find((option) => option.id === models.imageModel);
 
     const changeModel = (key: ModelKey, value: string) => {
         setModels((current) => ({ ...current, [key]: value }));
+        if (key === 'imageModel') {
+            changeSnapshot(value, sizeFor(initial.imageModels.find((option) => option.id === value), snapshotSize));
+            return;
+        }
         autosave.queue(`settings.${key}`, saveSetting({ [key]: value }), keepTyped);
+    };
+
+    // The model and its size go together: the API refuses a size the model is not drawn at.
+    const changeSnapshot = (imageModel: string, size: SnapshotSize) => {
+        setSnapshotSize(size);
+        autosave.queue('settings.snapshot', saveSetting({ imageModel, snapshotSize: size }), keepTyped);
     };
 
     const numberField = (key: NumberKey, id: string, label: string, kind: keyof typeof NUMBER_KINDS) => (
@@ -186,6 +204,26 @@ function SettingsForm({ initial, autosave }: { initial: SettingsResponse; autosa
                     options={initial.imageModels}
                     onChange={(value) => changeModel('imageModel', value)}
                 />
+                <div className="field">
+                    <label htmlFor="snapshot-size">Snapshot size</label>
+                    <select
+                        id="snapshot-size"
+                        value={snapshotSize}
+                        aria-describedby={imageOption && imageOption.sizes.length < 2 ? 'snapshot-size-note' : undefined}
+                        onChange={(event) => changeSnapshot(models.imageModel, event.target.value as SnapshotSize)}
+                    >
+                        {(imageOption?.sizes ?? [{ size: snapshotSize, priceUsd: 0 }]).map((entry) => (
+                            <option key={entry.size} value={entry.size}>
+                                {`${entry.size} · $${entry.priceUsd.toFixed(2)}`}
+                            </option>
+                        ))}
+                    </select>
+                    {imageOption && imageOption.sizes.length < 2 && (
+                        <p id="snapshot-size-note" className="muted">
+                            This model draws at 1K only.
+                        </p>
+                    )}
+                </div>
             </section>
 
             <section className="card">

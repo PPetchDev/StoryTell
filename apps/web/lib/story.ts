@@ -207,6 +207,8 @@ export const storyApi = {
     update: (storyId: number, fields: StoryFields) =>
         apiSend<Story>('PATCH', `/stories/${storyId}`, fields),
     remove: (storyId: number) => apiSend<void>('DELETE', `/stories/${storyId}`),
+    /** A new Story, "<title> (copy)", with everything the author wrote; no Chats or Snapshots. */
+    duplicate: (storyId: number) => apiSend<Story>('POST', `/stories/${storyId}/duplicate`),
     /** The stored Opening split by the Chat's own parser, for the editor's preview (Friendly UI ticket 09). */
     opening: (storyId: number) => apiFetch<{ parts: MessagePart[] }>(`/stories/${storyId}/opening`),
 

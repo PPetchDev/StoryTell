@@ -129,6 +129,60 @@ describe('Venice contract', () => {
         expect(records[0]).toMatchObject({ kind: 'snapshot_image', model: 'seedream-v5-pro-edit', costUsd: 0.0669 });
     });
 
+    describe('Snapshot size', () => {
+        it('draws Seedream V5 Pro edit at 2K when Settings ask for it, and records the 2K price', async () => {
+            const net = recordedFetch([...modelLists, edited]);
+            const { gateway, records } = gatewayUnderTest(net.fetch, {
+                settings: { imageModel: 'seedream-v5-pro-edit', snapshotSize: '2K' },
+            });
+
+            const result = await gateway.generateImage({
+                kind: 'snapshot_image',
+                prompt: 'A synthetic test scene.',
+                referenceImages: [FAKE_PNG, FAKE_PNG, FAKE_PNG],
+            });
+
+            expect(net.requests[2].url).toBe(`${BASE}/image/multi-edit`);
+            expect(net.requests[2].body).toMatchObject({ modelId: 'seedream-v5-pro-edit', resolution: '2K' });
+            // $0.11 at 2K, plus $0.00345 for each input image past the first.
+            expect(result).toMatchObject({ model: 'seedream-v5-pro-edit', costUsd: 0.1169 });
+            expect(records[0]).toMatchObject({ kind: 'snapshot_image', model: 'seedream-v5-pro-edit', costUsd: 0.1169 });
+        });
+
+        it('draws at 1K by default, sending no resolution', async () => {
+            const net = recordedFetch([...modelLists, edited]);
+            const { gateway } = gatewayUnderTest(net.fetch, { settings: { imageModel: 'seedream-v5-pro-edit' } });
+
+            const result = await gateway.generateImage({ kind: 'snapshot_image', prompt: 'A scene.', referenceImages: [FAKE_PNG] });
+
+            expect(net.requests[2].body.resolution).toBeUndefined();
+            expect(result.costUsd).toBe(0.06);
+        });
+
+        it('draws a text-only Snapshot at 2K with the 2K sibling price', async () => {
+            const net = recordedFetch([...modelLists, { fixture: 'venice/generate.json' }]);
+            const { gateway, records } = gatewayUnderTest(net.fetch, {
+                settings: { imageModel: 'seedream-v5-pro-edit', snapshotSize: '2K' },
+            });
+
+            const result = await gateway.generateImage({ kind: 'snapshot_image', prompt: 'A scene.' });
+
+            expect(net.requests[2].body).toMatchObject({ model: 'seedream-v5-pro', resolution: '2K' });
+            expect(result).toMatchObject({ model: 'seedream-v5-pro', costUsd: 0.11 });
+            expect(records[0]).toMatchObject({ model: 'seedream-v5-pro', costUsd: 0.11 });
+        });
+
+        it('draws a model that has no 2K at 1K, whatever the size says', async () => {
+            const net = recordedFetch([...modelLists, edited]);
+            const { gateway } = gatewayUnderTest(net.fetch, { settings: { imageModel: 'seedream-v4-edit', snapshotSize: '2K' } });
+
+            const result = await gateway.generateImage({ kind: 'snapshot_image', prompt: 'A scene.', referenceImages: [FAKE_PNG] });
+
+            expect(net.requests[2].body.resolution).toBeUndefined();
+            expect(result.costUsd).toBe(0.05);
+        });
+    });
+
     it('uses the Settings image model and its prompt limit from GET /models', async () => {
         const net = recordedFetch([...modelLists, edited]);
         const { gateway } = gatewayUnderTest(net.fetch, { settings: { imageModel: 'qwen-edit-uncensored' } });

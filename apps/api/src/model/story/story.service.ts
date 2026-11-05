@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 
-import { CharacterEntity } from './entities/character.entity.js';
+import { CharacterEntity, PortraitCrop } from './entities/character.entity.js';
 import { RoleEntity } from './entities/role.entity.js';
 import { SceneEntity } from './entities/scene.entity.js';
 import { StartingBondEntity } from './entities/starting-bond.entity.js';
@@ -64,6 +64,66 @@ export class StoryModelService {
             await manager.save(manager.create(RoleEntity, { storyId: story.id }));
             return story.id;
         });
+    }
+
+    /**
+     * A new Story holding a copy of everything authored under `source` (loaded by `findFull`):
+     * its text and style, Role, Characters, StartingBonds and Scenes, in one transaction. Reference
+     * images (with their Portrait crops) and the Cover are left empty for the caller, who copies the files. Answers the new
+     * Story's id and each source Character's id mapped to its copy's.
+     */
+    async duplicate(source: StoryEntity, title: string): Promise<{ storyId: number; characterIds: Map<number, number> }> {
+        return this.dataSource.transaction(async (manager) => {
+            const { setting, opening, pov, tense, replyLength, imageStyle } = source;
+            const story = await manager.save(manager.create(StoryEntity, { title, setting, opening, pov, tense, replyLength, imageStyle }));
+            await manager.save(
+                manager.create(RoleEntity, { storyId: story.id, name: source.role.name, description: source.role.description }),
+            );
+            const characterIds = new Map<number, number>();
+            for (const character of source.characters) {
+                const { name, appearance, personality, voice, exampleLines, background, secrets, arcDirections } = character;
+                const copy = await manager.save(
+                    manager.create(CharacterEntity, {
+                        storyId: story.id,
+                        position: character.position,
+                        name,
+                        appearance,
+                        personality,
+                        voice,
+                        exampleLines: [...exampleLines],
+                        background,
+                        secrets,
+                        arcDirections,
+                        referenceImagePath: null,
+                        portraitCrop: null,
+                    }),
+                );
+                characterIds.set(character.id, copy.id);
+            }
+            for (const bond of source.startingBonds) {
+                await manager.save(
+                    manager.create(StartingBondEntity, {
+                        storyId: story.id,
+                        fromCharacterId: characterIds.get(bond.fromCharacterId)!,
+                        toCharacterId: bond.toCharacterId === null ? null : characterIds.get(bond.toCharacterId)!,
+                        label: bond.label,
+                        description: bond.description,
+                    }),
+                );
+            }
+            for (const scene of source.scenes) {
+                const { position, name, situation, moveOnCondition } = scene;
+                await manager.save(manager.create(SceneEntity, { storyId: story.id, position, name, situation, moveOnCondition }));
+            }
+            return { storyId: story.id, characterIds };
+        });
+    }
+
+    /** Points Characters at their Reference image files, each with its Portrait crop, without marking the Story saved. */
+    async setReferenceImages(images: Map<number, { path: string; portraitCrop: PortraitCrop | null }>): Promise<void> {
+        for (const [id, image] of images) {
+            await this.characters.update({ id }, { referenceImagePath: image.path, portraitCrop: image.portraitCrop });
+        }
     }
 
     /**

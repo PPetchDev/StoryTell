@@ -31,6 +31,8 @@ export interface VeniceImageRequest {
     prompt: string;
     /** Input images for multi-edit: the first is the base, the rest are layers. */
     referenceImages?: ImageData[];
+    /** Sent as `resolution` on either endpoint; left out, Venice draws at 1K. */
+    resolution?: '2K';
 }
 
 /**
@@ -64,7 +66,7 @@ export class VeniceClient {
                 hide_watermark: true,
                 return_binary: false,
                 variants: 1,
-                ...(model.resolution ? { resolution: model.resolution } : {}),
+                ...(request.resolution ? { resolution: request.resolution } : {}),
             };
         }
         return {
@@ -74,6 +76,7 @@ export class VeniceClient {
             aspect_ratio: IMAGE_ASPECT_RATIO,
             output_format: 'jpeg',
             safe_mode: false,
+            ...(request.resolution ? { resolution: request.resolution } : {}),
         };
     }
 

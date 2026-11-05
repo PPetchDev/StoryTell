@@ -2,12 +2,14 @@ import { Column, Entity, PrimaryColumn, UpdateDateColumn } from 'typeorm';
 
 import { decimalColumn } from '../../../store/db/decimal.js';
 
-import type { PlayModel, SnapshotModel } from '../../../service/model-gateway/model-gateway.js';
+import type { PlayModel, SnapshotModel, SnapshotSize } from '../../../service/model-gateway/model-gateway.js';
 
 /** The one Settings row, as the API returns it. */
 export interface SettingsResponse {
     playModel: PlayModel;
     imageModel: SnapshotModel;
+    /** How large Snapshots are drawn; 2K only for a model offered at 2K. */
+    snapshotSize: SnapshotSize;
     /** Warn when a pool's remaining credit falls below this share of its cap. */
     textLowCreditPercent: number;
     imageLowCreditPercent: number;
@@ -31,6 +33,9 @@ export class SettingsEntity {
     @Column({ name: 'image_model', type: 'text' })
     imageModel: SnapshotModel;
 
+    @Column({ name: 'snapshot_size', type: 'text' })
+    snapshotSize: SnapshotSize;
+
     @Column({ name: 'text_low_credit_percent', type: 'integer' })
     textLowCreditPercent: number;
 
@@ -50,6 +55,7 @@ export class SettingsEntity {
         return {
             playModel: this.playModel,
             imageModel: this.imageModel,
+            snapshotSize: this.snapshotSize,
             textLowCreditPercent: this.textLowCreditPercent,
             imageLowCreditPercent: this.imageLowCreditPercent,
             textCreditCapUsd: this.textCreditCapUsd,

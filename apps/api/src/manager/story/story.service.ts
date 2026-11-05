@@ -15,7 +15,7 @@ import {
     StartingBondNotFoundError,
     StoryNotFoundError,
 } from '../../errors/story.errors.js';
-import { SnapshotNotFoundError, UnsupportedImageError } from '../../errors/image.errors.js';
+import { ImageNotFoundError, SnapshotNotFoundError, UnsupportedImageError } from '../../errors/image.errors.js';
 import { ChatModelService } from '../../model/chat/chat.service.js';
 import { LedgerModelService } from '../../model/ledger/ledger.service.js';
 import { SnapshotModelService } from '../../model/snapshot/snapshot.service.js';
@@ -24,6 +24,7 @@ import { SceneEntity } from '../../model/story/entities/scene.entity.js';
 import { StartingBondEntity } from '../../model/story/entities/starting-bond.entity.js';
 import {
     CoverFocus,
+    CoverSource,
     Pov,
     ReplyLength,
     StoryEntity,
@@ -199,6 +200,60 @@ export class StoryManagerService {
         ]);
         await this.storyModel.saveStory(story);
         return this.reload(storyId);
+    }
+
+    /**
+     * Spec: "Duplicate Story". A new Story, "<title> (copy)", with everything the author wrote:
+     * text and style, Role, Characters with their Reference images and Portraits, StartingBonds,
+     * Scenes and the Cover. Chats and Snapshots are not copied, so a Cover that is a Snapshot
+     * is dropped. Every file is copied to a path of the new Story's own, so deleting either
+     * Story never removes the other's files. A failure part-way leaves no copy behind.
+     */
+    async duplicateStory(storyId: number): Promise<StoryDetail> {
+        const source = await this.load(storyId);
+        const { storyId: copyId, characterIds } = await this.storyModel.duplicate(source, `${source.title} (copy)`.trim());
+        const written: string[] = [];
+        /** Copies a file under a new name; null when the source file is gone, which leaves that picture out of the copy. */
+        const copyFile = async (from: string, to: (extension: string) => string): Promise<string | null> => {
+            let bytes: Buffer;
+            try {
+                bytes = (await this.imageStore.read(from)).bytes;
+            } catch (error) {
+                if (!(error instanceof ImageNotFoundError)) throw error;
+                this.logger.warn(`Story ${storyId}: ${from} is missing, so the copy goes without it.`);
+                return null;
+            }
+            const relativePath = to(from.slice(from.lastIndexOf('.') + 1));
+            written.push(relativePath);
+            await this.imageStore.write(relativePath, bytes);
+            return relativePath;
+        };
+        try {
+            const images = new Map<number, { path: string; portraitCrop: PortraitCrop | null }>();
+            for (const character of source.characters) {
+                if (!character.referenceImagePath) continue;
+                const id = characterIds.get(character.id)!;
+                const token = randomBytes(6).toString('hex');
+                const copied = await copyFile(character.referenceImagePath, (ext) => `reference-images/story-${copyId}/character-${id}-${token}.${ext}`);
+                if (copied) images.set(id, { path: copied, portraitCrop: character.portraitCrop ? { ...character.portraitCrop } : null });
+            }
+            await this.storyModel.setReferenceImages(images);
+
+            const cover = source.cover();
+            const focus = cover?.focus ?? null;
+            if (cover?.source === CoverSource.Upload && source.coverImagePath) {
+                const token = randomBytes(6).toString('hex');
+                const imagePath = await copyFile(source.coverImagePath, (ext) => `covers/story-${copyId}/cover-${token}.${ext}`);
+                if (imagePath) await this.storyModel.setCover(copyId, { snapshotId: null, characterId: null, imagePath, focus });
+            } else if (cover?.source === CoverSource.ReferenceImage && cover.characterId !== null && images.has(characterIds.get(cover.characterId)!)) {
+                await this.storyModel.setCover(copyId, { snapshotId: null, characterId: characterIds.get(cover.characterId)!, imagePath: null, focus });
+            }
+        } catch (error) {
+            await this.storyModel.deleteStory(copyId);
+            for (const relativePath of written) await this.removeFile(relativePath);
+            throw error;
+        }
+        return this.reload(copyId);
     }
 
     /** Removes the Story and everything under it, Reference image, Gallery and Cover files included (spec: "Delete Story"). */

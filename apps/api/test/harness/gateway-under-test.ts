@@ -32,6 +32,7 @@ export function gatewayUnderTest(
     const settings: GatewayModelSettings = {
         playModel: 'glm-5.3',
         imageModel: 'seedream-v4-edit',
+        snapshotSize: '1K',
         ...options.settings,
     };
     const records: NewUsageRecord[] = [];

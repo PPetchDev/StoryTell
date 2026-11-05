@@ -2,7 +2,9 @@ import {
     ImageCallKind,
     ImageModel,
     REFERENCE_IMAGE_MODEL,
+    SNAPSHOT_MODEL_PRICES,
     SnapshotModel,
+    SnapshotSize,
     TEXT_ONLY_SNAPSHOT_MODELS,
     TextCallKind,
     TextModel,
@@ -65,12 +67,13 @@ export interface ImageModelSpec {
     /** Venice's model id, sent as `model` (generate) or `modelId` (multi-edit). */
     id: string;
     endpoint: 'generate' | 'multi-edit';
-    /** Venice reports no per-image cost, so UsageRecords carry the list price. */
-    listPriceUsd: number;
+    /**
+     * Venice reports no per-image cost, so UsageRecords carry the list price of the size drawn.
+     * A model with no 2K price is drawn at 1K only.
+     */
+    prices: { '1K': number; '2K'?: number };
     /** The list price of each input image past the first, where Venice charges for them (`pricing.inputImages`). */
     extraInputImageUsd?: number;
-    /** Sent as `resolution` where a tier costs no more than 1K; left out, Venice draws at 1K. */
-    resolution?: '2K';
     /**
      * `GET /models` reports `constraints.promptCharacterLimit`; this is the value read on
      * 2026-11-04, used when that call fails.
@@ -82,46 +85,55 @@ export const IMAGE_MODELS: Record<ImageModel, ImageModelSpec> = {
     'seedream-v4-edit': {
         id: 'seedream-v4-edit',
         endpoint: 'multi-edit',
-        listPriceUsd: 0.05,
+        prices: SNAPSHOT_MODEL_PRICES['seedream-v4-edit'],
         fallbackPromptCharacterLimit: 10_000,
     },
-    // Venice's `GET /models` on 2026-11-05: $0.06 at 1K with one input image included, $0.00345 per further one.
+    // Venice's `GET /models` on 2026-11-05: one input image included, $0.00345 per further one.
     'seedream-v5-pro-edit': {
         id: 'seedream-v5-pro-edit',
         endpoint: 'multi-edit',
-        listPriceUsd: 0.06,
+        prices: SNAPSHOT_MODEL_PRICES['seedream-v5-pro-edit'],
         extraInputImageUsd: 0.00345,
         fallbackPromptCharacterLimit: 10_000,
     },
     'qwen-edit-uncensored': {
         id: 'qwen-edit-uncensored',
         endpoint: 'multi-edit',
-        listPriceUsd: 0.04,
+        prices: SNAPSHOT_MODEL_PRICES['qwen-edit-uncensored'],
         fallbackPromptCharacterLimit: 1500,
     },
     'seedream-v4': {
         id: 'seedream-v4',
         endpoint: 'generate',
-        listPriceUsd: 0.05,
+        prices: { '1K': 0.05 },
         fallbackPromptCharacterLimit: 10_000,
     },
     'seedream-v5-pro': {
         id: 'seedream-v5-pro',
         endpoint: 'generate',
-        listPriceUsd: 0.06,
+        prices: { '1K': 0.06, '2K': 0.11 },
         fallbackPromptCharacterLimit: 10_000,
     },
-    // Venice's `GET /models` on 2026-11-05: $0.04 at both 1K and 2K, so it draws at 2K.
+    // Venice's `GET /models` on 2026-11-05: $0.04 at both 1K and 2K, so it always draws at 2K.
     'qwen-image-3': {
         id: 'qwen-image-3',
         endpoint: 'generate',
-        listPriceUsd: 0.04,
-        resolution: '2K',
+        prices: { '1K': 0.04, '2K': 0.04 },
         fallbackPromptCharacterLimit: 10_000,
     },
 };
 
 export const VENICE_HOST = 'venice';
+
+/**
+ * The size an image is drawn at: the one asked for when the model has it, and 2K whenever it
+ * costs no more than 1K. Reference images ask for 2K; Snapshots ask for the Settings size.
+ */
+export function drawnSize(model: ImageModelSpec, wanted: SnapshotSize): SnapshotSize {
+    const twoK = model.prices['2K'];
+    if (twoK === undefined) return '1K';
+    return wanted === '2K' || twoK <= model.prices['1K'] ? '2K' : '1K';
+}
 
 /** A Snapshot with no reference image goes to its model's text-to-image sibling, which needs no base image. */
 export function imageModelForKind(kind: ImageCallKind, snapshotModel: SnapshotModel, referenceCount: number): ImageModel {

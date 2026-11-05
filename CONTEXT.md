@@ -40,6 +40,10 @@ _Avoid_: Profile, avatar, user character
 The picture the author chooses for a Story, shown on its card on Home and at the top of its editor, cropped around a focus point the author taps. It is a Snapshot from the Story's Gallery, a Character's Reference image (which it follows when that is replaced), or a picture uploaded from the phone; only an uploaded one belongs to the Cover and is deleted with it. Without one, Home shows the newest Snapshot.
 _Avoid_: Thumbnail, banner, key art
 
+**Duplicate**:
+Making a new Story, "<title> (copy)", from everything the author wrote in another: its text, style, Role, Characters with their Reference images and Portraits, Scenes, Starting Bonds and Cover, each image in a file of its own. No Chats or Snapshots come along, so a Cover that is a Snapshot is dropped.
+_Avoid_: Clone, fork, template
+
 ## Playing
 
 **Chat**:
@@ -49,6 +53,10 @@ _Avoid_: Session, playthrough, conversation, thread
 **Message**:
 One entry in a Chat's history: either what the user wrote, shown under the Role or Persona they wore at the time, or the AI's reply, which is narration and Characters' speech in order. A Chat begins with the Opening as its first Message. Editing a Message discards every Message after it.
 _Avoid_: Post, reply, bubble, entry
+
+**Transcript**:
+A Chat as a plain text file the user downloads from the Chat menu: a title line, then every Message in order, the user's lines as "Name: …" under the identity worn when each was sent, and the AI's narration and speech as readable text.
+_Avoid_: Export, log, dump
 
 **Continue**:
 Asking the Narrator to write the next part of the Chat without a Message from the user; the result is an ordinary AI Message, and it never speaks or acts for the user.
@@ -97,6 +105,10 @@ _Avoid_: Character development, inconsistency
 **Snapshot**:
 An AI-generated image of the moment of a Chat's latest Message, seen through the user's eyes and made only on the user's request; it is kept in the Story's Gallery even after editing or resetting the Chat takes its moment away.
 _Avoid_: Illustration, picture, render
+
+**Snapshot size**:
+How large Snapshots are drawn, 1K or 2K, chosen in Settings next to the Snapshot model; 2K is offered only for a model Venice draws at 2K, and costs that model's 2K price.
+_Avoid_: Resolution, quality
 
 **Gallery**:
 The collection of every Snapshot taken in any of a Story's Chats.

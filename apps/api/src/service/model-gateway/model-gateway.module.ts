@@ -41,7 +41,11 @@ export class ModelGatewayModule {
                             settings: {
                                 current: async () => {
                                     const current = await settings.get();
-                                    return { playModel: current.playModel, imageModel: current.imageModel };
+                                    return {
+                                        playModel: current.playModel,
+                                        imageModel: current.imageModel,
+                                        snapshotSize: current.snapshotSize,
+                                    };
                                 },
                             },
                             usage: { record: (record) => usage.record(record) },

@@ -233,6 +233,15 @@ export function ChatTopBar({
                             >
                                 <MenuText label="Gallery" sub="Every Snapshot of this Chat" />
                             </Link>
+                            {/* A plain link: the API answers it as an attachment, so the page stays put. */}
+                            <a
+                                href={`/api/stories/${chat.storyId}/chats/${chat.id}/transcript`}
+                                className={styles.item}
+                                download
+                                onClick={close}
+                            >
+                                <MenuText label="Download as text" sub="The whole Chat as a .txt file" />
+                            </a>
                             <MenuButton onClick={() => setMenu('rename')} disabled={busy}>
                                 <MenuText label="Rename" sub={chat.title} />
                             </MenuButton>

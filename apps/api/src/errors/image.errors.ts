@@ -66,3 +66,10 @@ export class ImageTooLargeError extends AppError {
         super('413.002.010', `That picture is too large: at most ${maxMegabytes} MB.`);
     }
 }
+
+/** A Snapshot size the Snapshot model is not drawn at (Settings offers 2K only where Venice has it). */
+export class SnapshotSizeNotOfferedError extends AppError {
+    constructor(model: string, size: string) {
+        super('422.002.011', `${model} is not offered at ${size}.`);
+    }
+}
