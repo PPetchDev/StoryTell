@@ -13,10 +13,11 @@ import { MemoryExtractionManagerService } from './memory/extraction.service.js';
 import { MemoryManagerService } from './memory/memory.service.js';
 import { SuggestedRepliesManagerService } from './suggestions/suggested-replies.service.js';
 import { StorySoFarManagerService } from './story-so-far/story-so-far.service.js';
+import { ChatTranscriptManagerService } from './transcript.service.js';
 
 @Module({
     imports: [ChatModelModule, StoryModelModule, SettingsModelModule, LedgerModelModule, MemoryModelModule, PersonaModelModule, SnapshotModelModule],
-    providers: [ChatManagerService, JudgeManagerService, MemoryExtractionManagerService, MemoryManagerService, SuggestedRepliesManagerService, StorySoFarManagerService],
-    exports: [ChatManagerService, MemoryManagerService, StorySoFarManagerService],
+    providers: [ChatManagerService, JudgeManagerService, MemoryExtractionManagerService, MemoryManagerService, SuggestedRepliesManagerService, StorySoFarManagerService, ChatTranscriptManagerService],
+    exports: [ChatManagerService, MemoryManagerService, StorySoFarManagerService, ChatTranscriptManagerService],
 })
 export class ChatManagerModule {}

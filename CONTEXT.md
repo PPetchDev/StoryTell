@@ -50,6 +50,10 @@ _Avoid_: Session, playthrough, conversation, thread
 One entry in a Chat's history: either what the user wrote, shown under the Role or Persona they wore at the time, or the AI's reply, which is narration and Characters' speech in order. A Chat begins with the Opening as its first Message. Editing a Message discards every Message after it.
 _Avoid_: Post, reply, bubble, entry
 
+**Transcript**:
+A Chat as a plain text file the user downloads from the Chat menu: a title line, then every Message in order, the user's lines as "Name: …" under the identity worn when each was sent, and the AI's narration and speech as readable text.
+_Avoid_: Export, log, dump
+
 **Continue**:
 Asking the Narrator to write the next part of the Chat without a Message from the user; the result is an ordinary AI Message, and it never speaks or acts for the user.
 _Avoid_: Skip, auto-play, next
