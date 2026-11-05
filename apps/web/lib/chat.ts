@@ -258,6 +258,25 @@ export function backgroundPending(chat: Chat): boolean {
     return reply?.judge?.status === 'pending' || reply?.memory?.status === 'pending';
 }
 
+/**
+ * The one notice for what didn't save in the background (.scratch/background-retry/spec.md):
+ * the latest reply's calls whose automatic retry failed too, and the Chat's failed Snapshots,
+ * in plain words. Null when nothing failed. Only a reply's call holds the next send.
+ */
+export function backgroundNotice(chat: Chat, failedSnapshots: number): string | null {
+    const reply = latestReply(chat);
+    const judge = reply?.judge?.status === 'failed';
+    const memory = reply?.memory?.status === 'failed';
+    const sentences: string[] = [];
+    if (judge && memory) sentences.push("Couldn't save the Memories, feelings and Scene from that reply.");
+    else if (memory) sentences.push("Couldn't save the Memories from that reply.");
+    else if (judge) sentences.push("Couldn't save the feelings and the Scene from that reply.");
+    if (failedSnapshots === 1) sentences.push("Couldn't make the Snapshot.");
+    else if (failedSnapshots > 1) sentences.push(`Couldn't make ${failedSnapshots} Snapshots.`);
+    if (judge || memory) sentences.push("Sending waits until it's saved.");
+    return sentences.length === 0 ? null : sentences.join(' ');
+}
+
 /** Where a dashboard item's causing Message is on the Chat screen. */
 export function messageHref(storyId: number, chatId: number, messageId: number): string {
     return `/stories/${storyId}/chats/${chatId}#message-${messageId}`;

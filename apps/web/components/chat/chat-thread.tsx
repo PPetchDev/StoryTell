@@ -361,7 +361,6 @@ interface ChatThreadProps {
     /** 📷 in the action row: a Snapshot of the latest AI Message. */
     onSnapshot(): void;
     onOpenSnapshot(snapshot: Snapshot): void;
-    onRetrySnapshot(job: SnapshotJob): void;
     onDismissSnapshot(job: SnapshotJob): void;
 }
 
@@ -385,7 +384,6 @@ export function ChatThread({
     onCancelEdit,
     onSnapshot,
     onOpenSnapshot,
-    onRetrySnapshot,
     onDismissSnapshot,
 }: ChatThreadProps) {
     // ↺ Again replaces the reply in place: it leaves the thread while the writing indicator shows.
@@ -455,7 +453,6 @@ export function ChatThread({
                                         snapshots={snapshots.snapshots.filter((snapshot) => snapshot.messageId === message.id)}
                                         jobs={snapshots.jobs.filter((job) => job.messageId === message.id)}
                                         onOpen={onOpenSnapshot}
-                                        onRetry={onRetrySnapshot}
                                         onDismiss={onDismissSnapshot}
                                     />
                                 )

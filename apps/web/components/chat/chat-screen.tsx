@@ -15,7 +15,7 @@ import { Cast, Portraits } from '@/lib/character-colour';
 import { backgroundPending, Chat, chatApi, EditedChat, latestReply, Message, MessagePart, rollbackNotice, TurnStream } from '@/lib/chat';
 import { Memory, memoryApi, renderUser } from '@/lib/memory';
 import { setSceneStripHidden, useSceneStripHidden } from '@/lib/scene-strip';
-import { inThreadOrder, Snapshot } from '@/lib/snapshot';
+import { inThreadOrder, Snapshot, snapshotApi } from '@/lib/snapshot';
 import { Scene } from '@/lib/story';
 
 import styles from './chat-screen.module.css';
@@ -281,18 +281,23 @@ export function ChatScreen({ initial, cast, portraits, scenes }: ChatScreenProps
             return swapped;
         });
 
-    /** Runs only the failed judge again, then re-reads the Chat so the notice clears. */
-    const retryJudge = (messageId: number) =>
-        void runWrite(async () => {
-            await chatApi.retryJudge(chat.storyId, chat.id, messageId);
-            return apiFetch<Chat>(`/stories/${chat.storyId}/chats/${chat.id}`);
-        });
+    const failedJobs = snaps.state.jobs.filter((job) => job.status === 'failed');
 
-    /** The same for a failed Memory extraction; its adds are announced once the Chat reads done. */
-    const retryExtraction = (messageId: number) =>
+    /**
+     * The background notice's one Retry (.scratch/background-retry/spec.md): the latest reply's
+     * failed judge and extraction, and each failed Snapshot, run again together; then the Chat
+     * and its Snapshots re-read so the notice clears. A rerun extraction's adds are announced.
+     */
+    const retryBackground = () =>
         void runWrite(async () => {
-            announcedRef.current = null;
-            await chatApi.retryExtraction(chat.storyId, chat.id, messageId);
+            const reply = latestReply(chat);
+            if (reply?.memory?.status === 'failed') announcedRef.current = null;
+            await Promise.all([
+                reply?.judge?.status === 'failed' ? chatApi.retryJudge(chat.storyId, chat.id, reply.id) : null,
+                reply?.memory?.status === 'failed' ? chatApi.retryExtraction(chat.storyId, chat.id, reply.id) : null,
+                ...failedJobs.map((job) => snapshotApi.retry(chat.storyId, chat.id, job.id)),
+            ]);
+            await snaps.refresh();
             return apiFetch<Chat>(`/stories/${chat.storyId}/chats/${chat.id}`);
         });
 
@@ -359,7 +364,6 @@ export function ChatScreen({ initial, cast, portraits, scenes }: ChatScreenProps
                 onCancelEdit={() => setEditing(null)}
                 onSnapshot={() => setSnapshotSheet(true)}
                 onOpenSnapshot={setViewing}
-                onRetrySnapshot={(job) => void snaps.retry(job)}
                 onDismissSnapshot={(job) => void snaps.dismiss(job)}
             />
 
@@ -372,13 +376,13 @@ export function ChatScreen({ initial, cast, portraits, scenes }: ChatScreenProps
                 error={error}
                 rollback={rollback}
                 snapshotError={snaps.error}
+                failedSnapshots={failedJobs.length}
                 onDraft={setDraft}
                 onSend={send}
                 onContinue={continueStory}
                 onStop={stopTurn}
                 onRetry={() => void runTurn((stream) => chatApi.retry(chat.storyId, chat.id, stream))}
-                onRetryJudge={retryJudge}
-                onRetryExtraction={retryExtraction}
+                onRetryBackground={retryBackground}
             />
 
             {snapshotSheet && (

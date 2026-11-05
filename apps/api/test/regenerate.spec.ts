@@ -318,7 +318,13 @@ describe('Regenerate', () => {
             script('ignored');
             // Supertest sends only once awaited: `.then` starts the first request now.
             const first = regenerate(story.id, chat.id, lastAi(played).id).then((response) => response);
-            await new Promise((resolve) => setTimeout(resolve, 200));
+            // Wait for its turn call to be held, not for a fixed time: under load 200 ms was not
+            // always enough, and the second request then reached the held gateway too.
+            const deadline = Date.now() + 10_000;
+            while (turnCalls().length < 2) {
+                if (Date.now() > deadline) throw new Error('The first Regenerate never reached its turn call');
+                await new Promise((resolve) => setTimeout(resolve, 20));
+            }
 
             const second = await regenerate(story.id, chat.id, lastAi(played).id).expect(409);
             expect(second.body.error.code).toBe('409.004.004');
@@ -384,7 +390,7 @@ describe('Regenerate', () => {
             const story = await createStory();
             const chat = await createChat(story.id);
             t.gateway.scriptText('turn', 'Mira nods.');
-            t.gateway.scriptText('judge', new ProviderOutageError('DeepInfra answered 503.'));
+            t.gateway.scriptText('judge', new ProviderOutageError('DeepInfra answered 503.'), new ProviderOutageError('DeepInfra answered 503.'));
             t.gateway.scriptText('memory_extraction', NO_OPS);
             await t.http.post(`/api/stories/${story.id}/chats/${chat.id}/messages`).send({ text: 'Hello?' }).expect(201);
             const failed = await settled(story.id, chat.id);

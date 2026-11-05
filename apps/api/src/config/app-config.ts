@@ -20,6 +20,11 @@ export abstract class AppConfig {
      */
     abstract readonly backgroundWaitMs: number;
     /**
+     * How long a failed judge, Memory extraction or Snapshot waits before its one automatic
+     * retry (.scratch/background-retry/spec.md). Tests and e2e set it to about 0.
+     */
+    abstract readonly backgroundRetryMs: number;
+    /**
      * Where the daily backup job (scripts/backup.mjs) writes how its last run went, so the app
      * can show a failure. Live sets it; dev and tests leave it unset, and then nothing is shown.
      */
@@ -27,6 +32,7 @@ export abstract class AppConfig {
 }
 
 export const DEFAULT_BACKGROUND_WAIT_MS = 8_000;
+export const DEFAULT_BACKGROUND_RETRY_MS = 20_000;
 
 export interface ProviderKeys {
     /** OpenRouter API key: text calls and the text credit balance. */
@@ -60,12 +66,18 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
         throw new ConfigError(`BACKGROUND_WAIT_MS must be a non-negative integer, got "${env.BACKGROUND_WAIT_MS}"`);
     }
 
+    const backgroundRetryMs = env.BACKGROUND_RETRY_MS ? Number(env.BACKGROUND_RETRY_MS) : DEFAULT_BACKGROUND_RETRY_MS;
+    if (!Number.isInteger(backgroundRetryMs) || backgroundRetryMs < 0) {
+        throw new ConfigError(`BACKGROUND_RETRY_MS must be a non-negative integer, got "${env.BACKGROUND_RETRY_MS}"`);
+    }
+
     return {
         port,
         databaseUrl: env.DATABASE_URL!,
         imageDir: path.resolve(env.IMAGE_DIR!),
         modelGateway,
         backgroundWaitMs,
+        backgroundRetryMs,
         backupStatusFile: env.BACKUP_STATUS_FILE ? path.resolve(env.BACKUP_STATUS_FILE) : undefined,
         providerKeys: {
             openRouter: env.OPENROUTER_API_KEY || undefined,

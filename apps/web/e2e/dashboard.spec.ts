@@ -42,7 +42,8 @@ async function createJudgedChat(
     await request.post('/api/testing/fake-gateway/text', {
         data: { kind: 'turn', replies: [{ text: 'Mira looks up at last.\n\n@Mira: In this weather?', model: 'glm-5.3' }] },
     });
-    await request.post('/api/testing/fake-gateway/text', { data: { kind: 'judge', replies: [judgement] } });
+    // A failure fails twice: the try, and its automatic retry.
+    await request.post('/api/testing/fake-gateway/text', { data: { kind: 'judge', replies: typeof judgement === 'string' ? [judgement] : [judgement, judgement] } });
     // Memory extraction changes nothing in this spec: the turn now, and the edited reply later.
     await request.post('/api/testing/fake-gateway/text', { data: { kind: 'memory_extraction', replies: [NO_OPS, NO_OPS] } });
     const chat = await request.post(`/api/stories/${storyId}/chats`);

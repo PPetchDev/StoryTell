@@ -11,6 +11,7 @@ import { StoryEntity } from '../../../model/story/entities/story.entity.js';
 import { ModelGateway } from '../../../service/model-gateway/model-gateway.js';
 import { exchangeUserText } from '../exchange.js';
 import { exchangeIdentityName } from '../identity.js';
+import { Attempt, BackgroundRuns } from '../background-runs.js';
 import { partsToText } from '../turn/reply-parser.js';
 import { applyJudgement } from './apply-judgement.js';
 import { buildJudgePrompt, JUDGE_CONTEXT_MESSAGES, parseJudgement } from './judge-prompt.js';
@@ -44,63 +45,73 @@ export function latestJudged(chat: ChatEntity): MessageEntity | null {
 /**
  * The Bond, Arc and Scene judge (spec: "Background judge"): one V4 Flash call in JSON mode
  * after every turn, run in the background against the AI Message it judges. The result goes
- * through the apply rules into the ledger; a failure of any kind marks the Message failed
- * with the reason, and the next send is blocked until Retry runs the judge again.
+ * through the apply rules into the ledger. A failure of any kind is tried once more after
+ * `backgroundRetryMs`; if that fails too, the Message is marked failed with the reason, and
+ * the next send is blocked until Retry runs the judge again (.scratch/background-retry/spec.md).
  */
 @Injectable()
 export class JudgeManagerService {
     private readonly logger = new Logger(JudgeManagerService.name);
-    /** The judge running for each Chat, so a send can wait for it. */
-    private readonly running = new Map<number, Promise<void>>();
+    /** The judge running for each Chat, both tries included, so a send can wait for it. */
+    private readonly runs: BackgroundRuns;
 
     constructor(
         private readonly chatModel: ChatModelService,
         private readonly ledger: LedgerModelService,
         private readonly gateway: ModelGateway,
         private readonly config: AppConfig,
-    ) {}
+    ) {
+        this.runs = new BackgroundRuns(config.backgroundRetryMs);
+    }
 
     /** Runs the judge in the background. The Message's status must already be pending. */
     start(story: StoryEntity, chatId: number, messageId: number): void {
         void this.run(story, chatId, messageId);
     }
 
-    /** Runs the judge and resolves once its status is done or failed. Never rejects. */
-    run(story: StoryEntity, chatId: number, messageId: number): Promise<void> {
-        const work = this.execute(story, chatId, messageId).finally(() => {
-            if (this.running.get(chatId) === work) this.running.delete(chatId);
-        });
-        this.running.set(chatId, work);
-        return work;
+    /**
+     * Runs the judge and resolves once its status is done or failed. Never rejects. With
+     * `autoRetry` (the background after a reply), a failure is tried once more first; a Retry
+     * press runs it once.
+     */
+    run(story: StoryEntity, chatId: number, messageId: number, autoRetry = true): Promise<void> {
+        return this.runs.run(
+            chatId,
+            () => this.execute(story, chatId, messageId),
+            (reason) => this.recordFailure(chatId, messageId, reason),
+            autoRetry,
+        );
     }
 
     /**
-     * Spec: "Send flow", step 2. Waits for a pending judge up to the configured time. A
-     * pending Message with no judge running (the app restarted mid-call) is marked failed,
-     * so it can be retried rather than waited on forever.
+     * Spec: "Send flow", step 2. Waits for a pending judge up to the configured time; a retry
+     * still waiting out its delay is run at once. A pending Message with no judge running (the
+     * app restarted mid-call) is marked failed, so it can be retried rather than waited on forever.
      */
     async settle(chat: ChatEntity): Promise<SettledBackground> {
         const last = latestJudged(chat);
         if (!last) return { status: null, waited: false };
         if (last.judgeStatus !== BackgroundStatus.Pending) return { status: last.judgeStatus, waited: false };
 
-        const running = this.running.get(chat.id);
+        const running = this.runs.current(chat.id);
         if (!running) {
             await this.chatModel.setJudgeStatus(last.id, BackgroundStatus.Failed, 'The app restarted before the judge finished.');
             return { status: BackgroundStatus.Failed, waited: true };
         }
+        this.runs.hurry(chat.id);
         const finished = await Promise.race([running.then(() => true), sleep(this.config.backgroundWaitMs)]);
         if (!finished) return { status: BackgroundStatus.Pending, waited: true };
         const fresh = await this.chatModel.findMessage(last.id);
         return { status: fresh?.judgeStatus ?? BackgroundStatus.Failed, waited: true };
     }
 
-    private async execute(story: StoryEntity, chatId: number, messageId: number): Promise<void> {
+    /** One try of the judge: its result applied, or why it failed. Never rejects. */
+    private async execute(story: StoryEntity, chatId: number, messageId: number): Promise<Attempt> {
         try {
             // Reloaded here, not taken from the caller: the Chat may have moved on since it was read.
             const chat = await this.chatModel.findWithMessages(chatId);
             const index = chat?.messages.findIndex((message) => message.id === messageId) ?? -1;
-            if (!chat || index < 0) return;
+            if (!chat || index < 0) return { ok: true };
             const message = chat.messages[index];
             const before = chat.messages.slice(0, index);
             const userText = exchangeUserText(chat.messages, index);
@@ -158,14 +169,19 @@ export class JudgeManagerService {
                 this.logger.log(`Chat ${chat.id}, Message ${message.id}: judge item dropped: ${reason}`);
             }
             await this.ledger.record(chat.id, message.id, applied);
+            return { ok: true };
         } catch (error) {
             const reason = error instanceof AppError ? error.message : `Unexpected error: ${String(error)}`;
             this.logger.warn(`Chat ${chatId}, Message ${messageId}: the judge failed: ${reason}`);
-            try {
-                await this.chatModel.setJudgeStatus(messageId, BackgroundStatus.Failed, reason);
-            } catch (writeError) {
-                this.logger.error(`Chat ${chatId}, Message ${messageId}: could not record the judge failure: ${String(writeError)}`);
-            }
+            return { ok: false, reason };
+        }
+    }
+
+    private async recordFailure(chatId: number, messageId: number, reason: string): Promise<void> {
+        try {
+            await this.chatModel.setJudgeStatus(messageId, BackgroundStatus.Failed, reason);
+        } catch (writeError) {
+            this.logger.error(`Chat ${chatId}, Message ${messageId}: could not record the judge failure: ${String(writeError)}`);
         }
     }
 }

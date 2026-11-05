@@ -266,6 +266,8 @@ A Character knows only the Memories it is tagged on`);
             const story = await createStory();
             const chat = await createChat(story.id);
 
+            // The try, and its automatic retry, which goes the same way.
+            t.gateway.scriptText('memory_extraction', 'Sorry, nothing to extract.');
             const played = await play(story.id, chat.id, 'One.', 'Reply one.', 'Sorry, nothing to extract.');
 
             expect(lastAi(played)).toMatchObject({
@@ -609,14 +611,15 @@ A Character knows only the Memories it is tagged on`);
             const chat = await createChat(story.id);
             t.gateway.scriptText('turn', 'Reply one.');
             t.gateway.scriptText('judge', NO_CHANGE);
-            t.gateway.scriptText('memory_extraction', new ProviderOutageError('DeepInfra answered 503.'));
+            // The try and its automatic retry (.scratch/background-retry/spec.md).
+            t.gateway.scriptText('memory_extraction', new ProviderOutageError('first try'), new ProviderOutageError('DeepInfra answered 503.'));
             await t.http.post(`/api/stories/${story.id}/chats/${chat.id}/messages`).send({ text: 'One.' }).expect(201);
             const failed = await settled(story.id, chat.id);
             expect(lastAi(failed)).toMatchObject({ judge: { status: 'done' }, memory: { status: 'failed', error: 'DeepInfra answered 503.' } });
 
             t.gateway.scriptText('turn', 'Reply two.');
             const blocked = await t.http.post(`/api/stories/${story.id}/chats/${chat.id}/messages`).send({ text: 'Two.' }).expect(409);
-            expect(blocked.body.error).toEqual({ code: '409.004.008', message: "The Memories couldn't update after the previous turn. Retry before sending." });
+            expect(blocked.body.error).toEqual({ code: '409.004.008', message: "Couldn't save the Memories from the last reply. Retry before sending." });
             expect(t.gateway.textCalls('turn')).toHaveLength(1);
 
             // A judge retry is refused: the judge did not fail.
@@ -628,7 +631,7 @@ A Character knows only the Memories it is tagged on`);
             ]);
             expect(t.gateway.textCalls('turn')).toHaveLength(1);
             expect(t.gateway.textCalls('judge')).toHaveLength(1);
-            expect(t.gateway.textCalls('memory_extraction')).toHaveLength(2);
+            expect(t.gateway.textCalls('memory_extraction')).toHaveLength(3);
             expect((await memories(story.id, chat.id)).memories).toMatchObject([{ text: '{user} knocked.', messageId: lastAi(failed).id }]);
 
             expect((await t.http.post(`/api/stories/${story.id}/chats/${chat.id}/messages/${lastAi(failed).id}/memory`).expect(409)).body.error.code).toBe('409.004.010');
@@ -646,14 +649,14 @@ A Character knows only the Memories it is tagged on`);
             const story = await createStory();
             const chat = await createChat(story.id);
             t.gateway.scriptText('turn', 'Reply one.');
-            t.gateway.scriptText('judge', new ProviderOutageError());
-            t.gateway.scriptText('memory_extraction', new ProviderOutageError());
+            t.gateway.scriptText('judge', new ProviderOutageError(), new ProviderOutageError());
+            t.gateway.scriptText('memory_extraction', new ProviderOutageError(), new ProviderOutageError());
             await t.http.post(`/api/stories/${story.id}/chats/${chat.id}/messages`).send({ text: 'One.' }).expect(201);
             await settled(story.id, chat.id);
 
             const blocked = await t.http.post(`/api/stories/${story.id}/chats/${chat.id}/messages`).send({ text: 'Two.' }).expect(409);
 
-            expect(blocked.body.error.message).toBe("The Bonds, Arcs, Scene and Memories couldn't update after the previous turn. Retry before sending.");
+            expect(blocked.body.error.message).toBe("Couldn't save the Memories, feelings and Scene from the last reply. Retry before sending.");
         });
     });
 });

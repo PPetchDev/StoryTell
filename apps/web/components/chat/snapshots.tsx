@@ -62,7 +62,6 @@ export function useChatSnapshots(storyId: number, chatId: number) {
         error,
         refresh,
         take: (hint: string, messageId?: number) => run(() => snapshotApi.take(storyId, chatId, hint, messageId)),
-        retry: (job: SnapshotJob) => run(() => snapshotApi.retry(storyId, chatId, job.id)),
         dismiss: (job: SnapshotJob) => run(() => snapshotApi.dismiss(storyId, chatId, job.id)),
         remove: (snapshot: Snapshot) => run(() => snapshotApi.remove(storyId, snapshot.id)),
     };
@@ -72,12 +71,15 @@ interface MessageSnapshotsProps {
     snapshots: Snapshot[];
     jobs: SnapshotJob[];
     onOpen(snapshot: Snapshot): void;
-    onRetry(job: SnapshotJob): void;
     onDismiss(job: SnapshotJob): void;
 }
 
-/** Under an AI Message: its Snapshots inline, a placeholder per job being made, an error per failed one. */
-export function MessageSnapshots({ snapshots, jobs, onOpen, onRetry, onDismiss }: MessageSnapshotsProps) {
+/**
+ * Under an AI Message: its Snapshots inline, a placeholder per job being made (its one
+ * automatic retry included), and a plain line per failed one. Its Retry is the background
+ * notice's, by the composer (.scratch/background-retry/spec.md).
+ */
+export function MessageSnapshots({ snapshots, jobs, onOpen, onDismiss }: MessageSnapshotsProps) {
     if (snapshots.length === 0 && jobs.length === 0) return null;
     return (
         <div className={styles.snapshots} aria-label="Snapshots">
@@ -94,11 +96,8 @@ export function MessageSnapshots({ snapshots, jobs, onOpen, onRetry, onDismiss }
                     </div>
                 ) : (
                     <div key={job.id} className={styles.failed} role="alert">
-                        <span>The Snapshot failed: {job.error?.message ?? 'unknown error'}</span>
+                        <span>Couldn&apos;t make this Snapshot.</span>
                         <span className="toolbar">
-                            <button type="button" className="button button-quiet button-small" onClick={() => onRetry(job)}>
-                                Retry
-                            </button>
                             <button type="button" className="button button-quiet button-small" onClick={() => onDismiss(job)}>
                                 Dismiss
                             </button>

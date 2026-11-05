@@ -504,7 +504,8 @@ export class ChatManagerService {
             throw new NoFailedJudgeError();
         }
         await this.chatModel.setJudgeStatus(message.id, BackgroundStatus.Pending);
-        await this.judge.run(story, chat.id, message.id);
+        // A press runs once: its answer comes at once, with no automatic retry.
+        await this.judge.run(story, chat.id, message.id, false);
         return this.dashboard(storyId, chatId);
     }
 
@@ -517,7 +518,7 @@ export class ChatManagerService {
             throw new NoFailedExtractionError();
         }
         await this.chatModel.setMemoryStatus(message.id, BackgroundStatus.Pending);
-        await this.extraction.run(story, chat.id, message.id);
+        await this.extraction.run(story, chat.id, message.id, false);
         return this.dashboard(storyId, chatId);
     }
 
@@ -737,8 +738,9 @@ export class ChatManagerService {
 
     /**
      * Spec: "Send flow", steps 1–2. Not playable, or text credit out, or a turn in flight,
-     * refuses; a pending background call is waited for, and past the wait the user is told
-     * it is still saving; a failed call blocks with Retry (either call failed blocks).
+     * refuses; a pending background call is waited for (a retry waiting out its delay runs at
+     * once), and past the wait the user is told it is still saving; a call whose automatic retry
+     * failed too blocks with Retry (either call failed blocks).
      * Returns the Chat as it is once the wait is over, since the judge may have moved it on.
      */
     private async requireSendable(story: StoryEntity, chat: ChatEntity): Promise<ChatEntity> {

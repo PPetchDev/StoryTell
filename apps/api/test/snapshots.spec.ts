@@ -383,8 +383,9 @@ describe('Snapshots and the Gallery', () => {
         it('keeps a failure out of the store and shows it with Retry, which then stores the Snapshot', async () => {
             const story = await createStory();
             const chat = await createChat(story.id);
-            t.gateway.scriptText('snapshot_prompt', written(['Mira']));
-            t.gateway.scriptImage('snapshot_image', new ModelRefusalError('Venice returned the image blurred.'));
+            // The try and its automatic retry (.scratch/background-retry/spec.md).
+            t.gateway.scriptText('snapshot_prompt', written(['Mira']), written(['Mira']));
+            t.gateway.scriptImage('snapshot_image', new ModelRefusalError('blurred'), new ModelRefusalError('Venice returned the image blurred.'));
 
             await t.http.post(snapshotsPath(story.id, chat.id)).send({ hint: 'by the lamp' }).expect(202);
             const failed = await settled(story.id, chat.id);
@@ -406,8 +407,8 @@ describe('Snapshots and the Gallery', () => {
             const done = await settled(story.id, chat.id);
             expect(done.jobs).toEqual([]);
             expect(done.snapshots).toMatchObject([{ hint: 'by the lamp', messageId: chat.messages[0].id }]);
-            expect(t.gateway.textCalls('snapshot_prompt')).toHaveLength(2);
-            expect(t.gateway.imageCalls('snapshot_image')).toHaveLength(2);
+            expect(t.gateway.textCalls('snapshot_prompt')).toHaveLength(3);
+            expect(t.gateway.imageCalls('snapshot_image')).toHaveLength(3);
 
             // A Retry of a job that is gone answers 404.
             const gone = await t.http.post(`/api/stories/${story.id}/chats/${chat.id}/snapshot-jobs/${jobId}/retry`).expect(404);
@@ -417,7 +418,7 @@ describe('Snapshots and the Gallery', () => {
         it('fails on an unreadable prompt without an image call, and a failed job can be dismissed', async () => {
             const story = await createStory();
             const chat = await createChat(story.id);
-            t.gateway.scriptText('snapshot_prompt', 'A woman by a window.');
+            t.gateway.scriptText('snapshot_prompt', 'A woman by a window.', 'A woman by a window.');
 
             await t.http.post(snapshotsPath(story.id, chat.id)).send({}).expect(202);
             const failed = await settled(story.id, chat.id);
@@ -721,6 +722,8 @@ describe('Snapshots and the Gallery', () => {
 
             expect(failed.jobs).toMatchObject([{ status: 'failed', error: { code: '402.001.004' } }]);
             expect(failed.snapshots).toEqual([]);
+            // Out of credit is not tried again on its own: a retry could only fail the same way.
+            expect(t.gateway.imageCalls('snapshot_image')).toHaveLength(1);
         });
     });
 

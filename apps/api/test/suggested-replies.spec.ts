@@ -301,7 +301,7 @@ describe('Suggested replies', () => {
             const story = await createStory();
             const chat = await createChat(story.id);
             t.gateway.scriptText('turn', 'Mira nods.');
-            t.gateway.scriptText('judge', new ProviderOutageError('DeepInfra answered 503.'));
+            t.gateway.scriptText('judge', new ProviderOutageError('DeepInfra answered 503.'), new ProviderOutageError('DeepInfra answered 503.'));
             t.gateway.scriptText('memory_extraction', NO_OPS);
             await t.http.post(`/api/stories/${story.id}/chats/${chat.id}/messages`).send({ text: 'Hello?' }).expect(201);
             const failed = await settled(story.id, chat.id);

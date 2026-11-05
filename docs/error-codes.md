@@ -69,7 +69,7 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | `422.004.005` | `EmptyMessageError` | A send or a Message edit with nothing but whitespace. |
 | `404.004.006` | `MessageNotFoundError` | No Message with that id in this Chat. |
 | `409.004.007` | `BackgroundStillSavingError` | A send, Retry, Continue, Regenerate, Message edit, choosing a Reply version or reset while one of the previous AI Message's background calls (the judge, Memory extraction) was still pending past the short wait. Try again in a moment. |
-| `409.004.008` | `BackgroundFailedError` | A send, Retry, Continue or Regenerate while one of the previous AI Message's background calls has failed. The message names which; retry it (on the Chat screen or the dashboard) first. |
+| `409.004.008` | `BackgroundFailedError` | A send, Retry, Continue or Regenerate while one of the previous AI Message's background calls has failed, and so has its one automatic retry (`BACKGROUND_RETRY_MS` later). The message names which in plain words ("Couldn't save the Memories from the last reply."); retry it (on the Chat screen or the dashboard) first. |
 | `409.004.009` | `NoFailedJudgeError` | A judge retry on a Message whose judge did not fail, or that is not the latest AI Message. |
 | `409.004.010` | `NoFailedExtractionError` | A Memory extraction retry on a Message whose extraction did not fail, or that is not the latest AI Message. |
 | `404.004.011` | `MemoryNotFoundError` | No Memory with that id in this Chat. |
