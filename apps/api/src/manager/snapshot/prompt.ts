@@ -39,12 +39,18 @@ export interface SnapshotPromptInput {
 
 export function snapshotPromptMessages(input: SnapshotPromptInput): PromptMessage[] {
     const name = input.identity.name;
+    // The template lists this Story's own pieces: given a fixed example, the writer copied it.
+    const template = JSON.stringify({
+        pieces: Object.fromEntries(stylePieces(input.imageStyle).map((piece) => [piece, '?'])),
+        in_frame: ['Name'],
+        scene: 'one paragraph of at most 120 words',
+    });
     const system = `You write the scene for one image of the latest moment of an interactive story. The image is seen through the eyes of ${name}, the character the user plays.
 
 Rules:
 - First person: the camera is ${name}'s eyes. Never show ${name}: at most a glimpse at the edge of the frame, such as hands, forearms or sleeves.
 - Pick who is in frame: at most ${MAX_IN_FRAME} of the listed Characters, only ones present at this moment, by their exact names. An empty list is fine for a place with nobody in it.
-- Everyone shown is a fictional adult.
+- Everyone shown is a fictional adult with an adult face and body; describe nobody in words that make them read as a child.
 - Describe the moment concretely: the place, the light, each Character's pose, expression and action, and what each one is wearing right now. Always name the clothing; take it from the story so far, else from the Appearance.
 - Say where ${name} stands, which way the camera looks, and what fills the background behind the Characters. Keep the place's layout as the story and the hint give it: indoors or out, walls, doors, windows and openings, and nothing they rule out. Whatever ${name} stands in or looks through (a doorway, a window, a gap) frames the view or is behind the camera; never draw a second one.
 - Say the time of day and where the light comes from, as the story has it at this moment.
@@ -52,14 +58,14 @@ Rules:
 - Where the hint says what should be seen, keep it in view: a Character whose front the hint wants seen faces the camera.
 - Lasting changes from the story (a new scar, a haircut) override the Appearance: mention them.
 - Do not describe the art style or quote dialogue in "scene"; the image has no text or captions.
-- "drawing": the numbers of the art style's pieces that say only how the image is drawn (medium, linework, shading, colour, rendering). Leave out every piece that names a place, a landscape, an object, a time of day, weather or a light, even one that suits this moment: the scene sets those.
+- "pieces": label every piece of the art style. "drawing" when the piece says only how the image is drawn (medium, linework, shading, colour palette, rendering, film or paint texture). Otherwise what it names: "place" (a place, landscape or building), "object", "time" (a time of day or season), "weather" or "light" (a light or what it does, such as glow, shine or reflections). A piece that names any of those is never "drawing", even when it suits this moment: the scene sets them.
 
-Reply with JSON only:
-{"in_frame":["Name"],"scene":"one paragraph of at most 120 words","drawing":[1]}`;
+Reply with JSON only, replacing each "?" with that piece's label:
+${template}`;
 
     const sections = [
         `Setting:\n${input.setting.trim() || '(none)'}`,
-        `The art style, in numbered pieces:\n${stylePieces(input.imageStyle).map((piece, at) => `${at + 1}. ${piece}`).join('\n')}`,
+        `The art style, in pieces:\n${stylePieces(input.imageStyle).map((piece) => `- ${piece}`).join('\n')}`,
         `Characters:\n${input.cast.map((member) => `- ${member.name}: ${member.appearance.trim() || '(no Appearance written)'}`).join('\n')}`,
         `${name} (never shown beyond glimpses): ${input.identity.description.trim() || '(no description)'}`,
         `Memory:\n${input.memories.length > 0 ? input.memories.map((text) => `- ${text}`).join('\n') : '(none)'}`,
@@ -71,11 +77,26 @@ Reply with JSON only:
     if (input.hintNames.length > 0) {
         sections.push(`The hint names who is in frame: "in_frame" must be exactly ${JSON.stringify(input.hintNames)}.`);
     }
+    // Last, where the small writer reads it best: it kept "frozen" poses and back views the hint
+    // ruled out while these sat only in the rules (seen 2026-11-05).
+    const checks = [
+        `It says where ${name} stands, which way the camera looks, what fills the background, the time of day and where the light comes from.`,
+        'Every pose is caught mid-movement, and the words "frozen", "still" and "motionless" are not in it.',
+        'Every art style piece has a label in "pieces", and only pieces about how the image is drawn are "drawing".',
+    ];
+    if (input.hint.trim() !== '') {
+        checks.push(
+            'Everything the hint asks to see faces the camera and is in view: nobody turns their back or looks over their shoulder unless the hint asks for it.',
+        );
+    }
+    sections.push(`Before you answer, check the scene:\n${checks.map((check) => `- ${check}`).join('\n')}`);
     return [
         { role: 'system', content: system },
         { role: 'user', content: sections.join('\n\n') },
     ];
 }
+
+const fold = (text: string) => text.trim().toLocaleLowerCase();
 
 /** The Story's art style, or the default when it has none. */
 function effectiveStyle(imageStyle: string): string {
@@ -91,22 +112,22 @@ export function stylePieces(imageStyle: string): string[] {
 }
 
 /**
- * The art style for one Snapshot: only the pieces the writer picked as saying how the image is
+ * The art style for one Snapshot: only the pieces the writer labelled as saying how the image is
  * drawn, in the Story's own words and order. A style can name a place or a light ("golden-hour
  * light over open grassland"), and drawn literally that put daylight grassland behind a closed
- * tent at night (seen 2026-11-05). With no usable pick, the whole style stays.
+ * tent at night (seen 2026-11-05). With no piece labelled "drawing", the whole style stays.
  */
-export function drawingStyle(imageStyle: string, picked: number[] | null): string {
-    const pieces = stylePieces(imageStyle);
-    const kept = pieces.filter((_, at) => picked?.includes(at + 1));
+export function drawingStyle(imageStyle: string, labels: Record<string, string> | null): string {
+    const byPiece = new Map(Object.entries(labels ?? {}).map(([piece, label]) => [fold(piece), fold(label)]));
+    const kept = stylePieces(imageStyle).filter((piece) => byPiece.get(fold(piece)) === 'drawing');
     return kept.length > 0 ? kept.join(', ') : effectiveStyle(imageStyle);
 }
 
 export interface SnapshotScene {
     inFrame: string[];
     scene: string;
-    /** The art style pieces, numbered from 1, the writer picked as drawing only; null when it gave none. */
-    drawing: number[] | null;
+    /** The writer's label for each art style piece, keyed by the piece; null when it gave none. */
+    pieceLabels: Record<string, string> | null;
 }
 
 /** Reads the prompt writer's JSON. Throws `UnparseableOutputError` when there is no scene to draw. */
@@ -125,13 +146,13 @@ export function parseSnapshotScene(text: string): SnapshotScene {
     const inFrame = Array.isArray(record.in_frame)
         ? record.in_frame.filter((name): name is string => typeof name === 'string' && name.trim() !== '').map((name) => name.trim())
         : [];
-    const drawing = Array.isArray(record.drawing)
-        ? record.drawing.filter((at): at is number => Number.isInteger(at))
-        : null;
-    return { inFrame, scene, drawing };
+    const pieces = record.pieces;
+    const pieceLabels =
+        typeof pieces === 'object' && pieces !== null && !Array.isArray(pieces)
+            ? Object.fromEntries(Object.entries(pieces).filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
+            : null;
+    return { inFrame, scene, pieceLabels };
 }
-
-const fold = (name: string) => name.trim().toLocaleLowerCase();
 
 /** The cast's names the hint mentions as whole words, in the order the hint mentions them. */
 export function namesInHint(hint: string, cast: SnapshotCastMember[]): string[] {
@@ -171,17 +192,22 @@ export interface InFrameCharacter extends SnapshotCastMember {
 export function snapshotImagePrompt(input: {
     identityName: string;
     scene: string;
+    /** The user's hint, given to the image model too: the writer let it slip (a back view the hint ruled out). */
+    hint?: string;
     imageStyle: string;
-    /** The writer's pick of drawing-only style pieces; null or left out keeps the whole style. */
-    drawing?: number[] | null;
+    /** The writer's labels for the art style pieces; null or left out keeps the whole style. */
+    pieceLabels?: Record<string, string> | null;
     inFrame: InFrameCharacter[];
 }): string {
-    const style = drawingStyle(input.imageStyle, input.drawing ?? null);
+    const style = drawingStyle(input.imageStyle, input.pieceLabels ?? null);
     const lines = [
         `First-person view through the eyes of ${input.identityName}, who is never shown: at most a glimpse of hands or sleeves at the edge of the frame. ` +
             `The camera is at ${input.identityName}'s eyes, so no head, hair, back or shoulder of ${input.identityName} is in the foreground.`,
         input.scene,
     ];
+    if (input.hint && input.hint.trim() !== '') {
+        lines.push(`The user asked for this image: ${input.hint.trim()}. Where the scene above differs, follow this.`);
+    }
     if (input.inFrame.length === 0) {
         lines.push('Nobody else is in frame.');
     } else {
@@ -193,7 +219,8 @@ export function snapshotImagePrompt(input: {
                         ? ''
                         : `, the same person as in reference image ${character.referenceImage}, with the same face, hair, build and art style, ` +
                           `in the pose and clothing the scene gives (never the reference image's pose, clothing, framing or plain background)`;
-                return `- ${character.name}${source}. Appearance: ${character.appearance.trim()}`;
+                // An Appearance like "slight, short, the youngest" drew a childlike figure (seen 2026-11-05).
+                return `- ${character.name}${source}, drawn as a grown adult with an adult face and adult body proportions. Appearance: ${character.appearance.trim()}`;
             }),
         );
     }

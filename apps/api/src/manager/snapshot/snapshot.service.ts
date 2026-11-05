@@ -237,7 +237,8 @@ export class SnapshotManagerService {
             identityName: identity.name,
             scene: scene.scene,
             imageStyle: story.imageStyle,
-            drawing: scene.drawing,
+            pieceLabels: scene.pieceLabels,
+            hint: job.hint,
             inFrame: drawn,
         });
         const result = await this.gateway.generateImage({
