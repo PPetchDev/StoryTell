@@ -1,9 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent, useEffect, useLayoutEffect, useRef } from 'react';
+import { FormEvent, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
-import { Chat, latestReply, modelLabel } from '@/lib/chat';
+import { useConnection } from '@/components/connection';
+import { ApiUnreachableError } from '@/lib/api';
+import { Chat, chatApi, latestReply, modelLabel, SuggestedReply } from '@/lib/chat';
 
 import styles from './chat-composer.module.css';
 
@@ -54,6 +56,88 @@ function Notices({ chat, onRetryJudge, onRetryExtraction, retrying }: NoticesPro
                 </p>
             )}
         </>
+    );
+}
+
+/** The cards ⚡ shows: nothing, the short wait, the three, or a failed ask. */
+type Suggestions =
+    | { status: 'closed' }
+    | { status: 'loading'; afterMessageId: number | null }
+    | { status: 'ready'; afterMessageId: number | null; replies: SuggestedReply[] }
+    | { status: 'failed'; afterMessageId: number | null };
+
+/**
+ * Spec: "Suggested replies". ⚡ asks for three, and ⚡ again closes them. They are made for
+ * the Chat as it stands, so once a new Message arrives (a send, Continue, an edit) they are
+ * gone: never cached across turns. An answer that comes back after they were closed is dropped.
+ */
+function useSuggestedReplies(chat: Chat) {
+    const { reportUnreachable } = useConnection();
+    const [state, setState] = useState<Suggestions>({ status: 'closed' });
+    const asked = useRef(0);
+    const newestId = chat.messages[chat.messages.length - 1]?.id ?? null;
+    const shown: Suggestions = state.status !== 'closed' && state.afterMessageId === newestId ? state : { status: 'closed' };
+
+    const close = () => {
+        asked.current++;
+        setState({ status: 'closed' });
+    };
+
+    const toggle = async () => {
+        if (shown.status !== 'closed') return close();
+        const ask = ++asked.current;
+        setState({ status: 'loading', afterMessageId: newestId });
+        try {
+            const { suggestions } = await chatApi.suggest(chat.storyId, chat.id);
+            if (asked.current === ask) setState({ status: 'ready', afterMessageId: newestId, replies: suggestions });
+        } catch (caught) {
+            if (asked.current !== ask) return;
+            if (caught instanceof ApiUnreachableError) {
+                setState({ status: 'closed' });
+                reportUnreachable();
+            } else {
+                setState({ status: 'failed', afterMessageId: newestId });
+            }
+        }
+    };
+
+    return { shown, toggle, close };
+}
+
+const SUGGESTION_KIND_LABEL: Record<SuggestedReply['kind'], string> = {
+    action: 'Do',
+    speech: 'Say',
+    move: 'Bold move',
+};
+
+/** Above the box: the wait, the error, or the three cards. A tap on a card only fills the box. */
+function SuggestionCards({ suggestions, onPick }: { suggestions: Suggestions; onPick(text: string): void }) {
+    if (suggestions.status === 'loading') {
+        return (
+            <p className={styles.suggesting} role="status">
+                Thinking up replies…
+            </p>
+        );
+    }
+    if (suggestions.status === 'failed') {
+        return (
+            <p role="alert" className="turn-error">
+                Couldn&apos;t suggest replies, try again
+            </p>
+        );
+    }
+    if (suggestions.status !== 'ready') return null;
+    return (
+        <ul className={styles.suggestions} aria-label="Suggested replies">
+            {suggestions.replies.map((reply) => (
+                <li key={reply.kind}>
+                    <button type="button" className={styles.card} onClick={() => onPick(reply.text)}>
+                        <span className={styles.cardKind}>{SUGGESTION_KIND_LABEL[reply.kind]}</span>
+                        <span>{reply.text}</span>
+                    </button>
+                </li>
+            ))}
+        </ul>
     );
 }
 
@@ -130,11 +214,14 @@ export function ChatComposer({
     onRetryExtraction,
 }: ChatComposerProps) {
     const box = useAutoGrow(draft);
+    const suggestions = useSuggestedReplies(chat);
     const empty = draft.trim() === '';
     const send = (event: FormEvent) => {
         event.preventDefault();
         // Enter on an empty box does nothing; only a tap on ▶ lets the story go on.
-        if (!empty) onSend();
+        if (empty) return;
+        suggestions.close();
+        onSend();
     };
     return (
         <footer className={styles.composer}>
@@ -162,8 +249,23 @@ export function ChatComposer({
                     {snapshotError}
                 </p>
             )}
+            <SuggestionCards suggestions={suggestions.shown} onPick={onDraft} />
             <form className={styles.form} onSubmit={send} aria-label="Composer">
-                {/* Ticket 07's ⚡ Suggested replies button goes here, left of the box. */}
+                {/* Spec: "Suggested replies". Asks only when tapped, so they never spend credit unasked. */}
+                <button
+                    type="button"
+                    className={styles.suggest}
+                    aria-label="Suggest replies"
+                    title="Suggest replies"
+                    aria-pressed={suggestions.shown.status !== 'closed'}
+                    aria-busy={suggestions.shown.status === 'loading'}
+                    disabled={writing || busy || blocked}
+                    onClick={() => void suggestions.toggle()}
+                >
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+                        <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />
+                    </svg>
+                </button>
                 <textarea
                     ref={box}
                     aria-label={`Write as ${chat.identityName}`}
@@ -188,7 +290,10 @@ export function ChatComposer({
                         aria-label="Continue"
                         title="Let the story go on"
                         disabled={writing || busy || blocked || chat.awaitingReply}
-                        onClick={onContinue}
+                        onClick={() => {
+                            suggestions.close();
+                            onContinue();
+                        }}
                     >
                         <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
                             <path d="M8 5.1v13.8c0 .8.9 1.3 1.6.8l10.4-6.9c.6-.4.6-1.2 0-1.6L9.6 4.3C8.9 3.8 8 4.3 8 5.1z" />

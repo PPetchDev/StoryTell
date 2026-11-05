@@ -2,7 +2,9 @@
 
 import { BackupBanner } from '@/components/backup-banner';
 import { useApiQuery } from '@/components/connection';
-import { CreditPool, POOL_LABEL, PoolUsage, UsageResponse, usd } from '@/lib/types';
+import { CALL_KIND_LABEL, CreditPool, POOL_LABEL, PoolUsage, UsageResponse, usd } from '@/lib/types';
+
+import styles from './usage.module.css';
 
 const POOLS: CreditPool[] = ['text', 'image'];
 
@@ -12,6 +14,10 @@ function monthName(month: string): string {
         month: 'long',
         year: 'numeric',
     });
+}
+
+function calls(count: number): string {
+    return `${count} ${count === 1 ? 'call' : 'calls'}`;
 }
 
 function PoolCard({ pool, usage }: { pool: CreditPool; usage: PoolUsage }) {
@@ -25,9 +31,17 @@ function PoolCard({ pool, usage }: { pool: CreditPool; usage: PoolUsage }) {
                 <dt>Spent this month</dt>
                 <dd>
                     {usd(usage.spentUsd)}{' '}
-                    <span className="muted">
-                        ({usage.calls} {usage.calls === 1 ? 'call' : 'calls'})
-                    </span>
+                    <span className="muted">({calls(usage.calls)})</span>
+                    {usage.byKind.length > 0 && (
+                        <ul className={styles.kinds} aria-label={`${POOL_LABEL[pool]} spend by kind`}>
+                            {usage.byKind.map((kind) => (
+                                <li key={kind.kind}>
+                                    {CALL_KIND_LABEL[kind.kind]}: {usd(kind.spentUsd)}{' '}
+                                    <span className="muted">({calls(kind.calls)})</span>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
                 </dd>
                 <dt>Remaining credit</dt>
                 <dd>

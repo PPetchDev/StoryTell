@@ -53,6 +53,7 @@ const PLAY_MODEL_KINDS: ReadonlySet<TextCallKind> = new Set<TextCallKind>([
     'story_draft',
     'field_rewrite',
     'story_assistant',
+    'suggested_replies',
 ]);
 
 export function isPlayModelKind(kind: TextCallKind): boolean {

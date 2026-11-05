@@ -1,0 +1,31 @@
+{
+    "id": "gen-synthetic-0007",
+    "provider": "DeepInfra",
+    "model": "z-ai/glm-5.3",
+    "object": "chat.completion",
+    "created": 1762300006,
+    "choices": [
+        {
+            "logprobs": null,
+            "finish_reason": "stop",
+            "native_finish_reason": "stop",
+            "index": 0,
+            "message": {
+                "role": "assistant",
+                "content": "{\"suggestions\":[{\"kind\":\"action\",\"text\":\"You pull your boots off and set them by the stove.\"},{\"kind\":\"speech\",\"text\":\"\\\"The ferry was late. So was the storm.\\\"\"},{\"kind\":\"move\",\"text\":\"You take the logbook from her and read the last entry aloud.\"}]}",
+                "refusal": null,
+                "reasoning": null
+            }
+        }
+    ],
+    "usage": {
+        "prompt_tokens": 1500,
+        "completion_tokens": 90,
+        "total_tokens": 1590,
+        "cost": 0.000654,
+        "is_byok": false,
+        "prompt_tokens_details": { "cached_tokens": 0 },
+        "cost_details": { "upstream_inference_cost": null },
+        "completion_tokens_details": { "reasoning_tokens": 0 }
+    }
+}

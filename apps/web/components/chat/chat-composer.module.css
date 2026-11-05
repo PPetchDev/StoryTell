@@ -5,7 +5,7 @@
     background: var(--bg);
 }
 
-/* One row: the box between ⚡ (ticket 07) on the left and the send button on the right. */
+/* One row: the box between ⚡ on the left and the send button on the right. */
 .form {
     display: flex;
     align-items: flex-end;
@@ -58,4 +58,83 @@
 .send:focus-visible {
     outline: 2px solid var(--text);
     outline-offset: 2px;
+}
+
+/* ⚡ (spec: "Suggested replies"): a quiet round button left of the box, tinted while its cards are open. */
+.suggest {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+}
+
+.suggest[aria-pressed='true'] {
+    background: var(--accent-soft);
+    color: var(--accent);
+}
+
+.suggest:disabled {
+    color: var(--line);
+    cursor: default;
+}
+
+.suggest:focus-visible {
+    outline: 2px solid var(--text);
+    outline-offset: 2px;
+}
+
+/* The three cards above the box. */
+.suggestions {
+    list-style: none;
+    margin: 0 0 0.5rem;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    width: 100%;
+    text-align: left;
+    font: inherit;
+    font-size: 0.9375rem;
+    line-height: 1.35;
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 0.9rem;
+    padding: 0.5rem 0.8rem;
+    cursor: pointer;
+}
+
+.card:active {
+    background: var(--surface-raised);
+}
+
+.card:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+.cardKind {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+.suggesting {
+    margin: 0 0 0.5rem;
+    font-size: 0.875rem;
+    color: var(--muted);
 }

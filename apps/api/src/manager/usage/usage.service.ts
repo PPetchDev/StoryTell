@@ -1,13 +1,15 @@
 import { Injectable } from '@nestjs/common';
 
 import { SettingsModelService } from '../../model/settings/settings.service.js';
-import { UsageRecordModelService } from '../../model/usage-record/usage-record.service.js';
+import { KindSpend, UsageRecordModelService } from '../../model/usage-record/usage-record.service.js';
 import { CreditPool, ModelGateway } from '../../service/model-gateway/model-gateway.js';
 
 export interface PoolUsage {
     /** Sum of this month's UsageRecords for the pool. */
     spentUsd: number;
     calls: number;
+    /** This month's spend per call kind, most spent first; kinds with no calls are left out. */
+    byKind: KindSpend[];
     /** Read from the provider; null when it can't be read (Venice without an Admin key). */
     remainingUsd: number | null;
     /** What the pool holds when topped up (Settings); the base of the percent threshold. */
@@ -48,6 +50,7 @@ export class UsageManagerService {
             return {
                 spentUsd: round(spend[name].spentUsd),
                 calls: spend[name].calls,
+                byKind: spend[name].byKind.map((kind) => ({ ...kind, spentUsd: round(kind.spentUsd) })),
                 remainingUsd: remainingUsd === null ? null : round(remainingUsd),
                 capUsd,
                 lowCreditPercent,

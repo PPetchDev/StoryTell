@@ -23,9 +23,45 @@ export interface SettingsResponse {
     imageModels: ModelOption[];
 }
 
+/** The call kinds a UsageRecord is written under (apps/api's `CallKind`). */
+export type CallKind =
+    | 'turn'
+    | 'judge'
+    | 'memory_extraction'
+    | 'story_draft'
+    | 'field_rewrite'
+    | 'story_assistant'
+    | 'snapshot_prompt'
+    | 'suggested_replies'
+    | 'snapshot_image'
+    | 'reference_image';
+
+/** What each call kind is for, in the words the Usage page shows. */
+export const CALL_KIND_LABEL: Record<CallKind, string> = {
+    turn: 'Story replies',
+    judge: 'Bond, Arc and Scene checks',
+    memory_extraction: 'Memory keeping',
+    story_draft: 'Story drafts',
+    field_rewrite: 'Field rewrites',
+    story_assistant: 'Story assistant',
+    snapshot_prompt: 'Snapshot descriptions',
+    suggested_replies: 'Suggested replies',
+    snapshot_image: 'Snapshots',
+    reference_image: 'Reference images',
+};
+
+/** One call kind's share of a pool's spend this month. */
+export interface KindSpend {
+    kind: CallKind;
+    spentUsd: number;
+    calls: number;
+}
+
 export interface PoolUsage {
     spentUsd: number;
     calls: number;
+    /** Most spent first; kinds with no calls this month are left out. */
+    byKind: KindSpend[];
     remainingUsd: number | null;
     capUsd: number;
     lowCreditPercent: number;

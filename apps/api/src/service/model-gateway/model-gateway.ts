@@ -24,7 +24,8 @@ export type TextCallKind =
     | 'story_draft'
     | 'field_rewrite'
     | 'story_assistant'
-    | 'snapshot_prompt';
+    | 'snapshot_prompt'
+    | 'suggested_replies';
 
 export type ImageCallKind = 'snapshot_image' | 'reference_image';
 

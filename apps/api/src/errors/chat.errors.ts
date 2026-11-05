@@ -96,3 +96,10 @@ export class AwaitingReplyError extends AppError {
         super('409.004.013', 'Your last message is still waiting for its reply. Retry it first.');
     }
 }
+
+/** The model's Suggested replies could not be read as three suggestions of the three kinds. Nothing stored. */
+export class UnreadableSuggestionsError extends AppError {
+    constructor(reason: string) {
+        super('502.004.014', `Couldn't suggest replies (${reason}). Try again.`);
+    }
+}

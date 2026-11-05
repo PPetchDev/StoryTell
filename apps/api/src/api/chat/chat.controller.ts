@@ -14,6 +14,7 @@ import {
     EditMessageResponseBodyDTO,
     ListChatsResponseBodyDTO,
 } from './dto/chat.response.dto.js';
+import { SuggestionsResponseBodyDTO } from './dto/suggestions.response.dto.js';
 
 const Id = (name: string) => Param(name, ParseIntPipe);
 
@@ -147,6 +148,19 @@ export class ChatApiController {
         @Id('messageId') messageId: number,
     ): Promise<ChatDashboardResponseBodyDTO> {
         return this.chatManager.retryExtraction(storyId, chatId, messageId);
+    }
+
+    /**
+     * Spec: "Suggested replies". Three things the user might write next (an action, a line of
+     * speech and a bold move), written as the worn identity. Nothing is stored in the Chat.
+     * Refused while a turn is in flight or text credit is out; it never waits for the
+     * previous reply's background calls.
+     */
+    @Post(':chatId/suggestions')
+    @HttpCode(200)
+    @ApiOkResponse({ type: SuggestionsResponseBodyDTO })
+    async suggestions(@Id('storyId') storyId: number, @Id('chatId') chatId: number): Promise<SuggestionsResponseBodyDTO> {
+        return { suggestions: await this.chatManager.suggestReplies(storyId, chatId) };
     }
 
     /** Clears every Message and copies the current Opening in again; title and identity stay. */

@@ -1,0 +1,10 @@
+/* What each call kind spent, under the pool's total. */
+.kinds {
+    list-style: none;
+    margin: 0.35rem 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    font-size: 0.875rem;
+}
