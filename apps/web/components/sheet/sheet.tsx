@@ -7,7 +7,7 @@ import styles from './sheet.module.css';
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled])';
 
 /** Tab and Shift+Tab wrap around inside the panel, so focus never reaches the page behind it. */
-function keepFocusIn(panel: HTMLElement, event: KeyboardEvent) {
+export function keepFocusIn(panel: HTMLElement, event: KeyboardEvent) {
     const focusable = [...panel.querySelectorAll<HTMLElement>(FOCUSABLE)];
     if (focusable.length === 0) return;
     const first = focusable[0];

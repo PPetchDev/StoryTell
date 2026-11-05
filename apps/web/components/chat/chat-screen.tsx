@@ -13,7 +13,7 @@ import { ApiError, apiFetch, ApiUnreachableError } from '@/lib/api';
 import { Cast } from '@/lib/character-colour';
 import { backgroundPending, Chat, chatApi, EditedChat, latestReply, Message, rollbackNotice } from '@/lib/chat';
 import { Memory, memoryApi, renderUser } from '@/lib/memory';
-import { Snapshot } from '@/lib/snapshot';
+import { inThreadOrder, Snapshot } from '@/lib/snapshot';
 
 import styles from './chat-screen.module.css';
 
@@ -296,18 +296,19 @@ export function ChatScreen({ initial, cast }: ChatScreenProps) {
 
             {viewing && (
                 <SnapshotViewer
-                    snapshot={viewing}
+                    snapshots={inThreadOrder(chat.messages, snaps.state.snapshots)}
+                    openId={viewing.id}
                     onClose={() => setViewing(null)}
-                    onDelete={() => {
+                    onDelete={(snapshot) => {
                         setViewing(null);
-                        void snaps.remove(viewing);
+                        void snaps.remove(snapshot);
                     }}
                     onRetake={
-                        chat.imageCreditOut || viewing.messageId === null
+                        chat.imageCreditOut
                             ? undefined
-                            : () => {
+                            : (snapshot) => {
                                   setViewing(null);
-                                  void snaps.take(viewing.hint, viewing.messageId ?? undefined);
+                                  void snaps.take(snapshot.hint, snapshot.messageId ?? undefined);
                               }
                     }
                 />
