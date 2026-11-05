@@ -1,15 +1,13 @@
 'use client';
 
-import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { useConnection } from '@/components/connection';
-import { Sheet } from '@/components/sheet/sheet';
 import { SnapshotViewer, snapshotAlt } from '@/components/snapshot/snapshot-viewer';
 import { ApiError, apiFetch, ApiUnreachableError } from '@/lib/api';
 import { ChatSnapshots, chatSnapshotsPath, Snapshot, snapshotApi, snapshotImageUrl, SnapshotJob } from '@/lib/snapshot';
 
 import styles from './message-snapshots.module.css';
-import sheetStyles from './snapshot-sheet.module.css';
 
 /** How often the Chat's Snapshots are re-read while one is being made. */
 const SNAPSHOT_POLL_MS = 1_500;
@@ -109,56 +107,6 @@ export function MessageSnapshots({ snapshots, jobs, onOpen, onRetry, onDismiss }
                 ),
             )}
         </div>
-    );
-}
-
-interface SnapshotSheetProps {
-    /** Image credit is used up: the sheet says so and takes nothing. */
-    imageCreditOut: boolean;
-    onTake(hint: string): void;
-    onClose(): void;
-}
-
-/**
- * 📷 in the action row opens this (spec: "Snapshot sheet"): an optional hint, then one
- * Snapshot of the latest AI Message. It closes at once; the placeholder in the thread shows
- * the Snapshot being made, and a failure to start it shows by the composer.
- */
-export function SnapshotSheet({ imageCreditOut, onTake, onClose }: SnapshotSheetProps) {
-    const [hint, setHint] = useState('');
-    const take = (event: FormEvent) => {
-        event.preventDefault();
-        if (imageCreditOut) return;
-        onTake(hint);
-        onClose();
-    };
-    return (
-        <Sheet label="Take a Snapshot" onClose={onClose}>
-            <form className={sheetStyles.form} onSubmit={take}>
-                <h2 className={sheetStyles.title}>Take a Snapshot</h2>
-                <p className={sheetStyles.lead}>A picture of this moment, seen through your eyes.</p>
-                <label className={sheetStyles.field}>
-                    <span>Hint (optional)</span>
-                    <input
-                        type="text"
-                        aria-label="Snapshot hint"
-                        placeholder="e.g. close-up on her face"
-                        maxLength={300}
-                        value={hint}
-                        disabled={imageCreditOut}
-                        onChange={(event) => setHint(event.target.value)}
-                    />
-                </label>
-                {imageCreditOut && (
-                    <p className={sheetStyles.note} role="status">
-                        Snapshots are off: image credit is used up. Play goes on.
-                    </p>
-                )}
-                <button type="submit" className={`button ${sheetStyles.take}`} disabled={imageCreditOut}>
-                    Take Snapshot
-                </button>
-            </form>
-        </Sheet>
     );
 }
 

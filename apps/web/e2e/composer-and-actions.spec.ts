@@ -1,4 +1,4 @@
-import { APIRequestContext, expect, test } from '@playwright/test';
+import { APIRequestContext, expect, Page, test } from '@playwright/test';
 
 // The composer and the action row are used on a phone (spec: "Phone width"): 390px wide, with touch.
 test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
@@ -50,9 +50,9 @@ test('only the newest reply shows its actions; an older Message shows Edit when 
         await expect(replies).toHaveCount(2);
 
         // The newest reply carries its action row; nothing else offers Edit.
-        const actions = page.getByRole('group', { name: 'Reply actions' });
+        const actions = page.getByRole('group', { name: 'Message actions' });
         await expect(actions).toHaveCount(1);
-        await expect(replies.last().getByRole('group', { name: 'Reply actions' })).toBeVisible();
+        await expect(replies.last().getByRole('group', { name: 'Message actions' })).toBeVisible();
         await expect(actions.getByRole('button', { name: 'Edit' })).toBeVisible();
         await expect(actions.getByRole('button', { name: 'Snapshot' })).toBeVisible();
         await expect(thread.getByRole('button', { name: 'Edit' })).toHaveCount(1);
@@ -79,27 +79,31 @@ test('only the newest reply shows its actions; an older Message shows Edit when 
     }
 });
 
-test('the composer is one row that grows; Shift+Enter is a new line, Enter sends, and the actions hide while the reply is written', async ({
-    page,
-    request,
-}) => {
-    const { storyId, chatId } = await createPlayedChat(request, ['I set my boots by the door.']);
-    await scriptTurns(request, ['@Mira: The lamp room is up the stairs.']);
-
-    // Hold the turn back until the test has looked at the screen.
+/** Holds the Chat's send back until `release` is called, so a test can look at the screen meanwhile. */
+async function holdSend(page: Page, storyId: number, chatId: number): Promise<() => void> {
     let release: () => void = () => {};
     const held = new Promise<void>((resolve) => (release = resolve));
     await page.route(`**/api/stories/${storyId}/chats/${chatId}/messages`, async (route) => {
         await held;
         await route.continue();
     });
+    return release;
+}
+
+test('the composer is one row that grows, Enter on the phone is a new line, and the actions hide while the reply is written', async ({
+    page,
+    request,
+}) => {
+    const { storyId, chatId } = await createPlayedChat(request, ['I set my boots by the door.']);
+    await scriptTurns(request, ['@Mira: The lamp room is up the stairs.']);
+    const release = await holdSend(page, storyId, chatId);
 
     try {
         await page.goto(`/stories/${storyId}/chats/${chatId}`);
         const composer = page.getByRole('form', { name: 'Composer' });
         const box = composer.getByRole('textbox', { name: 'Write as Ash' });
         const send = composer.getByRole('button', { name: 'Send' });
-        await expect(page.getByRole('group', { name: 'Reply actions' })).toBeVisible();
+        await expect(page.getByRole('group', { name: 'Message actions' })).toBeVisible();
 
         // One row, naming the worn identity, with nothing to send yet.
         await expect(box).toHaveAttribute('placeholder', /Ash/);
@@ -108,24 +112,28 @@ test('the composer is one row that grows; Shift+Enter is a new line, Enter sends
         const oneRow = (await box.boundingBox())!.height;
         expect(oneRow).toBeLessThan(56);
 
-        // Shift+Enter makes a new line and the box grows with it, up to about five lines.
+        // The on-screen keyboard has no Shift+Enter, so Enter is a new line; the box grows with it.
         await box.pressSequentially('Where is');
-        await box.press('Shift+Enter');
+        await box.press('Enter');
         await box.pressSequentially('the lamp room?');
         await expect(box).toHaveValue('Where is\nthe lamp room?');
         await expect(send).toBeEnabled();
         await expect.poll(async () => (await box.boundingBox())!.height).toBeGreaterThan(oneRow + 10);
+
+        // It grows to about five lines, then scrolls.
         await box.fill(Array.from({ length: 12 }, (_, n) => `Line ${n + 1}`).join('\n'));
         const tall = (await box.boundingBox())!.height;
-        expect(tall).toBeLessThan(oneRow * 5);
+        expect(tall).toBeGreaterThan(oneRow * 3);
+        expect(tall).toBeLessThan(oneRow * 4);
+        expect(await box.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
         await box.fill('Where is\nthe lamp room?');
 
-        // Enter sends: the box clears, shrinks back, and no action shows while the reply is written.
-        await box.press('Enter');
+        // The button sends: the box clears, shrinks back, and no action shows while the reply is written.
+        await send.tap();
         await expect(box).toHaveValue('');
         await expect(page.getByRole('article', { name: 'Ash said' }).last()).toContainText('the lamp room?');
         await expect(page.getByRole('status').filter({ hasText: 'Writing' })).toBeVisible();
-        await expect(page.getByRole('group', { name: 'Reply actions' })).toHaveCount(0);
+        await expect(page.getByRole('group', { name: 'Message actions' })).toHaveCount(0);
         await page.getByRole('article', { name: 'Ash said' }).first().tap();
         await expect(page.getByRole('region', { name: 'Messages' }).getByRole('button', { name: 'Edit' })).toHaveCount(0);
         await expect.poll(async () => (await box.boundingBox())!.height).toBeLessThanOrEqual(oneRow + 1);
@@ -134,10 +142,35 @@ test('the composer is one row that grows; Shift+Enter is a new line, Enter sends
         release();
         const reply = page.getByRole('article', { name: 'AI reply' }).last();
         await expect(reply).toContainText('The lamp room is up the stairs.');
-        await expect(reply.getByRole('group', { name: 'Reply actions' })).toBeVisible();
-        await expect(page.getByRole('group', { name: 'Reply actions' })).toHaveCount(1);
+        await expect(reply.getByRole('group', { name: 'Message actions' })).toBeVisible();
+        await expect(page.getByRole('group', { name: 'Message actions' })).toHaveCount(1);
     } finally {
         release();
         await request.delete(`/api/stories/${storyId}`);
     }
+});
+
+test.describe('on a physical keyboard', () => {
+    test.use({ viewport: { width: 1280, height: 800 }, hasTouch: false, isMobile: false });
+
+    test('Shift+Enter is a new line and Enter sends', async ({ page, request }) => {
+        const { storyId, chatId } = await createPlayedChat(request, ['I set my boots by the door.']);
+        await scriptTurns(request, ['@Mira: The lamp room is up the stairs.']);
+
+        try {
+            await page.goto(`/stories/${storyId}/chats/${chatId}`);
+            const box = page.getByRole('textbox', { name: 'Write as Ash' });
+            await box.pressSequentially('Where is');
+            await box.press('Shift+Enter');
+            await box.pressSequentially('the lamp room?');
+            await expect(box).toHaveValue('Where is\nthe lamp room?');
+
+            await box.press('Enter');
+            await expect(box).toHaveValue('');
+            await expect(page.getByRole('article', { name: 'Ash said' }).last()).toContainText('the lamp room?');
+            await expect(page.getByRole('article', { name: 'AI reply' }).last()).toContainText('The lamp room is up the stairs.');
+        } finally {
+            await request.delete(`/api/stories/${storyId}`);
+        }
+    });
 });

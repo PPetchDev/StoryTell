@@ -75,10 +75,24 @@ function EditForm({ message, later, onSave, onCancel }: EditFormProps) {
     );
 }
 
+/** A Message's element id: the `#message-N` that dashboard and Memory links land on. */
+function messageAnchor(messageId: number): string {
+    return `message-${messageId}`;
+}
+
 /** Taps on these inside a Message do their own thing and never show or hide its Edit. */
 const OWN_CONTROLS = 'button, a, input, textarea, select, form';
 
-interface ReplyActionsProps {
+/** ✎ Edit, in the action row and under a tapped Message. */
+function EditAction({ onEdit }: { onEdit(): void }) {
+    return (
+        <button type="button" className={styles.action} onClick={onEdit}>
+            <span aria-hidden="true">✎</span>Edit
+        </button>
+    );
+}
+
+interface ActionRowProps {
     onEdit(): void;
     onSnapshot(): void;
 }
@@ -87,12 +101,10 @@ interface ReplyActionsProps {
  * Under the newest AI Message while no turn is in flight (spec: "Action row"). Ticket 06's
  * ↺ Again goes first in this row, and never on the Opening.
  */
-function ReplyActions({ onEdit, onSnapshot }: ReplyActionsProps) {
+function ActionRow({ onEdit, onSnapshot }: ActionRowProps) {
     return (
-        <div className={styles.actions} role="group" aria-label="Reply actions">
-            <button type="button" className={styles.action} onClick={onEdit}>
-                <span aria-hidden="true">✎</span>Edit
-            </button>
+        <div className={styles.actions} role="group" aria-label="Message actions">
+            <EditAction onEdit={onEdit} />
             <button type="button" className={styles.action} onClick={onSnapshot}>
                 <span aria-hidden="true">📷</span>Snapshot
             </button>
@@ -105,7 +117,7 @@ interface MessageViewProps {
     cast: Cast;
     later: number;
     editing: boolean;
-    /** What shows under the Message: its Edit once tapped, or the newest reply's action row. */
+    /** What shows under the Message: its Edit once tapped, or the action row. */
     tools: ReactNode;
     /** Its Snapshots and Snapshot jobs, for an AI Message. */
     snapshots: ReactNode;
@@ -117,7 +129,9 @@ interface MessageViewProps {
 
 function MessageView({ message, cast, later, editing, tools, snapshots, onTap, onSave, onCancel }: MessageViewProps) {
     const tap = (event: MouseEvent<HTMLElement>) => {
-        if (onTap && !(event.target as Element).closest(OWN_CONTROLS)) onTap();
+        // A drag that selects text is reading, not a tap.
+        const selecting = (window.getSelection()?.toString() ?? '') !== '';
+        if (onTap && !selecting && !(event.target as Element).closest(OWN_CONTROLS)) onTap();
     };
     // The same from the keyboard, so Edit stays reachable without a pointer.
     const key = (event: KeyboardEvent<HTMLElement>) => {
@@ -128,7 +142,7 @@ function MessageView({ message, cast, later, editing, tools, snapshots, onTap, o
     };
     return (
         <article
-            id={`message-${message.id}`}
+            id={messageAnchor(message.id)}
             className={[styles.message, message.kind === 'user' && styles.fromUser, onTap && styles.tappable].filter(Boolean).join(' ')}
             aria-label={messageLabel(message)}
             tabIndex={onTap ? 0 : undefined}
@@ -161,7 +175,7 @@ function useTappedMessage(canEdit: boolean) {
     useEffect(() => {
         if (tapped === null) return;
         const onClick = (event: Event) => {
-            const message = document.getElementById(`message-${tapped}`);
+            const message = document.getElementById(messageAnchor(tapped));
             if (!message?.contains(event.target as Node)) setTapped(null);
         };
         // Capture, so a tap on another Message hides this one before that one shows its own.
@@ -280,8 +294,8 @@ export function ChatThread({
     const { threadRef, contentRef } = useFollowEnd(`${messages.length}:${newest}:${pending !== null}:${writing}`);
     const storySize = { '--story-size': STORY_TEXT_SIZE[useTextSize()] } as CSSProperties;
     const [tapped, setTapped] = useTappedMessage(canEdit);
-    // The action row goes under the latest AI Message, the one a Snapshot is taken of.
-    const newestReply = messages.findLast((message) => message.kind === 'ai');
+    // The action row goes under the latest AI Message (the Opening counts), the one a Snapshot is taken of.
+    const newestAiMessage = messages.findLast((message) => message.kind === 'ai');
 
     const edit = (messageId: number) => {
         setTapped(null);
@@ -294,16 +308,14 @@ export function ChatThread({
                 {messages.map((message, index) => {
                     // A User Message edit runs a turn, so it waits while sending is blocked.
                     const editable = canEdit && (message.kind === 'ai' || !blocked);
-                    const withRow = canEdit && message === newestReply;
+                    const withRow = canEdit && message === newestAiMessage;
                     let tools: ReactNode = null;
                     if (withRow) {
-                        tools = <ReplyActions onEdit={() => edit(message.id)} onSnapshot={onSnapshot} />;
+                        tools = <ActionRow onEdit={() => edit(message.id)} onSnapshot={onSnapshot} />;
                     } else if (editable && tapped === message.id) {
                         tools = (
                             <div className={styles.tools}>
-                                <button type="button" className={styles.action} onClick={() => edit(message.id)}>
-                                    <span aria-hidden="true">✎</span>Edit
-                                </button>
+                                <EditAction onEdit={() => edit(message.id)} />
                             </div>
                         );
                     }

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent, useLayoutEffect, useRef } from 'react';
+import { FormEvent, useEffect, useLayoutEffect, useRef } from 'react';
 
 import { Chat, latestReply, modelLabel } from '@/lib/chat';
 
@@ -57,20 +57,38 @@ function Notices({ chat, onRetryJudge, onRetryExtraction, retrying }: NoticesPro
     );
 }
 
+/** Sets the box's height to its text's, which the CSS max-height caps. */
+function fitToText(box: HTMLTextAreaElement) {
+    box.style.height = 'auto';
+    const borders = box.offsetHeight - box.clientHeight;
+    box.style.height = `${box.scrollHeight + borders}px`;
+}
+
 /**
- * Fits the box to its text, from one row up to the CSS max-height (about five lines), past
- * which it scrolls (spec: "Composer").
+ * Fits the box to its text, from one row up to about five lines, past which it scrolls
+ * (spec: "Composer"). A new width (a turned phone) rewraps the text, so it fits again then.
  */
 function useAutoGrow(value: string) {
     const ref = useRef<HTMLTextAreaElement>(null);
     useLayoutEffect(() => {
-        const box = ref.current;
-        if (!box) return;
-        box.style.height = 'auto';
-        const borders = box.offsetHeight - box.clientHeight;
-        box.style.height = `${box.scrollHeight + borders}px`;
+        if (ref.current) fitToText(ref.current);
     }, [value]);
+    useEffect(() => {
+        const refit = () => {
+            if (ref.current) fitToText(ref.current);
+        };
+        window.addEventListener('resize', refit);
+        return () => window.removeEventListener('resize', refit);
+    }, []);
     return ref;
+}
+
+/**
+ * Enter sends on a physical keyboard (spec: "Composer"). A phone's on-screen keyboard has no
+ * Shift+Enter, so where no fine pointer is present, Enter is a new line and the button sends.
+ */
+function enterSends(): boolean {
+    return window.matchMedia('(any-pointer: fine)').matches;
 }
 
 interface ChatComposerProps {
@@ -147,15 +165,14 @@ export function ChatComposer({
                     placeholder={`Write as ${chat.identityName}…`}
                     value={draft}
                     rows={1}
-                    enterKeyHint="send"
                     disabled={writing || blocked}
                     onChange={(event) => onDraft(event.target.value)}
                     onKeyDown={(event) => {
-                        // Enter sends and Shift+Enter is a new line; Enter that ends an IME composition (Thai, say) only confirms it.
-                        if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
-                            event.preventDefault();
-                            event.currentTarget.form?.requestSubmit();
-                        }
+                        if (event.key !== 'Enter' || event.shiftKey || !enterSends()) return;
+                        // An Enter that confirms an input method's word (Thai, say) only confirms it; Safari reports it as 229.
+                        if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+                        event.preventDefault();
+                        event.currentTarget.form?.requestSubmit();
                     }}
                 />
                 {/* Ticket 05: while the box is empty or whitespace this becomes ▶ Continue. */}

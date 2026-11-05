@@ -42,7 +42,7 @@ test('takes a Snapshot from the action row with a hint, sees the placeholder and
 
         // The composer has no camera any more; 📷 is in the newest reply's action row.
         await expect(page.getByRole('form', { name: 'Composer' }).getByRole('textbox', { name: 'Snapshot hint' })).toHaveCount(0);
-        await opening.getByRole('group', { name: 'Reply actions' }).getByRole('button', { name: 'Snapshot' }).tap();
+        await opening.getByRole('group', { name: 'Message actions' }).getByRole('button', { name: 'Snapshot' }).tap();
         const sheet = page.getByRole('dialog', { name: 'Take a Snapshot' });
         await sheet.getByRole('textbox', { name: 'Snapshot hint' }).fill('close-up on Mira');
         await sheet.getByRole('button', { name: 'Take Snapshot' }).tap();
