@@ -1,5 +1,8 @@
 import { APIRequestContext, expect, test } from '@playwright/test';
 
+// Played on a phone (spec: "Phone width"): 390px wide, with touch.
+test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
 const OPENING = 'The lamp went out an hour ago.\n\n@Mira: Boots off, keeper.';
 const NO_CHANGE = '{"bond_changes":[],"arc_steps":[],"scene":{"move_on":false}}';
 const NO_OPS = '{"operations":[]}';
@@ -60,14 +63,17 @@ test('edits an earlier User Message, sees the later Messages gone and a new repl
         await expect(said).toHaveCount(2);
         await expect(replies).toHaveCount(2);
 
-        // Edit the first User Message; saving asks first, since two Messages come after it.
-        await said.first().getByRole('button', { name: 'Edit' }).click();
+        // An older Message offers Edit only once tapped.
+        await expect(said.first().getByRole('button', { name: 'Edit' })).toHaveCount(0);
+        await said.first().tap();
+        await said.first().getByRole('button', { name: 'Edit' }).tap();
+        // Saving asks first, since three Messages come after it.
         const box = page.getByRole('textbox', { name: 'Message text' });
         await expect(box).toHaveValue('I set my boots by the door.');
         await box.fill('I keep my boots on.');
-        await page.getByRole('button', { name: 'Save' }).click();
+        await page.getByRole('button', { name: 'Save' }).tap();
         await expect(page.getByText('This discards the 3 Messages after it')).toBeVisible();
-        await page.getByRole('button', { name: 'Save and rewind' }).click();
+        await page.getByRole('button', { name: 'Save and rewind' }).tap();
 
         // The later Messages are gone and one fresh reply follows the edited text.
         await expect(said).toHaveCount(1);

@@ -5,23 +5,57 @@
     background: var(--bg);
 }
 
+/* One row: the box between ⚡ (ticket 07) on the left and the send button on the right. */
 .form {
-    display: grid;
-    gap: 0.5rem;
+    display: flex;
+    align-items: flex-end;
+    gap: 0.4rem;
 }
 
 .form textarea {
+    flex: 1;
+    min-width: 0;
+    box-sizing: border-box;
     font: inherit;
-    width: 100%;
+    /* 1rem keeps a phone from zooming in on focus. */
+    font-size: 1rem;
+    line-height: 1.4;
     background: var(--surface);
     color: var(--text);
     border: 1px solid var(--line);
-    border-radius: 0.75rem;
-    padding: 0.625rem 0.75rem;
-    resize: vertical;
-    min-width: 0;
+    border-radius: 1.25rem;
+    padding: 0.55rem 0.9rem;
+    resize: none;
+    overflow-y: auto;
+    /* About five lines, then it scrolls. */
+    max-height: calc(5 * 1.4em + 1.1rem + 2px);
 }
 
-.form :global(.button) {
-    justify-self: end;
+.form textarea:focus-visible {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.send {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border: 0;
+    border-radius: 999px;
+    background: var(--accent);
+    color: #fff;
+    cursor: pointer;
+}
+
+.send:disabled {
+    background: var(--surface-raised);
+    color: var(--muted);
+    cursor: default;
+}
+
+.send:focus-visible {
+    outline: 2px solid var(--text);
+    outline-offset: 2px;
 }
