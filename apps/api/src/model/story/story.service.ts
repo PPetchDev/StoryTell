@@ -3,13 +3,14 @@ import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 
 import { CharacterEntity, PortraitCrop } from './entities/character.entity.js';
+import { LoreEntryEntity } from './entities/lore-entry.entity.js';
 import { RoleEntity } from './entities/role.entity.js';
 import { SceneEntity } from './entities/scene.entity.js';
 import { StartingBondEntity } from './entities/starting-bond.entity.js';
 import { CoverFocus, StoryEntity } from './entities/story.entity.js';
 
 // Relations are opted into here only; nothing on the entities auto-loads.
-const FULL_RELATIONS = { role: true, characters: true, startingBonds: true, scenes: true, coverSnapshot: true };
+const FULL_RELATIONS = { role: true, characters: true, startingBonds: true, scenes: true, lore: true, coverSnapshot: true };
 
 /** A Story's Cover columns: at most one of the three pointers set, and where to look. */
 export interface CoverColumns {
@@ -27,6 +28,7 @@ function byPosition<T extends { position: number; id: number }>(items: T[]): T[]
 function sorted(story: StoryEntity): StoryEntity {
     story.characters = byPosition(story.characters);
     story.scenes = byPosition(story.scenes);
+    story.lore = byPosition(story.lore);
     story.startingBonds = [...story.startingBonds].sort((a, b) => a.id - b.id);
     return story;
 }
@@ -41,6 +43,7 @@ export class StoryModelService {
         @InjectRepository(CharacterEntity) private readonly characters: Repository<CharacterEntity>,
         @InjectRepository(StartingBondEntity) private readonly bonds: Repository<StartingBondEntity>,
         @InjectRepository(SceneEntity) private readonly scenes: Repository<SceneEntity>,
+        @InjectRepository(LoreEntryEntity) private readonly lore: Repository<LoreEntryEntity>,
     ) {}
 
     /** Every Story with its relations, most recently saved first. */
@@ -68,7 +71,7 @@ export class StoryModelService {
 
     /**
      * A new Story holding a copy of everything authored under `source` (loaded by `findFull`):
-     * its text and style, Role, Characters, StartingBonds and Scenes, in one transaction. Reference
+     * its text and style, Role, Characters, StartingBonds, Scenes and Lore, in one transaction. Reference
      * images (with their Portrait crops) and the Cover are left empty for the caller, who copies the files. Answers the new
      * Story's id and each source Character's id mapped to its copy's.
      */
@@ -114,6 +117,10 @@ export class StoryModelService {
             for (const scene of source.scenes) {
                 const { position, name, situation, moveOnCondition } = scene;
                 await manager.save(manager.create(SceneEntity, { storyId: story.id, position, name, situation, moveOnCondition }));
+            }
+            for (const entry of source.lore) {
+                const { position, name, keywords, text, alwaysOn } = entry;
+                await manager.save(manager.create(LoreEntryEntity, { storyId: story.id, position, name, keywords: [...keywords], text, alwaysOn }));
             }
             return { storyId: story.id, characterIds };
         });
@@ -163,7 +170,7 @@ export class StoryModelService {
     }
 
     async deleteStory(id: number): Promise<void> {
-        // Role, Characters, StartingBonds and Scenes go with it through ON DELETE CASCADE.
+        // Role, Characters, StartingBonds, Scenes and Lore go with it through ON DELETE CASCADE.
         await this.stories.delete({ id });
     }
 
@@ -223,5 +230,17 @@ export class StoryModelService {
                 await manager.update(SceneEntity, { id }, { position });
             }
         });
+    }
+
+    createLoreEntry(fields: Partial<LoreEntryEntity>): LoreEntryEntity {
+        return this.lore.create(fields);
+    }
+
+    saveLoreEntry(entry: LoreEntryEntity): Promise<LoreEntryEntity> {
+        return this.lore.save(entry);
+    }
+
+    async removeLoreEntry(entry: LoreEntryEntity): Promise<void> {
+        await this.lore.delete({ id: entry.id });
     }
 }

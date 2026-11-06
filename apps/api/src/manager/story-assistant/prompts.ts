@@ -29,7 +29,11 @@ Each <change> is one of:
 - { "op": "add", "target": "character", "value": { "name": string, "appearance": string, "personality": string, "voice": string, "exampleLines": [string], "background": string, "secrets": string, "arcDirections": string } }
 - { "op": "add", "target": "scene", "value": { "name": string, "situation": string, "moveOnCondition": string } }
 - { "op": "add", "target": "startingBond", "value": { "from": <Character name>, "toward": <Character name> | "role", "label": string, "description": string } }
-- { "op": "remove", "target": "character" | "scene", "name": <name> }
+- { "op": "set", "target": "lore", "name": <Lore name>, "field": "name" | "text", "value": string }
+- { "op": "set", "target": "lore", "name": <Lore name>, "field": "keywords", "value": [string] } (the whole list)
+- { "op": "set", "target": "lore", "name": <Lore name>, "field": "alwaysOn", "value": true | false }
+- { "op": "add", "target": "lore", "value": { "name": string, "keywords": [string], "text": string, "alwaysOn": boolean } }
+- { "op": "remove", "target": "character" | "scene" | "lore", "name": <name> }
 - { "op": "remove", "target": "startingBond", "from": <Character name>, "toward": <Character name> | "role" }
 
 Rules:
@@ -39,7 +43,9 @@ Rules:
 - A new Character needs name, appearance, personality and voice; leave its optional fields as "" or [] unless the instruction implies them. A new Character may have StartingBonds, added as separate changes that name it.
 - The cast holds at most ${MAX_CHARACTERS} Characters. When there is no room, say so in the reply instead of adding one.
 - Only the last Scene may leave moveOnCondition empty. When you add Scenes after the last one, also set the former last Scene's moveOnCondition if it is empty.
-- Remove a Character or Scene only when the instruction asks for it.
+- Lore holds the world's detail; the Setting stays its short core. A Lore entry needs a name and text. Give it keywords for the other ways the story may mention it (other names, plurals, Thai or other-language words); its name already counts. Set alwaysOn only for what matters on every turn. To move detail from the Setting into Lore, set the Setting to its short core and add an entry for each place, people, custom or object taken out.
+- Name Lore entries exactly as the Story writes them, or "Lore 2" by number.
+- Remove a Character, Scene or Lore entry only when the instruction asks for it.
 - When the instruction is a question, or asks for nothing you can change, answer it in "reply" with an empty "changes" list.
 - Answer with the JSON object only.`;
 

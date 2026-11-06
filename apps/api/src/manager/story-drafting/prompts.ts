@@ -1,6 +1,7 @@
 import { StoryResponse } from '../../model/story/entities/story.entity.js';
 import { PromptMessage } from '../../service/model-gateway/model-gateway.js';
 import { MAX_CHARACTERS } from '../story/playable.js';
+import { MAX_DRAFT_LORE } from './draft-schema.js';
 
 /**
  * Prompt text for the two authoring calls (spec: "Story drafting and assistant"). Both open
@@ -19,7 +20,8 @@ What a Story holds:
 - Role: the part the author plays, with a name and a description the Characters know them by.
 - Characters: ${1} to ${MAX_CHARACTERS} AI-played figures, each with name, appearance (also used to draw them), personality, voice (how they talk), optional exampleLines (a few lines in their voice), optional background, optional secrets (what only this Character knows at the start) and optional arcDirections (how they might change, and what would cause it).
 - StartingBonds, optional: how a Character feels toward the Role or toward another Character when a Chat starts, as a short label and a description. At most one per Character per direction; a Character with none starts as a stranger.
-- Scenes, optional: ordered stages the plot moves through, each with a name, a situation or goal, and a plain-language moveOnCondition for when the story moves on. Only the last Scene may leave the condition empty.`;
+- Scenes, optional: ordered stages the plot moves through, each with a name, a situation or goal, and a plain-language moveOnCondition for when the story moves on. Only the last Scene may leave the condition empty.
+- Lore, optional: short notes about the world's own places, peoples, customs and objects, each with a name, keywords (other words that bring it up: other names, plurals, words in other languages) and text. An entry reaches the Narrator only when its name or a keyword comes up in play, or on every turn when alwaysOn is true. The Setting stays the short core sent on every turn; Lore holds the detail.`;
 
 const DRAFT_INSTRUCTIONS = `Turn the author's idea into one complete Story, as a single JSON object with exactly these keys:
 
@@ -31,7 +33,8 @@ const DRAFT_INSTRUCTIONS = `Turn the author's idea into one complete Story, as a
   "role": { "name": string, "description": string },
   "characters": [ { "name": string, "appearance": string, "personality": string, "voice": string, "exampleLines": [string], "background": string, "secrets": string, "arcDirections": string } ],
   "startingBonds": [ { "from": <Character name>, "toward": <Character name> | "role", "label": string, "description": string } ],
-  "scenes": [ { "name": string, "situation": string, "moveOnCondition": string } ]
+  "scenes": [ { "name": string, "situation": string, "moveOnCondition": string } ],
+  "lore": [ { "name": string, "keywords": [string], "text": string } ]
 }
 
 Rules:
@@ -39,6 +42,7 @@ Rules:
 - Choose the Style the idea implies; when it implies nothing, use second person, past tense, medium replies.
 - Give the cast only as many Characters as the idea needs, at least one and at most ${MAX_CHARACTERS}, each with a distinct name and voice.
 - Add exampleLines, background, secrets, arcDirections, startingBonds and scenes only when the idea implies them. Otherwise leave the text fields as "" and the lists empty. Never pad.
+- Add lore, at most ${MAX_DRAFT_LORE} entries of a few sentences each, only when the idea implies a world with its own places, peoples, customs or objects worth remembering. Otherwise leave it empty.
 - Every StartingBond's "from" and "toward" must be names from "characters" exactly as written there, or "role" for the Role.
 - Write in the language of the idea.
 - Answer with the JSON object only.`;
@@ -127,6 +131,20 @@ export function renderStory(story: StoryResponse): string {
                 `  ${line('Name', scene.name)}`,
                 `  ${line('Situation', scene.situation)}`,
                 `  ${line('Move-on condition', scene.moveOnCondition)}`,
+            ].join('\n'),
+        );
+    });
+    if (story.lore.length === 0) {
+        parts.push('Lore: none yet.');
+    }
+    story.lore.forEach((entry, index) => {
+        parts.push(
+            [
+                `Lore ${index + 1}:`,
+                `  ${line('Name', entry.name)}`,
+                `  Keywords: ${entry.keywords.length === 0 ? '(none)' : entry.keywords.join(', ')}`,
+                `  ${line('Text', entry.text)}`,
+                `  Always include: ${entry.alwaysOn ? 'yes' : 'no'}`,
             ].join('\n'),
         );
     });

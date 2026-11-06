@@ -19,6 +19,7 @@ import { StoryModelService } from '../../model/story/story.service.js';
 import { ImageData, ModelGateway } from '../../service/model-gateway/model-gateway.js';
 import { ImageStoreService, StoredImage } from '../../store/image/image-store.service.js';
 import { wornIdentity } from '../chat/identity.js';
+import { promptLore, selectLore } from '../chat/lore/lore-select.js';
 import { renderUser } from '../chat/memory/render-user.js';
 import { partsToText } from '../chat/turn/reply-parser.js';
 import {
@@ -217,6 +218,14 @@ export class SnapshotManagerService {
             .filter((memory) => !memory.archived)
             .map((memory) => renderUser(memory.text, identity.name));
         const hintNames = namesInHint(job.hint, story.characters);
+        const recent = chat.messages
+            .slice(Math.max(0, index + 1 - SNAPSHOT_RECENT_MESSAGES), index + 1)
+            .map((message) => ({
+                speaker: message.kind === MessageKind.User ? (message.identityName ?? identity.name) : 'Story',
+                text: momentText(message),
+            }));
+        // Spec: "Lore": scanned in the hint, then the moment's Messages newest first.
+        const lore = selectLore(promptLore(story), [job.hint, ...recent.map((message) => message.text).reverse()]);
         const written = await this.gateway.completeText({
             kind: 'snapshot_prompt',
             messages: snapshotPromptMessages({
@@ -225,15 +234,11 @@ export class SnapshotManagerService {
                 imageStyle: story.imageStyle,
                 cast: story.characters,
                 memories,
-                messages: chat.messages
-                    .slice(Math.max(0, index + 1 - SNAPSHOT_RECENT_MESSAGES), index + 1)
-                    .map((message) => ({
-                        speaker: message.kind === MessageKind.User ? (message.identityName ?? identity.name) : 'Story',
-                        text: momentText(message),
-                    })),
+                messages: recent,
                 hint: job.hint,
                 hintNames,
                 timeOfDay: chat.timeOfDay,
+                lore,
             }),
             maxTokens: SNAPSHOT_PROMPT_MAX_TOKENS,
             json: true,

@@ -51,7 +51,8 @@ import { charactersInExchange } from './memory/present.js';
 import { promptStorySoFar, StorySoFarManagerService } from './story-so-far/story-so-far.service.js';
 import { SuggestedRepliesManagerService } from './suggestions/suggested-replies.service.js';
 import { SuggestedReply } from './suggestions/suggestions-prompt.js';
-import { buildTurnPrompt, PromptArc, PromptBond, PromptHistoryMessage, PromptLayersInput, PromptMemory } from './turn/prompt.js';
+import { buildTurnPrompt, loreScan, PromptArc, PromptBond, PromptHistoryMessage, PromptLayersInput, PromptMemory } from './turn/prompt.js';
+import { promptLore, selectLore } from './lore/lore-select.js';
 import { CastName, parseReply, partsToText, releasedText, ReplyPart } from './turn/reply-parser.js';
 import { TurnStoppedError, TurnStream } from './turn/turn-stream.js';
 
@@ -122,6 +123,11 @@ export interface DashboardBackground {
 }
 
 /** The read-only dashboard (spec: "Dashboard"). */
+/** Spec: "Lore in play". */
+export interface LoreInPlay {
+    entries: Array<{ id: number; name: string; alwaysOn: boolean }>;
+}
+
 export interface ChatDashboard {
     chatId: number;
     storyId: number;
@@ -524,6 +530,16 @@ export class ChatManagerService {
         return this.dashboard(storyId, chatId);
     }
 
+    /**
+     * Spec: "Lore in play": the entries a turn would send now with no new user message, as a
+     * Continue would, for the Memory drawer.
+     */
+    async loreInPlay(storyId: number, chatId: number): Promise<LoreInPlay> {
+        const { story, chat } = await this.load(storyId, chatId);
+        const selected = selectLore(promptLore(story), loreScan(promptHistory(chat.messages), null));
+        return { entries: selected.map((entry) => ({ id: entry.id, name: entry.name, alwaysOn: entry.alwaysOn })) };
+    }
+
     /** Spec: "Dashboard (read-only)". */
     async dashboard(storyId: number, chatId: number): Promise<ChatDashboard> {
         const { story, chat } = await this.load(storyId, chatId);
@@ -629,6 +645,7 @@ export class ChatManagerService {
             memories: promptMemories(story, memories),
             storySoFar: promptStorySoFar(chat),
             timeOfDay: chat.timeOfDay,
+            lore: promptLore(story),
             history,
             userText,
             present: inLatestExchange(story, chat, userText),
@@ -726,6 +743,7 @@ export class ChatManagerService {
             memories: promptMemories(story, memories),
             storySoFar: promptStorySoFar(chat),
             timeOfDay: chat.timeOfDay,
+            lore: promptLore(story),
             present: inLatestExchange(story, chat, null),
         };
     }

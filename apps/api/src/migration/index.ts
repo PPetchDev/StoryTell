@@ -13,6 +13,7 @@ import { StorySoFar1763700000000 } from './1763700000000-StorySoFar.js';
 import { ReplyVersions1763810000000 } from './1763810000000-ReplyVersions.js';
 import { TimeOfDay1763850000000 } from './1763850000000-TimeOfDay.js';
 import { SnapshotSize1763860000000 } from './1763860000000-SnapshotSize.js';
+import { Lore1763870000000 } from './1763870000000-Lore.js';
 
 // Listed by hand, oldest first, so migrations load the same way from compiled JS, the
 // TypeORM CLI and Vitest. Add every new migration here.
@@ -32,4 +33,5 @@ export const migrations = [
     ReplyVersions1763810000000,
     TimeOfDay1763850000000,
     SnapshotSize1763860000000,
+    Lore1763870000000,
 ];

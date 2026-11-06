@@ -14,7 +14,7 @@ import { ASSISTANT_MAX_TOKENS, assistantMessages } from './prompts.js';
 
 export interface InstructRequest {
     instruction: string;
-    /** Without it, a change set that removes a Character or Scene is answered as `pending`. */
+    /** Without it, a change set that removes a Character or Scene is answered as `pending`; Lore and StartingBonds go without asking. */
     confirmRemovals?: boolean;
 }
 
@@ -28,16 +28,16 @@ export interface ApplyChangeSetRequest {
 export type AppliedChange =
     | {
           kind: 'set';
-          target: 'story' | 'role' | 'character' | 'scene' | 'startingBond';
-          /** The Character, Scene or StartingBond; absent for `story` and `role`. */
+          target: 'story' | 'role' | 'character' | 'scene' | 'startingBond' | 'lore';
+          /** The Character, Scene, StartingBond or Lore entry; absent for `story` and `role`. */
           id?: number;
           field: string;
-          before: string | string[];
-          after: string | string[];
+          before: string | string[] | boolean;
+          after: string | string[] | boolean;
           label: string;
       }
-    | { kind: 'add'; target: 'character' | 'scene' | 'startingBond'; id: number; label: string }
-    | { kind: 'remove'; target: 'character' | 'scene' | 'startingBond'; label: string };
+    | { kind: 'add'; target: 'character' | 'scene' | 'startingBond' | 'lore'; id: number; label: string }
+    | { kind: 'remove'; target: 'character' | 'scene' | 'startingBond' | 'lore'; label: string };
 
 export interface PendingChangeSet {
     changes: Change[];
@@ -143,6 +143,7 @@ export class StoryAssistantManagerService {
                     const label = removalLabel(change, before);
                     if (change.target === 'character') story = await this.storyManager.removeCharacter(storyId, change.id);
                     else if (change.target === 'scene') story = await this.storyManager.removeScene(storyId, change.id);
+                    else if (change.target === 'lore') story = await this.storyManager.removeLoreEntry(storyId, change.id);
                     else story = await this.storyManager.removeStartingBond(storyId, change.id);
                     applied.push({ kind: 'remove', target: change.target, label });
                     break;
@@ -169,6 +170,9 @@ export class StoryAssistantManagerService {
                                 [change.field]: change.value,
                             });
                             break;
+                        case 'lore':
+                            story = await this.storyManager.updateLoreEntry(storyId, change.id, { [change.field]: change.value });
+                            break;
                     }
                     applied.push({
                         kind: 'set',
@@ -194,6 +198,12 @@ export class StoryAssistantManagerService {
                             story = await this.storyManager.addScene(storyId, change.value);
                             const id = story.scenes[story.scenes.length - 1].id;
                             applied.push({ kind: 'add', target: 'scene', id, label: `Scene ${change.value.name}` });
+                            break;
+                        }
+                        case 'lore': {
+                            story = await this.storyManager.addLoreEntry(storyId, change.value);
+                            const id = story.lore[story.lore.length - 1].id;
+                            applied.push({ kind: 'add', target: 'lore', id, label: `Lore ${change.value.name}` });
                             break;
                         }
                         case 'startingBond': {
@@ -239,6 +249,12 @@ function sceneName(story: StoryDetail, id: number): string {
     return scene.name.trim() === '' ? `Scene ${story.scenes.indexOf(scene) + 1}` : scene.name;
 }
 
+function loreName(story: StoryDetail, id: number): string {
+    const entry = story.lore.find((other) => other.id === id);
+    if (!entry) return 'a Lore entry';
+    return entry.name.trim() === '' ? `Lore ${story.lore.indexOf(entry) + 1}` : entry.name;
+}
+
 function bondName(story: StoryDetail, id: number): string {
     const bond = story.startingBonds.find((other) => other.id === id);
     if (!bond) return 'a starting Bond';
@@ -254,18 +270,20 @@ function removalLabel(change: Extract<Change, { op: 'remove' }>, story: StoryDet
             return `Scene ${sceneName(story, change.id)}`;
         case 'startingBond':
             return bondName(story, change.id);
+        case 'lore':
+            return `Lore ${loreName(story, change.id)}`;
     }
 }
 
 /** What the set removes that needs confirming: Characters and Scenes, as manual removal asks. */
 function removalLabels(changes: Change[], story: StoryDetail): string[] {
     return changes.flatMap((change) =>
-        change.op === 'remove' && change.target !== 'startingBond' ? [removalLabel(change, story)] : [],
+        change.op === 'remove' && (change.target === 'character' || change.target === 'scene') ? [removalLabel(change, story)] : [],
     );
 }
 
 /** The label of a set change for the client's change list, and the value it replaces. */
-function setSubject(change: Extract<Change, { op: 'set' }>, story: StoryDetail): { label: string; current: string | string[] } {
+function setSubject(change: Extract<Change, { op: 'set' }>, story: StoryDetail): { label: string; current: string | string[] | boolean } {
     const fieldLabel = SET_FIELD_LABELS[change.field] ?? change.field;
     switch (change.target) {
         case 'story': {
@@ -289,6 +307,11 @@ function setSubject(change: Extract<Change, { op: 'set' }>, story: StoryDetail):
         case 'startingBond': {
             const bond = story.startingBonds.find((other) => other.id === change.id)!;
             return { label: `${bondName(story, change.id)}: ${fieldLabel}`, current: bond[change.field] };
+        }
+        case 'lore': {
+            const entry = story.lore.find((other) => other.id === change.id)!;
+            const current = change.field === 'keywords' ? [...entry.keywords] : entry[change.field];
+            return { label: `Lore ${loreName(story, change.id)}: ${fieldLabel}`, current };
         }
     }
 }

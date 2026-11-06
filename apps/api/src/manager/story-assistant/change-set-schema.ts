@@ -3,12 +3,16 @@ import { CastFullError } from '../../errors/story.errors.js';
 import { Pov, ReplyLength, StoryResponse, Tense } from '../../model/story/entities/story.entity.js';
 import {
     DraftCharacter,
+    DraftLore,
     DraftScene,
     isObject,
     Json,
     readJsonObject,
     validateDraftCharacter,
+    validateDraftLore,
     validateDraftScene,
+    MAX_LORE_KEYWORD_LENGTH,
+    MAX_LORE_KEYWORDS,
 } from '../story-drafting/draft-schema.js';
 import { MAX_CHARACTERS } from '../story/playable.js';
 
@@ -40,12 +44,14 @@ export const CHARACTER_SET_FIELDS = [
 ] as const;
 export const SCENE_SET_FIELDS = ['name', 'situation', 'moveOnCondition'] as const;
 export const BOND_SET_FIELDS = ['label', 'description'] as const;
+export const LORE_SET_FIELDS = ['name', 'keywords', 'text', 'alwaysOn'] as const;
 
 export type StorySetField = (typeof STORY_SET_FIELDS)[number];
 export type RoleSetField = (typeof ROLE_SET_FIELDS)[number];
 export type CharacterSetField = (typeof CHARACTER_SET_FIELDS)[number];
 export type SceneSetField = (typeof SCENE_SET_FIELDS)[number];
 export type BondSetField = (typeof BOND_SET_FIELDS)[number];
+export type LoreSetField = (typeof LORE_SET_FIELDS)[number];
 
 /** A Character of the cast by id, or one added in this set by its name. */
 export type CharacterRef = number | string;
@@ -64,10 +70,12 @@ export type Change =
     | { op: 'set'; target: 'character'; id: number; field: CharacterSetField; value: string | string[] }
     | { op: 'set'; target: 'scene'; id: number; field: SceneSetField; value: string }
     | { op: 'set'; target: 'startingBond'; id: number; field: BondSetField; value: string }
+    | { op: 'set'; target: 'lore'; id: number; field: LoreSetField; value: string | string[] | boolean }
     | { op: 'add'; target: 'character'; value: DraftCharacter }
     | { op: 'add'; target: 'scene'; value: DraftScene }
     | { op: 'add'; target: 'startingBond'; value: NewStartingBond }
-    | { op: 'remove'; target: 'character' | 'scene' | 'startingBond'; id: number };
+    | { op: 'add'; target: 'lore'; value: DraftLore }
+    | { op: 'remove'; target: 'character' | 'scene' | 'startingBond' | 'lore'; id: number };
 
 export type ChangeSource = 'model' | 'client';
 
@@ -107,6 +115,7 @@ export function validateChangeSet(json: Json, story: StoryResponse, source: Chan
     const removedCharacters = new Set<number>();
     const removedScenes = new Set<number>();
     const removedBonds = new Set<number>();
+    const removedLore = new Set<number>();
     items.forEach((item, index) => {
         if (item.op !== 'remove') return;
         const where = `change ${index + 1}`;
@@ -120,8 +129,11 @@ export function validateChangeSet(json: Json, story: StoryResponse, source: Chan
             case 'startingBond':
                 removedBonds.add(findBond(story, item, where, invalid).id);
                 break;
+            case 'lore':
+                removedLore.add(findLore(story, item, where, invalid).id);
+                break;
             default:
-                throw invalid(`${where}: a remove targets a character, scene or startingBond.`);
+                throw invalid(`${where}: a remove targets a character, scene, startingBond or lore.`);
         }
     });
     for (const bond of story.startingBonds) {
@@ -154,12 +166,15 @@ export function validateChangeSet(json: Json, story: StoryResponse, source: Chan
                     case 'scene':
                         changes.push({ op: 'remove', target: 'scene', id: findScene(story, item, where, invalid).id });
                         break;
+                    case 'lore':
+                        changes.push({ op: 'remove', target: 'lore', id: findLore(story, item, where, invalid).id });
+                        break;
                     default:
                         changes.push({ op: 'remove', target: 'startingBond', id: findBond(story, item, where, invalid).id });
                 }
                 break;
             case 'set':
-                changes.push(validateSet(story, item, where, invalid, removedCharacters, removedScenes, removedBonds));
+                changes.push(validateSet(story, item, where, invalid, removedCharacters, removedScenes, removedBonds, removedLore));
                 break;
             case 'add':
                 switch (item.target) {
@@ -178,12 +193,15 @@ export function validateChangeSet(json: Json, story: StoryResponse, source: Chan
                     case 'scene':
                         changes.push({ op: 'add', target: 'scene', value: validateScene(item.value, where, source) });
                         break;
+                    case 'lore':
+                        changes.push({ op: 'add', target: 'lore', value: validateLore(item.value, where, source) });
+                        break;
                     case 'startingBond':
                         // After every Character add, so a Bond may name one added later in the list.
                         bondAdds.push({ item, index });
                         break;
                     default:
-                        throw invalid(`${where}: an add targets a character, scene or startingBond.`);
+                        throw invalid(`${where}: an add targets a character, scene, startingBond or lore.`);
                 }
                 break;
             default:
@@ -244,6 +262,7 @@ function validateSet(
     removedCharacters: Set<number>,
     removedScenes: Set<number>,
     removedBonds: Set<number>,
+    removedLore: Set<number>,
 ): Change {
     const field = item.field;
     if (typeof field !== 'string') throw invalid(`${where}: a set needs a field.`);
@@ -304,8 +323,30 @@ function validateSet(
             if (removedBonds.has(bond.id)) throw invalid(`${where}: that starting Bond is removed in the same change set.`);
             return { op: 'set', target: 'startingBond', id: bond.id, field: oneOf(BOND_SET_FIELDS), value: text() };
         }
+        case 'lore': {
+            const entry = findLore(story, item, where, invalid);
+            if (removedLore.has(entry.id)) throw invalid(`${where}: ${entry.name || 'that Lore entry'} is removed in the same change set.`);
+            const which = oneOf(LORE_SET_FIELDS);
+            if (which === 'keywords') {
+                const list = item.value === undefined || item.value === null ? [] : item.value;
+                if (!Array.isArray(list) || !list.every((keyword) => typeof keyword === 'string')) {
+                    throw invalid(`${where}: keywords must be a list of text.`);
+                }
+                const value = (list as string[]).map((keyword) => keyword.trim()).filter((keyword) => keyword !== '');
+                if (value.length > MAX_LORE_KEYWORDS || value.some((keyword) => keyword.length > MAX_LORE_KEYWORD_LENGTH)) {
+                    throw invalid(`${where}: at most ${MAX_LORE_KEYWORDS} keywords of at most ${MAX_LORE_KEYWORD_LENGTH} characters.`);
+                }
+                return { op: 'set', target: 'lore', id: entry.id, field: which, value };
+            }
+            if (which === 'alwaysOn') {
+                const value = item.value === 'true' ? true : item.value === 'false' ? false : item.value;
+                if (typeof value !== 'boolean') throw invalid(`${where}: alwaysOn must be true or false.`);
+                return { op: 'set', target: 'lore', id: entry.id, field: which, value };
+            }
+            return { op: 'set', target: 'lore', id: entry.id, field: which, value: text() };
+        }
         default:
-            throw invalid(`${where}: a set targets the story, role, a character, scene or startingBond.`);
+            throw invalid(`${where}: a set targets the story, role, a character, scene, startingBond or lore.`);
     }
 }
 
@@ -342,6 +383,11 @@ function findCharacter(story: StoryResponse, item: Json, where: string, invalid:
     return resolveCharacter(story.characters, item.id ?? item.name ?? item.character, where, invalid);
 }
 
+/** A Lore entry by `id`, by `name` (case-insensitive) or as "Lore 2", by its number in the Story. */
+function findLore(story: StoryResponse, item: Json, where: string, invalid: Invalid): Named {
+    return resolveNamed(story.lore, item.id ?? item.name ?? item.lore, 'Lore', where, invalid);
+}
+
 function findScene(story: StoryResponse, item: Json, where: string, invalid: Invalid): Named {
     return resolveNamed(story.scenes, item.id ?? item.name ?? item.scene, 'Scene', where, invalid);
 }
@@ -375,6 +421,14 @@ function optionalText(source: Json, key: string, where: string, invalid: Invalid
 function validateCharacter(value: unknown, where: string, source: ChangeSource): DraftCharacter {
     try {
         return validateDraftCharacter(value, `${where}: the new Character`);
+    } catch (error) {
+        throw new InvalidChangeSetError(error instanceof Error ? error.message : String(error), source);
+    }
+}
+
+function validateLore(value: unknown, where: string, source: ChangeSource): DraftLore {
+    try {
+        return validateDraftLore(value, `${where}: the new Lore entry`);
     } catch (error) {
         throw new InvalidChangeSetError(error instanceof Error ? error.message : String(error), source);
     }

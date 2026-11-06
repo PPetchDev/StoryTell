@@ -63,6 +63,7 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | `422.003.010` | `InvalidCoverChoiceError` | A Cover pick that names both a Snapshot and a Character, or neither. |
 | `409.003.011` | `NoCoverError` | A Cover focus point for a Story with no Cover. |
 | `409.003.012` | `NoReferenceImageForCoverError` | A Cover picked from a Character with no Reference image. |
+| `404.003.013` | `LoreEntryNotFoundError` | No Lore entry with that id in this Story: edited or removed. |
 | `404.004.001` | `ChatNotFoundError` | No Chat with that id in this Story. |
 | `422.004.002` | `StoryNotPlayableError` | The Story has a required field empty. The message names the missing fields. Blocks starting a Chat, sending, Continue and Regenerate. |
 | `409.004.003` | `NoTurnToRetryError` | Retry when the Chat is not waiting for a reply to a User Message. |

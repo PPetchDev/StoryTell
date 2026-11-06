@@ -9,6 +9,7 @@ export const TABS = [
     { key: 'characters', label: 'Characters' },
     { key: 'bonds', label: 'Bonds' },
     { key: 'scenes', label: 'Scenes' },
+    { key: 'lore', label: 'Lore' },
 ] as const;
 
 export type TabKey = (typeof TABS)[number]['key'];
@@ -78,6 +79,7 @@ const TAB_OF_TARGET: Record<Exclude<RewriteTarget, 'story'>, TabKey> = {
     character: 'characters',
     startingBond: 'bonds',
     scene: 'scenes',
+    lore: 'lore',
 };
 
 /** Where a field named as the Rewrite buttons name it lives, e.g. one the assistant changed. */

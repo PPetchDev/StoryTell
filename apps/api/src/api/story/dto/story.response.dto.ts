@@ -4,6 +4,7 @@ import { MissingField } from '../../../manager/story/playable.js';
 import { LatestChat, StoryDetail, StoryListItem } from '../../../manager/story/story.service.js';
 import { CharacterResponse, PortraitCrop } from '../../../model/story/entities/character.entity.js';
 import { RoleResponse } from '../../../model/story/entities/role.entity.js';
+import { LoreEntryResponse } from '../../../model/story/entities/lore-entry.entity.js';
 import { SceneResponse } from '../../../model/story/entities/scene.entity.js';
 import { StartingBondResponse } from '../../../model/story/entities/starting-bond.entity.js';
 import {
@@ -221,6 +222,23 @@ export class SceneDTO implements SceneResponse {
     moveOnCondition: string;
 }
 
+export class LoreEntryDTO implements LoreEntryResponse {
+    @ApiProperty()
+    id: number;
+
+    @ApiProperty({ description: 'What the entry is about; it also counts as a keyword.' })
+    name: string;
+
+    @ApiProperty({ type: [String] })
+    keywords: string[];
+
+    @ApiProperty()
+    text: string;
+
+    @ApiProperty({ description: 'Sent on every turn, whether or not it comes up.' })
+    alwaysOn: boolean;
+}
+
 export class MissingFieldDTO implements MissingField {
     @ApiProperty({ description: 'Stable field path, e.g. `role.name` or `characters.0.voice`.' })
     field: string;
@@ -257,6 +275,9 @@ export class StoryResponseBodyDTO implements StoryDetail {
 
     @ApiProperty({ type: [SceneDTO], description: 'In play order.' })
     scenes: SceneDTO[];
+
+    @ApiProperty({ type: [LoreEntryDTO], description: 'In add order.' })
+    lore: LoreEntryDTO[];
 
     @ApiProperty({ type: StoryCoverDTO, nullable: true, description: 'The picture the author chose; null while there is none.' })
     cover: StoryCoverDTO | null;

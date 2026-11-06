@@ -3,22 +3,23 @@ import { RewriteRequest, Story } from './story';
 
 // Mirrors the API's assistant DTOs (apps/api/src/api/story-assistant/dto/).
 
-export type ChangeTarget = 'story' | 'role' | 'character' | 'scene' | 'startingBond';
+export type ChangeTarget = 'story' | 'role' | 'character' | 'scene' | 'startingBond' | 'lore';
 
 /** One change the assistant applied, as the API answered it. */
 export type AppliedChange =
     | {
           kind: 'set';
           target: ChangeTarget;
-          /** The Character, Scene or starting Bond; absent for `story` and `role`. */
+          /** The Character, Scene, starting Bond or Lore entry; absent for `story` and `role`. */
           id?: number;
           field: string;
-          before: string | string[];
-          after: string | string[];
+          /** A list for exampleLines and Lore keywords; true or false for Lore alwaysOn. */
+          before: string | string[] | boolean;
+          after: string | string[] | boolean;
           label: string;
       }
-    | { kind: 'add'; target: 'character' | 'scene' | 'startingBond'; id: number; label: string }
-    | { kind: 'remove'; target: 'character' | 'scene' | 'startingBond'; label: string };
+    | { kind: 'add'; target: 'character' | 'scene' | 'startingBond' | 'lore'; id: number; label: string }
+    | { kind: 'remove'; target: 'character' | 'scene' | 'startingBond' | 'lore'; label: string };
 
 export interface PendingChangeSet {
     /** Opaque to the client: sent back as is once the removals are confirmed. */

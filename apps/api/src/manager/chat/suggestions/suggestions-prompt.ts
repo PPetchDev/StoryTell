@@ -2,6 +2,7 @@ import { UnreadableSuggestionsError } from '../../../errors/chat.errors.js';
 import { PromptMessage } from '../../../service/model-gateway/model-gateway.js';
 import {
     estimateTokens,
+    exchangeLore,
     povAndTense,
     PromptHistoryMessage,
     PromptLayersInput,
@@ -55,7 +56,9 @@ Answer with only this JSON object and nothing else, one key per option:
 /** The turn's system layers and recent history, then the suggestions instruction. */
 export function buildSuggestionsPrompt(input: SuggestionsPromptInput): SuggestionsPrompt {
     const system = systemPrompt(input);
-    const instruction = suggestionsInstruction(input);
+    // The Lore the latest exchange brings up, as the turn would send it (spec: "Lore").
+    const lore = exchangeLore(input.lore, input.history, null);
+    const instruction = lore ? `${lore}\n\n${suggestionsInstruction(input)}` : suggestionsInstruction(input);
     const kept = recentHistory(
         uncoveredHistory(input.history, input.storySoFar),
         TURN_PROMPT_TOKEN_BUDGET - estimateTokens(system.text) - estimateTokens(instruction),

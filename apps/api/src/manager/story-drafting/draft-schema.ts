@@ -15,6 +15,8 @@ export interface DraftStory {
     characters: DraftCharacter[];
     startingBonds: DraftStartingBond[];
     scenes: DraftScene[];
+    /** Spec: "Lore": at most MAX_DRAFT_LORE; a longer list is cut. */
+    lore: DraftLore[];
 }
 
 export interface DraftCharacter {
@@ -42,6 +44,20 @@ export interface DraftScene {
     situation: string;
     moveOnCondition: string;
 }
+
+/** One Lore entry as a model writes it: name and text required. */
+export interface DraftLore {
+    name: string;
+    keywords: string[];
+    text: string;
+    alwaysOn: boolean;
+}
+
+/** Spec: "A draft may carry up to 8 lore entries". */
+export const MAX_DRAFT_LORE = 8;
+/** The API's own limits on an entry's keywords. */
+export const MAX_LORE_KEYWORDS = 20;
+export const MAX_LORE_KEYWORD_LENGTH = 100;
 
 export type Json = Record<string, unknown>;
 
@@ -190,7 +206,11 @@ export function validateDraft(json: Json): DraftStory {
         validateDraftScene(item, `Scene ${index + 1}`),
     );
 
-    return { title, setting, opening, style, role, characters, startingBonds, scenes };
+    const lore = optionalList(json, 'lore', 'the Story')
+        .slice(0, MAX_DRAFT_LORE)
+        .map((item, index) => validateDraftLore(item, `Lore entry ${index + 1}`));
+
+    return { title, setting, opening, style, role, characters, startingBonds, scenes, lore };
 }
 
 /** One Character as a model writes it: name, appearance, personality and voice required. */
@@ -220,5 +240,27 @@ export function validateDraftScene(item: unknown, where: string): DraftScene {
         name: requiredText(item, 'name', where),
         situation: requiredText(item, 'situation', where),
         moveOnCondition: optionalText(item, 'moveOnCondition', where),
+    };
+}
+
+/** One Lore entry as a model writes it: name and text required, keywords and alwaysOn optional. */
+export function validateDraftLore(item: unknown, where: string): DraftLore {
+    if (!isObject(item)) throw new InvalidDraftError(`${where} is not an object.`);
+    const name = requiredText(item, 'name', where);
+    const keywords = optionalList(item, 'keywords', name);
+    if (!keywords.every((keyword) => typeof keyword === 'string')) {
+        throw new InvalidDraftError(`${name}: keywords must be a list of text.`);
+    }
+    // A model may quote the boolean.
+    const alwaysOn = item.alwaysOn === 'true' ? true : item.alwaysOn === 'false' ? false : (item.alwaysOn ?? false);
+    if (typeof alwaysOn !== 'boolean') throw new InvalidDraftError(`${name}: alwaysOn must be true or false.`);
+    return {
+        name,
+        keywords: (keywords as string[])
+            .map((keyword) => keyword.trim())
+            .filter((keyword) => keyword !== '' && keyword.length <= MAX_LORE_KEYWORD_LENGTH)
+            .slice(0, MAX_LORE_KEYWORDS),
+        text: requiredText(item, 'text', where),
+        alwaysOn,
     };
 }

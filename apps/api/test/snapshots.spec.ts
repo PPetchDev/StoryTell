@@ -482,6 +482,26 @@ describe('Snapshots and the Gallery', () => {
             expect(done.jobs).toEqual([]);
             expect(done.snapshots).toMatchObject([{ messageId: chat.messages[0].id }]);
         });
+
+        it('gives the writer the Lore the moment and the hint bring up, and leaves the rest out', async () => {
+            const story = await createStory();
+            const lore = `/api/stories/${story.id}/lore`;
+            await t.http.post(lore).send({ name: 'The lamp room', keywords: ['lamp'], text: 'A glass drum ringed by brass rails.' }).expect(201);
+            await t.http.post(lore).send({ name: 'The cellar', text: 'Barrels of oil, cold and dark.' }).expect(201);
+            await t.http.post(lore).send({ name: 'Island law', text: 'No one leaves before the boat.', alwaysOn: true }).expect(201);
+            await t.http.post(lore).send({ name: 'The pier', text: 'Black planks slick with weed.' }).expect(201);
+            const chat = await createChat(story.id);
+            await play(story.id, chat.id, 'I climb to the lamp.', '@Mira: Mind the rail.');
+
+            await snap(story.id, chat.id, { hint: 'from the pier' });
+
+            const asked = t.gateway.textCalls('snapshot_prompt')[0].messages.map((message) => message.content).join('\n');
+            expect(asked).toContain('Lore this moment brings up');
+            expect(asked).toContain('A glass drum ringed by brass rails.');
+            expect(asked).toContain('No one leaves before the boat.');
+            expect(asked).toContain('Black planks slick with weed.');
+            expect(asked).not.toContain('Barrels of oil');
+        });
     });
 
     describe('Links on edit, reset and delete', () => {

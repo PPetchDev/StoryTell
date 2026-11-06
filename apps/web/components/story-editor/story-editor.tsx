@@ -11,6 +11,7 @@ import { ApiUnreachableError } from '@/lib/api';
 import { portraitsOf } from '@/lib/character-colour';
 import { AppliedChange } from '@/lib/story-assistant';
 import {
+    LoreEntry,
     MAX_CHARACTERS,
     MissingField,
     POV_LABELS,
@@ -41,6 +42,7 @@ import { FieldMarksContext } from './field-marks';
 import { ConfirmButton, SegmentedField, TextField } from './fields';
 import { OpeningPreview } from './opening-preview';
 import { fieldDomId, FieldRewrites, rewritableField, rewriteKey, RewriteStates } from './rewrite';
+import { LoreCard } from './lore-card';
 import { SceneCard } from './scene-card';
 import { StartingBondsCard } from './starting-bonds-card';
 import { StatusBox } from './status-box';
@@ -253,6 +255,13 @@ export function StoryEditor({ initial }: { initial: Story }) {
         }));
         queue(`scene.${sceneId}.${field}`, () => storyApi.updateScene(storyId, sceneId, { [field]: value }), applyStatus);
     };
+    const setLore = <K extends 'name' | 'text' | 'keywords' | 'alwaysOn'>(loreId: number, field: K, value: LoreEntry[K]) => {
+        setStory((current) => ({
+            ...current,
+            lore: current.lore.map((entry) => (entry.id === loreId ? { ...entry, [field]: value } : entry)),
+        }));
+        queue(`lore.${loreId}.${field}`, () => storyApi.updateLoreEntry(storyId, loreId, { [field]: value }), applyStatus);
+    };
 
     /**
      * A rewrite goes after pending edits, like a structural change, and its answer replaces
@@ -378,7 +387,7 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                 <ConfirmButton
                                     label="Delete Story"
                                     question="Delete this Story and everything under it?"
-                                    warning="Its Role, Characters, Scenes and starting Bonds go too. There is no undo."
+                                    warning="Its Role, Characters, Scenes, starting Bonds and Lore go too. There is no undo."
                                     confirmLabel="Delete"
                                     danger
                                     onConfirm={() => void deleteStory()}
@@ -543,6 +552,36 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                 onClick={() => void commit(() => storyApi.addScene(storyId), applyWhole)}
                             >
                                 + Add Scene
+                            </button>
+                        </section>
+                    )}
+
+                    {tab === 'lore' && (
+                        <section aria-label="Lore">
+                            {story.lore.length === 0 && (
+                                <p className={styles.note}>
+                                    Optional. Notes about your world: places, peoples, customs, things. Each reaches the story only when
+                                    its name or a keyword comes up, so the Setting can stay short.
+                                </p>
+                            )}
+                            {story.lore.map((entry, index) => (
+                                <LoreCard
+                                    key={entry.id}
+                                    entry={entry}
+                                    index={index}
+                                    rewrites={fieldRewrites}
+                                    onText={(field, value) => setLore(entry.id, field, value)}
+                                    onKeywords={(keywords) => setLore(entry.id, 'keywords', keywords)}
+                                    onAlwaysOn={(alwaysOn) => setLore(entry.id, 'alwaysOn', alwaysOn)}
+                                    onRemove={() => void commit(() => storyApi.removeLoreEntry(storyId, entry.id), applyWhole)}
+                                />
+                            ))}
+                            <button
+                                type="button"
+                                className={styles.add}
+                                onClick={() => void commit(() => storyApi.addLoreEntry(storyId), applyWhole)}
+                            >
+                                + Add Lore entry
                             </button>
                         </section>
                     )}

@@ -44,6 +44,7 @@ const ADDED_FIELDS: Record<Extract<AppliedChange, { kind: 'add' }>['target'], st
     character: ['name', 'appearance', 'personality', 'voice', 'background', 'secrets', 'arcDirections'],
     scene: ['name', 'situation', 'moveOnCondition'],
     startingBond: ['label', 'description'],
+    lore: ['name', 'keywords', 'text'],
 };
 
 /** The field a change is shown at, as the editor's Rewrite buttons name it; none for a removal. */
@@ -84,6 +85,8 @@ function restore(storyId: number, change: Extract<AppliedChange, { kind: 'set' }
             return storyApi.updateScene(storyId, change.id!, fields);
         case 'startingBond':
             return storyApi.updateStartingBond(storyId, change.id!, fields);
+        case 'lore':
+            return storyApi.updateLoreEntry(storyId, change.id!, fields);
     }
 }
 
@@ -96,6 +99,8 @@ function removeAdded(storyId: number, change: Extract<AppliedChange, { kind: 'ad
             return storyApi.removeScene(storyId, change.id);
         case 'startingBond':
             return storyApi.removeStartingBond(storyId, change.id);
+        case 'lore':
+            return storyApi.removeLoreEntry(storyId, change.id);
     }
 }
 

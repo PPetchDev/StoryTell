@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { CharacterEntity } from './entities/character.entity.js';
+import { LoreEntryEntity } from './entities/lore-entry.entity.js';
 import { RoleEntity } from './entities/role.entity.js';
 import { SceneEntity } from './entities/scene.entity.js';
 import { StartingBondEntity } from './entities/starting-bond.entity.js';
@@ -16,6 +17,7 @@ import { StoryModelService } from './story.service.js';
             CharacterEntity,
             StartingBondEntity,
             SceneEntity,
+            LoreEntryEntity,
         ]),
     ],
     providers: [StoryModelService],

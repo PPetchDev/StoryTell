@@ -86,6 +86,17 @@ export interface Scene {
     moveOnCondition: string;
 }
 
+/** A note about the Story's world, sent when its name or a keyword comes up (mirrors LoreEntryDTO). */
+export interface LoreEntry {
+    id: number;
+    /** What it is about; it also counts as a keyword. */
+    name: string;
+    keywords: string[];
+    text: string;
+    /** Sent on every turn, whether or not it comes up. */
+    alwaysOn: boolean;
+}
+
 export interface MissingField {
     field: string;
     label: string;
@@ -121,6 +132,8 @@ export interface Story {
     characters: Character[];
     startingBonds: StartingBond[];
     scenes: Scene[];
+    /** In add order. */
+    lore: LoreEntry[];
     /** Null while the author has chosen none. */
     cover: StoryCover | null;
     playable: boolean;
@@ -133,6 +146,7 @@ export type StoryFields = Partial<Pick<Story, 'title' | 'setting' | 'opening'> &
 export type CharacterFields = Partial<Omit<Character, 'id' | 'referenceImagePath' | 'portraitCrop'>>;
 export type SceneFields = Partial<Omit<Scene, 'id'>>;
 export type StartingBondFields = Partial<Pick<StartingBond, 'label' | 'description'>>;
+export type LoreEntryFields = Partial<Omit<LoreEntry, 'id'>>;
 
 export const POV_LABELS: Record<Pov, string> = {
     first: '1st person',
@@ -148,8 +162,11 @@ export const REPLY_LENGTH_LABELS: Record<ReplyLength, string> = {
 
 export const MAX_CHARACTERS = 6;
 
-/** Which part of the Story a rewrite is for (mirrors the API's REWRITE_TARGETS). */
-export type RewriteTarget = 'story' | 'role' | 'character' | 'startingBond' | 'scene';
+/**
+ * Which part of the Story a rewrite is for (mirrors the API's REWRITE_TARGETS). `lore` only
+ * names Lore fields for the assistant's highlights and links: Lore has no ✨ Rewrite.
+ */
+export type RewriteTarget = 'story' | 'role' | 'character' | 'startingBond' | 'scene' | 'lore';
 
 export interface RewriteRequest {
     target: RewriteTarget;
@@ -241,6 +258,12 @@ export const storyApi = {
         apiSend<Story>('DELETE', `/stories/${storyId}/scenes/${sceneId}`),
     reorderScenes: (storyId: number, sceneIds: number[]) =>
         apiSend<Story>('PUT', `/stories/${storyId}/scenes/order`, { sceneIds }),
+
+    addLoreEntry: (storyId: number, fields: LoreEntryFields = {}) =>
+        apiSend<Story>('POST', `/stories/${storyId}/lore`, fields),
+    updateLoreEntry: (storyId: number, loreId: number, fields: LoreEntryFields) =>
+        apiSend<Story>('PATCH', `/stories/${storyId}/lore/${loreId}`, fields),
+    removeLoreEntry: (storyId: number, loreId: number) => apiSend<Story>('DELETE', `/stories/${storyId}/lore/${loreId}`),
 
     /** Makes a round of 4 Reference image candidates; a new round discards the Character's old one (ticket 30). */
     generateReferenceCandidates: (storyId: number, characterId: number) =>

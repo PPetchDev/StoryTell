@@ -37,3 +37,10 @@
     display: flex;
     gap: 0.5rem;
 }
+
+/* The Lore in play card shares this card's look. */
+.list {
+    margin: 0;
+    padding-left: 1.125rem;
+    line-height: 1.5;
+}

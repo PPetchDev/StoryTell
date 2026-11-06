@@ -7,6 +7,7 @@ import {
     DuplicateStartingBondError,
     InvalidCoverChoiceError,
     InvalidOrderError,
+    LoreEntryNotFoundError,
     NoCoverError,
     NoReferenceImageError,
     NoReferenceImageForCoverError,
@@ -20,6 +21,7 @@ import { ChatModelService } from '../../model/chat/chat.service.js';
 import { LedgerModelService } from '../../model/ledger/ledger.service.js';
 import { SnapshotModelService } from '../../model/snapshot/snapshot.service.js';
 import { CharacterEntity, PortraitCrop } from '../../model/story/entities/character.entity.js';
+import { LoreEntryEntity } from '../../model/story/entities/lore-entry.entity.js';
 import { SceneEntity } from '../../model/story/entities/scene.entity.js';
 import { StartingBondEntity } from '../../model/story/entities/starting-bond.entity.js';
 import {
@@ -108,6 +110,14 @@ export interface NewStartingBond extends StartingBondFields {
     toCharacterId: number | null;
 }
 
+/** Spec: "Lore". Keywords are trimmed and blanks dropped before they are stored. */
+export interface LoreEntryFields {
+    name?: string;
+    keywords?: string[];
+    text?: string;
+    alwaysOn?: boolean;
+}
+
 export interface SceneFields {
     name?: string;
     situation?: string;
@@ -119,6 +129,25 @@ function assignSent<T extends object>(target: T, fields: Partial<T>, keys: (keyo
     for (const key of keys) {
         if (fields[key] !== undefined) target[key] = fields[key] as T[typeof key];
     }
+}
+
+/** The sent Lore fields onto the entry, keywords trimmed with blanks dropped. */
+function assignLore(entry: LoreEntryEntity, fields: LoreEntryFields): void {
+    assignSent(entry, fields, ['name', 'text', 'alwaysOn']);
+    if (fields.keywords !== undefined) entry.keywords = cleanKeywords(fields.keywords);
+}
+
+/** Keywords as stored: trimmed, blanks dropped, a repeat (ignoring case) dropped. */
+export function cleanKeywords(keywords: string[]): string[] {
+    const seen = new Set<string>();
+    return keywords
+        .map((keyword) => keyword.trim())
+        .filter((keyword) => {
+            const key = keyword.toLocaleLowerCase();
+            if (keyword === '' || seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
 }
 
 function isPermutation(ids: number[], items: { id: number }[]): boolean {
@@ -205,7 +234,7 @@ export class StoryManagerService {
     /**
      * Spec: "Duplicate Story". A new Story, "<title> (copy)", with everything the author wrote:
      * text and style, Role, Characters with their Reference images and Portraits, StartingBonds,
-     * Scenes and the Cover. Chats and Snapshots are not copied, so a Cover that is a Snapshot
+     * Scenes, Lore and the Cover. Chats and Snapshots are not copied, so a Cover that is a Snapshot
      * is dropped. Every file is copied to a path of the new Story's own, so deleting either
      * Story never removes the other's files. A failure part-way leaves no copy behind.
      */
@@ -565,6 +594,37 @@ export class StoryManagerService {
         if (!isPermutation(sceneIds, story.scenes)) throw new InvalidOrderError('Scenes');
         await this.storyModel.setSceneOrder(sceneIds);
         return this.saved(storyId);
+    }
+
+    /** Spec: "Lore". A new entry goes last; Lore never affects whether the Story can be played. */
+    async addLoreEntry(storyId: number, fields: LoreEntryFields): Promise<StoryDetail> {
+        const story = await this.load(storyId);
+        // After the highest position, not at the count: removals leave gaps, and a new entry always goes last.
+        const position = Math.max(-1, ...story.lore.map((other) => other.position)) + 1;
+        const entry = this.storyModel.createLoreEntry({ storyId, position, keywords: [] });
+        assignLore(entry, fields);
+        await this.storyModel.saveLoreEntry(entry);
+        return this.saved(storyId);
+    }
+
+    async updateLoreEntry(storyId: number, loreId: number, fields: LoreEntryFields): Promise<StoryDetail> {
+        const story = await this.load(storyId);
+        const entry = this.findLoreEntry(story, loreId);
+        assignLore(entry, fields);
+        await this.storyModel.saveLoreEntry(entry);
+        return this.saved(storyId);
+    }
+
+    async removeLoreEntry(storyId: number, loreId: number): Promise<StoryDetail> {
+        const story = await this.load(storyId);
+        await this.storyModel.removeLoreEntry(this.findLoreEntry(story, loreId));
+        return this.saved(storyId);
+    }
+
+    private findLoreEntry(story: StoryEntity, loreId: number): LoreEntryEntity {
+        const entry = story.lore.find((other) => other.id === loreId);
+        if (!entry) throw new LoreEntryNotFoundError();
+        return entry;
     }
 
     private assignCharacter(character: CharacterEntity, fields: CharacterFields): void {

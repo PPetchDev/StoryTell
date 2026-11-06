@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
     ArrayMaxSize,
     IsArray,
+    IsBoolean,
     IsEnum,
     IsInt,
     IsOptional,
@@ -14,6 +15,7 @@ import {
     CharacterFields,
     NewStartingBond,
     RoleFields,
+    LoreEntryFields,
     SceneFields,
     StartingBondFields,
     StoryFields,
@@ -187,6 +189,34 @@ export class SceneRequestBodyDTO implements SceneFields {
     @IsString()
     @MaxLength(TEXT_MAX)
     moveOnCondition?: string;
+}
+
+/** Spec: "Lore". Every field is optional, so autosave can send one at a time. */
+export class LoreEntryRequestBodyDTO implements LoreEntryFields {
+    @ApiPropertyOptional({ description: 'What the entry is about; it also counts as a keyword.' })
+    @IsOptional()
+    @IsString()
+    @MaxLength(200)
+    name?: string;
+
+    @ApiPropertyOptional({ type: [String], description: 'Other words that bring the entry into a turn: names, plurals, Thai words.' })
+    @IsOptional()
+    @IsArray()
+    @ArrayMaxSize(20)
+    @IsString({ each: true })
+    @MaxLength(100, { each: true })
+    keywords?: string[];
+
+    @ApiPropertyOptional({ description: 'The note itself, sent to the Narrator when the entry comes up.' })
+    @IsOptional()
+    @IsString()
+    @MaxLength(TEXT_MAX)
+    text?: string;
+
+    @ApiPropertyOptional({ description: 'Sent on every turn, whether or not it comes up.' })
+    @IsOptional()
+    @IsBoolean()
+    alwaysOn?: boolean;
 }
 
 export class SceneOrderRequestBodyDTO {

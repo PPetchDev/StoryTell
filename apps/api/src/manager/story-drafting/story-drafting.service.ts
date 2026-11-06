@@ -58,6 +58,9 @@ export const FIELD_LABELS: Record<string, string> = {
     label: 'Label',
     situation: 'Situation',
     moveOnCondition: 'Move-on condition',
+    keywords: 'Keywords',
+    text: 'Text',
+    alwaysOn: 'Always include',
 };
 
 /**
@@ -202,6 +205,9 @@ export class StoryDraftingManagerService {
         }
         for (const scene of draft.scenes) {
             await this.storyManager.addScene(storyId, scene);
+        }
+        for (const entry of draft.lore) {
+            await this.storyManager.addLoreEntry(storyId, entry);
         }
         return this.storyManager.getStory(storyId);
     }

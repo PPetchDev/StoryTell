@@ -8,6 +8,7 @@ import {
     TURN_PROMPT_TOKEN_BUDGET,
     turnFinalInstruction,
 } from '../turn/prompt.js';
+import { loreReserveTokens } from '../lore/lore-select.js';
 
 /**
  * The Story so far (spec: "Story so far"): when it is written, and the call that writes it.
@@ -39,6 +40,8 @@ export function storySoFarCoverage(layers: PromptLayersInput, history: PromptHis
     const fixed =
         estimateTokens(systemPrompt(layers).text) +
         NEXT_USER_MESSAGE_TOKENS +
+        // The Lore block varies by turn; the most it can take is reserved.
+        loreReserveTokens(layers.lore ?? []) +
         estimateTokens(`${reminder}
 ${turnFinalInstruction(layers.identity.name)}`);
     const room = budget - fixed;

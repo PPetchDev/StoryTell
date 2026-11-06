@@ -16,6 +16,7 @@ import {
     EditMessageResponseBodyDTO,
     ListChatsResponseBodyDTO,
 } from './dto/chat.response.dto.js';
+import { LoreInPlayResponseBodyDTO } from './dto/lore-in-play.response.dto.js';
 import { SuggestionsResponseBodyDTO } from './dto/suggestions.response.dto.js';
 import { answerTurn } from './turn-response.js';
 
@@ -186,6 +187,13 @@ export class ChatApiController {
         @Body() body: ChooseReplyVersionRequestBodyDTO,
     ): Promise<EditMessageResponseBodyDTO> {
         return this.chatManager.chooseReplyVersion(storyId, chatId, messageId, body.version);
+    }
+
+    /** Spec: "Lore in play": the Lore entries a turn would send now, for the Memory drawer. */
+    @Get(':chatId/lore')
+    @ApiOkResponse({ type: LoreInPlayResponseBodyDTO })
+    loreInPlay(@Id('storyId') storyId: number, @Id('chatId') chatId: number): Promise<LoreInPlayResponseBodyDTO> {
+        return this.chatManager.loreInPlay(storyId, chatId);
     }
 
     /** Spec: "Dashboard (read-only)". Bonds with history, Arc steps, the Scene and background status. */

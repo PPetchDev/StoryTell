@@ -4,6 +4,8 @@ import { PromptMessage } from '../../../service/model-gateway/model-gateway.js';
 import { MEMORY_CAP_TOKENS, memoryLine } from '../memory/memory-prompt.js';
 import { memoryIsAbout } from '../memory/present.js';
 import { renderUser } from '../memory/render-user.js';
+import { LORE_SCAN_MESSAGES, loreBlock, PromptLoreEntry, selectLore } from '../lore/lore-select.js';
+import { estimateTokens } from './prompt-tokens.js';
 
 /**
  * Prompt assembly for one turn (spec: "Prompt assembly"). Pure logic over plain inputs, so
@@ -14,6 +16,9 @@ import { renderUser } from '../memory/render-user.js';
  *  2. Setting             6. current Scene          10. recent Messages
  *  3. worn identity       7. Feelings (Bonds)       11. the user's message
  *  4. Style               8. Arcs                   12. the final instruction
+ *
+ * The final instruction opens with the Lore the latest exchange brings up (spec: "Lore"), so
+ * the system message, and with it the cached prefix, stays the same from turn to turn.
  *
  * On a Continue turn, layer 11 is the continue instruction in place of the user's message.
  *
@@ -113,6 +118,8 @@ export interface TurnPromptInput {
     present?: string[];
     /** The Chat's Time of day, stated in the reminder near the end; null or left out while there is none. */
     timeOfDay?: TimeOfDay | null;
+    /** Every Lore entry of the Story (spec: "Lore"); the latest exchange decides which are sent. */
+    lore?: PromptLoreEntry[];
     /** The Memory layer's cap in tokens (spec: "about 2k tokens"); past it, Memories are left out in `memoryLeaveOutOrder`. */
     memoryCapTokens?: number;
 }
@@ -151,10 +158,7 @@ export const PROMPT_LAYERS = {
     storySoFar: '# Story so far',
 } as const;
 
-/** A rough token count: about four characters per token of English prose. */
-export function estimateTokens(text: string): number {
-    return Math.ceil(text.length / 4);
-}
+export { estimateTokens };
 
 const POV_WORDS: Record<Pov, (name: string) => string> = {
     [Pov.First]: (name) => `first person as ${name} ("I")`,
@@ -377,11 +381,28 @@ export function stateReminder(input: Pick<TurnPromptInput, 'story' | 'identity' 
     return `Where things stand: ${lines.join(' ')}`;
 }
 
+/**
+ * Spec: "Lore", the scan window: the user's new message (none on a Continue), then the newest
+ * Messages before it, newest first.
+ */
+export function loreScan(history: PromptHistoryMessage[], userText: string | null): string[] {
+    const recent = history.slice(-LORE_SCAN_MESSAGES).reverse().map((message) => message.text);
+    return userText !== null && userText.trim() !== '' ? [userText, ...recent] : recent;
+}
+
+/** The Lore block for this exchange, or null when it brings up none. */
+export function exchangeLore(lore: PromptLoreEntry[] | undefined, history: PromptHistoryMessage[], userText: string | null): string | null {
+    return loreBlock(selectLore(lore ?? [], loreScan(history, userText)));
+}
+
 export function buildTurnPrompt(input: TurnPromptInput): TurnPrompt {
     const identity = input.identity.name;
     const userText = input.userText ?? continueInstruction(identity);
     const system = systemPrompt(input);
-    const finalInstruction = `${stateReminder(input)}\n${turnFinalInstruction(identity)}`;
+    const lore = exchangeLore(input.lore, input.history, input.userText);
+    const finalInstruction = [lore, `${stateReminder(input)}\n${turnFinalInstruction(identity)}`]
+        .filter((part): part is string => part !== null)
+        .join('\n\n');
 
     const budget = input.tokenBudget ?? TURN_PROMPT_TOKEN_BUDGET;
     const fixed = estimateTokens(system.text) + estimateTokens(userText) + estimateTokens(finalInstruction);

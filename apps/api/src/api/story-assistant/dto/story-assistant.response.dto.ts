@@ -9,11 +9,11 @@ import {
 import { StoryResponseBodyDTO } from '../../story/dto/story.response.dto.js';
 
 export class AppliedChangeDTO {
-    @ApiProperty({ enum: ['set', 'add', 'remove'], description: 'A field set, a Character/Scene/Bond added, or one removed.' })
+    @ApiProperty({ enum: ['set', 'add', 'remove'], description: 'A field set, a Character/Scene/Bond/Lore entry added, or one removed.' })
     kind: 'set' | 'add' | 'remove';
 
-    @ApiProperty({ enum: ['story', 'role', 'character', 'scene', 'startingBond'] })
-    target: 'story' | 'role' | 'character' | 'scene' | 'startingBond';
+    @ApiProperty({ enum: ['story', 'role', 'character', 'scene', 'startingBond', 'lore'] })
+    target: 'story' | 'role' | 'character' | 'scene' | 'startingBond' | 'lore';
 
     @ApiPropertyOptional({ description: 'The Character, Scene or StartingBond changed or added; absent for story, role and removals.' })
     id?: number;
@@ -21,11 +21,11 @@ export class AppliedChangeDTO {
     @ApiPropertyOptional({ description: 'Set only: the field, e.g. `voice` or `moveOnCondition`.' })
     field?: string;
 
-    @ApiPropertyOptional({ description: 'Set only: the value before, for Undo. A list for exampleLines.' })
-    before?: string | string[];
+    @ApiPropertyOptional({ description: 'Set only: the value before, for Undo. A list for exampleLines and Lore keywords; true or false for Lore alwaysOn.' })
+    before?: string | string[] | boolean;
 
     @ApiPropertyOptional({ description: 'Set only: the value written.' })
-    after?: string | string[];
+    after?: string | string[] | boolean;
 
     @ApiProperty({ description: 'For the change list, e.g. "Mira: Voice", "Character Lena", "Scene Arrival".' })
     label: string;

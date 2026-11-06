@@ -79,3 +79,9 @@ export class NoReferenceImageForCoverError extends AppError {
         super('409.003.012', 'That Character has no Reference image to use as the Cover.');
     }
 }
+
+export class LoreEntryNotFoundError extends AppError {
+    constructor() {
+        super('404.003.013', 'Lore entry not found in this Story.');
+    }
+}

@@ -1,5 +1,6 @@
 import { UnparseableOutputError } from '../../errors/model-gateway.errors.js';
 import { MAX_REFERENCE_IMAGES, PromptMessage } from '../../service/model-gateway/model-gateway.js';
+import { loreEntryText, PromptLoreEntry } from '../chat/lore/lore-select.js';
 import { DEFAULT_IMAGE_STYLE } from '../reference-image/prompt.js';
 
 /**
@@ -37,6 +38,8 @@ export interface SnapshotPromptInput {
     hintNames: string[];
     /** The Chat's Time of day (spec: "Story clock"); null or left out while there is none. */
     timeOfDay?: string | null;
+    /** The Lore the moment brings up (spec: "Lore"), already selected; left out or empty for none. */
+    lore?: PromptLoreEntry[];
 }
 
 export function snapshotPromptMessages(input: SnapshotPromptInput): PromptMessage[] {
@@ -67,6 +70,9 @@ ${template}`;
 
     const sections = [
         `Setting:\n${input.setting.trim() || '(none)'}`,
+        ...(input.lore && input.lore.length > 0
+            ? [`Lore this moment brings up (how these places, peoples and things are in this world):\n${input.lore.map(loreEntryText).join('\n\n')}`]
+            : []),
         `The art style, in pieces:\n${stylePieces(input.imageStyle).map((piece) => `- ${piece}`).join('\n')}`,
         `Characters:\n${input.cast.map((member) => `- ${member.name}: ${member.appearance.trim() || '(no Appearance written)'}`).join('\n')}`,
         `${name} (never shown beyond glimpses): ${input.identity.description.trim() || '(no description)'}`,

@@ -16,6 +16,7 @@ import { StoryManagerService } from '../../manager/story/story.service.js';
 import {
     CharacterOrderRequestBodyDTO,
     CharacterRequestBodyDTO,
+    LoreEntryRequestBodyDTO,
     NewStartingBondRequestBodyDTO,
     RoleRequestBodyDTO,
     SceneOrderRequestBodyDTO,
@@ -29,7 +30,7 @@ import { ListStoriesResponseBodyDTO, StoryResponseBodyDTO } from './dto/story.re
 const Id = (name: string) => Param(name, ParseIntPipe);
 
 /**
- * Stories with their nested Role, Characters, StartingBonds and Scenes (spec: "API surface").
+ * Stories with their nested Role, Characters, StartingBonds, Scenes and Lore (spec: "API surface").
  * Every write answers with the whole Story and its playable status.
  */
 @ApiTags('Stories')
@@ -197,5 +198,27 @@ export class StoryApiController {
         @Id('sceneId') sceneId: number,
     ): Promise<StoryResponseBodyDTO> {
         return this.storyManager.removeScene(storyId, sceneId);
+    }
+
+    @Post(':storyId/lore')
+    @ApiCreatedResponse({ type: StoryResponseBodyDTO })
+    addLoreEntry(@Id('storyId') storyId: number, @Body() body: LoreEntryRequestBodyDTO): Promise<StoryResponseBodyDTO> {
+        return this.storyManager.addLoreEntry(storyId, body);
+    }
+
+    @Patch(':storyId/lore/:loreId')
+    @ApiOkResponse({ type: StoryResponseBodyDTO })
+    updateLoreEntry(
+        @Id('storyId') storyId: number,
+        @Id('loreId') loreId: number,
+        @Body() body: LoreEntryRequestBodyDTO,
+    ): Promise<StoryResponseBodyDTO> {
+        return this.storyManager.updateLoreEntry(storyId, loreId, body);
+    }
+
+    @Delete(':storyId/lore/:loreId')
+    @ApiOkResponse({ type: StoryResponseBodyDTO })
+    removeLoreEntry(@Id('storyId') storyId: number, @Id('loreId') loreId: number): Promise<StoryResponseBodyDTO> {
+        return this.storyManager.removeLoreEntry(storyId, loreId);
     }
 }

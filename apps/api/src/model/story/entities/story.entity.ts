@@ -13,6 +13,7 @@ import type { Relation } from 'typeorm';
 
 import type { SnapshotEntity } from '../../snapshot/entities/snapshot.entity.js';
 import type { CharacterEntity, CharacterResponse } from './character.entity.js';
+import type { LoreEntryEntity, LoreEntryResponse } from './lore-entry.entity.js';
 import type { RoleEntity, RoleResponse } from './role.entity.js';
 import type { SceneEntity, SceneResponse } from './scene.entity.js';
 import type { StartingBondEntity, StartingBondResponse } from './starting-bond.entity.js';
@@ -76,6 +77,8 @@ export interface StoryResponse extends StorySummary {
     characters: CharacterResponse[];
     startingBonds: StartingBondResponse[];
     scenes: SceneResponse[];
+    /** In add order. */
+    lore: LoreEntryResponse[];
     /** Null while the author has chosen none. */
     cover: StoryCover | null;
 }
@@ -148,6 +151,9 @@ export class StoryEntity {
     @OneToMany('SceneEntity', 'story')
     scenes: Relation<SceneEntity[]>;
 
+    @OneToMany('LoreEntryEntity', 'story')
+    lore: Relation<LoreEntryEntity[]>;
+
     /** ON DELETE SET NULL: a deleted Snapshot leaves the Story without a Cover. */
     @ManyToOne('SnapshotEntity', { onDelete: 'SET NULL', nullable: true })
     @JoinColumn({ name: 'cover_snapshot_id' })
@@ -178,6 +184,7 @@ export class StoryEntity {
             characters: this.characters.map((character) => character.toResponse()),
             startingBonds: this.startingBonds.map((bond) => bond.toResponse()),
             scenes: this.scenes.map((scene) => scene.toResponse()),
+            lore: this.lore.map((entry) => entry.toResponse()),
             cover: this.cover(),
         };
     }

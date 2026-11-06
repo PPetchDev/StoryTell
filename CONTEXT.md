@@ -16,6 +16,10 @@ _Avoid_: Scene, world, background
 An optional, author-defined stage of a Story that the plot moves through in order, each ending when its plain-language move-on condition is met; a Scene steers the story but never limits what the user or the Characters can do.
 _Avoid_: Chapter, act, stage
 
+**Lore**:
+A Story's notes about its world, each a **Lore entry**: a name, keywords and a short text about a place, people, custom or object. An entry reaches the Narrator only when its name or a keyword comes up in the latest exchange, or on every turn when it is set to always be included; the Setting stays the short core sent on every turn. Lore is common knowledge in the world, so every Character knows it; a Character's secrets stay on their card. It belongs to the Story and is shared by all its Chats, where a Memory belongs to one Chat.
+_Avoid_: Lorebook, world info, codex, wiki
+
 **Opening**:
 The author-written passage that begins every Chat of a Story.
 _Avoid_: Intro, greeting, first message
@@ -41,7 +45,7 @@ The picture the author chooses for a Story, shown on its card on Home and at the
 _Avoid_: Thumbnail, banner, key art
 
 **Duplicate**:
-Making a new Story, "<title> (copy)", from everything the author wrote in another: its text, style, Role, Characters with their Reference images and Portraits, Scenes, Starting Bonds and Cover, each image in a file of its own. No Chats or Snapshots come along, so a Cover that is a Snapshot is dropped.
+Making a new Story, "<title> (copy)", from everything the author wrote in another: its text, style, Role, Characters with their Reference images and Portraits, Scenes, Starting Bonds, Lore and Cover, each image in a file of its own. No Chats or Snapshots come along, so a Cover that is a Snapshot is dropped.
 _Avoid_: Clone, fork, template
 
 ## Playing
