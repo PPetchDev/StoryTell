@@ -50,6 +50,11 @@ export const MAX_REFERENCE_IMAGES = 3;
 export const PLAY_MODELS = ['glm-5.3', 'deepseek-v4-pro'] as const;
 export type PlayModel = (typeof PLAY_MODELS)[number];
 export const BACKGROUND_MODEL = 'deepseek-v4-flash';
+/**
+ * Where a background call goes when the background model's host stays busy (a 429 or 503
+ * through every retry): a bigger model on the same host, so background work doesn't stall.
+ */
+export const BACKGROUND_FALLBACK_MODEL: PlayModel = 'deepseek-v4-pro';
 export type TextModel = PlayModel | typeof BACKGROUND_MODEL;
 
 export const SNAPSHOT_MODELS = ['seedream-v4-edit', 'seedream-v5-pro-edit', 'qwen-edit-uncensored'] as const;

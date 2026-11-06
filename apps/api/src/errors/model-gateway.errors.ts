@@ -11,6 +11,12 @@ export class ProviderOutageError extends ModelGatewayError {
     }
 }
 
+/**
+ * An outage that is only the host being busy: a 429 rate limit or a 503 overload that outlasted
+ * the retries. Nothing ran, so another model on the same host may still answer.
+ */
+export class ProviderBusyError extends ProviderOutageError {}
+
 /** The model refused, or the host stopped the output for content reasons. */
 export class ModelRefusalError extends ModelGatewayError {
     constructor(message = 'The model refused to write this.') {

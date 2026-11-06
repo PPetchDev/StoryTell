@@ -228,7 +228,7 @@ The Model Gateway is a deep module that hides every provider detail behind a sma
 
 What it does internally:
 
-- Pins hosts through OpenRouter with `provider.only` and `allow_fallbacks: false`. It never falls back automatically.
+- Pins hosts through OpenRouter with `provider.only` and `allow_fallbacks: false`. It never falls back to another host. The one automatic switch is a background call whose host stays busy (a 429 or 503 through every retry): it goes once more to DeepSeek V4 Pro on the same host, and the UsageRecord names that model. Play calls never switch model on their own.
 - Applies per-model reasoning settings.
 - Applies stop strings only where the host supports them.
 - Writes one UsageRecord per call.
@@ -240,7 +240,7 @@ Model table (from [Choose the text LLM](issues/05-choose-text-llm.md), corrected
 |---|---|---|---|
 | Play (Story turns), Story drafting, field rewrite, Story assistant | GLM-5.3 (default) | DeepInfra | Reasoning can't be turned off: send `reasoning: {effort: "minimal"}`. Stop strings supported. Served at fp4. |
 | Play fallback (manual only) | DeepSeek V4 Pro | GMICloud | `reasoning: {enabled: false}`. No `stop` support, so the backend cut is the only guard. |
-| Background calls (Bond/Arc/Scene judge, Memory extraction, Snapshot prompt) | DeepSeek V4 Flash | DeepInfra | `reasoning: {enabled: false}`, JSON mode. |
+| Background calls (Bond/Arc/Scene judge, Memory extraction, Snapshot prompt) | DeepSeek V4 Flash | DeepInfra | `reasoning: {enabled: false}`, JSON mode. When DeepInfra stays busy for Flash, the call goes once to DeepSeek V4 Pro on DeepInfra (added 2026-11-06). |
 | Snapshots | `seedream-v4-edit` (default) | Venice | `POST /image/multi-edit` with up to 3 Reference images, `safe_mode: false`, $0.05. `qwen-edit-uncensored` ($0.04) is the manual alternative. Decided by the check in ticket 18; Runware was dropped because of its $20 minimum top-up. |
 | Snapshots with no Reference image in frame | `seedream-v4` (beside `seedream-v4-edit`; `qwen-image-3` beside `qwen-edit-uncensored`) | Venice | `POST /image/generate`, $0.05. The edit models need a base image, so a Snapshot whose in-frame Characters have no Reference image uses the selected edit model's text-to-image sibling. Chosen before the call and recorded as the Snapshot's image model; never a fallback after a failure. Added in ticket 31. |
 | Reference images | `qwen-image-3` | Venice | `POST /image/generate`, `aspect_ratio: "2:3"`, `safe_mode: false`, $0.04. |

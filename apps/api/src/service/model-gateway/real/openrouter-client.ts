@@ -4,6 +4,7 @@ import {
     ModelGatewayError,
     ModelRefusalError,
     OutOfCreditError,
+    ProviderBusyError,
     ProviderOutageError,
     UnparseableOutputError,
 } from '../../../errors/model-gateway.errors.js';
@@ -344,9 +345,10 @@ export class OpenRouterClient {
         // is relayed this way), and a 503 is an overloaded host. Both are transient: `send`
         // retried them on the same host and gave up. Whatever metadata they carry, neither
         // means credit (https://openrouter.ai/docs/api-reference/limits documents
-        // `limit_source` on 402 and 403 only), so they stay an outage.
+        // `limit_source` on 402 and 403 only), so they stay an outage: a busy one, which the
+        // gateway may send on to another model.
         if (isRetryable(code) || isRetryable(status)) {
-            return new ProviderOutageError(described);
+            return new ProviderBusyError(described);
         }
         // Credit: a 402 (balance, key limit or the per-request in-flight reservation) or a
         // 403 budget block, both of which name their `limit_source`. OpenRouter refuses with

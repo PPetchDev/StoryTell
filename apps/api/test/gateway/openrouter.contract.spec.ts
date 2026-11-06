@@ -275,6 +275,68 @@ describe('OpenRouter contract', () => {
             },
         );
 
+        describe('a background call whose host stays busy', () => {
+            const busy = () =>
+                Array.from({ length: MAX_RETRIES + 1 }, () => ({
+                    status: 429,
+                    fixture: 'openrouter/error-overloaded-relayed.json',
+                }));
+
+            it('goes once more to DeepSeek V4 Pro on the same host, and records that model', async () => {
+                const net = recordedFetch([...busy(), { fixture: 'openrouter/chat-json.json' }]);
+                const { gateway, records } = gatewayUnderTest(net.fetch);
+
+                const result = await gateway.completeText({ kind: 'judge', messages, json: true });
+
+                expect(net.requests).toHaveLength(MAX_RETRIES + 2);
+                for (const request of net.requests.slice(0, MAX_RETRIES + 1)) {
+                    expect(request.body.model).toBe('deepseek/deepseek-v4-flash');
+                }
+                expect(net.requests[MAX_RETRIES + 1].body).toMatchObject({
+                    model: 'deepseek/deepseek-v4-pro',
+                    provider: { only: ['deepinfra'], allow_fallbacks: false },
+                    reasoning: { enabled: false },
+                    response_format: { type: 'json_object' },
+                });
+                expect(result.model).toBe('deepseek-v4-pro');
+                expect(records).toEqual([
+                    expect.objectContaining({ kind: 'judge', model: 'deepseek-v4-pro', host: 'deepinfra' }),
+                ]);
+            });
+
+            it('fails as an outage when the fallback stays busy too', async () => {
+                const net = recordedFetch([...busy(), ...busy()]);
+                const { gateway, records } = gatewayUnderTest(net.fetch);
+
+                await expect(gateway.completeText({ kind: 'memory_extraction', messages, json: true })).rejects.toMatchObject({
+                    code: '502.001.001',
+                });
+                expect(net.requests).toHaveLength(2 * (MAX_RETRIES + 1));
+                expect(records).toEqual([]);
+            });
+
+            it('does not switch model for any other failure', async () => {
+                const net = recordedFetch([
+                    { status: 500, json: { error: { code: 500, message: 'Internal error' } } },
+                ]);
+                const { gateway } = gatewayUnderTest(net.fetch);
+
+                await expect(gateway.completeText({ kind: 'judge', messages, json: true })).rejects.toBeInstanceOf(
+                    ProviderOutageError,
+                );
+                expect(net.requests).toHaveLength(1);
+            });
+
+            it('never switches a play call: the turn fails on its own model', async () => {
+                const net = recordedFetch(busy());
+                const { gateway } = gatewayUnderTest(net.fetch, { settings: { playModel: 'glm-5.3' } });
+
+                await expect(gateway.completeText({ kind: 'turn', messages })).rejects.toBeInstanceOf(ProviderOutageError);
+                expect(net.requests).toHaveLength(MAX_RETRIES + 1);
+                expect(net.pending()).toBe(0);
+            });
+        });
+
         it('still reports a 402 credit refusal as out of credit, without retrying it', async () => {
             const net = recordedFetch([
                 {

@@ -1,7 +1,8 @@
 import { Logger } from '@nestjs/common';
 
-import { ModelGatewayError } from '../../../errors/model-gateway.errors.js';
+import { ModelGatewayError, ProviderBusyError } from '../../../errors/model-gateway.errors.js';
 import {
+    BACKGROUND_FALLBACK_MODEL,
     BACKGROUND_MODEL,
     CallKind,
     CreditBalance,
@@ -22,7 +23,7 @@ import {
 } from '../model-gateway.js';
 import { drawnSize, IMAGE_MODELS, imageModelForKind, ImageModelSpec, isPlayModelKind, TEXT_MODELS, VENICE_HOST } from './model-table.js';
 import { defaultSleep, SleepFn } from './http.js';
-import { OpenRouterChatRequest, OpenRouterClient, TextBill } from './openrouter-client.js';
+import { OpenRouterChatRequest, OpenRouterChatResult, OpenRouterClient, TextBill } from './openrouter-client.js';
 import { VeniceClient } from './venice-client.js';
 
 /** The Settings the gateway reads before each call. */
@@ -76,9 +77,25 @@ export class RealModelGateway extends ModelGateway {
         this.sleep = deps.sleep ?? defaultSleep;
     }
 
+    /**
+     * A background call whose model's host stays busy through every retry goes once more to
+     * BACKGROUND_FALLBACK_MODEL on the same host; the result and its UsageRecord name the model
+     * that answered. Play calls never switch model on their own.
+     */
     async completeText(request: TextCompletionRequest): Promise<TextCompletionResult> {
-        const { modelName, chat } = await this.textCall(request);
-        const result = await this.deps.openRouter.chat(chat);
+        let { modelName, chat } = await this.textCall(request);
+        let result: OpenRouterChatResult;
+        try {
+            result = await this.deps.openRouter.chat(chat);
+        } catch (error) {
+            if (!(error instanceof ProviderBusyError) || modelName !== BACKGROUND_MODEL) throw error;
+            this.logger.warn(
+                `${request.kind} on ${BACKGROUND_MODEL} stayed busy (${error.message}); sending it to ${BACKGROUND_FALLBACK_MODEL}.`,
+            );
+            modelName = BACKGROUND_FALLBACK_MODEL;
+            chat = { ...chat, model: TEXT_MODELS[modelName] };
+            result = await this.deps.openRouter.chat(chat);
+        }
         await this.recordText(request, modelName, result);
         return {
             text: result.text,
