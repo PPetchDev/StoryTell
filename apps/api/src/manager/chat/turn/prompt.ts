@@ -173,13 +173,20 @@ You are the Narrator of an interactive story. You describe the Setting and actio
 - The user plays ${identity}. NEVER write ${identity}'s words, thoughts, feelings, decisions or actions. Describe only what others do and what ${identity} can perceive, then stop where ${identity} can respond.
 - Never guess ${identity}'s gender. Only ${identity}'s description above or the user's own messages can state it; earlier narration and Characters' lines do not count, even where they guessed. Until it is stated, the narration and every Character refer to ${identity} by name, as "they", or with words that carry no gender: never "he", "she", "boy", "girl", "man", "woman", "sir" or "miss".
 - Stay inside the Setting. Characters know nothing outside their world.
-- Keep each Character's voice distinct, and don't let everyone talk every turn.
 - Each Character acts only on what it knows: its own feelings and secrets, and what it has seen or been told.
 
 # Output format
 - Narration in plain paragraphs (no prefix).
-- Each Character's speech and small actions on lines starting with "@Name:" using exactly these names: ${castNames.join(', ')}.
-- Choose who speaks: only Characters present who would naturally respond. Zero, one or several may speak, in any order, interleaved with narration.`;
+- Each Character's speech on lines starting with "@Name:" using exactly these names: ${castNames.join(', ')}.
+- Choose who speaks: only Characters present who would naturally respond. Zero, one or several may speak, in any order, interleaved with narration.
+
+# Dialogue
+- A speech line holds only what the Character says aloud, the way people really talk: contractions, everyday words, sentences of mixed length. Never put stage directions, parentheses or *asterisk actions* inside it.
+- What a Character does (a look, a gesture, a blush) goes in a short narration line before or after the speech, and only when it adds something.
+- Keep each Character's voice distinct. Show it through their word choice and rhythm, as their Voice and Example lines do; never copy the card's descriptive words into the story as labels.
+- Don't repeat the same details turn after turn (ears, eyes, grins, how someone moves or sounds). Find a fresh detail or leave it out.
+- Dashes, trailing off and stammering only for a Character whose Voice calls for them. Italics for emphasis rarely.
+- Most turns, one or two Characters speak, and a speaker may say several sentences. The others react in narration or stay quiet; don't let everyone talk every turn.`;
 }
 
 function styleLayer(story: PromptStory, identity: string): string {
@@ -363,7 +370,7 @@ export function povAndTense(story: PromptStory, identity: string): string {
 
 /** The trailing system message of every turn. */
 export function turnFinalInstruction(identity: string): string {
-    return `Write the next turn now. Do not write anything ${identity} says, thinks or does. Use @Name: lines for Character speech.`;
+    return `Write the next turn now. Do not write anything ${identity} says, thinks or does. Use @Name: lines for Character speech, spoken words only: no parentheses or *(stage directions)* inside them, even where earlier turns had them. Actions go in narration.`;
 }
 
 /**
@@ -395,6 +402,25 @@ export function exchangeLore(lore: PromptLoreEntry[] | undefined, history: Promp
     return loreBlock(selectLore(lore ?? [], loreScan(history, userText)));
 }
 
+/**
+ * An earlier reply as the prompt shows it: its `@Name:` lines without `*(stage directions)*`.
+ * The model copies the shape of its earlier replies more than any rule, so a Chat whose
+ * replies grew stage directions would keep writing them; the stored Messages keep theirs.
+ */
+export function withoutStageDirections(text: string): string {
+    return text
+        .split('\n')
+        .map((line) =>
+            line.startsWith('@')
+                ? line
+                      .replace(/\s*\*\([^)]*\)\*\s*/g, ' ')
+                      .replace(/^(@[^:\s]+:)\s*/, '$1 ')
+                      .trimEnd()
+                : line,
+        )
+        .join('\n');
+}
+
 export function buildTurnPrompt(input: TurnPromptInput): TurnPrompt {
     const identity = input.identity.name;
     const userText = input.userText ?? continueInstruction(identity);
@@ -412,7 +438,10 @@ export function buildTurnPrompt(input: TurnPromptInput): TurnPrompt {
     return {
         messages: [
             { role: 'system', content: system.text },
-            ...kept.map((message) => ({ role: message.role, content: message.text })),
+            ...kept.map((message) => ({
+                role: message.role,
+                content: message.role === 'assistant' ? withoutStageDirections(message.text) : message.text,
+            })),
             { role: 'user', content: userText },
             { role: 'system', content: finalInstruction },
         ],

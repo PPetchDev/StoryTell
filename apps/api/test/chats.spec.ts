@@ -474,7 +474,7 @@ A Character knows only the Memories it is tagged on and acts as if the rest neve
                 { role: 'user', content: 'I knock the rain off my hat.' },
                 {
                     role: 'system',
-                    content: expect.stringMatching(/^Where things stand: [^\n]+\nWrite the next turn now. Do not write anything Ash says, thinks or does. Use @Name: lines for Character speech.$/),
+                    content: expect.stringMatching(/^Where things stand: [^\n]+\nWrite the next turn now. Do not write anything Ash says, thinks or does. Use @Name: lines for Character speech, spoken words only: no parentheses or \*\(stage directions\)\* inside them, even where earlier turns had them. Actions go in narration.$/),
                 },
             ]);
             expect(call.stop).toEqual(['\nAsh:', '\n@Ash:', '\nYou:']);
@@ -501,8 +501,9 @@ A Character knows only the Memories it is tagged on and acts as if the rest neve
         it('trims the recent-Message window from the oldest to fit the token budget', async () => {
             const story = await createStory();
             const chat = await createChat(story.id);
-            // Each long message is about 5k tokens, so four of them cannot share a 16k prompt.
-            const long = (n: number) => `Turn ${n}. ${'The storm goes on and on. '.repeat(770)}`.slice(0, 20_000);
+            // Each long message is about 4.75k tokens: three fit a 16k prompt beside the system
+            // prompt, four cannot.
+            const long = (n: number) => `Turn ${n}. ${'The storm goes on and on. '.repeat(770)}`.slice(0, 19_000);
             expect(TURN_PROMPT_TOKEN_BUDGET).toBe(16_000);
 
             await send(story.id, chat.id, long(1), 'Reply one.');
@@ -887,7 +888,7 @@ A Character knows only the Memories it is tagged on and acts as if the rest neve
                 },
                 {
                     role: 'system',
-                    content: expect.stringMatching(/^Where things stand: [^\n]+\nWrite the next turn now. Do not write anything Ash says, thinks or does. Use @Name: lines for Character speech.$/),
+                    content: expect.stringMatching(/^Where things stand: [^\n]+\nWrite the next turn now. Do not write anything Ash says, thinks or does. Use @Name: lines for Character speech, spoken words only: no parentheses or \*\(stage directions\)\* inside them, even where earlier turns had them. Actions go in narration.$/),
                 },
             ]);
             // The rule against writing the worn identity still holds in the system message.
