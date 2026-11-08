@@ -1,6 +1,6 @@
 # Spec: Branch
 
-Status: ready-for-agent
+Status: done
 Builds on: [Spec: Storytell AI MVP](../storytell-mvp/spec.md), [Spec: Reply versions (swipe)](../swipe/spec.md), [Spec: Story so far](../story-so-far/spec.md), [Spec: Story clock](../story-clock/spec.md)
 Decision: [Branch a Chat from any Message](../sillytavern-gaps/issues/01-branch-a-chat.md) (option A)
 

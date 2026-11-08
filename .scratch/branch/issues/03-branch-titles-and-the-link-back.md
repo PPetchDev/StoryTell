@@ -1,6 +1,6 @@
 # 03 — Branch titles and the link back
 
-**Status:** ready-for-agent
+**Status:** done
 
 Part of: [Spec: Branch](../spec.md)
 
@@ -13,7 +13,7 @@ Part of: [Spec: Branch](../spec.md)
 
 **Blocked by:** [02 — Branch a Chat from a reply](02-branch-a-chat.md).
 
-- [ ] API: titles "(branch)", then "(branch 2)"; a Branch of a Branch gives "(branch 2)", not a stacked suffix; a long title is cut to 200 characters.
-- [ ] API: `branchedFrom` on the detail and on the list; renaming the source shows the new title; deleting the source clears it and keeps the Branch; Reset keeps it; a Story whose Chats were never branched answers `branchedFrom: null` everywhere.
-- [ ] e2e (390 px, fake gateway): the Branch's Chat menu shows "Branched from <title>" at its top and it leads to the original Chat scrolled to the Message; the Chat list shows the line; after the original is deleted, neither shows.
-- [ ] Typecheck, the whole API suite and the whole e2e suite pass.
+- [x] API: titles "(branch)", then "(branch 2)"; a Branch of a Branch gives "(branch 2)", not a stacked suffix; a long title is cut to 200 characters.
+- [x] API: `branchedFrom` on the detail and on the list; renaming the source shows the new title; deleting the source clears it and keeps the Branch; Reset keeps it; a Story whose Chats were never branched answers `branchedFrom: null` everywhere.
+- [x] e2e (390 px, fake gateway): the Branch's Chat menu shows "Branched from <title>" at its top and it leads to the original Chat scrolled to the Message; the Chat list shows the line; after the original is deleted, neither shows.
+- [x] Typecheck, the whole API suite and the whole e2e suite pass.

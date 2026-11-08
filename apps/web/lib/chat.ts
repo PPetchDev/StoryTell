@@ -17,6 +17,8 @@ export interface ChatListItem extends ChatSummary {
     sceneName: string | null;
     /** The latest Message as one plain line of about 100 characters. */
     latestLine: string;
+    /** Shown as "Branched from <title>"; null when never branched, or once that Chat is deleted. */
+    branchedFrom: { chatId: number; title: string } | null;
 }
 
 export type MessagePart =
@@ -87,6 +89,8 @@ export interface Chat extends ChatSummary {
     imageCreditOut: boolean;
     playModel: string;
     drift: { lastModel: string; playModel: string } | null;
+    /** The Chat menu's link back to where a Branch came from: null when never branched, or once that Chat is deleted. */
+    branchedFrom: { chatId: number; title: string; messageId: number | null } | null;
 }
 
 export interface RollbackCounts {
@@ -94,6 +98,11 @@ export interface RollbackCounts {
     bondChanges: number;
     arcSteps: number;
     sceneAdvances: number;
+}
+
+/** A Branch answers with the new Chat, plus the User Message's text when it was branched from one. */
+export interface BranchedChat extends Chat {
+    draft: string | null;
 }
 
 /** An edit, or ↺ Again, answers with the Chat plus what the rewind rolled back. */
@@ -233,6 +242,12 @@ export const chatApi = {
     /** Wears a Persona, or the Story's Role for null, from the next User Message on. */
     swapIdentity: (storyId: number, chatId: number, personaId: number | null) =>
         apiSend<Chat>('PUT', `/stories/${storyId}/chats/${chatId}/identity`, { personaId }),
+    /**
+     * ⑂ Branch: a new Chat holding this Chat's Messages up to this one (up to the one before it,
+     * for a User Message, whose text comes back as `draft`). No model is called.
+     */
+    branch: (storyId: number, chatId: number, messageId: number) =>
+        apiSend<BranchedChat>('POST', `/stories/${storyId}/chats/${chatId}/messages/${messageId}/branch`),
     /** Clears every Message and copies the current Opening in again. */
     reset: (storyId: number, chatId: number) => apiSend<Chat>('POST', `/stories/${storyId}/chats/${chatId}/reset`),
     /** Runs the failed Bond, Arc and Scene judge of the latest AI Message again. Answers with the dashboard. */

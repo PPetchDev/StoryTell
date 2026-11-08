@@ -282,10 +282,11 @@ export class LedgerModelService {
      * in one transaction. A SceneAdvance puts the Chat back on the Scene it left (the Scene
      * may be gone since: free play then). A MemoryChange puts the Memory's fields back as
      * they were: an added Memory goes, even if the user edited it since; a deleted one comes
-     * back under its old id. Returns the counts by kind.
+     * back under its old id. Returns the counts by kind. Given a caller's `outer` manager it
+     * runs inside that transaction (a Branch's copy); without one it opens its own.
      */
-    rollbackFrom(chatId: number, fromPosition: number): Promise<RollbackCounts> {
-        return this.dataSource.transaction(async (manager) => {
+    rollbackFrom(chatId: number, fromPosition: number, outer?: EntityManager): Promise<RollbackCounts> {
+        const work = async (manager: EntityManager): Promise<RollbackCounts> => {
             const messages = await manager.find(MessageEntity, {
                 where: { chatId, position: MoreThanOrEqual(fromPosition) },
                 select: { id: true, position: true },
@@ -330,7 +331,8 @@ export class LedgerModelService {
                 counts.bondChanges++;
             }
             return counts;
-        });
+        };
+        return outer ? work(outer) : this.dataSource.transaction(work);
     }
 
     /**

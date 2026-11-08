@@ -6,7 +6,7 @@ import { FormEvent, ReactNode, useState } from 'react';
 import { useApiQuery } from '@/components/connection';
 import { ConfirmDialog } from '@/components/sheet/confirm-dialog';
 import { Sheet } from '@/components/sheet/sheet';
-import { Chat } from '@/lib/chat';
+import { Chat, messageHref } from '@/lib/chat';
 import { PersonaList } from '@/lib/persona';
 
 import styles from './chat-top-bar.module.css';
@@ -215,6 +215,19 @@ export function ChatTopBar({
                         />
                     ) : (
                         <div className={styles.menu}>
+                            {chat.branchedFrom && (
+                                // A Branch leads back to where the two Chats part (.scratch/branch/spec.md).
+                                <Link
+                                    href={
+                                        chat.branchedFrom.messageId === null
+                                            ? `/stories/${chat.storyId}/chats/${chat.branchedFrom.chatId}`
+                                            : messageHref(chat.storyId, chat.branchedFrom.chatId, chat.branchedFrom.messageId)
+                                    }
+                                    className={styles.item}
+                                >
+                                    <MenuText label={`Branched from ${chat.branchedFrom.title}`} sub="Back to where the two Chats part" />
+                                </Link>
+                            )}
                             <MenuButton onClick={choose(onOpenMemory)}>
                                 <MenuText label="Memory" sub="What the story remembers" />
                             </MenuButton>

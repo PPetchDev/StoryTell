@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
 import { ChatComposer } from '@/components/chat/chat-composer';
@@ -11,6 +12,7 @@ import { SnapshotSheet } from '@/components/chat/snapshot-sheet';
 import { SnapshotViewer, useChatSnapshots } from '@/components/chat/snapshots';
 import { useConnection } from '@/components/connection';
 import { ApiError, apiFetch, ApiUnreachableError, StreamBrokenError, StreamStoppedError } from '@/lib/api';
+import { handOffBranch, takeBranchHandoff } from '@/lib/branch';
 import { Cast, Portraits } from '@/lib/character-colour';
 import { backgroundPending, Chat, chatApi, EditedChat, latestReply, Message, MessagePart, rollbackNotice, TurnStream } from '@/lib/chat';
 import { Memory, memoryApi, renderUser } from '@/lib/memory';
@@ -55,6 +57,7 @@ interface ChatScreenProps {
 
 export function ChatScreen({ initial, cast, portraits, scenes }: ChatScreenProps) {
     const { reportUnreachable } = useConnection();
+    const router = useRouter();
     const [chat, setChat] = useState(initial);
     const [draft, setDraft] = useState('');
     /** The line just sent, shown in the thread until the turn settles. */
@@ -77,6 +80,14 @@ export function ChatScreen({ initial, cast, portraits, scenes }: ChatScreenProps
     const [replacing, setReplacing] = useState<number | null>(null);
     /** The reply whose finished extraction was already announced, so a re-read never toasts twice. */
     const announcedRef = useRef<number | null>(latestReply(initial)?.id ?? null);
+
+    // A Chat just made by ⑂ Branch: the quiet "Branched from" line, and a User Message's text in the composer.
+    useEffect(() => {
+        const handoff = takeBranchHandoff(initial.id);
+        if (!handoff) return;
+        setRollback(`Branched from ${handoff.from}.`);
+        if (handoff.draft !== null) setDraft(handoff.draft);
+    }, [initial.id]);
 
     // While the last reply's background calls run, re-read the Chat until they settle.
     useEffect(() => {
@@ -273,6 +284,29 @@ export function ChatScreen({ initial, cast, portraits, scenes }: ChatScreenProps
         }
     };
 
+    /**
+     * ⑂ Branch (.scratch/branch/spec.md): no confirmation, since it changes nothing here. The
+     * actions stay disabled while it runs; on success the new Chat opens, handed the title it
+     * came from and any User Message's text. An error shows in the usual line, here.
+     */
+    const branchFrom = (messageId: number) => {
+        if (writing || busy) return;
+        setBusy(true);
+        setError(null);
+        setRollback(null);
+        chatApi.branch(chat.storyId, chat.id, messageId).then(
+            (made) => {
+                handOffBranch(made.id, { from: chat.title, draft: made.draft });
+                router.push(`/stories/${chat.storyId}/chats/${made.id}`);
+            },
+            (caught: unknown) => {
+                setBusy(false);
+                if (caught instanceof ApiUnreachableError) reportUnreachable();
+                else setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+            },
+        );
+    };
+
     /** Swaps the worn identity; the drawer re-reads, since it renders {user} as the worn name. */
     const swapIdentity = (personaId: number | null) =>
         void runWrite(async () => {
@@ -293,8 +327,11 @@ export function ChatScreen({ initial, cast, portraits, scenes }: ChatScreenProps
             const reply = latestReply(chat);
             if (reply?.memory?.status === 'failed') announcedRef.current = null;
             await Promise.all([
-                reply?.judge?.status === 'failed' ? chatApi.retryJudge(chat.storyId, chat.id, reply.id) : null,
-                reply?.memory?.status === 'failed' ? chatApi.retryExtraction(chat.storyId, chat.id, reply.id) : null,
+                // One after the other: each holds the Chat's turn lock while it runs.
+                (async () => {
+                    if (reply?.judge?.status === 'failed') await chatApi.retryJudge(chat.storyId, chat.id, reply.id);
+                    if (reply?.memory?.status === 'failed') await chatApi.retryExtraction(chat.storyId, chat.id, reply.id);
+                })(),
                 ...failedJobs.map((job) => snapshotApi.retry(chat.storyId, chat.id, job.id)),
             ]);
             await snaps.refresh();
@@ -362,6 +399,7 @@ export function ChatScreen({ initial, cast, portraits, scenes }: ChatScreenProps
                 onAgain={again}
                 onVersion={chooseVersion}
                 onEdit={setEditing}
+                onBranch={branchFrom}
                 onSave={saveEdit}
                 onCancelEdit={() => setEditing(null)}
                 onSnapshot={() => setSnapshotSheet(true)}

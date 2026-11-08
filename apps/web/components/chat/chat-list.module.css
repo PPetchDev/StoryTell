@@ -14,3 +14,10 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
+
+/* A Branch's link back, read under its title (.scratch/branch/spec.md). */
+.branched {
+    font-size: 0.8125rem;
+    font-style: italic;
+    color: var(--muted);
+}

@@ -67,10 +67,10 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | `404.004.001` | `ChatNotFoundError` | No Chat with that id in this Story. |
 | `422.004.002` | `StoryNotPlayableError` | The Story has a required field empty. The message names the missing fields. Blocks starting a Chat, sending, Continue and Regenerate. |
 | `409.004.003` | `NoTurnToRetryError` | Retry when the Chat is not waiting for a reply to a User Message. |
-| `409.004.004` | `TurnInProgressError` | A send, a Continue, a Regenerate, Suggested replies, a Message edit, choosing a Reply version or a reset while this Chat's turn is still being written. |
+| `409.004.004` | `TurnInProgressError` | A send, a Continue, a Regenerate, Suggested replies, a Message edit, choosing a Reply version, a reset, a Branch or a manual Retry of the judge or Memory extraction while this Chat's turn is still being written, or while a manual Retry of either background call runs for it (a Retry holds the Chat's turn lock, so a Branch or another write meanwhile is refused, and a Retry tapped while a Branch copies the Chat is refused too). |
 | `422.004.005` | `EmptyMessageError` | A send or a Message edit with nothing but whitespace. |
 | `404.004.006` | `MessageNotFoundError` | No Message with that id in this Chat. |
-| `409.004.007` | `BackgroundStillSavingError` | A send, Retry, Continue, Regenerate, Message edit, choosing a Reply version or reset while one of the previous AI Message's background calls (the judge, Memory extraction) was still pending past the short wait. Try again in a moment. |
+| `409.004.007` | `BackgroundStillSavingError` | A send, Retry, Continue, Regenerate, Message edit, choosing a Reply version, reset or Branch while one of the previous AI Message's background calls (the judge, Memory extraction) was still pending past the short wait. Try again in a moment. |
 | `409.004.008` | `BackgroundFailedError` | A send, Retry, Continue or Regenerate while one of the previous AI Message's background calls has failed, and so has its one automatic retry (`BACKGROUND_RETRY_MS` later). The message names which in plain words ("Couldn't save the Memories from the last reply."); retry it (on the Chat screen or the dashboard) first. |
 | `409.004.009` | `NoFailedJudgeError` | A judge retry on a Message whose judge did not fail, or that is not the latest AI Message. |
 | `409.004.010` | `NoFailedExtractionError` | A Memory extraction retry on a Message whose extraction did not fail, or that is not the latest AI Message. |

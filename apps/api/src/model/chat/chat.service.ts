@@ -80,6 +80,11 @@ export class ChatModelService {
         return chat && inOrder(chat);
     }
 
+    /** The Chat row alone, without its Messages. */
+    findOne(chatId: number): Promise<ChatEntity | null> {
+        return this.chats.findOne({ where: { id: chatId } });
+    }
+
     createChat(fields: Partial<ChatEntity>): ChatEntity {
         return this.chats.create(fields);
     }

@@ -1,6 +1,6 @@
 # 04 — Branch from a User Message, with its text in the composer
 
-**Status:** ready-for-agent
+**Status:** done
 
 Part of: [Spec: Branch](../spec.md)
 
@@ -12,9 +12,9 @@ Part of: [Spec: Branch](../spec.md)
 
 **Blocked by:** [02 — Branch a Chat from a reply](02-branch-a-chat.md).
 
-- [ ] API: from a User Message `draft` is its text; from an AI Message it is null.
-- [ ] e2e (390 px, fake gateway): branching from a User Message opens the Branch ending on the reply before it, with that text in the composer and no turn running.
-- [ ] e2e: with the Story unplayable, a tap on a User Message shows ⑂ Branch and no ✎ Edit, and ⑂ makes the Branch with the draft; with the Story playable, the same tap shows both.
-- [ ] The draft is not in the URL, and reloading the new Chat afterwards does not put it back in the composer a second time.
-- [ ] An API error while branching (still saving, turn in progress) shows in the usual error line without leaving the Chat.
-- [ ] Typecheck, the whole API suite and the whole e2e suite pass.
+- [x] API: from a User Message `draft` is its text; from an AI Message it is null.
+- [x] e2e (390 px, fake gateway): branching from a User Message opens the Branch ending on the reply before it, with that text in the composer and no turn running.
+- [x] e2e: with the Story unplayable, a tap on a User Message shows ⑂ Branch and no ✎ Edit, and ⑂ makes the Branch with the draft; with the Story playable, the same tap shows both.
+- [x] The draft is not in the URL, and reloading the new Chat afterwards does not put it back in the composer a second time.
+- [x] An API error while branching (still saving, turn in progress) shows in the usual error line without leaving the Chat.
+- [x] Typecheck, the whole API suite and the whole e2e suite pass.

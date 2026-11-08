@@ -102,6 +102,24 @@ export class ChatEntity {
     @Column({ name: 'story_so_far_corrections', type: 'text', nullable: true })
     storySoFarCorrections: string | null;
 
+    /** The Chat this one was branched from; null for a Chat never branched, or once that Chat is deleted. */
+    @Index()
+    @Column({ name: 'branched_from_chat_id', type: 'integer', nullable: true })
+    branchedFromChatId: number | null;
+
+    @ManyToOne('ChatEntity', { onDelete: 'SET NULL', nullable: true })
+    @JoinColumn({ name: 'branched_from_chat_id' })
+    branchedFromChat: Relation<ChatEntity> | null;
+
+    /** The Message the user tapped there (a User Message itself when branched from one); null once it is gone. */
+    @Index()
+    @Column({ name: 'branched_from_message_id', type: 'integer', nullable: true })
+    branchedFromMessageId: number | null;
+
+    @ManyToOne('MessageEntity', { onDelete: 'SET NULL', nullable: true })
+    @JoinColumn({ name: 'branched_from_message_id' })
+    branchedFromMessage: Relation<MessageEntity> | null;
+
     // Loaded only through ChatModelService.findWithMessages(); never auto-loaded.
     @OneToMany('MessageEntity', 'chat')
     messages: Relation<MessageEntity[]>;

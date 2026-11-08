@@ -11,6 +11,7 @@ import {
     SwapIdentityRequestBodyDTO,
 } from './dto/chat.request.dto.js';
 import {
+    BranchResponseBodyDTO,
     ChatDashboardResponseBodyDTO,
     ChatResponseBodyDTO,
     EditMessageResponseBodyDTO,
@@ -187,6 +188,22 @@ export class ChatApiController {
         @Body() body: ChooseReplyVersionRequestBodyDTO,
     ): Promise<EditMessageResponseBodyDTO> {
         return this.chatManager.chooseReplyVersion(storyId, chatId, messageId, body.version);
+    }
+
+    /**
+     * Spec: .scratch/branch/spec.md. A new Chat, "<title> (branch)", holding this Chat's Messages
+     * up to and including this one (up to the one before it, for a User Message, whose text comes
+     * back as `draft`) with everything the Chat knew there. The source is not touched, and no
+     * model is called.
+     */
+    @Post(':chatId/messages/:messageId/branch')
+    @ApiCreatedResponse({ type: BranchResponseBodyDTO })
+    branch(
+        @Id('storyId') storyId: number,
+        @Id('chatId') chatId: number,
+        @Id('messageId') messageId: number,
+    ): Promise<BranchResponseBodyDTO> {
+        return this.chatManager.branchChat(storyId, chatId, messageId);
     }
 
     /** Spec: "Lore in play": the Lore entries a turn would send now, for the Memory drawer. */

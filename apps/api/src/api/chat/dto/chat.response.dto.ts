@@ -42,7 +42,23 @@ export class ChatSummaryDTO implements ChatSummary {
     lastPlayedAt: string;
 }
 
+export class BranchedFromDTO {
+    @ApiProperty({ description: 'The Chat this one was branched from.' })
+    chatId: number;
+
+    @ApiProperty({ description: "That Chat's title now, so a rename shows." })
+    title: string;
+}
+
+export class BranchedFromMessageDTO extends BranchedFromDTO {
+    @ApiProperty({ type: Number, nullable: true, description: 'The Message tapped there (a User Message itself when branched from one); null once it is gone.' })
+    messageId: number | null;
+}
+
 export class ChatListItemDTO extends ChatSummaryDTO implements ChatListItem {
+    @ApiProperty({ type: BranchedFromDTO, nullable: true, description: 'Shown as "Branched from <title>"; null when never branched, or once that Chat is deleted.' })
+    branchedFrom: BranchedFromDTO | null;
+
     @ApiProperty({ type: String, nullable: true, description: 'The Scene the Chat is on; null for free play.' })
     sceneName: string | null;
 
@@ -190,6 +206,19 @@ export class ChatResponseBodyDTO extends ChatSummaryDTO implements Omit<ChatDeta
 
     @ApiProperty({ type: DriftDTO, nullable: true, description: 'Set when the Drift notice shows.' })
     drift: DriftDTO | null;
+
+    @ApiProperty({
+        type: BranchedFromMessageDTO,
+        nullable: true,
+        description: 'The Chat menu line "Branched from <title>"; null when never branched, or once that Chat is deleted.',
+    })
+    branchedFrom: BranchedFromMessageDTO | null;
+}
+
+/** A Branch answers with the new Chat, plus the User Message's text when it was branched from one. */
+export class BranchResponseBodyDTO extends ChatResponseBodyDTO {
+    @ApiProperty({ type: String, nullable: true, description: "The User Message's text, for the new Chat's composer; null when branched from an AI Message." })
+    draft: string | null;
 }
 
 export class RollbackCountsDTO implements RollbackCounts {

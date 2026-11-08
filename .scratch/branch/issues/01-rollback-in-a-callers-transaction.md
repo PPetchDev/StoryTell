@@ -1,6 +1,6 @@
 # 01 — Ledger rollback can run inside a caller's transaction
 
-**Status:** ready-for-agent
+**Status:** done
 
 Part of: [Spec: Branch](../spec.md). A declared prefactor: it changes no behaviour, so it is not a vertical slice.
 
@@ -8,6 +8,6 @@ Part of: [Spec: Branch](../spec.md). A declared prefactor: it changes no behavio
 
 **Blocked by:** None — can start immediately.
 
-- [ ] Rolling back with a caller's transaction manager writes nothing until that transaction commits, and nothing at all when it rolls back (an API-level or model-level test with a deliberately failing outer transaction).
-- [ ] Every existing caller still uses its own transaction; no call site changes its behaviour.
-- [ ] The whole existing API suite stays green (`test/regenerate.spec.ts`, `test/reply-versions.spec.ts`, `test/judge.spec.ts` "rollback on edit", `test/memory.spec.ts`).
+- [x] Rolling back with a caller's transaction manager writes nothing until that transaction commits, and nothing at all when it rolls back (an API-level or model-level test with a deliberately failing outer transaction).
+- [x] Every existing caller still uses its own transaction; no call site changes its behaviour.
+- [x] The whole existing API suite stays green (`test/regenerate.spec.ts`, `test/reply-versions.spec.ts`, `test/judge.spec.ts` "rollback on edit", `test/memory.spec.ts`).

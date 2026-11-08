@@ -19,6 +19,7 @@ import {
 import { OutOfCreditError } from '../../errors/model-gateway.errors.js';
 import { PersonaNotFoundError } from '../../errors/persona.errors.js';
 import { StoryNotFoundError } from '../../errors/story.errors.js';
+import { BranchModelService } from '../../model/branch/branch.service.js';
 import { ChatModelService } from '../../model/chat/chat.service.js';
 import { ChatEntity, ChatSummary, TimeOfDay } from '../../model/chat/entities/chat.entity.js';
 import {
@@ -62,6 +63,8 @@ export interface ChatListItem extends ChatSummary {
     sceneName: string | null;
     /** The latest Message as one plain line of about 100 characters. */
     latestLine: string;
+    /** The Chat it was branched from, with that Chat's title now; null when never branched or that Chat is gone. */
+    branchedFrom: { chatId: number; title: string } | null;
 }
 
 /** A Chat as the Chat screen reads it: its Messages plus everything the notice line needs. */
@@ -88,6 +91,16 @@ export interface ChatDetail extends ChatSummary {
     playModel: string;
     /** Set when the last AI Message came from a different model than the current play model. */
     drift: { lastModel: string; playModel: string } | null;
+    /**
+     * The Chat it was branched from, with that Chat's title now and the Message the user tapped
+     * there (null once that Message is gone); null when never branched or that Chat is gone.
+     */
+    branchedFrom: { chatId: number; title: string; messageId: number | null } | null;
+}
+
+/** What a Branch answers with: the new Chat, plus the User Message's text when it was branched from one. */
+export interface BranchResult extends ChatDetail {
+    draft: string | null;
 }
 
 /** What an edit answers with: the Chat, plus what the rewind rolled back for the notice. */
@@ -164,6 +177,7 @@ export class ChatManagerService {
 
     constructor(
         private readonly chatModel: ChatModelService,
+        private readonly branchModel: BranchModelService,
         private readonly storyModel: StoryModelService,
         private readonly settingsModel: SettingsModelService,
         private readonly ledger: LedgerModelService,
@@ -182,11 +196,16 @@ export class ChatManagerService {
         const chats = await this.chatModel.findByStory(storyId);
         const latest = await this.chatModel.findLatestMessages(chats.map((chat) => chat.id));
         const latestOf = new Map(latest.map((message) => [message.chatId, message]));
-        return chats.map((chat) => ({
-            ...chat.toSummary(),
-            sceneName: story.scenes.find((scene) => scene.id === chat.currentSceneId)?.name ?? null,
-            latestLine: latestLine(latestOf.get(chat.id)),
-        }));
+        const titleOf = new Map(chats.map((chat) => [chat.id, chat.title]));
+        return chats.map((chat) => {
+            const sourceTitle = chat.branchedFromChatId === null ? undefined : titleOf.get(chat.branchedFromChatId);
+            return {
+                ...chat.toSummary(),
+                sceneName: story.scenes.find((scene) => scene.id === chat.currentSceneId)?.name ?? null,
+                latestLine: latestLine(latestOf.get(chat.id)),
+                branchedFrom: sourceTitle === undefined ? null : { chatId: chat.branchedFromChatId!, title: sourceTitle },
+            };
+        });
     }
 
     /**
@@ -224,14 +243,17 @@ export class ChatManagerService {
         if (this.inFlight.has(loaded.id)) throw new TurnInProgressError();
         const chat = await this.settledForWrite(loaded);
 
-        await this.ledger.clear(chat.id);
-        // Column updates, not a save of the loaded Chat: a save would write its old Story so far back.
-        await this.chatModel.setCurrentScene(chat.id, story.scenes[0]?.id ?? null);
-        await this.storySoFar.clear(chat.id);
-        await this.chatModel.clearMessages(chat.id);
-        await this.copyOpening(story, chat.id);
-        await this.seedLedger(story, chat.id);
-        return this.getChat(storyId, chatId);
+        // Under the turn lock, so a Branch never copies a half-reset Chat.
+        return this.writingTurn(chat.id, async () => {
+            await this.ledger.clear(chat.id);
+            // Column updates, not a save of the loaded Chat: a save would write its old Story so far back.
+            await this.chatModel.setCurrentScene(chat.id, story.scenes[0]?.id ?? null);
+            await this.storySoFar.clear(chat.id);
+            await this.chatModel.clearMessages(chat.id);
+            await this.copyOpening(story, chat.id);
+            await this.seedLedger(story, chat.id);
+            return this.getChat(storyId, chatId);
+        });
     }
 
     /**
@@ -270,13 +292,16 @@ export class ChatManagerService {
         for (const name of reply.unknownSpeakers) {
             this.logger.warn(`Chat ${chat.id}: unknown speaker "${name}" in the edited Message; kept by name with no Character link`);
         }
-        const rolledBack = await this.ledger.rollbackFrom(chat.id, message.position);
-        await this.storySoFar.rewound(chat, message.position);
-        await this.chatModel.rewriteAiMessage(message, reply.parts);
-        // Its Snapshots show a moment the edit took away; they stay in the Gallery.
-        await this.snapshotModel.clearMessageLinks([message.id]);
-        if (message.model !== AUTHOR_MODEL) await this.rerunBackground(story, chat.id, message.id);
-        return { ...(await this.getChat(storyId, chatId)), rolledBack };
+        // Under the turn lock, so a Branch never copies a half-made edit.
+        return this.writingTurn(chat.id, async () => {
+            const rolledBack = await this.ledger.rollbackFrom(chat.id, message.position);
+            await this.storySoFar.rewound(chat, message.position);
+            await this.chatModel.rewriteAiMessage(message, reply.parts);
+            // Its Snapshots show a moment the edit took away; they stay in the Gallery.
+            await this.snapshotModel.clearMessageLinks([message.id]);
+            if (message.model !== AUTHOR_MODEL) await this.rerunBackground(story, chat.id, message.id);
+            return { ...(await this.getChat(storyId, chatId)), rolledBack };
+        });
     }
 
     /**
@@ -346,6 +371,38 @@ export class ChatManagerService {
             await this.chatModel.chooseVersion(message, chosen);
             this.startBackground(story, chat.id, message.id);
             return { ...(await this.getChat(storyId, chatId)), rolledBack };
+        });
+    }
+
+    /**
+     * Spec: .scratch/branch/spec.md. A new Chat holding the source's Messages up to and including
+     * Message N, with everything the Chat knew there; the source is not touched. From a User
+     * Message, N is the Message before it. No model is called, so neither an unplayable Story nor
+     * credit being out nor a failed background call blocks it. Like an AI Message edit it waits
+     * for pending background calls, and it holds the source's turn lock while it copies.
+     * Answers with the new Chat, and the User Message's text as `draft` for its composer.
+     */
+    async branchChat(storyId: number, chatId: number, messageId: number): Promise<BranchResult> {
+        const { chat: loaded } = await this.load(storyId, chatId);
+        if (this.inFlight.has(loaded.id)) throw new TurnInProgressError();
+        if (!loaded.messages.some((candidate) => candidate.id === messageId)) throw new MessageNotFoundError();
+        const settled = await this.settledForWrite(loaded);
+
+        return this.writingTurn(settled.id, async () => {
+            // Read again inside the lock: an edit meanwhile may have deleted the Message.
+            const chat = await this.reload(settled.id);
+            const message = chat.messages.find((candidate) => candidate.id === messageId);
+            if (!message) throw new MessageNotFoundError();
+            const fromUser = message.kind === MessageKind.User;
+            // A User Message is never first (the Opening is), so there is always a Message before it.
+            const through = fromUser ? message.position - 1 : message.position;
+            const taken = (await this.chatModel.findByStory(storyId)).map((other) => other.title);
+            const branchId = await this.branchModel.copy(chat.id, through, {
+                title: branchTitle(chat.title, taken),
+                branchedFromMessageId: message.id,
+            });
+            const draft = fromUser ? (message.text ?? '') : null;
+            return { ...(await this.getChat(storyId, branchId)), draft };
         });
     }
 
@@ -502,7 +559,8 @@ export class ChatManagerService {
 
     /**
      * Spec: "Retry re-runs only the failed call." Allowed on the latest judged AI Message
-     * when its judge failed; it runs to the end before answering with the dashboard.
+     * when its judge failed; it runs to the end before answering with the dashboard. It holds
+     * the Chat's turn lock meanwhile, so a send, an edit, a reset or a Branch is refused.
      */
     async retryJudge(storyId: number, chatId: number, messageId: number): Promise<ChatDashboard> {
         const { story, chat } = await this.load(storyId, chatId);
@@ -511,10 +569,13 @@ export class ChatManagerService {
         if (message.judgeStatus !== BackgroundStatus.Failed || latestJudged(chat)?.id !== message.id) {
             throw new NoFailedJudgeError();
         }
-        await this.chatModel.setJudgeStatus(message.id, BackgroundStatus.Pending);
-        // A press runs once: its answer comes at once, with no automatic retry.
-        await this.judge.run(story, chat.id, message.id, false);
-        return this.dashboard(storyId, chatId);
+        // Under the turn lock, as a turn is, so a Branch never copies half of what it writes.
+        return this.writingTurn(chat.id, async () => {
+            await this.chatModel.setJudgeStatus(message.id, BackgroundStatus.Pending);
+            // A press runs once: its answer comes at once, with no automatic retry.
+            await this.judge.run(story, chat.id, message.id, false);
+            return this.dashboard(storyId, chatId);
+        });
     }
 
     /** The same for Memory extraction: a failed extraction on the latest extracted AI Message. */
@@ -525,9 +586,11 @@ export class ChatManagerService {
         if (message.memoryStatus !== BackgroundStatus.Failed || latestExtracted(chat)?.id !== message.id) {
             throw new NoFailedExtractionError();
         }
-        await this.chatModel.setMemoryStatus(message.id, BackgroundStatus.Pending);
-        await this.extraction.run(story, chat.id, message.id, false);
-        return this.dashboard(storyId, chatId);
+        return this.writingTurn(chat.id, async () => {
+            await this.chatModel.setMemoryStatus(message.id, BackgroundStatus.Pending);
+            await this.extraction.run(story, chat.id, message.id, false);
+            return this.dashboard(storyId, chatId);
+        });
     }
 
     /**
@@ -819,7 +882,12 @@ export class ChatManagerService {
     }
 
     private async detail(story: StoryEntity, chat: ChatEntity): Promise<ChatDetail> {
-        const [settings, creditOut] = await Promise.all([this.settingsModel.get(), this.creditOut()]);
+        const [settings, creditOut, source] = await Promise.all([
+            this.settingsModel.get(),
+            this.creditOut(),
+            // Read live, so a rename of the source shows.
+            chat.branchedFromChatId === null ? null : this.chatModel.findOne(chat.branchedFromChatId),
+        ]);
         const scene = story.scenes.find((candidate) => candidate.id === chat.currentSceneId);
         const lastModel = lastAiModel(chat);
         const identity = wornIdentity(story, chat);
@@ -840,6 +908,7 @@ export class ChatManagerService {
                 lastModel !== null && lastModel !== settings.playModel
                     ? { lastModel, playModel: settings.playModel }
                     : null,
+            branchedFrom: source ? { chatId: source.id, title: source.title, messageId: chat.branchedFromMessageId } : null,
         };
     }
 
@@ -905,6 +974,23 @@ function inLatestExchange(story: StoryEntity, chat: ChatEntity, userText: string
     const parts = lastAi ? [...lastAi.parts].sort((a, b) => a.position - b.position).map((part) => part.toResponse()) : [];
     const cast = story.characters.map((character) => ({ id: character.id, name: character.name }));
     return charactersInExchange(cast, userText ?? '', parts).map((character) => character.name);
+}
+
+/** The title limit a rename keeps to (RenameChatRequestBodyDTO). */
+const TITLE_MAX = 200;
+
+/**
+ * Spec: .scratch/branch/spec.md, "Title". "<title> (branch)", where <title> is the source's
+ * title with any trailing " (branch)" or " (branch N)" taken off, so a Branch of a Branch never
+ * stacks suffixes; when that is taken in the Story, the next free " (branch N)" from 2. Cut to
+ * the title limit.
+ */
+function branchTitle(source: string, taken: string[]): string {
+    const base = source.replace(/ \(branch(?: \d+)?\)$/, '');
+    const titled = (suffix: string) => `${base.slice(0, TITLE_MAX - suffix.length)}${suffix}`;
+    let title = titled(' (branch)');
+    for (let n = 2; taken.includes(title); n++) title = titled(` (branch ${n})`);
+    return title;
 }
 
 /** "Chat N" for the first title not yet taken in this Story. */

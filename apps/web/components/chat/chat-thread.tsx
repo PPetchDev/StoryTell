@@ -1,6 +1,6 @@
 'use client';
 
-import { CSSProperties, KeyboardEvent, MouseEvent, PointerEvent, ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { CSSProperties, Fragment, KeyboardEvent, MouseEvent, PointerEvent, ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { AiMessageParts, MessageBody, UserLine } from '@/components/chat/message-body';
 import { MessageSnapshots } from '@/components/chat/snapshots';
@@ -92,6 +92,107 @@ function EditAction({ onEdit }: { onEdit(): void }) {
     );
 }
 
+/** ⑂ Branch (.scratch/branch/spec.md): always the last action, in the action row and under a tapped Message. */
+function BranchAction({ onBranch }: { onBranch(): void }) {
+    return (
+        <button type="button" className={styles.action} onClick={onBranch}>
+            <span aria-hidden="true">⑂</span>Branch
+        </button>
+    );
+}
+
+interface OverflowItem {
+    key: string;
+    node: ReactNode;
+}
+
+/**
+ * A row of actions on one line (integration: "Message actions"): whatever doesn't fit moves, from
+ * the end, into a "⋯" menu, so the row never runs past the screen. Each item's natural width is
+ * read off a hidden copy of the row, again whenever the row changes size.
+ */
+function OverflowActions({ label, className, items }: { label: string; className: string; items: OverflowItem[] }) {
+    const rowRef = useRef<HTMLDivElement>(null);
+    const measureRef = useRef<HTMLDivElement>(null);
+    const [fit, setFit] = useState(items.length);
+    const [open, setOpen] = useState(false);
+    const keys = items.map((item) => item.key).join(' ');
+
+    useLayoutEffect(() => {
+        const row = rowRef.current;
+        const measure = measureRef.current;
+        if (!row || !measure) return;
+        const measureFit = () => {
+            const gap = parseFloat(getComputedStyle(measure).columnGap) || 0;
+            const widths = [...measure.children].map((child) => child.getBoundingClientRect().width);
+            // The hidden copy ends with the ⋯ button.
+            const more = widths.pop() ?? 0;
+            const room = row.clientWidth;
+            const all = widths.reduce((sum, width, index) => sum + width + (index > 0 ? gap : 0), 0);
+            if (all <= room) {
+                setFit(widths.length);
+                return;
+            }
+            let used = more;
+            let count = 0;
+            while (count < widths.length && used + gap + widths[count] <= room) used += gap + widths[count++];
+            setFit(count);
+        };
+        measureFit();
+        const observer = new ResizeObserver(measureFit);
+        observer.observe(row);
+        return () => observer.disconnect();
+    }, [keys]);
+
+    // A tap anywhere else closes the menu.
+    useEffect(() => {
+        if (!open) return;
+        const onClick = (event: Event) => {
+            if (!rowRef.current?.contains(event.target as Node)) setOpen(false);
+        };
+        document.addEventListener('click', onClick, true);
+        return () => document.removeEventListener('click', onClick, true);
+    }, [open]);
+
+    const hidden = items.slice(fit);
+    return (
+        <div ref={rowRef} className={`${className} ${styles.overflowRow}`} role="group" aria-label={label}>
+            {items.slice(0, fit).map((item) => (
+                <Fragment key={item.key}>{item.node}</Fragment>
+            ))}
+            {hidden.length > 0 && (
+                <span className={styles.more}>
+                    <button
+                        type="button"
+                        className={styles.action}
+                        aria-label="More actions"
+                        aria-expanded={open}
+                        onClick={() => setOpen((current) => !current)}
+                    >
+                        ⋯
+                    </button>
+                    {open && (
+                        <span className={styles.moreMenu} role="group" aria-label="More actions" onClick={() => setOpen(false)}>
+                            {hidden.map((item) => (
+                                <Fragment key={item.key}>{item.node}</Fragment>
+                            ))}
+                        </span>
+                    )}
+                </span>
+            )}
+            {/* Clipped to nothing, so the copy never widens the row or the thread. */}
+            <div className={styles.overflowClip} aria-hidden="true" inert>
+                <div ref={measureRef} className={styles.overflowMeasure}>
+                    {items.map((item) => (
+                        <Fragment key={item.key}>{item.node}</Fragment>
+                    ))}
+                    <span className={styles.action}>⋯</span>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 /** How far a finger must travel sideways on a reply before a swipe changes its version, in CSS pixels. */
 const SWIPE_VERSION_PX = 60;
 
@@ -135,29 +236,39 @@ interface ActionRowProps {
     onAgain: (() => void) | null;
     onEdit(): void;
     onSnapshot(): void;
+    onBranch(): void;
     /** ‹ n/m ›; null while the reply has only one version. */
     versions: VersionSwitchProps | null;
 }
 
 /**
  * Under the newest AI Message while no turn is in flight (spec: "Action row"). ‹ n/m › goes
- * first when the reply has versions, then ↺ Again, never on the Opening.
+ * first when the reply has versions, then ↺ Again, never on the Opening; ⑂ Branch goes last.
  */
-function ActionRow({ onAgain, onEdit, onSnapshot, versions }: ActionRowProps) {
-    return (
-        <div className={styles.actions} role="group" aria-label="Message actions">
-            {versions && <VersionSwitch {...versions} />}
-            {onAgain && (
+function ActionRow({ onAgain, onEdit, onSnapshot, onBranch, versions }: ActionRowProps) {
+    const items: OverflowItem[] = [];
+    if (versions) items.push({ key: 'versions', node: <VersionSwitch {...versions} /> });
+    if (onAgain) {
+        items.push({
+            key: 'again',
+            node: (
                 <button type="button" className={styles.action} onClick={onAgain}>
                     <span aria-hidden="true">↺</span>Again
                 </button>
-            )}
-            <EditAction onEdit={onEdit} />
+            ),
+        });
+    }
+    items.push({ key: 'edit', node: <EditAction onEdit={onEdit} /> });
+    items.push({
+        key: 'snapshot',
+        node: (
             <button type="button" className={styles.action} onClick={onSnapshot}>
                 <span aria-hidden="true">📷</span>Snapshot
             </button>
-        </div>
-    );
+        ),
+    });
+    items.push({ key: 'branch', node: <BranchAction onBranch={onBranch} /> });
+    return <OverflowActions label="Message actions" className={styles.actions} items={items} />;
 }
 
 interface MessageViewProps {
@@ -344,9 +455,9 @@ interface ChatThreadProps {
     replySoFar: MessagePart[] | null;
     /** The Message being edited in place, if any. */
     editing: number | null;
-    /** Edit is offered at all (no turn or write in flight, no other edit open). */
+    /** Edit and Branch are offered at all (no turn or write in flight, no other edit open). */
     canEdit: boolean;
-    /** User Messages can't be edited while sending is blocked, since an edit runs a turn. */
+    /** User Messages can't be edited while sending is blocked, since an edit runs a turn; Branch runs none, so it stays. */
     blocked: boolean;
     snapshots: ChatSnapshots;
     /** The reply ↺ Again is replacing: hidden while its replacement is written in its place. */
@@ -356,6 +467,8 @@ interface ChatThreadProps {
     /** Shows another Reply version of the newest reply (‹ n/m › or a swipe). */
     onVersion(messageId: number, version: number): void;
     onEdit(messageId: number): void;
+    /** ⑂ Branch: a new Chat from this Message. */
+    onBranch(messageId: number): void;
     onSave(message: Message, text: string): void;
     onCancelEdit(): void;
     /** 📷 in the action row: a Snapshot of the latest AI Message. */
@@ -380,6 +493,7 @@ export function ChatThread({
     onAgain,
     onVersion,
     onEdit,
+    onBranch,
     onSave,
     onCancelEdit,
     onSnapshot,
@@ -408,7 +522,7 @@ export function ChatThread({
         <section ref={threadRef} className={styles.thread} style={storySize} aria-label="Messages">
             <div ref={contentRef} className={styles.content}>
                 {shown.map((message, index) => {
-                    // A User Message edit runs a turn, so it waits while sending is blocked.
+                    // A User Message edit runs a turn, so it waits while sending is blocked; a Branch runs none.
                     const editable = canEdit && (message.kind === 'ai' || !blocked);
                     const withRow = canEdit && message === newestAiMessage;
                     let tools: ReactNode = null;
@@ -428,15 +542,15 @@ export function ChatThread({
                                 onAgain={again ? () => onAgain(message.id) : null}
                                 onEdit={() => edit(message.id)}
                                 onSnapshot={onSnapshot}
+                                onBranch={() => onBranch(message.id)}
                                 versions={versions ? { versions, onVersion: (version) => onVersion(message.id, version) } : null}
                             />
                         );
-                    } else if (editable && tapped === message.id) {
-                        tools = (
-                            <div className={styles.tools}>
-                                <EditAction onEdit={() => edit(message.id)} />
-                            </div>
-                        );
+                    } else if (canEdit && tapped === message.id) {
+                        const items: OverflowItem[] = [];
+                        if (editable) items.push({ key: 'edit', node: <EditAction onEdit={() => edit(message.id)} /> });
+                        items.push({ key: 'branch', node: <BranchAction onBranch={() => onBranch(message.id)} /> });
+                        tools = <OverflowActions label="Message tools" className={styles.tools} items={items} />;
                     }
                     return (
                         <MessageView
@@ -457,7 +571,7 @@ export function ChatThread({
                                     />
                                 )
                             }
-                            onTap={editable && !withRow ? () => setTapped((current) => (current === message.id ? null : message.id)) : null}
+                            onTap={canEdit && !withRow ? () => setTapped((current) => (current === message.id ? null : message.id)) : null}
                             onSwipe={editing === message.id ? null : step}
                             onSave={(text) => onSave(message, text)}
                             onCancel={onCancelEdit}

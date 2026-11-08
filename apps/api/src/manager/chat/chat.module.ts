@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 
+import { BranchModelModule } from '../../model/branch/branch.module.js';
 import { ChatModelModule } from '../../model/chat/chat.module.js';
 import { LedgerModelModule } from '../../model/ledger/ledger.module.js';
 import { MemoryModelModule } from '../../model/memory/memory.module.js';
@@ -16,7 +17,7 @@ import { StorySoFarManagerService } from './story-so-far/story-so-far.service.js
 import { ChatTranscriptManagerService } from './transcript.service.js';
 
 @Module({
-    imports: [ChatModelModule, StoryModelModule, SettingsModelModule, LedgerModelModule, MemoryModelModule, PersonaModelModule, SnapshotModelModule],
+    imports: [ChatModelModule, BranchModelModule, StoryModelModule, SettingsModelModule, LedgerModelModule, MemoryModelModule, PersonaModelModule, SnapshotModelModule],
     providers: [ChatManagerService, JudgeManagerService, MemoryExtractionManagerService, MemoryManagerService, SuggestedRepliesManagerService, StorySoFarManagerService, ChatTranscriptManagerService],
     exports: [ChatManagerService, MemoryManagerService, StorySoFarManagerService, ChatTranscriptManagerService],
 })

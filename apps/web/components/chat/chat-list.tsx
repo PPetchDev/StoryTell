@@ -74,6 +74,7 @@ export function ChatList({ storyId, initial }: { storyId: number; initial: ChatL
                         ) : (
                             <Link href={`/stories/${storyId}/chats/${chat.id}`} className="chat-link">
                                 <span className="story-title">{chat.title}</span>
+                                {chat.branchedFrom && <span className={styles.branched}>Branched from {chat.branchedFrom.title}</span>}
                                 <span className={styles.scene}>{chat.sceneName ?? 'Free play'}</span>
                                 {chat.latestLine && <span className={styles.line}>{chat.latestLine}</span>}
                                 <span className="muted chat-times">

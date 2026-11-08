@@ -1,6 +1,6 @@
 # 02 — Branch a Chat from a reply
 
-**Status:** ready-for-agent
+**Status:** done
 
 Part of: [Spec: Branch](../spec.md)
 
@@ -18,13 +18,13 @@ Part of: [Spec: Branch](../spec.md)
 
 **Blocked by:** [01 — Ledger rollback can run inside a caller's transaction](01-rollback-in-a-callers-transaction.md).
 
-- [ ] API spec `branch` (fake gateway): the Branch from AI Message N has Messages 1…N with the same parts; its Bonds, Arc steps and Scene equal what an edit of N + 1 in a twin Chat leaves; its Time of day is N's.
-- [ ] API: Memory at N: a later AI add is gone (also when the user edited it since); later updates, archives, Known-by additions and deletes are undone; a locked Memory keeps the user's text; a user-written Memory from after N stays.
-- [ ] API: separation: deleting or editing a Memory in the Branch leaves the source's alone, and an edit in the Branch that rolls back a pre-N delete puts the Memory back in the Branch only (source still holding it, and source having deleted it too).
-- [ ] API: Reply versions come along from the newest reply, and choosing one in the Branch leaves the source's shown version; none from an earlier reply. The Story so far rule; the source's Snapshots stay under the source.
-- [ ] API: from a User Message the Branch ends on the Message before it, `awaitingReply` is false, and the gateway received no call.
-- [ ] API: the gate (mid-turn refusal, waiting for a pending judge, `409.004.007` past the wait, allowed with failed calls and their statuses copied, allowed with the Story unplayable and with credit out) and isolation (Branch during a held manual Retry and Retry during a Branch are both `409.004.004`; a lone manual Retry answers as before).
-- [ ] API: the source is unchanged by a Branch (Messages, Memories, ledger rows, Story so far, `last_played_at`); a failure partway leaves no new Chat; the Branch's next turn sends only Messages 1…N in its history, with Memory and Feelings as at N.
-- [ ] e2e (390 px, fake gateway): ⑂ Branch on an earlier reply opens "<title> (branch)" ending on that reply; going back shows the original intact; neither the newest reply's action row nor a tapped Message's tools overflow horizontally.
-- [ ] `docs/error-codes.md` lists Branch among the writes `409.004.004` and `409.004.007` refuse, and `409.004.004` during a manual Retry.
-- [ ] Typecheck, the whole API suite and the whole e2e suite pass.
+- [x] API spec `branch` (fake gateway): the Branch from AI Message N has Messages 1…N with the same parts; its Bonds, Arc steps and Scene equal what an edit of N + 1 in a twin Chat leaves; its Time of day is N's.
+- [x] API: Memory at N: a later AI add is gone (also when the user edited it since); later updates, archives, Known-by additions and deletes are undone; a locked Memory keeps the user's text; a user-written Memory from after N stays.
+- [x] API: separation: deleting or editing a Memory in the Branch leaves the source's alone, and an edit in the Branch that rolls back a pre-N delete puts the Memory back in the Branch only (source still holding it, and source having deleted it too).
+- [x] API: Reply versions come along from the newest reply, and choosing one in the Branch leaves the source's shown version; none from an earlier reply. The Story so far rule; the source's Snapshots stay under the source.
+- [x] API: from a User Message the Branch ends on the Message before it, `awaitingReply` is false, and the gateway received no call.
+- [x] API: the gate (mid-turn refusal, waiting for a pending judge, `409.004.007` past the wait, allowed with failed calls and their statuses copied, allowed with the Story unplayable and with credit out) and isolation (Branch during a held manual Retry and Retry during a Branch are both `409.004.004`; a lone manual Retry answers as before).
+- [x] API: the source is unchanged by a Branch (Messages, Memories, ledger rows, Story so far, `last_played_at`); a failure partway leaves no new Chat; the Branch's next turn sends only Messages 1…N in its history, with Memory and Feelings as at N.
+- [x] e2e (390 px, fake gateway): ⑂ Branch on an earlier reply opens "<title> (branch)" ending on that reply; going back shows the original intact; neither the newest reply's action row nor a tapped Message's tools overflow horizontally.
+- [x] `docs/error-codes.md` lists Branch among the writes `409.004.004` and `409.004.007` refuse, and `409.004.004` during a manual Retry.
+- [x] Typecheck, the whole API suite and the whole e2e suite pass.
