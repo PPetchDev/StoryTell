@@ -355,3 +355,25 @@
         margin-bottom: 1rem;
     }
 }
+
+/* Character cards: the one-time notice after an import, with its Tidy offer. */
+.cardNotice {
+    border: 1px solid var(--accent-line);
+}
+
+.cardNotice p {
+    margin: 0 0 0.75rem;
+}
+
+.cardNoticeActions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+/* Character cards: Export as Character card, at the foot of a Character's card body. */
+.exportCard {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--line);
+}

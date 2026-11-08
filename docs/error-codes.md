@@ -28,6 +28,7 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | 004 | Chats and turns |
 | 005 | Story drafting |
 | 006 | Personas |
+| 007 | Character cards |
 
 ## Codes
 
@@ -93,3 +94,10 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | `422.005.009` | `EmptyInstructionError` | An assistant instruction with nothing but whitespace. |
 | `404.006.001` | `PersonaNotFoundError` | No Persona with that id: read, updated or deleted, or worn through a Chat's identity swap. |
 | `422.006.002` | `EmptyPersonaNameError` | A Persona created or renamed with nothing but whitespace as its Name. |
+| `400.007.001` | `NoCardFileError` | A card import (or preview) with no file in its `card` field. |
+| `415.007.002` | `UnsupportedCardError` | A card file whose bytes are neither a PNG nor JSON text (a WebP, a JPEG, a CHARX zip, a JSON array). Read from the bytes, never the file name. |
+| `413.007.003` | `CardTooLargeError` | A card file over 15 MB, refused before it is read. |
+| `422.007.004` | `UnreadableCardError` | The card's JSON is broken, is not an object, has a `spec` but no `data`, or has none of name, description and first message. Nothing is made. |
+| `422.007.005` | `InvalidGreetingError` | An import asking for a greeting the card doesn't have (0 is the first message, 1..n the alternate greetings). Nothing is made. |
+| `422.007.006` | `NoCardInPictureError` | A PNG with neither a `ccv3` nor a `chara` text chunk: an ordinary picture. Nothing is made. |
+| `415.007.007` | `NotAPngError` | A Character card export whose uploaded picture is not a PNG (the web draws one; a JPEG or a broken PNG is refused). |

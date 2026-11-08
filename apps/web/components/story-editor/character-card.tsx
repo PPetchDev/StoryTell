@@ -4,6 +4,7 @@ import { CharacterPortrait } from '@/components/portrait/character-portrait';
 import { Portrait } from '@/lib/character-colour';
 import { Character, characterRemovalWarning, Story } from '@/lib/story';
 import { useFieldMarks } from './field-marks';
+import { ExportCardButton } from './export-card';
 import { ChangedMark, ConfirmButton, OrderButtons, TextField, Toolbar } from './fields';
 import { FoldingCard } from './folding-card';
 import { ReferenceImage } from './reference-image';
@@ -185,6 +186,7 @@ export function CharacterCard(props: CharacterCardProps) {
                 onChange={(v) => props.onText('arcDirections', v)}
                 {...ofCharacter('arcDirections')}
             />
+            <ExportCardButton storyId={props.storyId} character={character} colour={props.colour} />
         </FoldingCard>
     );
 }

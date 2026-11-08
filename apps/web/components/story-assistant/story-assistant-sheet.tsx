@@ -151,8 +151,13 @@ function Entry({ entry, assistant, onShow }: EntryProps) {
  * a link back to its field (`onShow`).
  */
 export function StoryAssistantSheet({ assistant, onShow }: { assistant: StoryAssistant; onShow(field: RewriteRequest): void }) {
-    const [instruction, setInstruction] = useState('');
+    const [instruction, setInstruction] = useState(assistant.prefill?.text ?? '');
     const transcript = useRef<HTMLOListElement>(null);
+
+    // Opened again with an instruction to fill in while it was already open.
+    useEffect(() => {
+        if (assistant.prefill) setInstruction(assistant.prefill.text);
+    }, [assistant.prefill]);
 
     useEffect(() => {
         transcript.current?.lastElementChild?.scrollIntoView({ block: 'nearest' });

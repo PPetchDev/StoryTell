@@ -1216,3 +1216,78 @@ a {
 .gallery-earlier {
     color: #e0b36a;
 }
+
+/* --- Character cards: a picked PNG card's picture in the New Story panel --- */
+.card-import-picture {
+    display: block;
+    width: 8rem;
+    max-width: 40%;
+    height: auto;
+    aspect-ratio: 2 / 3;
+    object-fit: cover;
+    border-radius: 0.75rem;
+    margin: 0 0 0.75rem;
+}
+
+.card-import-head {
+    display: flex;
+    gap: 0.875rem;
+    align-items: flex-start;
+}
+
+.card-import-head p {
+    margin: 0.125rem 0 0;
+}
+
+.card-import-name {
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+.card-import-fold {
+    margin: 0.5rem 0;
+}
+
+.card-import-fold summary {
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.card-import-fold ul {
+    margin: 0.5rem 0 0;
+    padding-left: 1.25rem;
+}
+
+.card-import-text {
+    display: block;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-size: 0.875rem;
+}
+
+.card-import-greetings {
+    border: 0;
+    margin: 0.75rem 0;
+    padding: 0;
+    display: grid;
+    gap: 0.5rem;
+}
+
+.card-import-greetings legend {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.card-import-greeting {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-start;
+    padding: 0.5rem 0.625rem;
+    border-radius: 0.75rem;
+    background: var(--surface-raised, rgba(255, 255, 255, 0.04));
+}
+
+.card-import-greeting input {
+    margin-top: 0.25rem;
+    flex: none;
+}

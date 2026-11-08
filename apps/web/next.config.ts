@@ -21,6 +21,10 @@ const nextConfig: NextConfig = {
         // E2E turns it off: a dev cache left by the previous run made the first page of the
         // next run reload in a loop ("HMR hash mismatch") until the cache was deleted.
         turbopackFileSystemCacheForDev: process.env.NEXT_DEV_FS_CACHE !== 'off',
+        // The /api rewrite buffers each request body up to this size and cuts the rest (10 MB by
+        // default). A Character card goes through as picked, up to the API's 15 MB, so the body
+        // must pass whole; a bigger one must reach the API too, so it answers its own size error.
+        proxyClientMaxBodySize: '20mb',
     },
     poweredByHeader: false,
     // The dev-only route badge sits in a bottom corner, over the bottom nav's first tab.

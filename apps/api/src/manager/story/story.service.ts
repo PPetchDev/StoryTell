@@ -448,7 +448,13 @@ export class StoryManagerService {
         const previous = character.referenceImagePath;
         character.referenceImagePath = relativePath;
         character.portraitCrop = null;
-        await this.storyModel.saveCharacter(character);
+        try {
+            await this.storyModel.saveCharacter(character);
+        } catch (error) {
+            // Not recorded anywhere: the new file would be left behind with nothing pointing at it.
+            await this.removeFile(relativePath);
+            throw error;
+        }
         if (previous) await this.removeFile(previous);
         return this.saved(storyId);
     }

@@ -8,6 +8,7 @@ import { useConnection } from '@/components/connection';
 import { StoryAssistantSheet } from '@/components/story-assistant/story-assistant-sheet';
 import { fieldOf, useStoryAssistant } from '@/components/story-assistant/use-story-assistant';
 import { ApiUnreachableError } from '@/lib/api';
+import { FROM_CARD_PARAM, tidyMessage } from '@/lib/character-card';
 import { characterColour, portraitsOf } from '@/lib/character-colour';
 import { isFolded, setFolded } from '@/lib/folds';
 import { AppliedChange } from '@/lib/story-assistant';
@@ -105,6 +106,8 @@ export function StoryEditor({ initial }: { initial: Story }) {
     const [flashed, setFlashed] = useState<string | null>(null);
     const [previewOpen, setPreviewOpen] = useState(false);
     const [coverOpen, setCoverOpen] = useState(false);
+    /** Just made from a Character card: the one-time notice shows until dismissed or the page is left. */
+    const [fromCard, setFromCard] = useState(() => searchParams.get(FROM_CARD_PARAM) !== null);
     const flashTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
     const tabList = useRef<HTMLDivElement>(null);
     const header = useRef<HTMLDivElement>(null);
@@ -112,6 +115,14 @@ export function StoryEditor({ initial }: { initial: Story }) {
     const storyId = initial.id;
 
     useEffect(() => () => clearTimeout(flashTimer.current), []);
+
+    // One time: the flag leaves the URL at once, so a reload or Back doesn't show the notice again.
+    useEffect(() => {
+        const url = new URL(window.location.href);
+        if (!url.searchParams.has(FROM_CARD_PARAM)) return;
+        url.searchParams.delete(FROM_CARD_PARAM);
+        window.history.replaceState(null, '', url);
+    }, []);
 
     // The tab bar scrolls sideways on a phone: keep the selected tab in sight, e.g. after a jump.
     useEffect(() => {
@@ -363,6 +374,23 @@ export function StoryEditor({ initial }: { initial: Story }) {
                     commit={(run, onError) => commit(run, applyWhole, onError)}
                     onClose={() => setCoverOpen(false)}
                 />
+            )}
+            {fromCard && (
+                <section className={`${styles.card} ${styles.cardNotice}`} aria-label="Made from a Character card">
+                    <p>Made from a Character card. Fill in what&apos;s marked, or ask the Story assistant to tidy it.</p>
+                    <div className={styles.cardNoticeActions}>
+                        <button
+                            type="button"
+                            className="button button-small"
+                            onClick={() => assistant.openSheet(tidyMessage(story.characters[0]?.name || 'the Character'))}
+                        >
+                            Tidy with the Story assistant
+                        </button>
+                        <button type="button" className="button button-quiet button-small" onClick={() => setFromCard(false)}>
+                            Dismiss
+                        </button>
+                    </div>
+                </section>
             )}
             <StatusBox playable={story.playable} missing={story.missing} onGo={goTo} />
 
