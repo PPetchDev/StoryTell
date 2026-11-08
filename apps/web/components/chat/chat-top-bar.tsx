@@ -88,6 +88,74 @@ function RenameForm({ title, onSave }: { title: string; onSave(title: string): v
     );
 }
 
+/** The API's cap on an Author's note (.scratch/authors-note/spec.md): about 250 tokens. */
+export const AUTHORS_NOTE_MAX = 1_000;
+
+/** The menu row's quiet line: the note's first line (the row cuts it to fit), or how to start one. */
+function noteSummary(note: string): string {
+    const first = note.trim().split('\n')[0]?.trim() ?? '';
+    return first === '' ? 'None: steer this Chat in your own words' : first;
+}
+
+/**
+ * The Author's note in place of the menu's rows, like Rename (.scratch/authors-note/spec.md):
+ * the user's own direction for this Chat. The box stops at the API's cap, so a longer paste
+ * is cut there and Save never sends more than it accepts.
+ */
+function AuthorsNoteForm({
+    note,
+    onSave,
+    onCancel,
+}: {
+    note: string;
+    onSave(text: string): void;
+    onCancel(): void;
+}) {
+    const [value, setValue] = useState(note);
+    const save = (event: FormEvent) => {
+        event.preventDefault();
+        onSave(value);
+    };
+    return (
+        <form className={styles.rename} onSubmit={save}>
+            <h2 className={styles.renameTitle}>Author&apos;s note</h2>
+            <p className={styles.noteHint}>
+                Your direction for this Chat. The Narrator reads it every turn.
+            </p>
+            <textarea
+                className={`${styles.renameInput} ${styles.noteInput}`}
+                aria-label="Author's note"
+                aria-describedby="authors-note-count"
+                placeholder={'Keep it a slow burn.\nIt rains all day.'}
+                value={value}
+                autoFocus
+                rows={5}
+                maxLength={AUTHORS_NOTE_MAX}
+                onChange={(event) => setValue(event.target.value)}
+            />
+            <span id="authors-note-count" className={styles.noteCount}>
+                {value.length.toLocaleString('en-US')} / {AUTHORS_NOTE_MAX.toLocaleString('en-US')}
+            </span>
+            <button type="submit" className={`button ${styles.renameSave}`}>
+                Save
+            </button>
+            <div className={styles.noteActions}>
+                <button
+                    type="button"
+                    className="button button-quiet"
+                    disabled={note === ''}
+                    onClick={() => onSave('')}
+                >
+                    Clear
+                </button>
+                <button type="button" className="button button-quiet" onClick={onCancel}>
+                    Cancel
+                </button>
+            </div>
+        </form>
+    );
+}
+
 /** One row of the ⋯ menu: a bold label with a quiet line under it. */
 function MenuText({ label, sub }: { label: string; sub: string }) {
     return (
@@ -128,6 +196,8 @@ interface ChatTopBarProps {
     onSwapIdentity(personaId: number | null): void;
     onOpenMemory(): void;
     onRename(title: string): void;
+    /** Saves the Author's note; an empty text clears it. */
+    onSetAuthorsNote(text: string): void;
     onReset(): void;
 }
 
@@ -144,9 +214,10 @@ export function ChatTopBar({
     onSwapIdentity,
     onOpenMemory,
     onRename,
+    onSetAuthorsNote,
     onReset,
 }: ChatTopBarProps) {
-    const [menu, setMenu] = useState<'closed' | 'menu' | 'rename'>('closed');
+    const [menu, setMenu] = useState<'closed' | 'menu' | 'rename' | 'note'>('closed');
     const [confirming, setConfirming] = useState(false);
     const close = () => setMenu('closed');
     /** Closes the menu, then runs the choice, so a drawer or dialog it opens takes the focus. */
@@ -204,7 +275,10 @@ export function ChatTopBar({
             </header>
 
             {menu !== 'closed' && (
-                <Sheet label={menu === 'rename' ? 'Rename Chat' : 'Chat menu'} onClose={close}>
+                <Sheet
+                    label={menu === 'rename' ? 'Rename Chat' : menu === 'note' ? "Author's note" : 'Chat menu'}
+                    onClose={close}
+                >
                     {menu === 'rename' ? (
                         <RenameForm
                             title={chat.title}
@@ -212,6 +286,15 @@ export function ChatTopBar({
                                 close();
                                 onRename(title);
                             }}
+                        />
+                    ) : menu === 'note' ? (
+                        <AuthorsNoteForm
+                            note={chat.authorsNote}
+                            onSave={(text) => {
+                                close();
+                                onSetAuthorsNote(text);
+                            }}
+                            onCancel={close}
                         />
                     ) : (
                         <div className={styles.menu}>
@@ -267,6 +350,10 @@ export function ChatTopBar({
                                     />
                                 </MenuButton>
                             )}
+                            {/* The first of the new rows (.scratch/sillytavern-gaps/integration.md). */}
+                            <MenuButton onClick={() => setMenu('note')} disabled={busy}>
+                                <MenuText label="Author's note" sub={noteSummary(chat.authorsNote)} />
+                            </MenuButton>
                             <hr className={styles.rule} />
                             <MenuButton
                                 danger

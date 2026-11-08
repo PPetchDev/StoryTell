@@ -91,6 +91,8 @@ export interface Chat extends ChatSummary {
     drift: { lastModel: string; playModel: string } | null;
     /** The Chat menu's link back to where a Branch came from: null when never branched, or once that Chat is deleted. */
     branchedFrom: { chatId: number; title: string; messageId: number | null } | null;
+    /** The Author's note: the user's standing direction for this Chat; empty when there is none. */
+    authorsNote: string;
 }
 
 export interface RollbackCounts {
@@ -210,6 +212,9 @@ export const chatApi = {
     create: (storyId: number) => apiSend<Chat>('POST', `/stories/${storyId}/chats`),
     rename: (storyId: number, chatId: number, title: string) =>
         apiSend<Chat>('PATCH', `/stories/${storyId}/chats/${chatId}`, { title }),
+    /** Sets the Author's note, read from the next turn on; an empty text clears it. */
+    setAuthorsNote: (storyId: number, chatId: number, text: string) =>
+        apiSend<Chat>('PUT', `/stories/${storyId}/chats/${chatId}/authors-note`, { text }),
     remove: (storyId: number, chatId: number) => apiSend<void>('DELETE', `/stories/${storyId}/chats/${chatId}`),
     send: (storyId: number, chatId: number, text: string, stream?: TurnStream) =>
         turn<Chat>('POST', `/stories/${storyId}/chats/${chatId}/messages`, { text }, stream),

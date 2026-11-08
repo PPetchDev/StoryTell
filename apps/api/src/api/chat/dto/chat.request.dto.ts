@@ -36,6 +36,19 @@ export class ChooseReplyVersionRequestBodyDTO {
     version: number;
 }
 
+/** .scratch/authors-note/spec.md: about 250 tokens, so the note never crowds the story out of the prompt. */
+export const AUTHORS_NOTE_MAX = 1_000;
+
+export class SetAuthorsNoteRequestBodyDTO {
+    @ApiProperty({
+        maxLength: AUTHORS_NOTE_MAX,
+        description: "The Chat's Author's note: the user's standing direction, read on every turn. Trimmed; whitespace only clears it.",
+    })
+    @IsString()
+    @MaxLength(AUTHORS_NOTE_MAX)
+    text: string;
+}
+
 export class SwapIdentityRequestBodyDTO {
     @ApiProperty({
         type: Number,

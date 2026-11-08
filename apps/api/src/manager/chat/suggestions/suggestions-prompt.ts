@@ -1,8 +1,10 @@
 import { UnreadableSuggestionsError } from '../../../errors/chat.errors.js';
 import { PromptMessage } from '../../../service/model-gateway/model-gateway.js';
 import {
+    authorsNoteBlock,
     estimateTokens,
     exchangeLore,
+    joinBlocks,
     povAndTense,
     PromptHistoryMessage,
     PromptLayersInput,
@@ -53,12 +55,19 @@ Answer with only this JSON object and nothing else, one key per option:
 {"action":"...","speech":"...","move":"..."}`;
 }
 
-/** The turn's system layers and recent history, then the suggestions instruction. */
+/**
+ * The turn's system layers and recent history, then the closing message: the Lore the latest
+ * exchange brings up (spec: "Lore") and the Author's note, as the turn would send them, then the
+ * suggestions instruction (.scratch/sillytavern-gaps/integration.md). The history is kept to
+ * the budget left after the closing message, so the note's tokens are reserved there.
+ */
 export function buildSuggestionsPrompt(input: SuggestionsPromptInput): SuggestionsPrompt {
     const system = systemPrompt(input);
-    // The Lore the latest exchange brings up, as the turn would send it (spec: "Lore").
-    const lore = exchangeLore(input.lore, input.history, null);
-    const instruction = lore ? `${lore}\n\n${suggestionsInstruction(input)}` : suggestionsInstruction(input);
+    const instruction = joinBlocks([
+        exchangeLore(input.lore, input.history, null),
+        authorsNoteBlock(input.authorsNote, input.identity.name),
+        suggestionsInstruction(input),
+    ]);
     const kept = recentHistory(
         uncoveredHistory(input.history, input.storySoFar),
         TURN_PROMPT_TOKEN_BUDGET - estimateTokens(system.text) - estimateTokens(instruction),

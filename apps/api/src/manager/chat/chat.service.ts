@@ -96,6 +96,8 @@ export interface ChatDetail extends ChatSummary {
      * there (null once that Message is gone); null when never branched or that Chat is gone.
      */
     branchedFrom: { chatId: number; title: string; messageId: number | null } | null;
+    /** The Author's note (.scratch/authors-note/spec.md); empty when there is none. */
+    authorsNote: string;
 }
 
 /** What a Branch answers with: the new Chat, plus the User Message's text when it was branched from one. */
@@ -497,6 +499,18 @@ export class ChatManagerService {
     }
 
     /**
+     * .scratch/authors-note/spec.md: the user's standing direction for this Chat, trimmed, read
+     * from the next turn on; whitespace only clears it. Like swapping the worn identity it takes
+     * no turn lock and waits for no background call: a turn already being written finishes with
+     * the note it started with.
+     */
+    async setAuthorsNote(storyId: number, chatId: number, text: string): Promise<ChatDetail> {
+        const { chat } = await this.load(storyId, chatId);
+        await this.chatModel.setAuthorsNote(chat.id, text.trim());
+        return this.getChat(storyId, chatId);
+    }
+
+    /**
      * Spec: "Delete Chat". Its Messages and ledger records go with it; its Snapshots stay in
      * the Gallery, their Chat and Message links cleared by ON DELETE SET NULL.
      */
@@ -709,6 +723,7 @@ export class ChatManagerService {
             storySoFar: promptStorySoFar(chat),
             timeOfDay: chat.timeOfDay,
             lore: promptLore(story),
+            authorsNote: chat.authorsNote,
             history,
             userText,
             present: inLatestExchange(story, chat, userText),
@@ -793,7 +808,8 @@ export class ChatManagerService {
 
     /**
      * Layers 1–9 of a prompt as the Chat stands now: the worn identity, the current Scene,
-     * every Bond and Arc, and the Memory, read the way `writeTurn` reads them.
+     * every Bond and Arc, and the Memory, plus the Lore and the Author's note the closing
+     * message reads, all read the way `writeTurn` reads them.
      */
     private async promptLayersFor(story: StoryEntity, chat: ChatEntity): Promise<PromptLayersInput> {
         const scene = story.scenes.find((candidate) => candidate.id === chat.currentSceneId) ?? null;
@@ -807,6 +823,7 @@ export class ChatManagerService {
             storySoFar: promptStorySoFar(chat),
             timeOfDay: chat.timeOfDay,
             lore: promptLore(story),
+            authorsNote: chat.authorsNote,
             present: inLatestExchange(story, chat, null),
         };
     }
@@ -909,6 +926,7 @@ export class ChatManagerService {
                     ? { lastModel, playModel: settings.playModel }
                     : null,
             branchedFrom: source ? { chatId: source.id, title: source.title, messageId: chat.branchedFromMessageId } : null,
+            authorsNote: chat.authorsNote,
         };
     }
 

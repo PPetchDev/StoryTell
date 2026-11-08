@@ -140,6 +140,10 @@ export class ChatModelService {
         await this.chats.update({ id: chatId }, { personaId });
     }
 
+    async setAuthorsNote(chatId: number, authorsNote: string): Promise<void> {
+        await this.chats.update({ id: chatId }, { authorsNote });
+    }
+
     /**
      * Stores a Story so far covering the Messages through position `through`, and clears any
      * failure. The user's own text is also kept as the corrections every later rewrite gets.

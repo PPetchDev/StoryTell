@@ -213,6 +213,9 @@ export class ChatResponseBodyDTO extends ChatSummaryDTO implements Omit<ChatDeta
         description: 'The Chat menu line "Branched from <title>"; null when never branched, or once that Chat is deleted.',
     })
     branchedFrom: BranchedFromMessageDTO | null;
+
+    @ApiProperty({ description: "The Chat's Author's note, the user's standing direction; empty when there is none." })
+    authorsNote: string;
 }
 
 /** A Branch answers with the new Chat, plus the User Message's text when it was branched from one. */

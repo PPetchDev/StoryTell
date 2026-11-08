@@ -64,7 +64,7 @@ export class BranchModelService {
 }
 
 /**
- * The Chat row: its Story, Scene, Time of day and worn identity, and the Story so far only when
+ * The Chat row: its Story, Scene, Time of day, worn identity and Author's note, and the Story so far only when
  * it covers nothing past N (the same test a rewind from N + 1 uses), with the link back to the
  * source. The new Chat gets its own `created_at` and `last_played_at`, so it heads the Chat list.
  */
@@ -79,6 +79,8 @@ async function copyChat(manager: EntityManager, sourceChatId: number, through: n
         currentSceneId: source.currentSceneId,
         timeOfDay: source.timeOfDay,
         personaId: source.personaId,
+        // The user's own direction, not story state: copied as it stands now (.scratch/authors-note/spec.md).
+        authorsNote: source.authorsNote,
         ...(keepStorySoFar
             ? {
                   storySoFar: source.storySoFar,

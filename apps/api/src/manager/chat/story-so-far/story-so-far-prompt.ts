@@ -1,5 +1,6 @@
 import { PromptMessage } from '../../../service/model-gateway/model-gateway.js';
 import {
+    authorsNoteBlock,
     estimateTokens,
     PromptHistoryMessage,
     PromptLayersInput,
@@ -42,6 +43,8 @@ export function storySoFarCoverage(layers: PromptLayersInput, history: PromptHis
         NEXT_USER_MESSAGE_TOKENS +
         // The Lore block varies by turn; the most it can take is reserved.
         loreReserveTokens(layers.lore ?? []) +
+        // The Author's note, as the Chat holds it when the check runs.
+        estimateTokens(authorsNoteBlock(layers.authorsNote, layers.identity.name) ?? '') +
         estimateTokens(`${reminder}
 ${turnFinalInstruction(layers.identity.name)}`);
     const room = budget - fixed;

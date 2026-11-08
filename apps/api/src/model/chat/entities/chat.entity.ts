@@ -120,6 +120,14 @@ export class ChatEntity {
     @JoinColumn({ name: 'branched_from_message_id' })
     branchedFromMessage: Relation<MessageEntity> | null;
 
+    /**
+     * The Author's note (.scratch/authors-note/spec.md): the user's standing direction for this
+     * Chat, trimmed; empty means none. Chat state outside the ledger, like the worn identity: an
+     * edit or Regenerate never touches it, Reset keeps it, a Branch copies it.
+     */
+    @Column({ name: 'authors_note', type: 'text', default: '' })
+    authorsNote: string;
+
     // Loaded only through ChatModelService.findWithMessages(); never auto-loaded.
     @OneToMany('MessageEntity', 'chat')
     messages: Relation<MessageEntity[]>;

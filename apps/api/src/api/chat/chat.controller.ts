@@ -8,6 +8,7 @@ import {
     EditMessageRequestBodyDTO,
     RenameChatRequestBodyDTO,
     SendMessageRequestBodyDTO,
+    SetAuthorsNoteRequestBodyDTO,
     SwapIdentityRequestBodyDTO,
 } from './dto/chat.request.dto.js';
 import {
@@ -73,6 +74,17 @@ export class ChatApiController {
         @Body() body: SwapIdentityRequestBodyDTO,
     ): Promise<ChatResponseBodyDTO> {
         return this.chatManager.swapIdentity(storyId, chatId, body.personaId);
+    }
+
+    /** Sets the Author's note, read from the next turn on; whitespace only clears it. Never rolled back. */
+    @Put(':chatId/authors-note')
+    @ApiOkResponse({ type: ChatResponseBodyDTO })
+    setAuthorsNote(
+        @Id('storyId') storyId: number,
+        @Id('chatId') chatId: number,
+        @Body() body: SetAuthorsNoteRequestBodyDTO,
+    ): Promise<ChatResponseBodyDTO> {
+        return this.chatManager.setAuthorsNote(storyId, chatId, body.text);
     }
 
     @Delete(':chatId')

@@ -1,6 +1,6 @@
 # 02 — Suggested replies follow the Author's note
 
-**Status:** ready-for-agent
+**Status:** done
 
 Part of: [Spec: Author's note](../spec.md)
 
@@ -8,6 +8,6 @@ Part of: [Spec: Author's note](../spec.md)
 
 **Blocked by:** [01 — Write an Author's note from the Chat menu, and every turn follows it](01-authors-note-in-turns-and-the-chat-menu.md).
 
-- [ ] API test (fake gateway): Suggested replies on a Chat with a note carry the block after the Lore and before their instruction; without a note they carry none and equal today's prompt.
-- [ ] Pure prompt test: where the budget is tight, a long note trims one more old Message from the Suggested replies history.
-- [ ] The whole API suite stays green.
+- [x] API test (fake gateway): Suggested replies on a Chat with a note carry the block after the Lore and before their instruction; without a note they carry none and equal today's prompt.
+- [x] Pure prompt test: where the budget is tight, a long note trims one more old Message from the Suggested replies history.
+- [x] The whole API suite stays green.

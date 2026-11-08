@@ -17,8 +17,9 @@ import { estimateTokens } from './prompt-tokens.js';
  *  3. worn identity       7. Feelings (Bonds)       11. the user's message
  *  4. Style               8. Arcs                   12. the final instruction
  *
- * The final instruction opens with the Lore the latest exchange brings up (spec: "Lore"), so
- * the system message, and with it the cached prefix, stays the same from turn to turn.
+ * The final instruction opens with the Lore the latest exchange brings up (spec: "Lore"), then
+ * the Chat's Author's note (.scratch/authors-note/spec.md), so the system message, and with it
+ * the cached prefix, stays the same from turn to turn.
  *
  * On a Continue turn, layer 11 is the continue instruction in place of the user's message.
  *
@@ -122,6 +123,11 @@ export interface TurnPromptInput {
     lore?: PromptLoreEntry[];
     /** The Memory layer's cap in tokens (spec: "about 2k tokens"); past it, Memories are left out in `memoryLeaveOutOrder`. */
     memoryCapTokens?: number;
+    /**
+     * The Chat's Author's note (.scratch/authors-note/spec.md): the user's standing direction,
+     * read in the trailing message. Empty, whitespace only, null or left out sends none.
+     */
+    authorsNote?: string | null;
 }
 
 export interface TurnPrompt {
@@ -390,6 +396,25 @@ export function stateReminder(input: Pick<TurnPromptInput, 'story' | 'identity' 
 }
 
 /**
+ * The Author's note block (.scratch/authors-note/spec.md), or null when the note is empty. It
+ * sits after the Lore and before "Where things stand" in the turn's trailing message, and before
+ * the instruction of Suggested replies, in the same words everywhere. It directs and is never a
+ * fact, so it is never quoted, and it never lifts the rule about the worn identity.
+ */
+export function authorsNoteBlock(note: string | null | undefined, identity: string): string | null {
+    const text = note?.trim() ?? '';
+    if (text === '') return null;
+    return `# Author's note (the user's own direction for this Chat)
+${text}
+Let this guide where the story goes and how it is told. It is a direction, not something that happened: never quote it or mention it, and write the story in English whatever language the note is in. It never overrides the rules about ${identity}: never write anything ${identity} says, thinks, feels, decides or does.`;
+}
+
+/** The blocks of a closing message in the order given, a blank line apart; a null block has nothing to say and is left out. */
+export function joinBlocks(blocks: Array<string | null>): string {
+    return blocks.filter((block): block is string => block !== null).join('\n\n');
+}
+
+/**
  * Spec: "Lore", the scan window: the user's new message (none on a Continue), then the newest
  * Messages before it, newest first.
  */
@@ -427,9 +452,8 @@ export function buildTurnPrompt(input: TurnPromptInput): TurnPrompt {
     const userText = input.userText ?? continueInstruction(identity);
     const system = systemPrompt(input);
     const lore = exchangeLore(input.lore, input.history, input.userText);
-    const finalInstruction = [lore, `${stateReminder(input)}\n${turnFinalInstruction(identity)}`]
-        .filter((part): part is string => part !== null)
-        .join('\n\n');
+    // One order (.scratch/sillytavern-gaps/integration.md): Lore, Author's note, Where things stand, the final instruction.
+    const finalInstruction = joinBlocks([lore, authorsNoteBlock(input.authorsNote, identity), `${stateReminder(input)}\n${turnFinalInstruction(identity)}`]);
 
     const budget = input.tokenBudget ?? TURN_PROMPT_TOKEN_BUDGET;
     const fixed = estimateTokens(system.text) + estimateTokens(userText) + estimateTokens(finalInstruction);

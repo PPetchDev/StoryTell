@@ -169,3 +169,34 @@
     width: 100%;
     min-height: 2.75rem;
 }
+
+/* --- Author's note: the Rename form's look, with a box, a count and Clear and Cancel --- */
+.noteHint {
+    margin: -0.25rem 0 0;
+    font-size: 0.875rem;
+    color: var(--muted);
+}
+
+.noteInput {
+    resize: vertical;
+    min-height: 7rem;
+    line-height: 1.4;
+}
+
+.noteCount {
+    justify-self: end;
+    margin-top: -0.5rem;
+    font-size: 0.8125rem;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.noteActions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+}
+
+.noteActions > button {
+    min-height: 2.75rem;
+}

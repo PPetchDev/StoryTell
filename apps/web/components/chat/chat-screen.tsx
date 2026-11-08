@@ -350,6 +350,9 @@ export function ChatScreen({ initial, cast, portraits, scenes }: ChatScreenProps
                 onRename={(title) =>
                     void runWrite(() => chatApi.rename(chat.storyId, chat.id, title))
                 }
+                onSetAuthorsNote={(text) =>
+                    void runWrite(() => chatApi.setAuthorsNote(chat.storyId, chat.id, text))
+                }
                 onReset={() => void runWrite(async () => refreshMemory(await chatApi.reset(chat.storyId, chat.id)))}
             />
             {!stripHidden && (
