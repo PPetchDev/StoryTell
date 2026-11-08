@@ -4,7 +4,8 @@ import { useSyncExternalStore } from 'react';
  * Which folding cards the user has folded on this device (a per-device preference, like the
  * List / Graph switch). Everything starts unfolded, so only folded keys are kept, together
  * under one key as a list. Keys name what is folded: `storySoFar`, `character:<id>`,
- * `bonds:<characterId>`, `scene:<id>`, `lore:<id>`, `feelings:<characterId>`.
+ * `bonds:<characterId>`, `scene:<id>`, `lore:<id>`, `feelings:<characterId>`, and in the Gallery
+ * `galleryStory:<storyId>` and `galleryChat:<storyId>:<chatId or "deleted">`.
  */
 const STORAGE_KEY = 'storytell.folded';
 

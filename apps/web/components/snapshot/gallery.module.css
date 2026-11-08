@@ -1,18 +1,54 @@
-/* The Gallery: a Chat filter and a grid of whole Snapshots (spec: story 13). */
-.filter {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-    margin-bottom: 1rem;
+/* The Gallery: Snapshots grouped by Story, then by Chat, each a folding section over a grid of whole images (spec: story 13). */
+.groups {
+    display: grid;
+    gap: 1.25rem;
 }
 
-.filter select {
-    font: inherit;
-    background: var(--bg);
-    color: var(--text);
+.story {
+    display: grid;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem 1rem;
     border: 1px solid var(--line);
-    border-radius: 0.5rem;
-    padding: 0.375rem 0.5rem;
+    border-radius: 0.875rem;
+    background: var(--surface);
+}
+
+.story > h2 {
+    font-size: 1.125rem;
+}
+
+/* The Story's Cover, drawn as on Home's cards: the same 3:4 frame, rounded. */
+.cover {
+    flex: none;
+    width: 4.5rem;
+    aspect-ratio: 3 / 4;
+    border-radius: 0.6rem;
+}
+
+.storyText {
+    min-width: 0;
+    display: grid;
+    gap: 0.15rem;
+}
+
+.storyBody {
+    display: grid;
+    gap: 1rem;
+}
+
+.chat {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.groupTitle {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.count {
+    flex: none;
+    font-weight: 400;
 }
 
 .grid {
@@ -22,6 +58,10 @@
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
     gap: 0.75rem;
+}
+
+.grid[hidden] {
+    display: none;
 }
 
 .grid li {
@@ -52,4 +92,15 @@
 
 .earlier {
     color: var(--warning);
+}
+
+/* Wider screens show more pictures per row. */
+@media (min-width: 1024px) {
+    .grid {
+        grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+    }
+
+    .cover {
+        width: 6rem;
+    }
 }

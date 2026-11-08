@@ -29,6 +29,17 @@ const LINKS = [
         icon: icon(<path d="M4 5c3-1.5 5.5-1.5 8 0v14c-2.5-1.5-5-1.5-8 0zM12 5c2.5-1.5 5-1.5 8 0v14c-3-1.5-5.5-1.5-8 0z" />),
     },
     {
+        href: '/gallery',
+        label: 'Gallery',
+        icon: icon(
+            <>
+                <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+                <circle cx="9" cy="10" r="1.6" />
+                <path d="M4 17.5l5-4.5 3.5 3 3-2.5 4.5 4" />
+            </>,
+        ),
+    },
+    {
         href: '/personas',
         label: 'Personas',
         icon: icon(
@@ -57,13 +68,17 @@ const LINKS = [
  */
 const CHAT_SCREEN = /^\/stories\/[^/]+\/chats\/[^/]+\/?$/;
 
+/** A Story's own Gallery counts as the Gallery in the menu, not as Stories. */
+const STORY_GALLERY = /^\/stories\/[^/]+\/gallery\/?$/;
+
 function isCurrent(href: string, pathname: string): boolean {
-    if (href === '/') return pathname === '/' || pathname.startsWith('/stories');
+    if (href === '/gallery') return pathname === '/gallery' || STORY_GALLERY.test(pathname);
+    if (href === '/') return pathname === '/' || (pathname.startsWith('/stories') && !STORY_GALLERY.test(pathname));
     return pathname === href || pathname.startsWith(`${href}/`);
 }
 
 /**
- * The main nav (spec story 46): Stories, Personas, Usage and Settings, each an icon and a
+ * The main nav (spec story 46): Stories, Gallery, Personas, Usage and Settings, each an icon and a
  * label. On a phone it is a fixed bottom bar, left off the Chat screen, and a spacer of its
  * height ends the page so nothing scrolls out of reach behind it. From 1024px wide it is a side
  * rail on the left of every page, the Chat included (spec: "Desktop layout").

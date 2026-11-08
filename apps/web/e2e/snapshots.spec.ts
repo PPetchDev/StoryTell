@@ -80,10 +80,11 @@ test('takes a Snapshot from the action row with a hint, sees the placeholder and
         await page.getByRole('button', { name: 'Chat menu' }).click();
         await page.getByRole('dialog', { name: 'Chat menu' }).getByRole('link', { name: /^Gallery/ }).click();
         await expect(page.getByRole('heading', { name: /Gallery/ })).toBeVisible();
-        const gallery = page.getByRole('list', { name: 'Gallery' });
+        // Grouped by Chat: the list is named for its Chat.
+        const gallery = page.getByRole('list', { name: 'Snapshots of Chat 1' });
         await expect(gallery.getByRole('listitem')).toHaveCount(1);
         await expect(gallery).toContainText('From an earlier version of this Chat');
-        await expect(gallery).toContainText('Chat 1');
+        await expect(page.getByRole('heading', { name: /^Chat 1/ })).toBeVisible();
         await gallery.getByRole('img', { name: 'Snapshot with Mira' }).click();
         await expect(page.getByRole('dialog', { name: 'Snapshot' })).toContainText('From an earlier version of this Chat.');
     } finally {

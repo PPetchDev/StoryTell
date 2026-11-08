@@ -6,28 +6,24 @@ import { Suspense, use } from 'react';
 
 import { useApiQuery } from '@/components/connection';
 import { Gallery } from '@/components/snapshot/gallery';
-import { ApiError } from '@/lib/api';
-import { ChatSummary } from '@/lib/chat';
 import { Story, storyTitle } from '@/lib/story';
 
-/** A Story's Gallery (spec: stories 119–123). `?chat=` opens it filtered to one Chat. */
+/** A Story's Gallery (spec: stories 119–123), grouped by Chat. `?chat=` opens it on that Chat. */
 function GalleryPage({ storyId }: { storyId: number }) {
     const chatParam = useSearchParams().get('chat');
     const story = useApiQuery<Story>(`/stories/${storyId}`);
-    const chats = useApiQuery<{ chats: ChatSummary[] }>(`/stories/${storyId}/chats`);
 
-    if (story.status === 'loading' || chats.status === 'loading') {
+    if (story.status === 'loading') {
         return (
             <main>
                 <p className="muted">Loading…</p>
             </main>
         );
     }
-    if (story.status === 'error' || chats.status === 'error') {
-        const failed = story.status === 'error' ? story.error : (chats as { error: ApiError }).error;
+    if (story.status === 'error') {
         return (
             <main>
-                <p role="alert">{failed.message}</p>
+                <p role="alert">{story.error.message}</p>
                 <Link href="/">Back to Stories</Link>
             </main>
         );
@@ -38,7 +34,10 @@ function GalleryPage({ storyId }: { storyId: number }) {
                 <Link href={`/stories/${storyId}/chats`}>← Chats</Link>
             </nav>
             <h1>Gallery · {storyTitle(story.data)}</h1>
-            <Gallery storyId={storyId} chats={chats.data.chats} initialChatId={chatParam ? Number(chatParam) : null} />
+            <Gallery
+                stories={[{ id: storyId, title: story.data.title }]}
+                initialChatId={chatParam ? Number(chatParam) : null}
+            />
         </main>
     );
 }

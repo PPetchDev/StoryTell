@@ -98,7 +98,7 @@ test('in the Gallery, the same viewer swipes through the filter, steps with the 
     const { storyId } = await createChatWithTwoSnapshots(request);
     try {
         await page.goto(`/stories/${storyId}/gallery`);
-        const thumbs = page.getByRole('list', { name: 'Gallery' }).getByRole('img', { name: 'Snapshot with Mira' });
+        const thumbs = page.getByRole('list', { name: /^Snapshots of / }).getByRole('img', { name: 'Snapshot with Mira' });
         await expect(thumbs).toHaveCount(2);
         // Thumbnails show the whole image.
         await expect(thumbs.first()).toHaveCSS('object-fit', 'contain');

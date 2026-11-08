@@ -140,10 +140,11 @@ test("a Story's Chat list shows each Chat's latest line and Scene", async ({ pag
     }
 });
 
-test('the bottom nav reaches Stories, Personas, Usage and Settings, and marks where you are', async ({ page }) => {
+test('the bottom nav reaches Stories, Gallery, Personas, Usage and Settings, and marks where you are', async ({ page }) => {
     await page.goto('/');
 
     for (const [label, path, heading] of [
+        ['Gallery', '/gallery', 'Gallery'],
         ['Personas', '/personas', 'Personas'],
         ['Usage', '/usage', 'Usage'],
         ['Settings', '/settings', 'Settings'],

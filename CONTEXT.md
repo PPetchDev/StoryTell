@@ -115,7 +115,7 @@ How large Snapshots are drawn, 1K or 2K, chosen in Settings next to the Snapshot
 _Avoid_: Resolution, quality
 
 **Gallery**:
-The collection of every Snapshot taken in any of a Story's Chats.
+The collection of every Snapshot taken in any of a Story's Chats, grouped by Chat. The main menu's Gallery shows every Story's, grouped by Story and then by Chat.
 _Avoid_: Album, library
 
 **Reference image**:
