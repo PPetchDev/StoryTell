@@ -18,7 +18,7 @@ import {
 } from '../../errors/chat.errors.js';
 import { OutOfCreditError } from '../../errors/model-gateway.errors.js';
 import { PersonaNotFoundError } from '../../errors/persona.errors.js';
-import { StoryNotFoundError } from '../../errors/story.errors.js';
+import { CharacterNotFoundError, StoryNotFoundError } from '../../errors/story.errors.js';
 import { BranchModelService } from '../../model/branch/branch.service.js';
 import { ChatModelService } from '../../model/chat/chat.service.js';
 import { ChatEntity, ChatSummary, TimeOfDay } from '../../model/chat/entities/chat.entity.js';
@@ -54,7 +54,7 @@ import { SuggestedRepliesManagerService } from './suggestions/suggested-replies.
 import { SuggestedReply } from './suggestions/suggestions-prompt.js';
 import { buildTurnPrompt, loreScan, PromptArc, PromptBond, PromptHistoryMessage, PromptLayersInput, PromptMemory } from './turn/prompt.js';
 import { promptLore, selectLore } from './lore/lore-select.js';
-import { CastName, parseReply, partsToText, releasedText, ReplyPart } from './turn/reply-parser.js';
+import { CastName, ParseOptions, parseReply, partsToText, releasedText, ReplyPart } from './turn/reply-parser.js';
 import { TurnStoppedError, TurnStream } from './turn/turn-stream.js';
 
 /** A Chat as a Story's Chat list shows it (spec: "Lists and Home"). */
@@ -98,6 +98,8 @@ export interface ChatDetail extends ChatSummary {
     branchedFrom: { chatId: number; title: string; messageId: number | null } | null;
     /** The Author's note (.scratch/authors-note/spec.md); empty when there is none. */
     authorsNote: string;
+    /** The ids of the Characters sitting out (.scratch/speaker-controls/spec.md), in cast order. */
+    sittingOut: number[];
 }
 
 /** What a Branch answers with: the new Chat, plus the User Message's text when it was branched from one. */
@@ -511,6 +513,20 @@ export class ChatManagerService {
     }
 
     /**
+     * .scratch/speaker-controls/spec.md, "Sitting out": replaces the whole set of Characters kept
+     * out of this Chat's turns. An id outside the Story's cast is refused. Like the Author's note
+     * it takes no turn lock and waits for no background call: a turn already being written
+     * finishes with the set it started with.
+     */
+    async setSittingOut(storyId: number, chatId: number, characterIds: number[]): Promise<ChatDetail> {
+        const { story, chat } = await this.load(storyId, chatId);
+        const cast = new Set(story.characters.map((character) => character.id));
+        if (characterIds.some((id) => !cast.has(id))) throw new CharacterNotFoundError();
+        await this.chatModel.setSittingOut(chat.id, characterIds);
+        return this.getChat(storyId, chatId);
+    }
+
+    /**
      * Spec: "Delete Chat". Its Messages and ledger records go with it; its Snapshots stay in
      * the Gallery, their Chat and Message links cleared by ON DELETE SET NULL.
      */
@@ -713,6 +729,7 @@ export class ChatManagerService {
             }));
         const scene = story.scenes.find((candidate) => candidate.id === chat.currentSceneId) ?? null;
         const identity: WornIdentity = wornIdentity(story, chat);
+        const sittingOut = sittingOutOf(story, chat);
         const [state, memories] = await Promise.all([this.ledger.state(chat.id), this.memoryModel.findByChat(chat.id)]);
         const prompt = buildTurnPrompt({
             story,
@@ -727,6 +744,7 @@ export class ChatManagerService {
             history,
             userText,
             present: inLatestExchange(story, chat, userText),
+            sittingOut: sittingOut.map((character) => character.name),
         });
         if (prompt.trimmed > 0) {
             this.logger.log(`Chat ${chat.id}: left out the ${prompt.trimmed} oldest Messages to fit the prompt budget`);
@@ -742,13 +760,17 @@ export class ChatManagerService {
             stop: prompt.stop,
             servedFor: { storyId: story.id, chatId: chat.id },
         };
+        const options = { sittingOut: sittingOut.map((character) => character.id) };
         const result = stream
-            ? await this.streamReply(request, story.characters, identity.name, stream)
+            ? await this.streamReply(request, story.characters, identity.name, options, stream)
             : await this.gateway.completeText(request);
 
-        const reply = parseReply(result.text, story.characters, identity.name);
+        const reply = parseReply(result.text, story.characters, identity.name, options);
         for (const name of reply.unknownSpeakers) {
             this.logger.warn(`Chat ${chat.id}: unknown speaker "${name}" in the reply; kept by name with no Character link`);
+        }
+        for (const name of reply.droppedSpeakers) {
+            this.logger.warn(`Chat ${chat.id}: the reply wrote lines for ${name}, who is sitting out; dropped`);
         }
         if (reply.cutAtUserLine) {
             this.logger.warn(`Chat ${chat.id}: the reply wrote a line as ${identity.name}; cut off there`);
@@ -777,12 +799,14 @@ export class ChatManagerService {
      * The turn's call as a stream (spec: "The guard while streaming"). Each piece re-parses
      * the released reply for `onParts`; text that could still become a line written as the
      * worn identity is held back, and once such a line begins the call is aborted, leaving
-     * the text before it for the usual parse and cut. The user's Stop throws.
+     * the text before it for the usual parse and cut. The user's Stop throws. Each re-parse
+     * drops the lines of Characters sitting out, as the final parse does, so none ever shows.
      */
     private async streamReply(
         request: TextCompletionRequest,
         cast: CastName[],
         identityName: string,
+        options: ParseOptions,
         stream: TurnStream,
     ): Promise<TextCompletionResult> {
         if (stream.signal.aborted) throw new TurnStoppedError();
@@ -798,7 +822,7 @@ export class ChatManagerService {
                 if (release.userLine) guard.abort();
                 if (release.text !== released) {
                     released = release.text;
-                    stream.onParts(parseReply(released, cast, identityName).parts);
+                    stream.onParts(parseReply(released, cast, identityName, options).parts);
                 }
             },
         });
@@ -825,6 +849,7 @@ export class ChatManagerService {
             lore: promptLore(story),
             authorsNote: chat.authorsNote,
             present: inLatestExchange(story, chat, null),
+            sittingOut: sittingOutOf(story, chat).map((character) => character.name),
         };
     }
 
@@ -927,6 +952,7 @@ export class ChatManagerService {
                     : null,
             branchedFrom: source ? { chatId: source.id, title: source.title, messageId: chat.branchedFromMessageId } : null,
             authorsNote: chat.authorsNote,
+            sittingOut: sittingOutOf(story, chat).map((character) => character.id),
         };
     }
 
@@ -981,6 +1007,15 @@ function promptMemories(story: StoryEntity, memories: MemoryEntity[]): PromptMem
     return memories
         .filter((memory) => !memory.archived)
         .map((memory) => ({ text: memory.text, knownBy: memory.knownByIds(order).flatMap(nameOf), locked: memory.locked }));
+}
+
+/**
+ * The Characters sitting out of the Chat (.scratch/speaker-controls/spec.md), in cast order. A
+ * Chat loaded without its set (only `findWithMessages` reads it) has nobody sitting out.
+ */
+function sittingOutOf(story: StoryEntity, chat: ChatEntity): CastName[] {
+    const ids = new Set(chat.sittingOutIds());
+    return story.characters.filter((character) => ids.has(character.id)).map((character) => ({ id: character.id, name: character.name }));
 }
 
 /**

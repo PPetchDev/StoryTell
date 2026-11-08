@@ -224,8 +224,20 @@ const copyLedger: CopyStep = async ({ manager, sourceChatId, chatId, messageIds 
     );
 };
 
+/**
+ * Who is sitting out (.scratch/speaker-controls/spec.md): the user's choice, not story state, so
+ * the Branch starts with the same people in play, as the source has them now.
+ */
+const copySittingOut: CopyStep = async ({ manager, sourceChatId, chatId }) => {
+    await manager.query(
+        `INSERT INTO "chat_sitting_out" ("chat_id", "character_id")
+         SELECT $1, s."character_id" FROM "chat_sitting_out" s WHERE s."chat_id" = $2`,
+        [chatId, sourceChatId],
+    );
+};
+
 /** In order: Messages before anything that points at them, Memories before their changes. */
-const COPY_STEPS: CopyStep[] = [copyMessages, copyMessageParts, copyMemories, copyLedger];
+const COPY_STEPS: CopyStep[] = [copyMessages, copyMessageParts, copyMemories, copyLedger, copySittingOut];
 
 /** `count` fresh ids from `table`'s id sequence, ascending. */
 async function reserveIds(manager: EntityManager, table: string, count: number): Promise<number[]> {

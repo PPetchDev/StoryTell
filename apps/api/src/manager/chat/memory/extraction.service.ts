@@ -95,6 +95,9 @@ export class MemoryExtractionManagerService {
             const userText = exchangeUserText(chat.messages, index);
             const identityName = exchangeIdentityName(story, chat, index);
             const cast = story.characters.map((character) => ({ id: character.id, name: character.name }));
+            // Who sits out when the extraction runs (.scratch/speaker-controls/spec.md): never present, never told.
+            const sittingOut = chat.sittingOutIds();
+            const inStory = cast.filter((member) => !sittingOut.includes(member.id));
             const nameOf = (characterId: number): string | null => cast.find((member) => member.id === characterId)?.name ?? null;
             const parts = message.parts.map((part) => part.toResponse());
 
@@ -111,7 +114,7 @@ export class MemoryExtractionManagerService {
             const prompt = buildExtractionPrompt({
                 cast: cast.map((member) => member.name),
                 identityName,
-                present: presentCharacters(cast, userText ?? '', parts).map((member) => member.name),
+                present: presentCharacters(inStory, userText ?? '', parts).map((member) => member.name),
                 memories: lines,
                 userText,
                 aiText: partsToText(parts),
@@ -137,6 +140,7 @@ export class MemoryExtractionManagerService {
                         locked: memory.locked,
                         archived: memory.archived,
                     })),
+                    sittingOut,
                 },
                 extraction,
             );

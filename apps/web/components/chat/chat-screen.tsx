@@ -51,11 +51,13 @@ interface ChatScreenProps {
     cast: Cast;
     /** The cast's Reference images, beside their lines. */
     portraits: Portraits;
+    /** The Story's Characters in cast order, for "Who's in this Chat"; empty if the Story can't be read. */
+    characters: readonly { id: number; name: string }[];
     /** The Story's Scenes, for the goals in the Scene strip; empty if the Story can't be read. */
     scenes: Scene[];
 }
 
-export function ChatScreen({ initial, cast, portraits, scenes }: ChatScreenProps) {
+export function ChatScreen({ initial, cast, characters, portraits, scenes }: ChatScreenProps) {
     const { reportUnreachable } = useConnection();
     const router = useRouter();
     const [chat, setChat] = useState(initial);
@@ -342,6 +344,10 @@ export function ChatScreen({ initial, cast, portraits, scenes }: ChatScreenProps
         <main className={`chat ${styles.screen}`}>
             <ChatTopBar
                 chat={chat}
+                cast={cast}
+                characters={characters}
+                portraits={portraits}
+                error={error}
                 busy={writing || busy || editing !== null}
                 stripHidden={stripHidden}
                 onShowStrip={() => setSceneStripHidden(false)}
@@ -352,6 +358,9 @@ export function ChatScreen({ initial, cast, portraits, scenes }: ChatScreenProps
                 }
                 onSetAuthorsNote={(text) =>
                     void runWrite(() => chatApi.setAuthorsNote(chat.storyId, chat.id, text))
+                }
+                onSetSittingOut={(characterIds) =>
+                    void runWrite(() => chatApi.setSittingOut(chat.storyId, chat.id, characterIds))
                 }
                 onReset={() => void runWrite(async () => refreshMemory(await chatApi.reset(chat.storyId, chat.id)))}
             />

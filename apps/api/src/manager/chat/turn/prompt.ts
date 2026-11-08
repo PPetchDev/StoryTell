@@ -19,7 +19,8 @@ import { estimateTokens } from './prompt-tokens.js';
  *
  * The final instruction opens with the Lore the latest exchange brings up (spec: "Lore"), then
  * the Chat's Author's note (.scratch/authors-note/spec.md), so the system message, and with it
- * the cached prefix, stays the same from turn to turn.
+ * the cached prefix, stays the same from turn to turn. "Where things stand" names the Characters
+ * sitting out (.scratch/speaker-controls/spec.md) for the same reason.
  *
  * On a Continue turn, layer 11 is the continue instruction in place of the user's message.
  *
@@ -115,6 +116,8 @@ export interface TurnPromptInput {
     /**
      * The Characters in the latest exchange, named in the reminder near the end; left out, the
      * reminder names none. Past the Memory cap, Memories about them are kept before others.
+     * Everyone in the exchange, those sitting out included: the reminder leaves them out itself,
+     * while the Memory layer's leave-out order must not change when someone sits out.
      */
     present?: string[];
     /** The Chat's Time of day, stated in the reminder near the end; null or left out while there is none. */
@@ -128,6 +131,12 @@ export interface TurnPromptInput {
      * read in the trailing message. Empty, whitespace only, null or left out sends none.
      */
     authorsNote?: string | null;
+    /**
+     * The Characters sitting out of this Chat by name, in cast order (.scratch/speaker-controls/spec.md).
+     * Only the reminder near the end reads them: the cast cards, the name list and the Memory layer
+     * stay as they are, so the system message, and with it the cached prefix, never changes.
+     */
+    sittingOut?: string[];
 }
 
 export interface TurnPrompt {
@@ -386,13 +395,27 @@ export function turnFinalInstruction(identity: string): string {
  * far up a long prompt fade (docs/research/keeping-characters-in-character.md); this keeps the
  * essentials close.
  */
-export function stateReminder(input: Pick<TurnPromptInput, 'story' | 'identity' | 'scene' | 'present' | 'timeOfDay'>): string {
+export function stateReminder(
+    input: Pick<TurnPromptInput, 'story' | 'identity' | 'scene' | 'present' | 'timeOfDay' | 'sittingOut'>,
+): string {
+    const sittingOut = input.sittingOut ?? [];
+    // Someone sitting out is never "in the latest exchange", so the two hints never disagree.
+    const present = (input.present ?? []).filter((name) => !sittingOut.includes(name));
     const lines = [input.scene ? `Scene: ${input.scene.name}.` : 'No Scene: the story unfolds freely.'];
     if (input.timeOfDay) lines.push(`Time: ${input.timeOfDay}.`);
-    if (input.present && input.present.length > 0) lines.push(`In the latest exchange: ${input.present.join(', ')}.`);
+    if (present.length > 0) lines.push(`In the latest exchange: ${present.join(', ')}.`);
+    if (sittingOut.length > 0) lines.push(sittingOutSentence(sittingOut));
     lines.push(`Narrate in ${povAndTense(input.story, input.identity.name)}, and keep each Character as their card describes.`);
     lines.push(`Gender ${input.identity.name} only as their description or the user's own messages do, whatever earlier turns said.`);
     return `Where things stand: ${lines.join(' ')}`;
+}
+
+/**
+ * The reminder's sentence for the Characters sitting out (.scratch/speaker-controls/spec.md): they
+ * take no part in the story for now. Others may still talk about them.
+ */
+export function sittingOutSentence(names: string[]): string {
+    return `Sitting out: ${names.join(', ')}. They take no part in the story for now: don't write their words or actions, and don't bring them into the scene.`;
 }
 
 /**

@@ -46,11 +46,18 @@ export const SUGGESTIONS_MAX_TOKENS = 400;
  */
 export function suggestionsInstruction(input: PromptLayersInput): string {
     const identity = input.identity.name;
+    // .scratch/speaker-controls/spec.md: no idea that addresses a Character sitting out.
+    const sittingOut = input.sittingOut ?? [];
+    const away =
+        sittingOut.length > 0
+            ? `
+No option may speak to, call for or involve anyone sitting out, who takes no part in the story for now: ${sittingOut.join(', ')}.`
+            : '';
     return `Step outside the story for this one answer. The user plays ${identity} and wants ideas for what ${identity} could do next. Suggest three short options the user could send, written as ${identity} in ${povAndTense(input.story, identity)}, following on from exactly where the story stands:
 - "action": something ${identity} does.
 - "speech": a line ${identity} says aloud.
 - "move": a bold move by ${identity} that pushes the story forward.
-Each option is one or two sentences, and the three must be clearly different. Write only for ${identity}, never for the Characters.
+Each option is one or two sentences, and the three must be clearly different. Write only for ${identity}, never for the Characters.${away}
 Answer with only this JSON object and nothing else, one key per option:
 {"action":"...","speech":"...","move":"..."}`;
 }

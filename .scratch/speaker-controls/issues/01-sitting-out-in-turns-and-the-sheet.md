@@ -1,6 +1,6 @@
 # 01 — Set a Character sitting out, and the turns leave them out
 
-**Status:** ready-for-agent
+**Status:** done
 
 Part of: [Spec: Speaker controls](../spec.md)
 
@@ -15,8 +15,8 @@ Part of: [Spec: Speaker controls](../spec.md)
 
 **Blocked by:** [Branch 02 — Branch a Chat from a reply](../../branch/issues/02-branch-a-chat.md) (Branch's copy, which this extends).
 
-- [ ] Pure prompt tests: the reminder sentence; "In the latest exchange" without them; the system message identical with and without someone sitting out, including with the Memory layer over its cap and a Memory about the Character sitting out; no change to the prompt when nobody is.
-- [ ] API tests (fake gateway): the PUT replaces the set; an unknown id is `404.003.002`; removing the Character from the Story drops them from it; a reply with their `@Name:` line stores no part for them and the streamed parts never showed one, while narration naming them stays; an edited AI Message keeps their line; a User Message edit and Reset keep the set; a Branch carries it; Suggested replies carry the line.
-- [ ] A Chat with nobody sitting out sends exactly the prompts it sent before.
-- [ ] e2e (390 px): setting a Character sitting out from the Chat menu updates the row's line and survives a reload; switching them back restores "Everyone is in"; a one-Character Story's Chat menu offers the row too.
-- [ ] Typecheck, the whole API suite and the whole e2e suite pass.
+- [x] Pure prompt tests: the reminder sentence; "In the latest exchange" without them; the system message identical with and without someone sitting out, including with the Memory layer over its cap and a Memory about the Character sitting out; no change to the prompt when nobody is.
+- [x] API tests (fake gateway): the PUT replaces the set; an unknown id is `404.003.002`; removing the Character from the Story drops them from it; a reply with their `@Name:` line stores no part for them and the streamed parts never showed one, while narration naming them stays; an edited AI Message keeps their line; a User Message edit and Reset keep the set; a Branch carries it; Suggested replies carry the line.
+- [x] A Chat with nobody sitting out sends exactly the prompts it sent before.
+- [x] e2e (390 px): setting a Character sitting out from the Chat menu updates the row's line and survives a reload; switching them back restores "Everyone is in"; a one-Character Story's Chat menu offers the row too.
+- [x] Typecheck, the whole API suite and the whole e2e suite pass.

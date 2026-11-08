@@ -16,6 +16,7 @@ import { SnapshotSize1763860000000 } from './1763860000000-SnapshotSize.js';
 import { Lore1763870000000 } from './1763870000000-Lore.js';
 import { BranchLink1763880000000 } from './1763880000000-BranchLink.js';
 import { AuthorsNote1763890000000 } from './1763890000000-AuthorsNote.js';
+import { SittingOut1763900000000 } from './1763900000000-SittingOut.js';
 
 // Listed by hand, oldest first, so migrations load the same way from compiled JS, the
 // TypeORM CLI and Vitest. Add every new migration here.
@@ -38,4 +39,5 @@ export const migrations = [
     Lore1763870000000,
     BranchLink1763880000000,
     AuthorsNote1763890000000,
+    SittingOut1763900000000,
 ];

@@ -1,3 +1,4 @@
+import { ChatSittingOutEntity } from '../../model/chat/entities/chat-sitting-out.entity.js';
 import { ChatEntity } from '../../model/chat/entities/chat.entity.js';
 import { MessagePartEntity } from '../../model/chat/entities/message-part.entity.js';
 import { MessageEntity } from '../../model/chat/entities/message.entity.js';
@@ -33,6 +34,7 @@ export const entities = [
     SettingsEntity,
     UsageRecordEntity,
     ChatEntity,
+    ChatSittingOutEntity,
     MessageEntity,
     MessagePartEntity,
     ReplyVersionEntity,

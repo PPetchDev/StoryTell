@@ -13,6 +13,7 @@ import type { Relation } from 'typeorm';
 import type { PersonaEntity } from '../../persona/entities/persona.entity.js';
 import type { SceneEntity } from '../../story/entities/scene.entity.js';
 import type { StoryEntity } from '../../story/entities/story.entity.js';
+import type { ChatSittingOutEntity } from './chat-sitting-out.entity.js';
 import type { MessageEntity } from './message.entity.js';
 
 /** Spec: "Story clock". Where a Chat's story is in the day, in order through it. */
@@ -131,6 +132,15 @@ export class ChatEntity {
     // Loaded only through ChatModelService.findWithMessages(); never auto-loaded.
     @OneToMany('MessageEntity', 'chat')
     messages: Relation<MessageEntity[]>;
+
+    /** The Characters sitting out (.scratch/speaker-controls/spec.md); loaded only through findWithMessages(). */
+    @OneToMany('ChatSittingOutEntity', 'chat')
+    sittingOut: Relation<ChatSittingOutEntity[]>;
+
+    /** The ids of the Characters sitting out; none on a Chat loaded without the set. */
+    sittingOutIds(): number[] {
+        return (this.sittingOut ?? []).map((row) => row.characterId);
+    }
 
     toSummary(): ChatSummary {
         return {

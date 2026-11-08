@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsInt, IsString, MaxLength, Min, ValidateIf } from 'class-validator';
+import { IsArray, IsInt, IsString, MaxLength, Min, ValidateIf } from 'class-validator';
 
 const TITLE_MAX = 200;
 // Long enough for any turn the user writes, short enough to refuse a runaway client.
@@ -47,6 +47,16 @@ export class SetAuthorsNoteRequestBodyDTO {
     @IsString()
     @MaxLength(AUTHORS_NOTE_MAX)
     text: string;
+}
+
+export class SetSittingOutRequestBodyDTO {
+    @ApiProperty({
+        type: [Number],
+        description: "Every Character to keep out of this Chat's turns until brought back; replaces the whole set. Empty brings everyone back.",
+    })
+    @IsArray()
+    @IsInt({ each: true })
+    characterIds: number[];
 }
 
 export class SwapIdentityRequestBodyDTO {

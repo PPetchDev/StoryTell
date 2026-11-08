@@ -18,6 +18,18 @@ export interface ParsedReply {
     unknownSpeakers: string[];
     /** True when the reply was cut at a line written as the worn identity. */
     cutAtUserLine: boolean;
+    /** The names of Characters sitting out whose speech lines were dropped, for the logs. */
+    droppedSpeakers: string[];
+}
+
+export interface ParseOptions {
+    /** The guard: cut at a line written as the worn identity, and drop lines of Characters sitting out. On by default. */
+    guard?: boolean;
+    /**
+     * The ids of the Characters sitting out (.scratch/speaker-controls/spec.md). With the guard on,
+     * their speech lines are dropped with the lines continuing them; narration naming them stays.
+     */
+    sittingOut?: number[];
 }
 
 function escapeRegExp(text: string): string {
@@ -45,20 +57,21 @@ export function userLinePattern(identityName: string): RegExp {
  * - after a blank line, text is narration; consecutive narration lines merge
  * - an unknown speaker is kept by name, with no Character link
  * - the reply is cut at the first line written as the worn identity or "You" (the guard;
- *   off for the Opening, which the author wrote)
+ *   off for the Opening, which the author wrote, and for an AI Message the user edits)
+ * - with the guard on, the speech of a Character sitting out is dropped, with the lines
+ *   continuing it; narration that names them stays
  */
-export function parseReply(
-    text: string,
-    cast: CastName[],
-    identityName: string,
-    options: { guard?: boolean } = {},
-): ParsedReply {
+export function parseReply(text: string, cast: CastName[], identityName: string, options: ParseOptions = {}): ParsedReply {
     const userLine = userLinePattern(identityName);
     const guard = options.guard ?? true;
+    const sittingOut = new Set(guard ? (options.sittingOut ?? []) : []);
     const parts: ReplyPart[] = [];
     const unknownSpeakers: string[] = [];
+    const droppedSpeakers: string[] = [];
     let cutAtUserLine = false;
     let afterBlank = true;
+    // True from a dropped speech line through the lines right under it, which continue it.
+    let dropping = false;
 
     for (const line of text.split('\n')) {
         if (guard && userLine.test(line)) {
@@ -66,11 +79,19 @@ export function parseReply(
             break;
         }
         const speech = line.match(SPEECH_LINE);
+        if (dropping && !speech && line.trim()) continue;
+        dropping = false;
         const last = parts[parts.length - 1];
         if (speech) {
             const spoken = speech[1].trim();
             const character = cast.find((member) => member.name.toLowerCase() === spoken.toLowerCase());
             if (!character) unknownSpeakers.push(spoken);
+            if (character && sittingOut.has(character.id)) {
+                if (!droppedSpeakers.includes(character.name)) droppedSpeakers.push(character.name);
+                dropping = true;
+                afterBlank = false;
+                continue;
+            }
             parts.push({
                 kind: 'speech',
                 characterId: character?.id ?? null,
@@ -89,7 +110,7 @@ export function parseReply(
     }
 
     for (const part of parts) part.text = part.text.trim();
-    return { parts: parts.filter((part) => part.text !== ''), unknownSpeakers, cutAtUserLine };
+    return { parts: parts.filter((part) => part.text !== ''), unknownSpeakers, cutAtUserLine, droppedSpeakers };
 }
 
 /** The `@Name:` text of a parsed Message, as the editor (ticket 25) and the prompt show it. */

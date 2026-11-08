@@ -216,6 +216,9 @@ export class ChatResponseBodyDTO extends ChatSummaryDTO implements Omit<ChatDeta
 
     @ApiProperty({ description: "The Chat's Author's note, the user's standing direction; empty when there is none." })
     authorsNote: string;
+
+    @ApiProperty({ type: [Number], description: 'The ids of the Characters sitting out of this Chat, in cast order; empty when everyone is in.' })
+    sittingOut: number[];
 }
 
 /** A Branch answers with the new Chat, plus the User Message's text when it was branched from one. */

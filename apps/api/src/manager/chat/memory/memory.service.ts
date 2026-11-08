@@ -20,7 +20,10 @@ export interface MemoryList {
     identityName: string;
     /** The cast, in order, for Known-by chips and the add form. */
     cast: Array<{ id: number; name: string }>;
-    /** The Characters present in the latest exchange: a hand-added Memory is known by these. */
+    /**
+     * The Characters present in the latest exchange: a hand-added Memory is known by these. Never
+     * one sitting out (.scratch/speaker-controls/spec.md), though the user may still tick them.
+     */
     present: number[];
     /** Active and archived, oldest first. */
     memories: MemoryResponse[];
@@ -132,9 +135,15 @@ function castOrder(story: StoryEntity): number[] {
     return story.characters.map((character) => character.id);
 }
 
-/** The Characters present in the latest exchange: the last User Message and the reply after it, if any. */
+/**
+ * The Characters present in the latest exchange: the last User Message and the reply after it, if
+ * any. Those sitting out are never present, the "everyone" fallback included.
+ */
 function present(story: StoryEntity, chat: ChatEntity): number[] {
-    const cast = story.characters.map((character) => ({ id: character.id, name: character.name }));
+    const sittingOut = chat.sittingOutIds();
+    const cast = story.characters
+        .filter((character) => !sittingOut.includes(character.id))
+        .map((character) => ({ id: character.id, name: character.name }));
     const last = chat.messages[chat.messages.length - 1];
     if (!last) return cast.map((member) => member.id);
     const reply = last.kind === MessageKind.Ai ? last : null;

@@ -1,6 +1,6 @@
 # 02 — Sitting out in the judge, Memory and Snapshots
 
-**Status:** ready-for-agent
+**Status:** done
 
 Part of: [Spec: Speaker controls](../spec.md)
 
@@ -13,10 +13,10 @@ Part of: [Spec: Speaker controls](../spec.md)
 
 **Blocked by:** [01 — Set a Character sitting out, and the turns leave them out](01-sitting-out-in-turns-and-the-sheet.md).
 
-- [ ] API tests (fake gateway): a scripted judgement with a Bond change from them and an Arc step for them applies neither (the dashboard shows their Bonds and Arc unchanged), while a Bond change toward them from another Character applies.
-- [ ] API test: a scripted extraction that adds them to a new Memory's Known by stores the Memory without them; their existing Memories keep them.
-- [ ] API test: a Memory added by hand with no Known by is not known by them, and the Memory list's `present` leaves them out; one added with them given explicitly keeps them.
-- [ ] API test: the Snapshot writer's cast leaves them out, and includes them when the hint names them.
-- [ ] e2e (390 px): with a Character sitting out, the Memory drawer's add form starts with them unticked.
-- [ ] With nobody sitting out, the judge, extraction, Memory add and Snapshot calls are exactly as before.
-- [ ] Typecheck, the whole API suite and the whole e2e suite pass.
+- [x] API tests (fake gateway): a scripted judgement with a Bond change from them and an Arc step for them applies neither (the dashboard shows their Bonds and Arc unchanged), while a Bond change toward them from another Character applies.
+- [x] API test: a scripted extraction that adds them to a new Memory's Known by stores the Memory without them; their existing Memories keep them.
+- [x] API test: a Memory added by hand with no Known by is not known by them, and the Memory list's `present` leaves them out; one added with them given explicitly keeps them.
+- [x] API test: the Snapshot writer's cast leaves them out, and includes them when the hint names them.
+- [x] e2e (390 px): with a Character sitting out, the Memory drawer's add form starts with them unticked.
+- [x] With nobody sitting out, the judge, extraction, Memory add and Snapshot calls are exactly as before.
+- [x] Typecheck, the whole API suite and the whole e2e suite pass.

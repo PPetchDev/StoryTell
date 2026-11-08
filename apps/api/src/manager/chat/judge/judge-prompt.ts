@@ -13,6 +13,8 @@ export interface JudgeCastMember {
     personality: string;
     /** The Arc directions copied into the Chat; empty when the author wrote none. */
     arcDirection: string;
+    /** Sitting out of this Chat (.scratch/speaker-controls/spec.md): not in the story now, so no Bond or Arc changes. */
+    sittingOut?: boolean;
 }
 
 export interface JudgeBond {
@@ -43,6 +45,10 @@ export interface JudgePromptInput {
     userText: string | null;
     aiText: string;
 }
+
+/** How a Character sitting out is marked in the judge's cast (.scratch/speaker-controls/spec.md). */
+export const SITTING_OUT_MARK =
+    ' [SITTING OUT: not in the story now. No Bond changes from them and no Arc steps for them; others may still change how they feel toward them.]';
 
 /** How many Messages before the exchange the judge sees for context. */
 export const JUDGE_CONTEXT_MESSAGES = 6;
@@ -88,7 +94,7 @@ export function buildJudgePrompt(input: JudgePromptInput): { messages: PromptMes
             (member) =>
                 `- ${member.name}: ${member.personality}${
                     member.arcDirection.trim() ? ` (Author's Arc direction: ${member.arcDirection})` : ''
-                }`,
+                }${member.sittingOut ? SITTING_OUT_MARK : ''}`,
         )
         .join('\n');
     const bonds =

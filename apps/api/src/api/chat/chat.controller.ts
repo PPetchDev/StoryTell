@@ -9,6 +9,7 @@ import {
     RenameChatRequestBodyDTO,
     SendMessageRequestBodyDTO,
     SetAuthorsNoteRequestBodyDTO,
+    SetSittingOutRequestBodyDTO,
     SwapIdentityRequestBodyDTO,
 } from './dto/chat.request.dto.js';
 import {
@@ -85,6 +86,17 @@ export class ChatApiController {
         @Body() body: SetAuthorsNoteRequestBodyDTO,
     ): Promise<ChatResponseBodyDTO> {
         return this.chatManager.setAuthorsNote(storyId, chatId, body.text);
+    }
+
+    /** Replaces who is sitting out, read from the next turn on. Never rolled back. */
+    @Put(':chatId/sitting-out')
+    @ApiOkResponse({ type: ChatResponseBodyDTO })
+    setSittingOut(
+        @Id('storyId') storyId: number,
+        @Id('chatId') chatId: number,
+        @Body() body: SetSittingOutRequestBodyDTO,
+    ): Promise<ChatResponseBodyDTO> {
+        return this.chatManager.setSittingOut(storyId, chatId, body.characterIds);
     }
 
     @Delete(':chatId')

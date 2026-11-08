@@ -7,7 +7,7 @@ import { placeholderUser } from './render-user.js';
  * locked Memories take no update, delete, merge or archive but do take Known-by additions;
  * names are never removed from Known by; unknown Memory ids and unknown names are dropped;
  * a merge becomes its deletes plus one add under one cause, and is dropped whole when any
- * of its sources is locked. Pure logic.
+ * of its sources is locked. A Character sitting out learns nothing new. Pure logic.
  */
 
 export interface ApplyCastMember {
@@ -29,6 +29,11 @@ export interface ApplyExtractionInput {
     identityName: string;
     /** Every Memory of the Chat, archived ones included. */
     memories: ApplyMemory[];
+    /**
+     * The ids of the Characters sitting out (.scratch/speaker-controls/spec.md): added to no new
+     * Memory's Known by and to no Known by of an existing one. A merge keeps its sources' Known by.
+     */
+    sittingOut?: number[];
 }
 
 export interface AppliedExtraction {
@@ -45,6 +50,7 @@ export function applyExtraction(input: ApplyExtractionInput, extraction: Extract
     const memories = new Map(input.memories.map((memory) => [memory.id, memory]));
     const gone = new Set<number>();
     const text = (raw: string): string => placeholderUser(raw, input.identityName);
+    const sittingOut = new Set(input.sittingOut ?? []);
 
     /** Cast ids for the names given; the user is not a Character and is skipped quietly. */
     const resolve = (names: string[], what: string): number[] => {
@@ -53,6 +59,7 @@ export function applyExtraction(input: ApplyExtractionInput, extraction: Extract
             if (same(name, 'user') || same(name, '{user}') || same(name, input.identityName)) continue;
             const member = input.cast.find((candidate) => same(candidate.name, name));
             if (!member) rejected.push(`${what}: unknown name "${name}" in known by`);
+            else if (sittingOut.has(member.id)) rejected.push(`${what}: ${member.name} is sitting out; left off known by`);
             else if (!found.includes(member.id)) found.push(member.id);
         }
         return found;

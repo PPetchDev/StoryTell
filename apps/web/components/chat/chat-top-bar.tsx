@@ -4,8 +4,10 @@ import Link from 'next/link';
 import { FormEvent, ReactNode, useState } from 'react';
 
 import { useApiQuery } from '@/components/connection';
+import { CharacterPortrait } from '@/components/portrait/character-portrait';
 import { ConfirmDialog } from '@/components/sheet/confirm-dialog';
 import { Sheet } from '@/components/sheet/sheet';
+import { Cast, characterColour, Portraits } from '@/lib/character-colour';
 import { Chat, messageHref } from '@/lib/chat';
 import { PersonaList } from '@/lib/persona';
 
@@ -156,6 +158,89 @@ function AuthorsNoteForm({
     );
 }
 
+/** Names in a sentence: "Mira", "Mira and Kai", "Mira, Kai and Oren". */
+function nameList(names: string[]): string {
+    return names.length < 2 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
+/** The menu row's quiet line (.scratch/speaker-controls/spec.md): "Everyone is in", or who is sitting out. */
+function sittingOutSummary(names: string[]): string {
+    if (names.length === 0) return 'Everyone is in';
+    return `${nameList(names)} ${names.length === 1 ? 'is' : 'are'} sitting out`;
+}
+
+/**
+ * "Who's in this Chat" in place of the menu's rows (.scratch/speaker-controls/spec.md): every
+ * Character with their Portrait, name and a switch between "In the story" and "Sitting out".
+ * Each switch saves the whole set at once, as a write; the sheet stays open, so several can be
+ * switched in a row, and the switches wait while a turn or a write is in flight.
+ */
+function WhosInForm({
+    chat,
+    cast,
+    characters,
+    portraits,
+    busy,
+    error,
+    onSave,
+}: {
+    chat: Chat;
+    cast: Cast;
+    characters: readonly { id: number; name: string }[];
+    portraits: Portraits;
+    busy: boolean;
+    error: string | null;
+    onSave(characterIds: number[]): void;
+}) {
+    const toggle = (characterId: number) => {
+        const out = chat.sittingOut.includes(characterId);
+        onSave(out ? chat.sittingOut.filter((id) => id !== characterId) : [...chat.sittingOut, characterId]);
+    };
+    return (
+        <div className={styles.rename}>
+            <h2 className={styles.renameTitle}>Who&apos;s in this Chat</h2>
+            <p className={styles.noteHint}>
+                Someone sitting out takes no part in the story until you bring them back.
+            </p>
+            <ul className={styles.whoList} aria-busy={busy}>
+                {characters.map((character) => {
+                    const inStory = !chat.sittingOut.includes(character.id);
+                    const nameId = `who-${character.id}`;
+                    return (
+                        <li key={character.id} className={styles.who}>
+                            <CharacterPortrait
+                                name={character.name}
+                                colour={characterColour(character.id, cast)}
+                                portrait={portraits[character.id]}
+                                className={styles.whoPortrait}
+                            />
+                            <span id={nameId} className={styles.whoName}>
+                                {character.name}
+                            </span>
+                            <button
+                                type="button"
+                                role="switch"
+                                aria-checked={inStory}
+                                aria-labelledby={nameId}
+                                className={inStory ? styles.whoSwitch : `${styles.whoSwitch} ${styles.whoOut}`}
+                                disabled={busy}
+                                onClick={() => toggle(character.id)}
+                            >
+                                {inStory ? 'In the story' : 'Sitting out'}
+                            </button>
+                        </li>
+                    );
+                })}
+            </ul>
+            {error && (
+                <p role="alert" className="turn-error">
+                    {error}
+                </p>
+            )}
+        </div>
+    );
+}
+
 /** One row of the ⋯ menu: a bold label with a quiet line under it. */
 function MenuText({ label, sub }: { label: string; sub: string }) {
     return (
@@ -188,6 +273,13 @@ function MenuButton({ onClick, disabled, danger, children }: MenuButtonProps) {
 
 interface ChatTopBarProps {
     chat: Chat;
+    /** The Story's Character ids in cast order, which pick each Character's colour. */
+    cast: Cast;
+    /** The Story's Characters in cast order, for "Who's in this Chat". */
+    characters: readonly { id: number; name: string }[];
+    portraits: Portraits;
+    /** The last write's error, shown in "Who's in this Chat" while it is open. */
+    error: string | null;
     /** A turn or a write is in flight, or a Message is being edited. */
     busy: boolean;
     /** The Scene strip is hidden on this device, so the menu offers it back. */
@@ -198,6 +290,8 @@ interface ChatTopBarProps {
     onRename(title: string): void;
     /** Saves the Author's note; an empty text clears it. */
     onSetAuthorsNote(text: string): void;
+    /** Saves who is sitting out, the whole set at once. */
+    onSetSittingOut(characterIds: number[]): void;
     onReset(): void;
 }
 
@@ -208,6 +302,10 @@ interface ChatTopBarProps {
  */
 export function ChatTopBar({
     chat,
+    cast,
+    characters,
+    portraits,
+    error,
     busy,
     stripHidden,
     onShowStrip,
@@ -215,9 +313,11 @@ export function ChatTopBar({
     onOpenMemory,
     onRename,
     onSetAuthorsNote,
+    onSetSittingOut,
     onReset,
 }: ChatTopBarProps) {
-    const [menu, setMenu] = useState<'closed' | 'menu' | 'rename' | 'note'>('closed');
+    const [menu, setMenu] = useState<'closed' | 'menu' | 'rename' | 'note' | 'who'>('closed');
+    const sittingOutNames = chat.sittingOut.flatMap((id) => characters.find((character) => character.id === id)?.name ?? []);
     const [confirming, setConfirming] = useState(false);
     const close = () => setMenu('closed');
     /** Closes the menu, then runs the choice, so a drawer or dialog it opens takes the focus. */
@@ -276,7 +376,15 @@ export function ChatTopBar({
 
             {menu !== 'closed' && (
                 <Sheet
-                    label={menu === 'rename' ? 'Rename Chat' : menu === 'note' ? "Author's note" : 'Chat menu'}
+                    label={
+                        menu === 'rename'
+                            ? 'Rename Chat'
+                            : menu === 'note'
+                              ? "Author's note"
+                              : menu === 'who'
+                                ? "Who's in this Chat"
+                                : 'Chat menu'
+                    }
                     onClose={close}
                 >
                     {menu === 'rename' ? (
@@ -295,6 +403,16 @@ export function ChatTopBar({
                                 onSetAuthorsNote(text);
                             }}
                             onCancel={close}
+                        />
+                    ) : menu === 'who' ? (
+                        <WhosInForm
+                            chat={chat}
+                            cast={cast}
+                            characters={characters}
+                            portraits={portraits}
+                            busy={busy}
+                            error={error}
+                            onSave={onSetSittingOut}
                         />
                     ) : (
                         <div className={styles.menu}>
@@ -353,6 +471,10 @@ export function ChatTopBar({
                             {/* The first of the new rows (.scratch/sillytavern-gaps/integration.md). */}
                             <MenuButton onClick={() => setMenu('note')} disabled={busy}>
                                 <MenuText label="Author's note" sub={noteSummary(chat.authorsNote)} />
+                            </MenuButton>
+                            {/* After Author's note (.scratch/sillytavern-gaps/integration.md), whatever the cast size. */}
+                            <MenuButton onClick={() => setMenu('who')}>
+                                <MenuText label="Who's in this Chat" sub={sittingOutSummary(sittingOutNames)} />
                             </MenuButton>
                             <hr className={styles.rule} />
                             <MenuButton

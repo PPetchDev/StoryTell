@@ -93,6 +93,8 @@ export interface Chat extends ChatSummary {
     branchedFrom: { chatId: number; title: string; messageId: number | null } | null;
     /** The Author's note: the user's standing direction for this Chat; empty when there is none. */
     authorsNote: string;
+    /** The ids of the Characters sitting out of this Chat's turns, in cast order; empty when everyone is in. */
+    sittingOut: number[];
 }
 
 export interface RollbackCounts {
@@ -215,6 +217,9 @@ export const chatApi = {
     /** Sets the Author's note, read from the next turn on; an empty text clears it. */
     setAuthorsNote: (storyId: number, chatId: number, text: string) =>
         apiSend<Chat>('PUT', `/stories/${storyId}/chats/${chatId}/authors-note`, { text }),
+    /** Replaces who is sitting out, read from the next turn on; an empty list brings everyone back. */
+    setSittingOut: (storyId: number, chatId: number, characterIds: number[]) =>
+        apiSend<Chat>('PUT', `/stories/${storyId}/chats/${chatId}/sitting-out`, { characterIds }),
     remove: (storyId: number, chatId: number) => apiSend<void>('DELETE', `/stories/${storyId}/chats/${chatId}`),
     send: (storyId: number, chatId: number, text: string, stream?: TurnStream) =>
         turn<Chat>('POST', `/stories/${storyId}/chats/${chatId}/messages`, { text }, stream),

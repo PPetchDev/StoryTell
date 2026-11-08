@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, IsNull, MoreThan, Not, Repository } from 'typeorm';
 
+import { ChatSittingOutEntity } from './entities/chat-sitting-out.entity.js';
 import { ChatEntity, StorySoFarAuthor } from './entities/chat.entity.js';
 import { MessagePartEntity, MessagePartKind } from './entities/message-part.entity.js';
 import { BackgroundStatus, MessageEntity, MessageKind } from './entities/message.entity.js';
@@ -34,6 +35,7 @@ export class ChatModelService {
         @InjectDataSource() private readonly dataSource: DataSource,
         @InjectRepository(ChatEntity) private readonly chats: Repository<ChatEntity>,
         @InjectRepository(MessageEntity) private readonly messages: Repository<MessageEntity>,
+        @InjectRepository(ChatSittingOutEntity) private readonly sittingOut: Repository<ChatSittingOutEntity>,
     ) {}
 
     /** A Story's Chats, most recently played first. */
@@ -77,7 +79,10 @@ export class ChatModelService {
             where: { id: chatId },
             relations: { persona: true, messages: { parts: true, versions: true } },
         });
-        return chat && inOrder(chat);
+        if (!chat) return null;
+        // Read on its own, not joined: a join would repeat every Message row once per Character sitting out.
+        chat.sittingOut = await this.sittingOut.find({ where: { chatId } });
+        return inOrder(chat);
     }
 
     /** The Chat row alone, without its Messages. */
@@ -142,6 +147,15 @@ export class ChatModelService {
 
     async setAuthorsNote(chatId: number, authorsNote: string): Promise<void> {
         await this.chats.update({ id: chatId }, { authorsNote });
+    }
+
+    /** Replaces the Characters sitting out of a Chat with `characterIds`, in one transaction. */
+    async setSittingOut(chatId: number, characterIds: number[]): Promise<void> {
+        await this.dataSource.transaction(async (manager) => {
+            await manager.delete(ChatSittingOutEntity, { chatId });
+            const rows = [...new Set(characterIds)].map((characterId) => manager.create(ChatSittingOutEntity, { chatId, characterId }));
+            if (rows.length > 0) await manager.save(rows);
+        });
     }
 
     /**

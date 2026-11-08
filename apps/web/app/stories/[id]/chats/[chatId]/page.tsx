@@ -42,7 +42,14 @@ export default function ChatPage({ params }: { params: Promise<{ id: string; cha
     return (
         <CharacterProfiles characters={characters}>
             {/* Keyed by the Chat, so opening another (a new Branch) starts its screen afresh. */}
-            <ChatScreen key={chat.data.id} initial={chat.data} cast={cast} portraits={portraits} scenes={scenes} />
+            <ChatScreen
+                key={chat.data.id}
+                initial={chat.data}
+                cast={cast}
+                characters={characters}
+                portraits={portraits}
+                scenes={scenes}
+            />
         </CharacterProfiles>
     );
 }

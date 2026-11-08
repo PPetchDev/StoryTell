@@ -123,11 +123,14 @@ export class JudgeManagerService {
             const state = await this.ledger.state(chat.id);
             const bonds = currentBonds(state.bondChanges);
             const scene = story.scenes.find((candidate) => candidate.id === chat.currentSceneId) ?? null;
+            // Read with the Chat as it is now, like the Scene: who sits out when the judge runs.
+            const sittingOut = chat.sittingOutIds();
             const prompt = buildJudgePrompt({
                 cast: story.characters.map((character) => ({
                     name: character.name,
                     personality: character.personality,
                     arcDirection: state.arcDirections.find((d) => d.characterId === character.id)?.text ?? '',
+                    ...(sittingOut.includes(character.id) ? { sittingOut: true } : {}),
                 })),
                 identityName,
                 bonds: bonds.flatMap((bond) => {
@@ -164,6 +167,7 @@ export class JudgeManagerService {
                     scenes: story.scenes.map((candidate) => ({ id: candidate.id, name: candidate.name })),
                     currentSceneId: chat.currentSceneId,
                     timeOfDay: chat.timeOfDay,
+                    sittingOut,
                 },
                 judgement,
             );

@@ -6,7 +6,8 @@ import { Judgement } from './judge-prompt.js';
  * The backend rules for applying a judgement (spec: "Backend rules when applying a
  * judgement"): drop unknown names and self-Bonds, drop a Bond "change" to the same label,
  * keep one change per Bond per turn, advance at most one Scene, drop a Time of day equal to
- * the current one. Pure logic.
+ * the current one. A Character sitting out gets no Bond change from them and no Arc step. Pure
+ * logic.
  */
 
 export interface ApplyCastMember {
@@ -37,6 +38,11 @@ export interface ApplyInput {
     currentSceneId: number | null;
     /** The Chat's Time of day now; null while there is none. Left out, it reads as null. */
     timeOfDay?: TimeOfDay | null;
+    /**
+     * The ids of the Characters sitting out (.scratch/speaker-controls/spec.md): their own feelings
+     * and Arc stay as they were, while others' feelings toward them may still change.
+     */
+    sittingOut?: number[];
 }
 
 export interface AppliedJudgement extends MessageChanges {
@@ -53,6 +59,7 @@ export function applyJudgement(input: ApplyInput, judgement: Judgement): Applied
     const bondKey = (fromId: number, toId: number | null): string => `${fromId}->${toId ?? 'user'}`;
     const current = new Map(input.bonds.map((bond) => [bondKey(bond.fromCharacterId, bond.toCharacterId), bond]));
 
+    const sittingOut = new Set(input.sittingOut ?? []);
     const bonds: NewBondChange[] = [];
     const changed = new Set<string>();
     for (const change of judgement.bondChanges) {
@@ -61,6 +68,10 @@ export function applyJudgement(input: ApplyInput, judgement: Judgement): Applied
         const to = towardUser ? null : byName(change.to);
         if (!from || (!towardUser && !to)) {
             rejected.push(`Bond ${change.from} → ${change.to}: unknown name`);
+            continue;
+        }
+        if (sittingOut.has(from.id)) {
+            rejected.push(`Bond ${from.name} → ${change.to}: ${from.name} is sitting out`);
             continue;
         }
         const toId = to?.id ?? null;
@@ -93,6 +104,10 @@ export function applyJudgement(input: ApplyInput, judgement: Judgement): Applied
         const character = byName(step.character);
         if (!character) {
             rejected.push(`Arc step for ${step.character}: unknown name`);
+            return [];
+        }
+        if (sittingOut.has(character.id)) {
+            rejected.push(`Arc step for ${character.name}: sitting out`);
             return [];
         }
         return [{ characterId: character.id, step: step.step, event: step.cause }];

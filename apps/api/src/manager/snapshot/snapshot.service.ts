@@ -218,6 +218,11 @@ export class SnapshotManagerService {
             .filter((memory) => !memory.archived)
             .map((memory) => renderUser(memory.text, identity.name));
         const hintNames = namesInHint(job.hint, story.characters);
+        // .scratch/speaker-controls/spec.md: someone sitting out is out of the frame, unless the user's hint names them.
+        const sittingOut = chat.sittingOutIds();
+        const cast = story.characters.filter(
+            (character) => !sittingOut.includes(character.id) || hintNames.includes(character.name.trim()),
+        );
         const recent = chat.messages
             .slice(Math.max(0, index + 1 - SNAPSHOT_RECENT_MESSAGES), index + 1)
             .map((message) => ({
@@ -232,7 +237,7 @@ export class SnapshotManagerService {
                 identity,
                 setting: story.setting,
                 imageStyle: story.imageStyle,
-                cast: story.characters,
+                cast,
                 memories,
                 messages: recent,
                 hint: job.hint,
@@ -245,7 +250,7 @@ export class SnapshotManagerService {
             servedFor: { storyId, chatId: chat.id },
         });
         const scene = parseSnapshotScene(written.text);
-        const inFrame = pickInFrame(story.characters, scene.inFrame, hintNames);
+        const inFrame = pickInFrame(cast, scene.inFrame, hintNames);
 
         const references: ImageData[] = [];
         const drawn: InFrameCharacter[] = [];
