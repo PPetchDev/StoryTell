@@ -1,11 +1,13 @@
 import { useSyncExternalStore } from 'react';
 
 /**
- * Which folding cards the user has folded on this device (a per-device preference, like the
- * List / Graph switch). Everything starts unfolded, so only folded keys are kept, together
- * under one key as a list. Keys name what is folded: `storySoFar`, `character:<id>`,
- * `bonds:<characterId>`, `scene:<id>`, `lore:<id>`, `feelings:<characterId>`, and in the Gallery
- * `galleryStory:<storyId>` and `galleryChat:<storyId>:<chatId or "deleted">`.
+ * Which folds the user has turned from their starting state on this device (a per-device
+ * preference, like the List / Graph switch). Only those keys are kept, together under one key as
+ * a list. Almost every fold starts unfolded, so its key records that it is folded: `storySoFar`,
+ * `character:<id>`, `bonds:<characterId>`, `scene:<id>`, `lore:<id>`, `feelings:<characterId>`,
+ * and in the Gallery `galleryStory:<storyId>` and `galleryChat:<storyId>:<chatId or "deleted">`.
+ * A Lore card's More triggers fold starts folded, so its key, `loreMoreOpen:<id>`, records the
+ * opposite: that it is open (FoldTitle's `startsFolded`).
  */
 const STORAGE_KEY = 'storytell.folded';
 

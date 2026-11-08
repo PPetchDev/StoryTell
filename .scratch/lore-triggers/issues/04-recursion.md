@@ -1,6 +1,6 @@
 # 04 — Entries brought in by other entries
 
-**Status:** ready-for-agent
+**Status:** done
 
 **What to build:** After the Always and came-up entries are chosen, the text of the chosen entries is searched for the names, keywords and patterns of entries not yet chosen, at most 3 steps deep (spec: "Recursion"). Entries found rank after the came-up ones, by step then position, and take what room is left under the cap; they still pass their second-keyword condition, looked for in the scanned Messages plus the chosen entries' text. Lore in play shows them as "brought in by <name>", naming the first chosen entry whose text did it. Each entry gets "Brought in by other entries" (Yes / No, default Yes) in the More triggers fold; No keeps it from being brought in, though it can still come up from the scan or be Always included. The summary gains "Not from other entries" when it is off. Column `recursable` in a migration; DTO, Story response and Duplicate Story carry it.
 

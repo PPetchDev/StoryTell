@@ -4,7 +4,7 @@ import { PromptMessage } from '../../../service/model-gateway/model-gateway.js';
 import { MEMORY_CAP_TOKENS, memoryLine } from '../memory/memory-prompt.js';
 import { memoryIsAbout } from '../memory/present.js';
 import { renderUser } from '../memory/render-user.js';
-import { LORE_SCAN_MESSAGES, loreBlock, PromptLoreEntry, selectLore } from '../lore/lore-select.js';
+import { loreBlock, PromptLoreEntry } from '../lore/lore-select.js';
 import { estimateTokens } from './prompt-tokens.js';
 
 /**
@@ -122,8 +122,14 @@ export interface TurnPromptInput {
     present?: string[];
     /** The Chat's Time of day, stated in the reminder near the end; null or left out while there is none. */
     timeOfDay?: TimeOfDay | null;
-    /** Every Lore entry of the Story (spec: "Lore"); the latest exchange decides which are sent. */
+    /** Every Lore entry of the Story (spec: "Lore"); the Story so far reserves room for the most they can take. */
     lore?: PromptLoreEntry[];
+    /**
+     * The Lore entries this prompt carries, already chosen at its point by the one selection
+     * (.scratch/lore-triggers/spec.md: "Selection at a point"), in the block's order. No prompt
+     * builder chooses Lore itself.
+     */
+    chosenLore?: PromptLoreEntry[];
     /** The Memory layer's cap in tokens (spec: "about 2k tokens"); past it, Memories are left out in `memoryLeaveOutOrder`. */
     memoryCapTokens?: number;
     /**
@@ -438,20 +444,6 @@ export function joinBlocks(blocks: Array<string | null>): string {
 }
 
 /**
- * Spec: "Lore", the scan window: the user's new message (none on a Continue), then the newest
- * Messages before it, newest first.
- */
-export function loreScan(history: PromptHistoryMessage[], userText: string | null): string[] {
-    const recent = history.slice(-LORE_SCAN_MESSAGES).reverse().map((message) => message.text);
-    return userText !== null && userText.trim() !== '' ? [userText, ...recent] : recent;
-}
-
-/** The Lore block for this exchange, or null when it brings up none. */
-export function exchangeLore(lore: PromptLoreEntry[] | undefined, history: PromptHistoryMessage[], userText: string | null): string | null {
-    return loreBlock(selectLore(lore ?? [], loreScan(history, userText)));
-}
-
-/**
  * An earlier reply as the prompt shows it: its `@Name:` lines without `*(stage directions)*`.
  * The model copies the shape of its earlier replies more than any rule, so a Chat whose
  * replies grew stage directions would keep writing them; the stored Messages keep theirs.
@@ -474,7 +466,7 @@ export function buildTurnPrompt(input: TurnPromptInput): TurnPrompt {
     const identity = input.identity.name;
     const userText = input.userText ?? continueInstruction(identity);
     const system = systemPrompt(input);
-    const lore = exchangeLore(input.lore, input.history, input.userText);
+    const lore = loreBlock(input.chosenLore ?? []);
     // One order (.scratch/sillytavern-gaps/integration.md): Lore, Author's note, Where things stand, the final instruction.
     const finalInstruction = joinBlocks([lore, authorsNoteBlock(input.authorsNote, identity), `${stateReminder(input)}\n${turnFinalInstruction(identity)}`]);
 

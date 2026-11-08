@@ -25,6 +25,7 @@ interface Pending {
     timer: ReturnType<typeof setTimeout>;
     run: () => Promise<unknown>;
     apply: (value: unknown) => void;
+    onError?: OnError;
 }
 
 /** How long typing may pause before a field is sent (spec: "Autosave"). */
@@ -91,18 +92,19 @@ export function useAutosave() {
 
     /**
      * Debounced: a later call with the same key replaces the earlier one. The answer is usually
-     * the Story; the Memory drawer, Personas and Settings (ticket 11) save other records.
+     * the Story; the Memory drawer, Personas and Settings (ticket 11) save other records. With
+     * `onError`, a refusal is reported there (shown at the field) instead of in the save state.
      */
     const queue = useCallback(
-        <T = Story,>(key: string, run: () => Promise<T>, apply: (value: T) => void) => {
+        <T = Story,>(key: string, run: () => Promise<T>, apply: (value: T) => void, onError?: OnError) => {
             const earlier = pending.current.get(key);
             if (earlier) clearTimeout(earlier.timer);
             setState((current) => (current.kind === 'saving' ? current : { kind: 'dirty' }));
             const timer = setTimeout(() => {
                 pending.current.delete(key);
-                void enqueue(run, apply);
+                void enqueue(run, apply, onError);
             }, DEBOUNCE_MS);
-            pending.current.set(key, { timer, run, apply: apply as (value: unknown) => void });
+            pending.current.set(key, { timer, run, apply: apply as (value: unknown) => void, onError });
         },
         [enqueue],
     );
@@ -129,7 +131,7 @@ export function useAutosave() {
         for (const [key, item] of pending.current) {
             clearTimeout(item.timer);
             pending.current.delete(key);
-            void enqueue(item.run, item.apply);
+            void enqueue(item.run, item.apply, item.onError);
         }
         await chain.current;
     }, [enqueue]);

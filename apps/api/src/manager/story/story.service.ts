@@ -7,6 +7,7 @@ import {
     DuplicateStartingBondError,
     InvalidCoverChoiceError,
     InvalidOrderError,
+    InvalidLorePatternError,
     LoreEntryNotFoundError,
     NoCoverError,
     NoReferenceImageError,
@@ -16,12 +17,13 @@ import {
     StartingBondNotFoundError,
     StoryNotFoundError,
 } from '../../errors/story.errors.js';
+import { cleanPatterns, compileLorePattern } from '../chat/lore/lore-pattern.js';
 import { ImageNotFoundError, SnapshotNotFoundError, UnsupportedImageError } from '../../errors/image.errors.js';
 import { ChatModelService } from '../../model/chat/chat.service.js';
 import { LedgerModelService } from '../../model/ledger/ledger.service.js';
 import { SnapshotModelService } from '../../model/snapshot/snapshot.service.js';
 import { CharacterEntity, PortraitCrop } from '../../model/story/entities/character.entity.js';
-import { LoreEntryEntity } from '../../model/story/entities/lore-entry.entity.js';
+import { LoreEntryEntity, LoreTriggers } from '../../model/story/entities/lore-entry.entity.js';
 import { SceneEntity } from '../../model/story/entities/scene.entity.js';
 import { StartingBondEntity } from '../../model/story/entities/starting-bond.entity.js';
 import {
@@ -118,6 +120,13 @@ export interface LoreEntryFields {
     alwaysOn?: boolean;
 }
 
+/**
+ * A Lore entry's trigger settings (.scratch/lore-triggers/spec.md), set only in the editor: the
+ * Story assistant, drafting and Character cards write `LoreEntryFields`, so their entries keep
+ * the defaults.
+ */
+export type LoreTriggerFields = Partial<LoreTriggers>;
+
 export interface SceneFields {
     name?: string;
     situation?: string;
@@ -131,10 +140,26 @@ function assignSent<T extends object>(target: T, fields: Partial<T>, keys: (keyo
     }
 }
 
-/** The sent Lore fields onto the entry, keywords trimmed with blanks dropped. */
-function assignLore(entry: LoreEntryEntity, fields: LoreEntryFields): void {
-    assignSent(entry, fields, ['name', 'text', 'alwaysOn']);
+/** The sent Lore fields onto the entry, keywords and second keywords trimmed with blanks and repeats dropped. */
+function assignLore(entry: LoreEntryEntity, fields: LoreEntryFields & LoreTriggerFields): void {
+    assignSent(entry, fields, ['name', 'text', 'alwaysOn', 'secondaryMode', 'recursable', 'sticky', 'cooldown', 'delay', 'chance']);
     if (fields.keywords !== undefined) entry.keywords = cleanKeywords(fields.keywords);
+    if (fields.secondaryKeywords !== undefined) entry.secondaryKeywords = cleanKeywords(fields.secondaryKeywords);
+    if (fields.patterns !== undefined) entry.patterns = validPatterns(fields.patterns);
+    if (fields.group !== undefined) entry.group = fields.group.trim();
+}
+
+/**
+ * Patterns as stored: trimmed, blanks dropped, each one compiling (.scratch/lore-triggers/spec.md:
+ * "Matching"). A broken one refuses the whole write before anything is saved.
+ */
+function validPatterns(patterns: string[]): string[] {
+    const cleaned = cleanPatterns(patterns);
+    for (const pattern of cleaned) {
+        const compiled = compileLorePattern(pattern);
+        if (!(compiled instanceof RegExp)) throw new InvalidLorePatternError(pattern, compiled.reason);
+    }
+    return cleaned;
 }
 
 /** Keywords as stored: trimmed, blanks dropped, a repeat (ignoring case) dropped. */
@@ -603,7 +628,7 @@ export class StoryManagerService {
     }
 
     /** Spec: "Lore". A new entry goes last; Lore never affects whether the Story can be played. */
-    async addLoreEntry(storyId: number, fields: LoreEntryFields): Promise<StoryDetail> {
+    async addLoreEntry(storyId: number, fields: LoreEntryFields & LoreTriggerFields): Promise<StoryDetail> {
         const story = await this.load(storyId);
         // After the highest position, not at the count: removals leave gaps, and a new entry always goes last.
         const position = Math.max(-1, ...story.lore.map((other) => other.position)) + 1;
@@ -613,7 +638,7 @@ export class StoryManagerService {
         return this.saved(storyId);
     }
 
-    async updateLoreEntry(storyId: number, loreId: number, fields: LoreEntryFields): Promise<StoryDetail> {
+    async updateLoreEntry(storyId: number, loreId: number, fields: LoreEntryFields & LoreTriggerFields): Promise<StoryDetail> {
         const story = await this.load(storyId);
         const entry = this.findLoreEntry(story, loreId);
         assignLore(entry, fields);

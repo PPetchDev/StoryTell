@@ -95,7 +95,25 @@ export interface LoreEntry {
     text: string;
     /** Sent on every turn, whether or not it comes up. */
     alwaysOn: boolean;
+    /** Second keywords: they filter an entry that came up, by `secondaryMode` (.scratch/lore-triggers/spec.md). */
+    secondaryKeywords: string[];
+    secondaryMode: LoreSecondaryMode;
+    /** Patterns: regular expressions, matched ignoring case, that bring the entry up like keywords. */
+    patterns: string[];
+    /** "Brought in by other entries": named in the text of a chosen entry, it comes along. */
+    recursable: boolean;
+    /** "Stays for", "Rests for", "Waits until the Chat has": in Messages, 0 = off. */
+    sticky: number;
+    cooldown: number;
+    delay: number;
+    /** "Chance": the percentage of the times it would come in that it does; 100 = no roll. */
+    chance: number;
+    /** "Group": at most one entry of a group goes in per turn; blank = none. */
+    group: string;
 }
+
+/** "alsoNeeds": one of the second keywords must be there too; "unless": none of them may be. */
+export type LoreSecondaryMode = 'alsoNeeds' | 'unless';
 
 export interface MissingField {
     field: string;

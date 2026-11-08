@@ -17,6 +17,12 @@ import { Lore1763870000000 } from './1763870000000-Lore.js';
 import { BranchLink1763880000000 } from './1763880000000-BranchLink.js';
 import { AuthorsNote1763890000000 } from './1763890000000-AuthorsNote.js';
 import { SittingOut1763900000000 } from './1763900000000-SittingOut.js';
+import { LoreSecondaryKeywords1763910000000 } from './1763910000000-LoreSecondaryKeywords.js';
+import { LorePatterns1763920000000 } from './1763920000000-LorePatterns.js';
+import { LoreRecursable1763930000000 } from './1763930000000-LoreRecursable.js';
+import { LoreTimedEffects1763940000000 } from './1763940000000-LoreTimedEffects.js';
+import { LoreChance1763950000000 } from './1763950000000-LoreChance.js';
+import { LoreGroup1763960000000 } from './1763960000000-LoreGroup.js';
 
 // Listed by hand, oldest first, so migrations load the same way from compiled JS, the
 // TypeORM CLI and Vitest. Add every new migration here.
@@ -40,4 +46,10 @@ export const migrations = [
     BranchLink1763880000000,
     AuthorsNote1763890000000,
     SittingOut1763900000000,
+    LoreSecondaryKeywords1763910000000,
+    LorePatterns1763920000000,
+    LoreRecursable1763930000000,
+    LoreTimedEffects1763940000000,
+    LoreChance1763950000000,
+    LoreGroup1763960000000,
 ];

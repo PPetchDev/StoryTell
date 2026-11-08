@@ -52,8 +52,8 @@ import { charactersInExchange } from './memory/present.js';
 import { promptStorySoFar, StorySoFarManagerService } from './story-so-far/story-so-far.service.js';
 import { SuggestedRepliesManagerService } from './suggestions/suggested-replies.service.js';
 import { SuggestedReply } from './suggestions/suggestions-prompt.js';
-import { buildTurnPrompt, loreScan, PromptArc, PromptBond, PromptHistoryMessage, PromptLayersInput, PromptMemory } from './turn/prompt.js';
-import { promptLore, selectLore } from './lore/lore-select.js';
+import { buildTurnPrompt, PromptArc, PromptBond, PromptHistoryMessage, PromptLayersInput, PromptMemory } from './turn/prompt.js';
+import { chosenLore, LoreInPlay, loreInPlayOf, promptLore, selectLoreAt } from './lore/lore-select.js';
 import { CastName, ParseOptions, parseReply, partsToText, releasedText, ReplyPart } from './turn/reply-parser.js';
 import { TurnStoppedError, TurnStream } from './turn/turn-stream.js';
 
@@ -140,11 +140,6 @@ export interface DashboardBackground {
 }
 
 /** The read-only dashboard (spec: "Dashboard"). */
-/** Spec: "Lore in play". */
-export interface LoreInPlay {
-    entries: Array<{ id: number; name: string; alwaysOn: boolean }>;
-}
-
 export interface ChatDashboard {
     chatId: number;
     storyId: number;
@@ -629,8 +624,7 @@ export class ChatManagerService {
      */
     async loreInPlay(storyId: number, chatId: number): Promise<LoreInPlay> {
         const { story, chat } = await this.load(storyId, chatId);
-        const selected = selectLore(promptLore(story), loreScan(promptHistory(chat.messages), null));
-        return { entries: selected.map((entry) => ({ id: entry.id, name: entry.name, alwaysOn: entry.alwaysOn })) };
+        return loreInPlayOf(selectLoreAt(promptLore(story), promptHistory(chat.messages)));
     }
 
     /** Spec: "Dashboard (read-only)". */
@@ -705,7 +699,10 @@ export class ChatManagerService {
         if (this.inFlight.has(chat.id)) throw new TurnInProgressError();
         if (await this.textCreditOut()) throw new OutOfCreditError('text');
         const layers = await this.promptLayersFor(story, chat);
-        return this.suggestedReplies.suggest({ ...layers, history: promptHistory(chat.messages) }, { storyId: story.id, chatId: chat.id });
+        const history = promptHistory(chat.messages);
+        // The point after the newest Message, as Lore in play reads it.
+        const chosen = chosenLore(selectLoreAt(layers.lore ?? [], history));
+        return this.suggestedReplies.suggest({ ...layers, chosenLore: chosen, history }, { storyId: story.id, chatId: chat.id });
     }
 
     /**
@@ -740,6 +737,8 @@ export class ChatManagerService {
             storySoFar: promptStorySoFar(chat),
             timeOfDay: chat.timeOfDay,
             lore: promptLore(story),
+            // The one selection, once per turn, at the reply's point: the user's new Message is before it.
+            chosenLore: chosenLore(selectLoreAt(promptLore(story), promptHistory(chat.messages))),
             authorsNote: chat.authorsNote,
             history,
             userText,

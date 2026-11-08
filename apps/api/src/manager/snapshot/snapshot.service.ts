@@ -19,7 +19,7 @@ import { StoryModelService } from '../../model/story/story.service.js';
 import { ImageData, ModelGateway } from '../../service/model-gateway/model-gateway.js';
 import { ImageStoreService, StoredImage } from '../../store/image/image-store.service.js';
 import { wornIdentity } from '../chat/identity.js';
-import { promptLore, selectLore } from '../chat/lore/lore-select.js';
+import { chosenLore, promptLore, selectLoreAt } from '../chat/lore/lore-select.js';
 import { renderUser } from '../chat/memory/render-user.js';
 import { partsToText } from '../chat/turn/reply-parser.js';
 import {
@@ -229,8 +229,15 @@ export class SnapshotManagerService {
                 speaker: message.kind === MessageKind.User ? (message.identityName ?? identity.name) : 'Story',
                 text: momentText(message),
             }));
-        // Spec: "Lore": scanned in the hint, then the moment's Messages newest first.
-        const lore = selectLore(promptLore(story), [job.hint, ...recent.map((message) => message.text).reverse()]);
+        // Spec: "Lore": chosen at the point after the Message shown, scanning the hint, then the
+        // moment's Messages newest first (.scratch/lore-triggers/spec.md: "The point, and the scan").
+        const upToMoment = chat.messages.slice(0, index + 1).map((message) => ({
+            role: message.kind === MessageKind.User ? ('user' as const) : ('assistant' as const),
+            text: momentText(message),
+        }));
+        const lore = chosenLore(
+            selectLoreAt(promptLore(story), upToMoment, { extraScan: job.hint, scanLength: SNAPSHOT_RECENT_MESSAGES }),
+        );
         const written = await this.gateway.completeText({
             kind: 'snapshot_prompt',
             messages: snapshotPromptMessages({

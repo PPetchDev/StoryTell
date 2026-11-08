@@ -1,6 +1,6 @@
 # 02 — Second keywords and the More triggers fold
 
-**Status:** ready-for-agent
+**Status:** done
 
 **What to build:** An author can give a Lore entry second keywords with a mode, "Also needs one of" or "Unless one of" (spec: "The Lore entry", "Matching"). They only filter an entry whose name or keyword came up, and are looked for in the scanned Messages, any extra scan text and the text of entries already chosen, by the keyword rule. A failed condition puts the entry in Lore in play's left-out list with the `condition` reason ("needs one of: night" / "not with: last year"). The Lore card gets the **More triggers** fold (spec: "The Lore card in the editor"):
 

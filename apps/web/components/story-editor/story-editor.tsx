@@ -14,6 +14,7 @@ import { isFolded, setFolded } from '@/lib/folds';
 import { AppliedChange } from '@/lib/story-assistant';
 import {
     LoreEntry,
+    LoreEntryFields,
     MAX_CHARACTERS,
     MissingField,
     POV_LABELS,
@@ -281,12 +282,33 @@ export function StoryEditor({ initial }: { initial: Story }) {
         }));
         queue(`scene.${sceneId}.${field}`, () => storyApi.updateScene(storyId, sceneId, { [field]: value }), applyStatus);
     };
-    const setLore = <K extends 'name' | 'text' | 'keywords' | 'alwaysOn'>(loreId: number, field: K, value: LoreEntry[K]) => {
+    const setLore = <K extends keyof LoreEntryFields>(loreId: number, field: K, value: LoreEntry[K]) => {
         setStory((current) => ({
             ...current,
             lore: current.lore.map((entry) => (entry.id === loreId ? { ...entry, [field]: value } : entry)),
         }));
         queue(`lore.${loreId}.${field}`, () => storyApi.updateLoreEntry(storyId, loreId, { [field]: value }), applyStatus);
+    };
+
+    /**
+     * A Lore entry's patterns (.scratch/lore-triggers/spec.md): the API may refuse one that
+     * doesn't compile, so the editor takes them only once saved, and a refusal goes to the field.
+     */
+    const setLorePatterns = (loreId: number, patterns: string[], onSaved: () => void, onError: (message: string) => void) => {
+        queue(
+            `lore.${loreId}.patterns`,
+            () => storyApi.updateLoreEntry(storyId, loreId, { patterns }),
+            (saved: Story) => {
+                applyStatus(saved);
+                const stored = saved.lore.find((entry) => entry.id === loreId)?.patterns ?? patterns;
+                setStory((current) => ({
+                    ...current,
+                    lore: current.lore.map((entry) => (entry.id === loreId ? { ...entry, patterns: stored } : entry)),
+                }));
+                onSaved();
+            },
+            onError,
+        );
     };
 
     /**
@@ -622,6 +644,8 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                     onText={(field, value) => setLore(entry.id, field, value)}
                                     onKeywords={(keywords) => setLore(entry.id, 'keywords', keywords)}
                                     onAlwaysOn={(alwaysOn) => setLore(entry.id, 'alwaysOn', alwaysOn)}
+                                    onTrigger={(field, value) => setLore(entry.id, field, value)}
+                                    onPatterns={(patterns, onSaved, onError) => setLorePatterns(entry.id, patterns, onSaved, onError)}
                                     onRemove={() => void commit(() => storyApi.removeLoreEntry(storyId, entry.id), applyWhole)}
                                 />
                             ))}

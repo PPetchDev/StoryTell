@@ -4,7 +4,8 @@ import { MissingField } from '../../../manager/story/playable.js';
 import { LatestChat, StoryDetail, StoryListItem } from '../../../manager/story/story.service.js';
 import { CharacterResponse, PortraitCrop } from '../../../model/story/entities/character.entity.js';
 import { RoleResponse } from '../../../model/story/entities/role.entity.js';
-import { LoreEntryResponse } from '../../../model/story/entities/lore-entry.entity.js';
+import { LORE_SECONDARY_MODES, LoreEntryResponse } from '../../../model/story/entities/lore-entry.entity.js';
+import type { LoreSecondaryMode } from '../../../model/story/entities/lore-entry.entity.js';
 import { SceneResponse } from '../../../model/story/entities/scene.entity.js';
 import { StartingBondResponse } from '../../../model/story/entities/starting-bond.entity.js';
 import {
@@ -237,6 +238,33 @@ export class LoreEntryDTO implements LoreEntryResponse {
 
     @ApiProperty({ description: 'Sent on every turn, whether or not it comes up.' })
     alwaysOn: boolean;
+
+    @ApiProperty({ type: [String], description: 'Second keywords: they filter an entry that came up, by `secondaryMode`.' })
+    secondaryKeywords: string[];
+
+    @ApiProperty({ enum: LORE_SECONDARY_MODES })
+    secondaryMode: LoreSecondaryMode;
+
+    @ApiProperty({ type: [String], description: 'Patterns: regular-expression sources that bring the entry up like keywords.' })
+    patterns: string[];
+
+    @ApiProperty({ description: '"Brought in by other entries".' })
+    recursable: boolean;
+
+    @ApiProperty({ description: '"Stays for", in Messages; 0 = off.' })
+    sticky: number;
+
+    @ApiProperty({ description: '"Rests for", in Messages; 0 = off.' })
+    cooldown: number;
+
+    @ApiProperty({ description: '"Waits until the Chat has", in Messages; 0 = off.' })
+    delay: number;
+
+    @ApiProperty({ description: '"Chance", 0–100; 100 means no roll.' })
+    chance: number;
+
+    @ApiProperty({ description: '"Group"; blank = none.' })
+    group: string;
 }
 
 export class MissingFieldDTO implements MissingField {

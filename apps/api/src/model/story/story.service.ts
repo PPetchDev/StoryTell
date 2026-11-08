@@ -119,8 +119,9 @@ export class StoryModelService {
                 await manager.save(manager.create(SceneEntity, { storyId: story.id, position, name, situation, moveOnCondition }));
             }
             for (const entry of source.lore) {
-                const { position, name, keywords, text, alwaysOn } = entry;
-                await manager.save(manager.create(LoreEntryEntity, { storyId: story.id, position, name, keywords: [...keywords], text, alwaysOn }));
+                // Every field the entry answers with, its trigger settings included (.scratch/lore-triggers/spec.md).
+                const { id: _id, ...fields } = entry.toResponse();
+                await manager.save(manager.create(LoreEntryEntity, { ...fields, storyId: story.id, position: entry.position }));
             }
             return { storyId: story.id, characterIds };
         });

@@ -1,4 +1,4 @@
-import { APIRequestContext, expect, test } from '@playwright/test';
+import { APIRequestContext, expect, Page, test } from '@playwright/test';
 
 // Lore (CONTEXT.md: "Lore") in the Story editor and the Memory drawer, on a phone: 390px wide, with touch.
 test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
@@ -38,7 +38,7 @@ test('an entry added in the Lore tab autosaves and survives a reload', async ({ 
         await expect(card.getByRole('textbox', { name: 'Keywords' })).toHaveValue('yurt, กระโจม, ');
 
         const stored = (await (await request.get(`/api/stories/${storyId}`)).json()) as { lore: unknown[] };
-        expect(stored.lore).toEqual([{ id: expect.any(Number), name: 'Tents', keywords: ['yurt', 'กระโจม'], text: 'Round felt tents with a smoke hole.', alwaysOn: true }]);
+        expect(stored.lore).toEqual([expect.objectContaining({ name: 'Tents', keywords: ['yurt', 'กระโจม'], text: 'Round felt tents with a smoke hole.', alwaysOn: true })]);
 
         await page.reload();
         await page.getByRole('tab', { name: 'Lore', exact: true }).tap();
@@ -51,33 +51,73 @@ test('an entry added in the Lore tab autosaves and survives a reload', async ({ 
     }
 });
 
-test('after a turn that mentions an entry, the Memory drawer lists it in play', async ({ page, request }) => {
+/** Opens the Memory drawer from the Chat menu and answers its Lore in play card. */
+async function openLoreInPlay(page: Page) {
+    await page.getByRole('button', { name: 'Chat menu' }).click();
+    await page.getByRole('dialog', { name: 'Chat menu' }).getByRole('button', { name: /^Memory/ }).click();
+    return page.getByRole('complementary', { name: 'Memory' }).getByRole('region', { name: 'Lore in play' });
+}
+
+async function scriptTurn(request: APIRequestContext, reply: string) {
+    await request.post('/api/testing/fake-gateway/text', { data: { kind: 'turn', replies: [{ text: reply, model: 'glm-5.3' }] } });
+    await request.post('/api/testing/fake-gateway/text', { data: { kind: 'judge', replies: [NO_CHANGE] } });
+    await request.post('/api/testing/fake-gateway/text', { data: { kind: 'memory_extraction', replies: [NO_OPS] } });
+}
+
+test('after a turn that mentions an entry, the Memory drawer says it came up with the keyword', async ({ page, request }) => {
     await request.delete('/api/testing/fake-gateway');
     const storyId = await createStory(request);
     try {
         await request.post(`/api/stories/${storyId}/lore`, { data: { name: 'Tents', keywords: ['yurt'], text: 'Round felt tents.' } });
         await request.post(`/api/stories/${storyId}/lore`, { data: { name: 'Salt', text: 'Salt is money here.' } });
+        await request.post(`/api/stories/${storyId}/lore`, { data: { name: 'Sky law', text: 'Never point at the moon.', alwaysOn: true } });
         const chatId = (await (await request.post(`/api/stories/${storyId}/chats`)).json()).id as number;
 
         await page.goto(`/stories/${storyId}/chats/${chatId}`);
-        await page.getByRole('button', { name: 'Chat menu' }).click();
-        await page.getByRole('dialog', { name: 'Chat menu' }).getByRole('button', { name: /^Memory/ }).click();
-        const drawer = page.getByRole('complementary', { name: 'Memory' });
-        const card = drawer.getByRole('region', { name: 'Lore in play' });
-        await expect(card.getByText(/None right now/)).toBeVisible();
-        await drawer.getByRole('button', { name: 'Close' }).first().click();
+        let card = await openLoreInPlay(page);
+        await expect(card.getByRole('list', { name: 'Lore entries in play' }).getByRole('listitem')).toHaveText(['Sky law · always']);
+        await page.getByRole('complementary', { name: 'Memory' }).getByRole('button', { name: 'Close' }).first().click();
 
-        await request.post('/api/testing/fake-gateway/text', { data: { kind: 'turn', replies: [{ text: '@Nara: My yurt is the blue one.', model: 'glm-5.3' }] } });
-        await request.post('/api/testing/fake-gateway/text', { data: { kind: 'judge', replies: [NO_CHANGE] } });
-        await request.post('/api/testing/fake-gateway/text', { data: { kind: 'memory_extraction', replies: [NO_OPS] } });
+        await scriptTurn(request, '@Nara: My yurt is the blue one.');
         await page.getByLabel('Write as Petch').fill('Where do you sleep?');
         await page.getByRole('button', { name: 'Send' }).click();
         await expect(page.getByText('My yurt is the blue one.')).toBeVisible();
 
-        await page.getByRole('button', { name: 'Chat menu' }).click();
-        await page.getByRole('dialog', { name: 'Chat menu' }).getByRole('button', { name: /^Memory/ }).click();
-        const list = drawer.getByRole('region', { name: 'Lore in play' }).getByRole('list', { name: 'Lore entries in play' });
-        await expect(list.getByRole('listitem')).toHaveText(['Tents']);
+        card = await openLoreInPlay(page);
+        await expect(card.getByRole('list', { name: 'Lore entries in play' }).getByRole('listitem')).toHaveText([
+            'Sky law · always',
+            'Tents · came up: yurt, in the newest Message',
+        ]);
+        // Nothing was left out: no fold.
+        await expect(card.getByText(/Came up but left out/)).toHaveCount(0);
+    } finally {
+        await request.delete(`/api/stories/${storyId}`);
+    }
+});
+
+test('an entry that came up but did not fit shows under the closed left-out fold once opened', async ({ page, request }) => {
+    await request.delete('/api/testing/fake-gateway');
+    const storyId = await createStory(request);
+    try {
+        // About 1,250 tokens each, under a cap of about 1,500: only the first to come up fits.
+        await request.post(`/api/stories/${storyId}/lore`, { data: { name: 'Tents', keywords: ['yurt'], text: 'Felt. '.repeat(830) } });
+        await request.post(`/api/stories/${storyId}/lore`, { data: { name: 'Traveller', text: 'Dust. '.repeat(830) } });
+        const chatId = (await (await request.post(`/api/stories/${storyId}/chats`)).json()).id as number;
+
+        await scriptTurn(request, '@Nara: My yurt is the blue one.');
+        await page.goto(`/stories/${storyId}/chats/${chatId}`);
+        await page.getByLabel('Write as Petch').fill('Where do you sleep?');
+        await page.getByRole('button', { name: 'Send' }).click();
+        await expect(page.getByText('My yurt is the blue one.')).toBeVisible();
+
+        const card = await openLoreInPlay(page);
+        await expect(card.getByRole('list', { name: 'Lore entries in play' }).getByRole('listitem')).toHaveText([
+            'Tents · came up: yurt, in the newest Message',
+        ]);
+        const leftOut = card.getByRole('list', { name: 'Lore entries left out' });
+        await expect(leftOut).toBeHidden();
+        await card.getByText('Came up but left out (1)').click();
+        await expect(leftOut.getByRole('listitem')).toHaveText(['Traveller · no room']);
     } finally {
         await request.delete(`/api/stories/${storyId}`);
     }

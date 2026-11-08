@@ -1,6 +1,6 @@
 # 05 — Stays for, Rests for, Waits until (Sticky, Cooldown, Delay)
 
-**Status:** ready-for-agent
+**Status:** done
 
 **What to build:** Timed effects, worked out again from the Chat's Messages every time, with nothing stored per Chat (spec: "Timed effects, worked out again every time"). An entry that goes in at point q stays for the next `sticky` Messages whether or not it is mentioned (not extended by a mention), then rests for `cooldown` Messages when it can't come in by any route, and can't come in at all before the Chat has `delay` Messages. Staying entries rank right after Always include ones and skip their condition. The state is found by replaying the full selection over the Chat's past points, each with the turn window, in a window of 2 × (longest sticky + cooldown) Messages, at most 200, starting from nothing staying; with no entry using Sticky or Cooldown, there is no replay. A Snapshot's own point keeps its 6-Message scan, but its staying and resting state comes from the same replay. Lore in play shows "stays n more Messages", and left-out "resting, n more Messages" / "waits n more Messages". The More triggers fold gains the three number fields (0–50, 0 = off) with the one hint that each of your lines and each reply counts one; Stays for is hidden while Include is Always; the summary gains "Stays 4", "Rests 6", "Waits 10". Columns `sticky`, `cooldown`, `delay` in a migration (default 0); DTO, Story response and Duplicate Story carry them.
 

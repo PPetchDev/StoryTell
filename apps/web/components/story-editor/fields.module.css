@@ -185,3 +185,19 @@ textarea.input {
         animation: none;
     }
 }
+
+/* A number field: a narrow box with its unit beside it. */
+.numberRow {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.number {
+    width: 5.5rem;
+}
+
+.unit {
+    color: var(--muted);
+    font-size: 0.9375rem;
+}

@@ -85,3 +85,10 @@ export class LoreEntryNotFoundError extends AppError {
         super('404.003.013', 'Lore entry not found in this Story.');
     }
 }
+
+/** A Lore pattern that does not compile as a regular expression (.scratch/lore-triggers/spec.md: "Matching"); nothing of the write is saved. */
+export class InvalidLorePatternError extends AppError {
+    constructor(pattern: string, reason: string) {
+        super('422.003.014', `The pattern "${pattern}" is not a valid regular expression: ${reason}`);
+    }
+}

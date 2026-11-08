@@ -88,6 +88,8 @@ interface TextFieldProps {
     rewrite?: RewriteState;
     /** The assistant changed this field and the change has not been undone (ticket 23). */
     highlighted?: boolean;
+    /** Why the API refused what is typed, shown under the field (a Lore pattern that doesn't compile). */
+    error?: string | null;
 }
 
 export function TextField({
@@ -102,15 +104,17 @@ export function TextField({
     onRewrite,
     rewrite,
     highlighted,
+    error,
 }: TextFieldProps) {
     const ownId = useId();
     const id = domId ?? ownId;
     const hintId = `${id}-hint`;
     const neededId = `${id}-needed`;
+    const errorId = `${id}-error`;
     const busy = rewrite?.kind === 'busy';
     const { needed, flashed } = useFieldMarks(domId);
     const grow = useAutoGrow(value);
-    const describedBy = [needed && neededId, hint && hintId].filter(Boolean).join(' ');
+    const describedBy = [needed && neededId, error && errorId, hint && hintId].filter(Boolean).join(' ');
     // While a rewrite runs, its answer replaces the field: typing then would be lost.
     const shared = {
         id,
@@ -118,6 +122,7 @@ export function TextField({
         placeholder,
         readOnly: busy,
         'aria-describedby': describedBy || undefined,
+        'aria-invalid': error ? true : undefined,
     };
     return (
         <div
@@ -151,6 +156,11 @@ export function TextField({
                 />
             ) : (
                 <input {...shared} type="text" className={styles.input} onChange={(event) => onChange(event.target.value)} />
+            )}
+            {error && (
+                <p id={errorId} role="alert" className={styles.error}>
+                    {error}
+                </p>
             )}
             {hint && (
                 <p id={hintId} className={styles.hint}>
@@ -325,4 +335,81 @@ export function OrderButtons({ index, count, what, onMove }: OrderButtonsProps) 
 
 export function Toolbar({ children }: { children: ReactNode }) {
     return <div className="toolbar">{children}</div>;
+}
+
+interface NumberFieldProps {
+    label: string;
+    value: number;
+    /** Sent only for a whole number in range; anything else stays as typed, with an error. */
+    onChange(value: number): void;
+    min: number;
+    max: number;
+    /** The unit after the box, e.g. "Messages" or "%". */
+    unit: string;
+    hint?: string;
+    domId?: string;
+    highlighted?: boolean;
+}
+
+/** A whole number in a range, with its unit beside the box (a Lore entry's Stays for, Chance). */
+export function NumberField({ label, value, onChange, min, max, unit, hint, domId, highlighted }: NumberFieldProps) {
+    const ownId = useId();
+    const id = domId ?? ownId;
+    const errorId = `${id}-error`;
+    const hintId = `${id}-hint`;
+    const { flashed } = useFieldMarks(domId);
+    const [text, setText] = useState(String(value));
+    const [error, setError] = useState<string | null>(null);
+    // Follows the stored number when it changes from elsewhere; what is typed stays while it means the same.
+    useEffect(() => {
+        setText((typed) => (Number(typed) === value && typed.trim() !== '' ? typed : String(value)));
+        setError(null);
+    }, [value]);
+    const change = (typed: string) => {
+        setText(typed);
+        const number = Number(typed);
+        if (typed.trim() === '' || !Number.isInteger(number) || number < min || number > max) {
+            setError(`A whole number from ${min} to ${max}.`);
+            return;
+        }
+        setError(null);
+        if (number !== value) onChange(number);
+    };
+    const describedBy = [error && errorId, hint && hintId].filter(Boolean).join(' ');
+    return (
+        <div className={classes(styles.field, highlighted && styles.marked, flashed && styles.flash)}>
+            <div className={styles.head}>
+                <span className={styles.label}>
+                    <label htmlFor={id}>{label}</label>
+                </span>
+                {highlighted && <ChangedMark />}
+            </div>
+            <div className={styles.numberRow}>
+                <input
+                    id={id}
+                    type="number"
+                    inputMode="numeric"
+                    min={min}
+                    max={max}
+                    step={1}
+                    value={text}
+                    className={classes(styles.input, styles.number)}
+                    aria-invalid={error ? true : undefined}
+                    aria-describedby={describedBy || undefined}
+                    onChange={(event) => change(event.target.value)}
+                />
+                <span className={styles.unit}>{unit}</span>
+            </div>
+            {error && (
+                <p id={errorId} role="alert" className={styles.error}>
+                    {error}
+                </p>
+            )}
+            {hint && (
+                <p id={hintId} className={styles.hint}>
+                    {hint}
+                </p>
+            )}
+        </div>
+    );
 }

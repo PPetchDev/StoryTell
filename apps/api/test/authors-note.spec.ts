@@ -53,7 +53,7 @@ describe("Author's note: the turn prompt (pure)", () => {
     const lore = [{ id: 1, name: 'The lamp', keywords: [], text: 'The lamp burns whale oil.', alwaysOn: true }];
 
     it('sits after the Lore and before "Where things stand" and the final instruction, in the trailing message only', () => {
-        const prompt = buildTurnPrompt(input({ lore, authorsNote: `  ${NOTE}\n` }));
+        const prompt = buildTurnPrompt(input({ lore, chosenLore: lore, authorsNote: `  ${NOTE}\n` }));
         const trailing = prompt.messages.at(-1)!;
         expect(trailing.role).toBe('system');
         const at = (text: string) => trailing.content.indexOf(text);
@@ -69,9 +69,9 @@ describe("Author's note: the turn prompt (pure)", () => {
     });
 
     it('sends no block for no note or only whitespace, and the prompt equals one built without the field', () => {
-        const today = buildTurnPrompt(input({ lore }));
+        const today = buildTurnPrompt(input({ lore, chosenLore: lore }));
         for (const authorsNote of [undefined, null, '', ' \n\t ']) {
-            const prompt = buildTurnPrompt(input({ lore, authorsNote }));
+            const prompt = buildTurnPrompt(input({ lore, chosenLore: lore, authorsNote }));
             expect(prompt).toEqual(today);
             expect(prompt.messages.at(-1)!.content).not.toContain(HEADING);
         }

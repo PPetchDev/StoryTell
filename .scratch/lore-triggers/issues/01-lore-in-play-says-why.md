@@ -1,6 +1,6 @@
 # 01 — Lore in play says why each entry is in
 
-**Status:** ready-for-agent
+**Status:** done
 
 **What to build:** The prefactor every later ticket stands on, delivered as something the player can see. Lore selection moves to one entry point in the Lore module that chooses for a **point** of a Chat (spec: "The point, and the scan", "Selection at a point") from the Chat's stored Messages, and answers each chosen entry with a reason and each left-out candidate with a reason. The turn, Lore in play, Suggested replies, Write for me and the Snapshot writer all call it; the turn and Suggested replies prompt builders receive the chosen entries instead of choosing them. Write for me does not exist yet: if it lands before this ticket, this ticket moves it onto the entry point with a test; if after, Write for me's own ticket calls the entry point (integration: "Write for me's inputs"). The Snapshot writer keeps its own scan, its hint then the 6 Messages ending with the one it shows, through the entry point's scan-length option. No new entry settings yet, so the only reasons are `always` and `cameUp` (with the trigger and how many Messages back), and the only left-out reason is `noRoom`. `GET .../chats/:chatId/lore` answers the spec's `LoreInPlay` shape (`entries` with `why` and `chance`, plus `leftOut`). The Memory drawer's Lore in play card says why each entry is in, in plain words ("came up: yurt, 2 Messages back", "always"), and shows a "Came up but left out (n)" fold, closed by default, for entries that didn't fit.
 

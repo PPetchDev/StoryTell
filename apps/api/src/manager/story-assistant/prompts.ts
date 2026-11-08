@@ -45,6 +45,7 @@ Rules:
 - Only the last Scene may leave moveOnCondition empty. When you add Scenes after the last one, also set the former last Scene's moveOnCondition if it is empty.
 - Lore holds the world's detail; the Setting stays its short core. A Lore entry needs a name and text. Give it keywords for the other ways the story may mention it (other names, plurals, Thai or other-language words); its name already counts. Set alwaysOn only for what matters on every turn. To move detail from the Setting into Lore, set the Setting to its short core and add an entry for each place, people, custom or object taken out.
 - Name Lore entries exactly as the Story writes them, or "Lore 2" by number.
+- A Lore entry's "More triggers" line shows its trigger settings (second keywords, patterns, Stays, Rests, Waits, Chance, Group, whether other entries bring it in). The author sets those in the editor: you can set only the Lore fields listed above, and your changes keep the trigger settings as they are. Take them into account when you advise on an entry.
 - Remove a Character, Scene or Lore entry only when the instruction asks for it.
 - When the instruction is a question, or asks for nothing you can change, answer it in "reply" with an empty "changes" list.
 - Answer with the JSON object only.`;
@@ -56,7 +57,7 @@ export function assistantMessages(story: StoryResponse, instruction: string): Pr
         { role: 'system', content: `${FRAME}\n\n${ASSISTANT_INSTRUCTIONS}` },
         {
             role: 'user',
-            content: `The Story now:\n\n${renderStory(story)}\n\nThe author's instruction:\n${instruction.trim()}`,
+            content: `The Story now:\n\n${renderStory(story, { loreTriggers: true })}\n\nThe author's instruction:\n${instruction.trim()}`,
         },
     ];
 }

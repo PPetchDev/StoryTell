@@ -1,9 +1,9 @@
 import { UnreadableSuggestionsError } from '../../../errors/chat.errors.js';
 import { PromptMessage } from '../../../service/model-gateway/model-gateway.js';
+import { loreBlock } from '../lore/lore-select.js';
 import {
     authorsNoteBlock,
     estimateTokens,
-    exchangeLore,
     joinBlocks,
     povAndTense,
     PromptHistoryMessage,
@@ -63,15 +63,15 @@ Answer with only this JSON object and nothing else, one key per option:
 }
 
 /**
- * The turn's system layers and recent history, then the closing message: the Lore the latest
- * exchange brings up (spec: "Lore") and the Author's note, as the turn would send them, then the
+ * The turn's system layers and recent history, then the closing message: the Lore chosen at the
+ * point after the newest Message (spec: "Lore"), handed in, and the Author's note, as the turn would send them, then the
  * suggestions instruction (.scratch/sillytavern-gaps/integration.md). The history is kept to
  * the budget left after the closing message, so the note's tokens are reserved there.
  */
 export function buildSuggestionsPrompt(input: SuggestionsPromptInput): SuggestionsPrompt {
     const system = systemPrompt(input);
     const instruction = joinBlocks([
-        exchangeLore(input.lore, input.history, null),
+        loreBlock(input.chosenLore ?? []),
         authorsNoteBlock(input.authorsNote, input.identity.name),
         suggestionsInstruction(input),
     ]);

@@ -2,6 +2,7 @@ import { StoryResponse } from '../../model/story/entities/story.entity.js';
 import { PromptMessage } from '../../service/model-gateway/model-gateway.js';
 import { MAX_CHARACTERS } from '../story/playable.js';
 import { MAX_DRAFT_LORE } from './draft-schema.js';
+import { loreTriggerSummary } from '../chat/lore/lore-summary.js';
 
 /**
  * Prompt text for the two authoring calls (spec: "Story drafting and assistant"). Both open
@@ -84,8 +85,13 @@ function line(label: string, text: string): string {
     return `${label}: ${text.trim() === '' ? '(empty)' : text}`;
 }
 
-/** The whole Story as readable text, so a rewrite sees every other field. */
-export function renderStory(story: StoryResponse): string {
+/**
+ * The whole Story as readable text, so a rewrite sees every other field. With `loreTriggers`
+ * (the Story assistant only), each Lore entry with a trigger setting off its default gets one
+ * line "More triggers: <summary>" in the editor's exact words (.scratch/lore-triggers/spec.md:
+ * "Story assistant and drafting"); a field rewrite's prompt stays as it was.
+ */
+export function renderStory(story: StoryResponse, options: { loreTriggers?: boolean } = {}): string {
     const name = (id: number | null) => {
         if (id === null) return `${story.role.name || 'the Role'} (the Role)`;
         return story.characters.find((character) => character.id === id)?.name || 'an unnamed Character';
@@ -145,6 +151,7 @@ export function renderStory(story: StoryResponse): string {
                 `  Keywords: ${entry.keywords.length === 0 ? '(none)' : entry.keywords.join(', ')}`,
                 `  ${line('Text', entry.text)}`,
                 `  Always include: ${entry.alwaysOn ? 'yes' : 'no'}`,
+                ...(options.loreTriggers && loreTriggerSummary(entry) !== 'None' ? [`  More triggers: ${loreTriggerSummary(entry)}`] : []),
             ].join('\n'),
         );
     });

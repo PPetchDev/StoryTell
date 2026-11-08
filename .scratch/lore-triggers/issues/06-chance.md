@@ -1,6 +1,6 @@
 # 06 — Chance
 
-**Status:** ready-for-agent
+**Status:** done
 
 **What to build:** An entry's Chance (0–100%, default 100 = no roll) is the share of the times it would come in (Always, came up or brought in) that it actually does (spec: "Chance"). The roll is fixed per point: a number in [0, 100) from a SHA-256 hash of the entry's id, the point, and the text of the Message just before the point, passing when below the Chance. So Regenerate, choosing a Reply version, a reload, Lore in play, Suggested replies and Write for me all agree, and an edited Message rolls again. A staying entry is not rolled again during its stay; replayed past points roll the same way, so a stay that started on a lucky roll stays. Lore in play shows "· 40% chance" beside an entry in play below 100, and the left-out reason "lost its 40% chance". The More triggers fold gains "Chance … %"; the summary gains "40%". Column `chance` in a migration (default 100); DTO, Story response and Duplicate Story carry it.
 

@@ -377,3 +377,51 @@
     padding-top: 0.75rem;
     border-top: 1px solid var(--line);
 }
+
+/* A Lore card's More triggers fold (.scratch/lore-triggers/spec.md): a quieter fold inside the card. */
+.moreTriggers {
+    margin-top: 1rem;
+    border-top: 1px dashed var(--line);
+}
+
+.moreTriggersTitle {
+    font-size: 0.9375rem;
+}
+
+/* What is set, beside the title, in the summary's own words. */
+.moreTriggersSummary {
+    min-width: 0;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--muted);
+    overflow-wrap: anywhere;
+}
+
+.moreTriggersBody {
+    padding: 0.75rem 0 0.25rem;
+}
+
+.moreTriggersFoot {
+    margin: 0.75rem 0 0;
+    font-size: 0.8125rem;
+    color: var(--muted);
+}
+
+/* The title and its summary share a line while they fit, and the summary wraps under on a phone. */
+.moreTriggersTitle button > span {
+    flex-wrap: wrap;
+    gap: 0.125rem 0.75rem;
+}
+
+/* Stays for, Rests for, Waits until: side by side while they fit, with one hint under them. */
+.timedFields {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+    gap: 0 1rem;
+}
+
+.timedHint {
+    margin: -0.5rem 0 1rem;
+    font-size: 0.8125rem;
+    color: var(--muted);
+}
