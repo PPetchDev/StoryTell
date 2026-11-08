@@ -1,5 +1,5 @@
 import { execFileSync, execSync, spawn } from 'node:child_process';
-import { openSync, readFileSync, writeFileSync } from 'node:fs';
+import { openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -49,13 +49,27 @@ async function waitFor(condition: () => Promise<boolean>, what: string): Promise
     }
 }
 
+/**
+ * The E2E API's own build folder. `npm run dev` serves the API from `dist` and `nest build`
+ * empties that folder first, so building there took the dev API down mid-run ("Cannot find
+ * module dist/main"). E2E builds here instead and never touches `dist`.
+ */
+export const API_BUILD_DIR = 'dist-e2e';
+
 export function buildApi(): void {
-    // A shell resolves npm on Windows (npm.cmd), so pass the command as one string.
-    execSync('npm run build', { cwd: API_DIR, stdio: 'inherit' });
+    rmSync(path.join(API_DIR, API_BUILD_DIR), { recursive: true, force: true });
+    // The same compile `nest build` runs (tsc on tsconfig.build.json), into the E2E folder, and
+    // in full every time: an incremental build record says "nothing changed" once the folder is
+    // emptied, so nothing was emitted on a second run, and it is the record `npm run dev` uses.
+    // A shell resolves npx on Windows (npx.cmd), so pass the command as one string.
+    execSync(`npx tsc -p tsconfig.build.json --outDir ${API_BUILD_DIR} --incremental false`, {
+        cwd: API_DIR,
+        stdio: 'inherit',
+    });
 }
 
 export function migrate(env: Record<string, string>): void {
-    execFileSync(process.execPath, ['dist/migrate.js'], {
+    execFileSync(process.execPath, [`${API_BUILD_DIR}/migrate.js`], {
         cwd: API_DIR,
         env: { ...process.env, ...env },
         stdio: 'inherit',
@@ -68,7 +82,7 @@ export function migrate(env: Record<string, string>): void {
  */
 export async function spawnApi(env: Record<string, string>): Promise<number> {
     const log = openSync(path.join(path.dirname(stateFile()), 'api.log'), 'a');
-    const child = spawn(process.execPath, ['dist/main.js'], {
+    const child = spawn(process.execPath, [`${API_BUILD_DIR}/main.js`], {
         cwd: API_DIR,
         env: { ...process.env, ...env },
         stdio: ['ignore', log, log],

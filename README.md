@@ -347,8 +347,10 @@ The first time only, install the browser:
 npx playwright install chromium
 ```
 
-Global setup builds the API, starts a throwaway PostgreSQL, migrates it, and runs the built
-API on port 4101 with the fake gateway. Playwright starts Next.js on port 3101, proxying to it.
+Global setup builds the API into its own folder, `apps/api/dist-e2e`, starts a throwaway
+PostgreSQL, migrates it, and runs the built API on port 4101 with the fake gateway. Playwright
+starts Next.js on port 3101 (built in `.next-e2e`), proxying to it. Neither touches `dist` or
+`.next`, so the browser tests can run while `npm run dev` is up.
 Tests run one at a time because some stop and restart the shared API
 (`apps/web/e2e/harness/api-server.ts`). The report is written to `apps/web/playwright-report/`.
 To run two suites at once (two worktrees, say), give the second one its own ports:
