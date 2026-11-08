@@ -123,7 +123,7 @@ An image of a Character, chosen by the author, that keeps the Character looking 
 _Avoid_: Avatar, profile picture
 
 **Portrait**:
-The square of a Character's Reference image that the author picks to show beside the Character's lines in a Chat; until one is picked, a square near the top middle stands in, and without a Reference image, the Character's initial.
+The square of a Character's Reference image that the author picks to stand for the Character: beside their lines in a Chat, on their node in the Memory graph, on the Dashboard and on their cards in the Story editor; until one is picked, a square near the top middle stands in, and without a Reference image, the Character's initial on their Character colour.
 _Avoid_: Avatar, profile picture, icon
 
 **Character profile**:

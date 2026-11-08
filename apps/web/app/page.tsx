@@ -47,7 +47,7 @@ export default function HomePage() {
     const panelOpen = newStory.kind !== 'closed';
 
     return (
-        <main>
+        <main className="wide">
             <div className="page-header">
                 <h1>Stories</h1>
                 {!panelOpen && (

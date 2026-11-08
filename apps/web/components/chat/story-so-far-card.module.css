@@ -1,13 +1,19 @@
 .card {
     background: var(--surface);
-    border-radius: 0.75rem;
-    padding: 0.75rem 0.875rem;
-    margin: 0.75rem 0;
+    border-radius: 0.875rem;
+    padding: 0.375rem 1rem 0.375rem;
+    margin: 1rem 0;
 }
 
+/* The Lore in play card's title; the Story so far's is its fold button. */
 .title {
-    margin: 0 0 0.375rem;
+    margin: 0.5rem 0 0.5rem;
     font-size: 0.9375rem;
+}
+
+/* What folds away under the title. */
+.body {
+    padding: 0.125rem 0 0.75rem;
 }
 
 .text {
@@ -40,7 +46,11 @@
 
 /* The Lore in play card shares this card's look. */
 .list {
-    margin: 0;
+    margin: 0 0 0.75rem;
     padding-left: 1.125rem;
     line-height: 1.5;
+}
+
+.card > p:last-child {
+    margin-bottom: 0.75rem;
 }

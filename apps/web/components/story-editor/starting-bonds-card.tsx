@@ -2,8 +2,11 @@
 
 import { useState } from 'react';
 
+import { CharacterPortrait } from '@/components/portrait/character-portrait';
+import { Portrait } from '@/lib/character-colour';
 import { Character, Role, StartingBond } from '@/lib/story';
 import { TextField } from './fields';
+import { FoldingCard } from './folding-card';
 import { FieldRewrites, rewritableField } from './rewrite';
 import styles from './story-editor.module.css';
 
@@ -11,6 +14,9 @@ interface StartingBondsCardProps {
     /** The Character the Bonds go from. */
     character: Character;
     index: number;
+    /** The Character's colour and Portrait, for the picture in the card's header. */
+    colour: string;
+    portrait?: Portrait;
     cast: Character[];
     role: Role;
     bonds: StartingBond[];
@@ -22,7 +28,7 @@ interface StartingBondsCardProps {
 
 const ROLE_TARGET = 'role';
 
-/** One Character's StartingBonds, on the Bonds tab: where they stand with the others at the start. */
+/** One Character's StartingBonds, on the Bonds tab, folding: where they stand with the others at the start. */
 export function StartingBondsCard(props: StartingBondsCardProps) {
     const { character, index, cast, role, bonds, rewrites } = props;
     const name = character.name.trim() === '' ? `Character ${index + 1}` : character.name;
@@ -46,8 +52,17 @@ export function StartingBondsCard(props: StartingBondsCardProps) {
         rewritableField({ target: 'startingBond', id: bondId, field }, rewrites);
 
     return (
-        <section className={styles.card} aria-label={`Starting Bonds from ${name}`}>
-            <h3 className={styles.cardTitle}>From {name}</h3>
+        <FoldingCard
+            foldKey={`bonds:${character.id}`}
+            label={`Starting Bonds from ${name}`}
+            fieldPrefixes={bonds.map((bond) => `field-startingBond.${bond.id}.`)}
+            title={
+                <>
+                    <CharacterPortrait name={name} colour={props.colour} portrait={props.portrait} className={styles.cardPortrait} />
+                    From {name}
+                </>
+            }
+        >
             {bonds.length === 0 && <p className={styles.note}>Optional. With none, {name} starts as a stranger to everyone.</p>}
             {bonds.map((bond) => (
                 <div className={styles.bond} key={bond.id} role="group" aria-label={`Bond toward ${targetName(bond.toCharacterId)}`}>
@@ -96,6 +111,6 @@ export function StartingBondsCard(props: StartingBondsCardProps) {
                     </button>
                 </div>
             )}
-        </section>
+        </FoldingCard>
     );
 }

@@ -2,6 +2,7 @@
 
 import { Scene, SCENE_REMOVAL_WARNING } from '@/lib/story';
 import { ConfirmButton, OrderButtons, TextField, Toolbar } from './fields';
+import { FoldingCard } from './folding-card';
 import { FieldRewrites, rewritableField } from './rewrite';
 import styles from './story-editor.module.css';
 
@@ -22,11 +23,16 @@ export function SceneCard({ scene, index, count, rewrites, onText, onMove, onRem
     const last = index === count - 1;
     const rewritable = (field: TextKey) => rewritableField({ target: 'scene', id: scene.id, field }, rewrites);
     return (
-        <section className={styles.card} aria-label={`Scene ${index + 1}`}>
-            <div className={styles.cardHeader}>
-                <h3 className={styles.cardTitle}>
+        <FoldingCard
+            foldKey={`scene:${scene.id}`}
+            label={`Scene ${index + 1}`}
+            fieldPrefixes={[`field-scene.${scene.id}.`]}
+            title={
+                <span>
                     {index + 1}. {heading}
-                </h3>
+                </span>
+            }
+            tools={
                 <Toolbar>
                     <OrderButtons index={index} count={count} what={heading} onMove={onMove} />
                     <ConfirmButton
@@ -38,7 +44,8 @@ export function SceneCard({ scene, index, count, rewrites, onText, onMove, onRem
                         onConfirm={onRemove}
                     />
                 </Toolbar>
-            </div>
+            }
+        >
             <TextField
                 label="Name"
                 value={scene.name}
@@ -66,6 +73,6 @@ export function SceneCard({ scene, index, count, rewrites, onText, onMove, onRem
                 onChange={(v) => onText('moveOnCondition', v)}
                 {...rewritable('moveOnCondition')}
             />
-        </section>
+        </FoldingCard>
     );
 }

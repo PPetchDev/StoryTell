@@ -1,7 +1,7 @@
 import { CSSProperties, ReactNode, useId } from 'react';
 
 import { useCharacterProfile } from '@/components/chat/character-profile';
-import { PortraitImage } from '@/components/portrait/portrait-image';
+import { CharacterPortrait } from '@/components/portrait/character-portrait';
 import { Cast, characterColour, Portrait, Portraits } from '@/lib/character-colour';
 import { Message, MessagePart } from '@/lib/chat';
 
@@ -16,19 +16,7 @@ function withActions(text: string): ReactNode[] {
 
 /** A round picture beside a line: the Character's Portrait, or their initial on their colour. */
 function Avatar({ name, colour, portrait, light = false }: { name: string; colour: string; portrait?: Portrait; light?: boolean }) {
-    const initial = name.trim().charAt(0).toUpperCase() || '?';
-    return portrait ? (
-        <PortraitImage portrait={portrait} className={styles.avatar} />
-    ) : (
-        // The Character colours are light, so their initial is dark; the user's accent fill takes white.
-        <span
-            className={styles.avatar}
-            style={{ background: colour, color: light ? 'var(--accent-text)' : 'var(--bg)' } as CSSProperties}
-            aria-hidden="true"
-        >
-            {initial}
-        </span>
-    );
+    return <CharacterPortrait name={name} colour={colour} portrait={portrait} light={light} className={styles.avatar} />;
 }
 
 /** What the user wrote, under the identity they wore: a purple bubble on the right. */

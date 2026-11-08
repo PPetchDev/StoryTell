@@ -51,12 +51,11 @@ const LINKS = [
     },
 ];
 
-/** The Chat screen is the one route without the bar: it gives the story the whole screen. */
+/**
+ * The Chat screen is the one route without the bar on a phone: it gives the story the whole
+ * screen. On a wide screen the side rail stays, since it takes no height from the story.
+ */
 const CHAT_SCREEN = /^\/stories\/[^/]+\/chats\/[^/]+\/?$/;
-
-function showsBottomNav(pathname: string): boolean {
-    return !CHAT_SCREEN.test(pathname);
-}
 
 function isCurrent(href: string, pathname: string): boolean {
     if (href === '/') return pathname === '/' || pathname.startsWith('/stories');
@@ -64,18 +63,19 @@ function isCurrent(href: string, pathname: string): boolean {
 }
 
 /**
- * The fixed bottom bar (spec story 46): Stories, Personas, Usage and Settings, each an icon
- * and a label, at every width but the Chat screen. A spacer of its height ends the page, so
- * nothing scrolls out of reach behind it.
+ * The main nav (spec story 46): Stories, Personas, Usage and Settings, each an icon and a
+ * label. On a phone it is a fixed bottom bar, left off the Chat screen, and a spacer of its
+ * height ends the page so nothing scrolls out of reach behind it. From 1024px wide it is a side
+ * rail on the left of every page, the Chat included (spec: "Desktop layout").
  */
 export function BottomNav() {
     const pathname = usePathname();
-    if (!showsBottomNav(pathname)) return null;
+    const onChat = CHAT_SCREEN.test(pathname);
 
     return (
         <>
-            <div className={styles.spacer} aria-hidden="true" />
-            <nav className={styles.bar} aria-label="Main">
+            {!onChat && <div className={styles.spacer} aria-hidden="true" />}
+            <nav className={onChat ? `${styles.bar} ${styles.railOnly}` : styles.bar} aria-label="Main">
                 <div className={styles.links}>
                     {LINKS.map((link) => (
                         <Link

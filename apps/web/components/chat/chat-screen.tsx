@@ -343,6 +343,7 @@ export function ChatScreen({ initial, cast, portraits, scenes }: ChatScreenProps
                     version={drawer.version}
                     onClose={() => setDrawer((current) => ({ ...current, open: false, focus: null }))}
                     onJump={jumpTo}
+                    portraits={portraits}
                 />
             )}
 

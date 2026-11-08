@@ -10,6 +10,7 @@ import { Autosave, useAutosave } from '@/components/story-editor/autosave';
 import { ConfirmButton } from '@/components/story-editor/fields';
 import { SaveStatus } from '@/components/story-editor/save-status';
 import { ApiError, ApiUnreachableError } from '@/lib/api';
+import { Portraits } from '@/lib/character-colour';
 import { devicePreference } from '@/lib/device-preference';
 import { Memory, memoryApi, MemoryList, renderUser } from '@/lib/memory';
 
@@ -319,6 +320,8 @@ export interface MemoryDrawerProps {
     version: number;
     onClose(): void;
     onJump(messageId: number): void;
+    /** The Characters' Portraits, for the Memory graph's people. */
+    portraits?: Portraits;
 }
 
 /**
@@ -328,7 +331,7 @@ export interface MemoryDrawerProps {
  * typed, with the status in the drawer's header (spec: "Saving"). Opens from the Chat head and
  * from a "Memory added" toast, which lands on that Memory.
  */
-export function MemoryDrawer({ storyId, chatId, focusMemoryId, version, onClose, onJump }: MemoryDrawerProps) {
+export function MemoryDrawer({ storyId, chatId, focusMemoryId, version, onClose, onJump, portraits }: MemoryDrawerProps) {
     const { reportUnreachable } = useConnection();
     const autosave = useAutosave();
     const [list, setList] = useState<MemoryList | null>(null);
@@ -511,7 +514,7 @@ export function MemoryDrawer({ storyId, chatId, focusMemoryId, version, onClose,
                         <p className="muted">Nothing remembered yet.</p>
                     ) : viewKind === 'graph' ? (
                         <>
-                            <MemoryGraph list={list} memories={active} selected={selection} onSelect={select} />
+                            <MemoryGraph list={list} memories={active} selected={selection} onSelect={select} portraits={portraits} />
                             {graphPick(list)}
                         </>
                     ) : (

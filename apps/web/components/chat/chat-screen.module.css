@@ -25,3 +25,20 @@
 .screen > :not(section) {
     flex: none;
 }
+
+/*
+ * Desktop (spec: "Desktop layout"): the Chat spans the page beside the side rail, so the thread
+ * scrolls anywhere across it, while the top bar, the strip, the lines and the composer keep a
+ * reading column of about 48rem in the middle.
+ */
+@media (min-width: 1024px) {
+    :global(.page):has(> .screen) {
+        padding-left: 0;
+        padding-right: 0;
+    }
+
+    .screen > :not(section):not(aside) {
+        width: min(100% - 3rem, 48rem);
+        margin-inline: auto;
+    }
+}

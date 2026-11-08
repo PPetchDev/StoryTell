@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 
 import { LoreEntry } from '@/lib/story';
 import { ConfirmButton, SegmentedField, TextField, Toolbar } from './fields';
+import { FoldingCard } from './folding-card';
 import { FieldRewrites, fieldDomId, rewriteKey } from './rewrite';
 import styles from './story-editor.module.css';
 
@@ -51,9 +52,12 @@ export function LoreCard({ entry, index, rewrites, onText, onKeywords, onAlwaysO
     }, [entry.keywords]);
 
     return (
-        <section className={styles.card} aria-label={`Lore ${index + 1}`}>
-            <div className={styles.cardHeader}>
-                <h3 className={styles.cardTitle}>{heading}</h3>
+        <FoldingCard
+            foldKey={`lore:${entry.id}`}
+            label={`Lore ${index + 1}`}
+            fieldPrefixes={[`field-lore.${entry.id}.`]}
+            title={heading}
+            tools={
                 <Toolbar>
                     <ConfirmButton
                         label="Remove"
@@ -64,7 +68,8 @@ export function LoreCard({ entry, index, rewrites, onText, onKeywords, onAlwaysO
                         onConfirm={onRemove}
                     />
                 </Toolbar>
-            </div>
+            }
+        >
             <TextField
                 label="Name"
                 value={entry.name}
@@ -101,6 +106,6 @@ export function LoreCard({ entry, index, rewrites, onText, onKeywords, onAlwaysO
                 onChange={(value) => onAlwaysOn(value === 'always')}
                 {...marks('alwaysOn')}
             />
-        </section>
+        </FoldingCard>
     );
 }

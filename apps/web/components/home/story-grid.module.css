@@ -66,3 +66,11 @@
     font-size: 0.75rem;
     color: var(--muted);
 }
+
+/* Wider screens: as many covers to a row as fit, about 11rem each (spec: "Desktop layout"). */
+@media (min-width: 720px) {
+    .grid {
+        grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+        gap: 1.75rem 1.25rem;
+    }
+}

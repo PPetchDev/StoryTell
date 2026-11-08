@@ -1,8 +1,11 @@
 'use client';
 
+import { CharacterPortrait } from '@/components/portrait/character-portrait';
+import { Portrait } from '@/lib/character-colour';
 import { Character, characterRemovalWarning, Story } from '@/lib/story';
 import { useFieldMarks } from './field-marks';
 import { ChangedMark, ConfirmButton, OrderButtons, TextField, Toolbar } from './fields';
+import { FoldingCard } from './folding-card';
 import { ReferenceImage } from './reference-image';
 import { fieldDomId, FieldRewrites, rewritableField, rewriteKey } from './rewrite';
 import styles from './story-editor.module.css';
@@ -16,6 +19,9 @@ interface CharacterCardProps {
     imageStyle: string;
     index: number;
     count: number;
+    /** Their Character colour and Portrait, for the picture in the card's header. */
+    colour: string;
+    portrait?: Portrait;
     rewrites: FieldRewrites;
     onText(field: TextKey, value: string): void;
     onExampleLines(lines: string[]): void;
@@ -26,7 +32,7 @@ interface CharacterCardProps {
     commit(run: () => Promise<Story>, onError: (message: string) => void): Promise<Story | undefined>;
 }
 
-/** One Character on the Characters tab. Their starting Bonds are on the Bonds tab. */
+/** One Character on the Characters tab, folding. Their starting Bonds are on the Bonds tab. */
 export function CharacterCard(props: CharacterCardProps) {
     const { character, index, count, rewrites } = props;
     const heading = character.name.trim() === '' ? `Character ${index + 1}` : character.name;
@@ -49,9 +55,18 @@ export function CharacterCard(props: CharacterCardProps) {
     };
 
     return (
-        <section className={styles.card} aria-label={`Character ${index + 1}`}>
-            <div className={styles.cardHeader}>
-                <h3 className={styles.cardTitle}>{heading}</h3>
+        <FoldingCard
+            foldKey={`character:${character.id}`}
+            label={`Character ${index + 1}`}
+            fieldPrefixes={[`field-character.${character.id}.`]}
+            bodyClassName={styles.characterBody}
+            title={
+                <>
+                    <CharacterPortrait name={heading} colour={props.colour} portrait={props.portrait} className={styles.cardPortrait} />
+                    {heading}
+                </>
+            }
+            tools={
                 <Toolbar>
                     <OrderButtons index={index} count={count} what={heading} onMove={props.onMove} />
                     <ConfirmButton
@@ -63,7 +78,8 @@ export function CharacterCard(props: CharacterCardProps) {
                         onConfirm={props.onRemove}
                     />
                 </Toolbar>
-            </div>
+            }
+        >
             <TextField
                 label="Name"
                 value={character.name}
@@ -169,6 +185,6 @@ export function CharacterCard(props: CharacterCardProps) {
                 onChange={(v) => props.onText('arcDirections', v)}
                 {...ofCharacter('arcDirections')}
             />
-        </section>
+        </FoldingCard>
     );
 }

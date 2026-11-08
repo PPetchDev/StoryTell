@@ -1,8 +1,10 @@
 'use client';
 
-import { KeyboardEvent, MouseEvent, useMemo } from 'react';
+import { KeyboardEvent, MouseEvent, useId, useMemo } from 'react';
 
-import { characterColour } from '@/lib/character-colour';
+import { initialOf } from '@/components/portrait/character-portrait';
+import { DEFAULT_PORTRAIT_CROP } from '@/components/portrait/portrait-image';
+import { characterColour, Portrait, Portraits } from '@/lib/character-colour';
 import { Memory, MemoryList, renderUser } from '@/lib/memory';
 import { layoutMemoryGraph, MEMORY_RADIUS, memoryAbout, Person, PERSON_RADIUS } from '@/lib/memory-graph';
 
@@ -28,6 +30,8 @@ interface MemoryGraphProps {
     memories: readonly Memory[];
     selected: GraphSelection;
     onSelect(selection: GraphSelection): void;
+    /** The Characters' Portraits; one without shows their initial. */
+    portraits?: Portraits;
 }
 
 /** Enter and Space press a node, as on a button. */
@@ -38,12 +42,42 @@ function pressOnKey(event: KeyboardEvent, press: () => void) {
 }
 
 /**
+ * A Character's Portrait inside their node's ring: the chosen square of the Reference image, as
+ * PortraitImage places it, clipped to a circle just inside the ring.
+ */
+function PortraitInNode({ portrait, clipId }: { portrait: Portrait; clipId: string }) {
+    const crop = portrait.crop ?? DEFAULT_PORTRAIT_CROP;
+    const radius = PERSON_RADIUS - 1;
+    const frame = radius * 2;
+    // The crop is in fractions of the image's width, so the image is frame / size wide. Its height
+    // is unknown here: a box four widths tall with "meet" keeps it exactly that wide, from the top.
+    const width = frame / crop.size;
+    return (
+        <g className="memory-graph-portrait">
+            <clipPath id={clipId}>
+                <circle r={radius} />
+            </clipPath>
+            <image
+                href={portrait.src}
+                x={-radius - (crop.x / crop.size) * frame}
+                y={-radius - (crop.y / crop.size) * frame}
+                width={width}
+                height={width * 4}
+                preserveAspectRatio="xMinYMin meet"
+                clipPath={`url(#${clipId})`}
+            />
+        </g>
+    );
+}
+
+/**
  * The Memory graph (CONTEXT.md: "Memory graph"): the worn identity in the middle, the Characters round
  * it in their colours, and each Memory a dot linked to the people it is about. A person is
  * picked to light up the Memories about them and fade the ones a Character does not know; a dot
  * is picked to open that Memory under the graph. A tap on empty space clears the pick.
  */
-export function MemoryGraph({ list, memories, selected, onSelect }: MemoryGraphProps) {
+export function MemoryGraph({ list, memories, selected, onSelect, portraits = {} }: MemoryGraphProps) {
+    const clipPrefix = `memory-graph-${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
     const castIds = list.cast.map((character) => character.id);
     const people: Person[] = ['user', ...castIds];
     const about = new Map(memories.map((memory) => [memory.id, memoryAbout(memory, list)]));
@@ -165,9 +199,13 @@ export function MemoryGraph({ list, memories, selected, onSelect }: MemoryGraphP
                         onKeyDown={(event) => pressOnKey(event, press)}
                     >
                         <circle r={PERSON_RADIUS} stroke={colourOf(person)} fill="var(--surface-raised)" className="memory-graph-person-ring" />
-                        <text className="memory-graph-initial" fill={colourOf(person)} dy="0.35em">
-                            {Array.from(name)[0]?.toUpperCase()}
-                        </text>
+                        {person !== 'user' && portraits[person] ? (
+                            <PortraitInNode portrait={portraits[person]} clipId={`${clipPrefix}-${person}`} />
+                        ) : (
+                            <text className="memory-graph-initial" fill={colourOf(person)} dy="0.35em">
+                                {initialOf(name)}
+                            </text>
+                        )}
                         <text className="memory-graph-name" y={PERSON_RADIUS + 13}>
                             {person === 'user' ? `${name} (you)` : name}
                         </text>

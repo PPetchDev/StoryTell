@@ -8,7 +8,8 @@ import { useConnection } from '@/components/connection';
 import { StoryAssistantSheet } from '@/components/story-assistant/story-assistant-sheet';
 import { fieldOf, useStoryAssistant } from '@/components/story-assistant/use-story-assistant';
 import { ApiUnreachableError } from '@/lib/api';
-import { portraitsOf } from '@/lib/character-colour';
+import { characterColour, portraitsOf } from '@/lib/character-colour';
+import { isFolded, setFolded } from '@/lib/folds';
 import { AppliedChange } from '@/lib/story-assistant';
 import {
     LoreEntry,
@@ -107,6 +108,7 @@ export function StoryEditor({ initial }: { initial: Story }) {
     const flashTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
     const tabList = useRef<HTMLDivElement>(null);
     const header = useRef<HTMLDivElement>(null);
+    const headerRow = useRef<HTMLDivElement>(null);
     const storyId = initial.id;
 
     useEffect(() => () => clearTimeout(flashTimer.current), []);
@@ -170,6 +172,9 @@ export function StoryEditor({ initial }: { initial: Story }) {
         if (!place.domId) return;
         const target = document.getElementById(place.domId);
         if (!target) return;
+        // A field in a folded card: unfold it now, so there is something to scroll to and focus.
+        const foldKey = target.closest<HTMLElement>('[data-fold-key]')?.dataset.foldKey;
+        if (foldKey && isFolded(foldKey)) flushSync(() => setFolded(foldKey, false));
         target.scrollIntoView({
             block: fitsInView(target) ? 'center' : 'start',
             behavior: prefersReducedMotion() ? 'auto' : 'smooth',
@@ -183,15 +188,22 @@ export function StoryEditor({ initial }: { initial: Story }) {
     const showField = (field: RewriteRequest, how: { focus: boolean }) => jumpTo(placeOfField(field), how);
 
     // What scrolls into view (a jump, Tab, the browser's own scroll to a focused field) lands
-    // under the sticky header, kept measured as it wraps, and above the Assistant's sheet.
+    // under the sticky header, kept measured as it wraps, and above the Assistant's sheet. On a
+    // phone the header and the tabs stick together; on a wide screen the tabs are a side list and
+    // only the header row sticks (the top block is then `display: contents`).
     useEffect(() => {
         const node = header.current;
-        if (!node) return;
+        const row = headerRow.current;
+        if (!node || !row) return;
         const root = document.documentElement;
-        const measure = () => root.style.setProperty('--editor-top', `${node.offsetHeight}px`);
+        const measure = () => {
+            const sticky = getComputedStyle(node).display === 'contents' ? row : node;
+            root.style.setProperty('--editor-top', `${sticky.offsetHeight}px`);
+        };
         measure();
         const observer = new ResizeObserver(measure);
         observer.observe(node);
+        observer.observe(row);
         root.classList.add(styles.underHeaderRoot);
         return () => {
             observer.disconnect();
@@ -207,6 +219,9 @@ export function StoryEditor({ initial }: { initial: Story }) {
     }, [assistant.open]);
 
     const marks = useMemo(() => ({ needed: neededIds(story.missing, story), flashed }), [story, flashed]);
+    // Each Character's colour and picture, for the headers of their cards.
+    const castIds = story.characters.map((character) => character.id);
+    const portraits = portraitsOf(story.characters);
     const tabsMissing = useMemo(() => tabsWithMissing(story.missing, story), [story]);
 
     const setStoryText = (field: StoryText, value: string) => {
@@ -308,16 +323,18 @@ export function StoryEditor({ initial }: { initial: Story }) {
     };
 
     return (
-        <main className={assistant.open ? styles.underSheet : undefined}>
+        <main className={assistant.open ? `wide ${styles.editor} ${styles.underSheet}` : `wide ${styles.editor}`}>
             <div ref={header} className={styles.top}>
-                <EditorHeader
-                    title={storyTitle(story)}
-                    save={state}
-                    playable={story.playable}
-                    missingCount={story.missing.length}
-                    onAssistant={assistant.openSheet}
-                    onPlay={play}
-                />
+                <div ref={headerRow} className={styles.headerRow}>
+                    <EditorHeader
+                        title={storyTitle(story)}
+                        save={state}
+                        playable={story.playable}
+                        missingCount={story.missing.length}
+                        onAssistant={assistant.openSheet}
+                        onPlay={play}
+                    />
+                </div>
                 <div ref={tabList} className={styles.tabs} role="tablist" aria-label="Story sections" onKeyDown={onTabKey}>
                     {TABS.map((t) => (
                         <button
@@ -472,6 +489,8 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                     commit={(run, onError) => commit(run, applyWhole, onError)}
                                     index={index}
                                     count={story.characters.length}
+                                    colour={characterColour(character.id, castIds)}
+                                    portrait={portraits[character.id]}
                                     rewrites={fieldRewrites}
                                     onText={(field, value) => setCharacterField(character.id, field, value)}
                                     onExampleLines={(lines) => setCharacterField(character.id, 'exampleLines', lines)}
@@ -510,6 +529,8 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                     key={character.id}
                                     character={character}
                                     index={index}
+                                    colour={characterColour(character.id, castIds)}
+                                    portrait={portraits[character.id]}
                                     cast={story.characters}
                                     role={story.role}
                                     bonds={story.startingBonds.filter((bond) => bond.fromCharacterId === character.id)}
@@ -595,7 +616,7 @@ export function StoryEditor({ initial }: { initial: Story }) {
                 <OpeningPreview
                     storyId={storyId}
                     cast={story.characters.map((character) => character.id)}
-                    portraits={portraitsOf(story.characters)}
+                    portraits={portraits}
                     playable={story.playable}
                     flush={flush}
                     onPlay={play}

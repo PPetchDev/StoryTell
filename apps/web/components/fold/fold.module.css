@@ -1,0 +1,59 @@
+/* A folding card's title: the whole title is the button, with a chevron that turns as it opens. */
+
+.title {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    font-size: inherit;
+}
+
+.button {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    min-height: 2.75rem;
+    margin: 0;
+    padding: 0.25rem 0;
+    background: transparent;
+    border: 0;
+    border-radius: 0.6rem;
+    font: inherit;
+    font-weight: 700;
+    color: var(--text);
+    text-align: left;
+    overflow-wrap: anywhere;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.label {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+/* Points down while folded (there is more), up while open. */
+.chevron {
+    flex: none;
+    color: var(--muted);
+    transform: rotate(180deg);
+    transition: transform 0.15s ease;
+}
+
+.button[aria-expanded='false'] .chevron {
+    transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .chevron {
+        transition: none;
+    }
+}

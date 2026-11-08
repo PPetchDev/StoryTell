@@ -165,3 +165,12 @@
         opacity: 0.75;
     }
 }
+
+/* Desktop: the lines keep the reading column while the thread scrolls across the page. */
+@media (min-width: 1024px) {
+    .content {
+        width: min(100% - 3rem, 48rem);
+        margin-inline: auto;
+        padding-top: 1.25rem;
+    }
+}

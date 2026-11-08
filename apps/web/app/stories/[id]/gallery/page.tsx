@@ -33,7 +33,7 @@ function GalleryPage({ storyId }: { storyId: number }) {
         );
     }
     return (
-        <main>
+        <main className="wide">
             <nav className="breadcrumbs">
                 <Link href={`/stories/${storyId}/chats`}>← Chats</Link>
             </nav>
