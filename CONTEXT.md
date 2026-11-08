@@ -17,8 +17,16 @@ An optional, author-defined stage of a Story that the plot moves through in orde
 _Avoid_: Chapter, act, stage
 
 **Lore**:
-A Story's notes about its world, each a **Lore entry**: a name, keywords and a short text about a place, people, custom or object. An entry reaches the Narrator only when its name or a keyword comes up in the latest exchange, or on every turn when it is set to always be included; the Setting stays the short core sent on every turn. Lore is common knowledge in the world, so every Character knows it; a Character's secrets stay on their card. It belongs to the Story and is shared by all its Chats, where a Memory belongs to one Chat.
+A Story's notes about its world, each a **Lore entry**: a name, keywords and a short text about a place, people, custom or object. An entry reaches the Narrator only when its triggers come up in the latest exchange or in another entry already chosen, for a few Messages after that when it is set to stay, or on every turn when it is set to always be included; the Setting stays the short core sent on every turn. Lore is common knowledge in the world, so every Character knows it; a Character's secrets stay on their card. It belongs to the Story and is shared by all its Chats, where a Memory belongs to one Chat.
 _Avoid_: Lorebook, world info, codex, wiki
+
+**Document**:
+A longer text the author attaches to a Story — pasted, uploaded or taken from a web page — whose passages reach the Narrator when they are close in meaning to the latest exchange. Like Lore it is common knowledge shared by all the Story's Chats, but it is found by meaning, not by keywords, and is never edited into entries.
+_Avoid_: Data bank, attachment, file, source
+
+**Character card**:
+A character in the community card format (a PNG or JSON file) used by other roleplay apps. Importing one makes a new Story around that character; any Character can be exported as one.
+_Avoid_: Tavern card, bot card, character file
 
 **Opening**:
 The author-written passage that begins every Chat of a Story.
@@ -45,7 +53,7 @@ The picture the author chooses for a Story, shown on its card on Home and at the
 _Avoid_: Thumbnail, banner, key art
 
 **Duplicate**:
-Making a new Story, "<title> (copy)", from everything the author wrote in another: its text, style, Role, Characters with their Reference images and Portraits, Scenes, Starting Bonds, Lore and Cover, each image in a file of its own. No Chats or Snapshots come along, so a Cover that is a Snapshot is dropped.
+Making a new Story, "<title> (copy)", from everything the author wrote in another: its text, style, Narration voice and Backdrop choice, Role, Characters with their Reference images, Portraits, Expressions and Speaking voices, Scenes, Starting Bonds, Lore, Documents, its own Saved replies and Replace rules, and Cover, each image in a file of its own. No Chats or Snapshots come along, so a Cover that is a Snapshot is dropped.
 _Avoid_: Clone, fork, template
 
 ## Playing
@@ -57,6 +65,54 @@ _Avoid_: Session, playthrough, conversation, thread
 **Message**:
 One entry in a Chat's history: either what the user wrote, shown under the Role or Persona they wore at the time, or the AI's reply, which is narration and Characters' speech in order. A Chat begins with the Opening as its first Message. Editing a Message discards every Message after it.
 _Avoid_: Post, reply, bubble, entry
+
+**Branch**:
+A new Chat copied from another up to one of its Messages, with everything that Chat knew at that Message — Memory, Bonds, Arcs, Scene, Time of day — so the story can go another way while the original stays as it was. A Branch remembers which Chat it came from.
+_Avoid_: Fork, checkpoint, clone, copy
+
+**Author's note**:
+The user's own standing direction for one Chat ("keep it a slow burn"), read by the Narrator every turn. It directs; it is never a fact (a Memory) or a stage of the plot (a Scene).
+_Avoid_: Director's note, system note, instruction
+
+**Nudge**:
+Asking the Narrator to give one Character a line in the next turn; a hint it may pass over, never a forced speaker.
+_Avoid_: Force talk, mention, ping
+
+**Sitting out**:
+A Character the user keeps out of a Chat's turns until bringing them back; the Narrator doesn't write them, but their Memories and Bonds stay as they were.
+_Avoid_: Mute, disable, remove
+
+**Write for me**:
+Asking the AI to write the user's next Message in English, as the Role or Persona they wear, from whatever is in the composer (Thai, notes, half a line) or from nothing; the result only fills the composer.
+_Avoid_: Impersonate, autocomplete, auto-reply
+
+**Thai reading**:
+A Thai translation of one Message, made when the user asks and kept for re-reading; it is never part of the Chat and the AI never reads it.
+_Avoid_: Translation (alone), localisation
+
+**Saved reply**:
+A line the user wrote once and keeps for reuse, for the whole app or one Story, that fills the composer in one tap.
+_Avoid_: Quick reply, macro, snippet
+
+**Replace rule**:
+A find-and-replace the user sets, applied to AI Messages as they are shown (what is stored never changes) and, when chosen, to the user's own Message before it is sent.
+_Avoid_: Regex, filter, script
+
+**Dictation**:
+Speaking into the composer instead of typing, in Thai or English; what is heard becomes ordinary composer text.
+_Avoid_: Voice input, speech-to-text
+
+**Read aloud**:
+Playing an AI Message as speech: narration in the Story's Narration voice and each Character's lines in their Speaking voice.
+_Avoid_: TTS, narrate, voice playback
+
+**Backdrop**:
+The dimmed picture behind a Chat's Messages: the Story's Cover or the Chat's newest Snapshot.
+_Avoid_: Background, wallpaper
+
+**Visual novel view**:
+A way of showing a Chat one part at a time, with the speaking Character's picture large over the Backdrop and their words in a box below; the Chat itself is the same in either view.
+_Avoid_: VN mode, stage view
 
 **Transcript**:
 A Chat as a plain text file the user downloads from the Chat menu: a title line, then every Message in order, the user's lines as "Name: …" under the identity worn when each was sent, and the AI's narration and speech as readable text.
@@ -125,6 +181,14 @@ _Avoid_: Avatar, profile picture
 **Portrait**:
 The square of a Character's Reference image that the author picks to stand for the Character: beside their lines in a Chat, on their node in the Memory graph, on the Dashboard and on their cards in the Story editor; until one is picked, a square near the top middle stands in, and without a Reference image, the Character's initial on their Character colour.
 _Avoid_: Avatar, profile picture, icon
+
+**Expression**:
+A Character's picture for one emotion, drawn from their Reference image or uploaded by the author. When a line of theirs carries that emotion it shows in place of their Portrait; without one, the Portrait shows as usual.
+_Avoid_: Sprite, emote, mood picture
+
+**Speaking voice**:
+The synthetic voice a Character's lines are read aloud in, chosen by the author; unrelated to the Character's Voice, which is how they talk on the page. A Story also has a **Narration voice** for everything that is not a Character's line.
+_Avoid_: TTS voice, audio voice
 
 **Character profile**:
 What a tap on a Character's Portrait in a Chat opens: their whole Reference image, name, Appearance, Personality, Voice and Background, but never their Secrets or Arc directions, which would give the story away.
