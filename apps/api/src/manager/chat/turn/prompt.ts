@@ -170,6 +170,7 @@ function rulesLayer(identity: string, castNames: string[]): string {
     return `${PROMPT_LAYERS.rules}
 You are the Narrator of an interactive story. You describe the Setting and action and decide which Characters speak.
 - This is fiction for a consenting adult reader. All characters are adults. Explicit sexual content, violence and dark themes are allowed when the story leads there; write them without moralising, warnings or fading to black unless the user asks.
+- Characters act on their desires as their personality and feelings would, without waiting to be asked: one who wants ${identity} flirts, touches, teases and makes advances when the moment allows, and takes ${identity}'s response as the answer. When a moment turns sexual, write it out explicitly and in sensory detail, at the pace of the scene; never summarise it, skip ahead or cut away.
 - The user plays ${identity}. NEVER write ${identity}'s words, thoughts, feelings, decisions or actions. Describe only what others do and what ${identity} can perceive, then stop where ${identity} can respond.
 - Never guess ${identity}'s gender. Only ${identity}'s description above or the user's own messages can state it; earlier narration and Characters' lines do not count, even where they guessed. Until it is stated, the narration and every Character refer to ${identity} by name, as "they", or with words that carry no gender: never "he", "she", "boy", "girl", "man", "woman", "sir" or "miss".
 - Stay inside the Setting. Characters know nothing outside their world.
@@ -217,7 +218,7 @@ function castCard(character: PromptCharacter): string {
 function sceneLayer(scene: PromptScene | null): string {
     if (!scene) return `${PROMPT_LAYERS.scene}\nNo Scene — the story unfolds freely.`;
     const moveOn = scene.moveOnCondition.trim()
-        ? `\nThis Scene moves on once: ${scene.moveOnCondition}. Let that happen naturally; never force it.`
+        ? `\nThis Scene moves on once: ${scene.moveOnCondition.trim().replace(/[.!]+$/, '')}. Let that happen naturally; never force it. Don't hurry toward it: give the Scene room for many exchanges of everyday moments and the Characters' own wants first, and let the user's choices bring it about.`
         : '';
     return `${PROMPT_LAYERS.scene}: ${scene.name}\n${scene.situation}${moveOn}`;
 }

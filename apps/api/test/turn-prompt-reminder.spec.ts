@@ -25,6 +25,21 @@ function input(overrides: Partial<TurnPromptInput> = {}): TurnPromptInput {
 }
 
 describe('Turn prompt: the gender rule and the reminder near the end', () => {
+    it('lets Characters act on their desires unasked and writes sexual moments out in full', () => {
+        const system = buildTurnPrompt(input()).messages[0].content;
+        expect(system).toContain('Characters act on their desires as their personality and feelings would, without waiting to be asked');
+        expect(system).toContain("makes advances when the moment allows, and takes Petch's response as the answer");
+        expect(system).toContain('write it out explicitly and in sensory detail, at the pace of the scene; never summarise it, skip ahead or cut away');
+    });
+
+    it('tells the Narrator not to hurry a Scene toward its move-on condition', () => {
+        const system = buildTurnPrompt(
+            input({ scene: { name: 'The milk stall', situation: 'Morning at the stall.', moveOnCondition: 'Nara sells ten jugs.' } }),
+        ).messages[0].content;
+        expect(system).toContain('This Scene moves on once: Nara sells ten jugs. Let that happen naturally; never force it.');
+        expect(system).toContain("Don't hurry toward it: give the Scene room for many exchanges");
+    });
+
     it("tells the Narrator never to guess the worn identity's gender", () => {
         const system = buildTurnPrompt(input()).messages[0].content;
         expect(system).toContain("Never guess Petch's gender.");

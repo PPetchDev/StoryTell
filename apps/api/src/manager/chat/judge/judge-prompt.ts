@@ -65,7 +65,12 @@ Arc rules:
 - The core definition is never rewritten; you only add steps. A step can reverse an earlier one.
 
 Scene rule:
-- Judge whether the current Scene's move-on condition has now been met, with the Bonds in view. Be strict: met means clearly met in the story, not "getting closer".
+- Judge whether the current Scene's move-on condition has now been met, with the Bonds in view. Be strict: met means it has fully HAPPENED in the story by the end of the latest exchange.
+- Not met: getting closer, someone about to do it, saying they could or will do it, agreeing to do it later, or the story setting it up.
+- When the condition names who must act (the user or a Character), only that one doing it counts. Someone else revealing or doing it instead does not.
+- When the condition has several parts, every part must have happened.
+- When in doubt, move_on is false. A Scene is meant to last many exchanges.
+- Write the reason first, saying what has and has not happened yet, then decide move_on from it.
 
 Time of day rule:
 - Give the in-story time of day only when the latest exchange moves it on to a new one, or first makes it clear: one of "dawn", "morning", "noon", "afternoon", "evening" or "night". Otherwise null. Read it from the story (light, meals, sleep, the sky); never guess.
@@ -73,7 +78,7 @@ Time of day rule:
 Reply with JSON only:
 {"bond_changes":[{"from":"Name","to":"user|Name","label":"...","description":"...","cause":"..."}],
  "arc_steps":[{"character":"Name","step":"...","cause":"..."}],
- "scene":{"move_on":false,"reason":"..."},
+ "scene":{"reason":"...","move_on":false},
  "time_of_day":null}
 Empty arrays when nothing changed.`;
 
