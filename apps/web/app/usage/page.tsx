@@ -21,11 +21,13 @@ function callCount(count: number): string {
 }
 
 function PoolCard({ pool, usage }: { pool: CreditPool; usage: PoolUsage }) {
-    const provider = pool === 'text' ? 'OpenRouter' : 'Venice';
+    // The Venice pool's label already names its provider.
+    const provider = pool === 'text' ? 'OpenRouter' : null;
     return (
         <section className="card" aria-labelledby={`pool-${pool}`}>
             <h2 id={`pool-${pool}`}>
-                {POOL_LABEL[pool]} <span className="muted">({provider})</span>
+                {POOL_LABEL[pool]}
+                {provider && <> <span className="muted">({provider})</span></>}
             </h2>
             <dl className="facts">
                 <dt>Spent this month</dt>

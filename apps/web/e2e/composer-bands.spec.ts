@@ -56,8 +56,15 @@ test('the composer stacks the panel, the Character row, the tool row and the box
         const boxRow = await box(text);
         expect(toolRow.y + toolRow.height).toBeLessThanOrEqual(boxRow.y + 1);
 
-        // With ⚡ and ✱ out of its row, the box takes most of the phone's width.
-        expect(boxRow.width).toBeGreaterThan(390 * 0.75);
+        // With ⚡ and ✱ out of its row, the box shares it only with 🎤 and the send slot
+        // (.scratch/dictation/spec.md: "Box row = box · 🎤 · send slot"), and takes the rest:
+        // two 2.75rem buttons and the gaps leave it about two thirds of the phone.
+        const dictate = composer.getByRole('button', { name: 'Dictate' });
+        const send = composer.getByRole('button', { name: 'Continue' });
+        const [dictateBox, sendBox] = [await box(dictate), await box(send)];
+        expect(boxRow.x + boxRow.width).toBeLessThanOrEqual(dictateBox.x);
+        expect(dictateBox.x + dictateBox.width).toBeLessThanOrEqual(sendBox.x);
+        expect(boxRow.width).toBeGreaterThan(390 * 0.62);
 
         // A one-Character Story: the Character row is there but takes no height.
         const characters = composer.locator('[data-band="characters"]');

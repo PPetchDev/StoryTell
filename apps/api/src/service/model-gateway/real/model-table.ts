@@ -10,6 +10,7 @@ import {
     TEXT_ONLY_SNAPSHOT_MODELS,
     TextCallKind,
     TextModel,
+    TranscriptionModel,
 } from '../model-gateway.js';
 
 /**
@@ -246,6 +247,18 @@ export const IMAGE_MODELS: Record<ImageModel, ImageModelSpec> = {
 };
 
 export const VENICE_HOST = 'venice';
+
+export interface TranscriptionModelSpec {
+    /** Venice's model id. */
+    id: string;
+    /** List price per second of audio, recorded since Venice reports no cost per call. */
+    priceUsdPerSecond: number;
+}
+
+/** Venice's pricing page, read 2026-11-08: Whisper Large V3 at $0.0001 per audio second. */
+export const TRANSCRIPTION_MODELS: Record<TranscriptionModel, TranscriptionModelSpec> = {
+    'whisper-large-v3': { id: 'openai/whisper-large-v3', priceUsdPerSecond: 0.0001 },
+};
 
 /**
  * The size an image is drawn at: the one asked for when the model has it, and 2K whenever it

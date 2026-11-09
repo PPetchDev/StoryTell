@@ -73,7 +73,10 @@ export type CallKind =
     | 'snapshot_image'
     | 'reference_image'
     | 'document_embedding'
-    | 'document_search';
+    | 'document_search'
+    | 'dictation'
+    | 'read_aloud'
+    | 'voice_preview';
 
 /** What each call kind is for, in the words the Usage page shows. */
 export const CALL_KIND_LABEL: Record<CallKind, string> = {
@@ -92,6 +95,9 @@ export const CALL_KIND_LABEL: Record<CallKind, string> = {
     reference_image: 'Reference images',
     document_embedding: 'Document adding',
     document_search: 'Document search',
+    dictation: 'Dictation',
+    read_aloud: 'Read aloud',
+    voice_preview: 'Voice samples',
 };
 
 /** One call kind's share of a pool's spend this month. */
@@ -117,7 +123,8 @@ export interface UsageResponse {
     pools: Record<CreditPool, PoolUsage>;
 }
 
-export const POOL_LABEL: Record<CreditPool, string> = { text: 'Text', image: 'Image' };
+/** The Venice pool is named for everything it pays for; its id stays `image` (.scratch/dictation/spec.md). */
+export const POOL_LABEL: Record<CreditPool, string> = { text: 'Text', image: 'Images and audio (Venice)' };
 
 /** Dollars to the cent; a non-zero amount under a cent shows as "<$0.01", so small spend is never "$0.00". */
 export function usd(amount: number): string {

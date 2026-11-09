@@ -266,8 +266,8 @@ function SettingsForm({ initial, autosave }: { initial: SettingsResponse; autosa
                     {numberField('textLowCreditPercent', 'text-threshold', 'Text warning (%)', 'percent')}
                 </div>
                 <div className="field-row">
-                    {numberField('imageCreditCapUsd', 'image-cap', 'Image pool (USD)', 'usd')}
-                    {numberField('imageLowCreditPercent', 'image-threshold', 'Image warning (%)', 'percent')}
+                    {numberField('imageCreditCapUsd', 'image-cap', 'Images and audio (Venice) pool (USD)', 'usd')}
+                    {numberField('imageLowCreditPercent', 'image-threshold', 'Images and audio (Venice) warning (%)', 'percent')}
                 </div>
             </section>
         </>

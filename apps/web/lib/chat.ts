@@ -1,4 +1,4 @@
-import { apiSend, apiSendStream } from './api';
+import { apiFetch, apiSend, apiSendStream } from './api';
 import { MissingField } from './story';
 import type { TraySavedReply } from './saved-replies';
 import type { ChatReplaceRule } from './replace-rules';
@@ -228,6 +228,14 @@ function withNudge(body: object | undefined, nudge: number | null | undefined): 
     return nudge === null || nudge === undefined ? body : { ...body, nudgeCharacterId: nudge };
 }
 
+/** The file name a recording is sent under: the API reads the type from its bytes, but a name helps logs. */
+function recordingExtension(mimeType: string): string {
+    if (mimeType.startsWith('audio/mp4')) return 'm4a';
+    if (mimeType.startsWith('audio/ogg')) return 'ogg';
+    if (mimeType.startsWith('audio/wav')) return 'wav';
+    return 'webm';
+}
+
 /** Writes answer with the whole Chat; the list and the Chat itself are read with useApiQuery. */
 export const chatApi = {
     create: (storyId: number) => apiSend<Chat>('POST', `/stories/${storyId}/chats`),
@@ -253,6 +261,14 @@ export const chatApi = {
     /** The user's next Message in English, as the worn identity, from the composer's draft (or from nothing). Nothing is stored. */
     writeForMe: (storyId: number, chatId: number, draft: string) =>
         apiSend<{ text: string }>('POST', `/stories/${storyId}/chats/${chatId}/write-for-me`, { draft }),
+    /** .scratch/dictation/spec.md: a recording's text, for the composer. Nothing is stored, the audio included. */
+    dictate: (storyId: number, chatId: number, recording: Blob, language: 'th' | 'en', durationMs: number) => {
+        const form = new FormData();
+        form.append('audio', recording, `dictation.${recordingExtension(recording.type)}`);
+        form.append('language', language);
+        form.append('durationMs', String(Math.round(durationMs)));
+        return apiFetch<{ text: string }>(`/stories/${storyId}/chats/${chatId}/dictation`, { method: 'POST', body: form });
+    },
     /** The Message's stored text in Thai, made once by the background model and kept. */
     thaiReading: (storyId: number, chatId: number, messageId: number) =>
         apiSend<{ messageId: number; text: string }>('POST', `/stories/${storyId}/chats/${chatId}/messages/${messageId}/thai-reading`),

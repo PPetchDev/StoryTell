@@ -22,6 +22,9 @@ const CALL_KINDS = Object.keys({
     reference_image: true,
     document_embedding: true,
     document_search: true,
+    dictation: true,
+    read_aloud: true,
+    voice_preview: true,
 } satisfies Record<CallKind, true>);
 
 export class KindSpendDTO implements KindSpend {

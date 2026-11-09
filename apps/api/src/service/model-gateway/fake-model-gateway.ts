@@ -16,6 +16,8 @@ import {
     TextCompletionResult,
     TextStream,
     TextStreamResult,
+    TranscriptionRequest,
+    TranscriptionResult,
 } from './model-gateway.js';
 
 /**
@@ -43,9 +45,13 @@ export type FakeImageReply = (Partial<ImageGenerationResult> & { delayMs?: numbe
  */
 export type FakeEmbeddingReply = 'answer' | ModelGatewayError;
 
+/** A transcription is its text, a partial result (`delayMs` holds it back, as for images), or an error. */
+export type FakeTranscriptionReply = string | (Partial<TranscriptionResult> & { delayMs?: number }) | ModelGatewayError;
+
 export type FakeGatewayCall =
     | { method: 'completeText'; request: TextCompletionRequest }
     | { method: 'embedTexts'; request: EmbeddingRequest }
+    | { method: 'transcribe'; request: TranscriptionRequest }
     /** `stopped` turns true when the caller's signal ended the stream. */
     | { method: 'streamText'; request: TextCompletionRequest; stopped: boolean }
     | { method: 'generateImage'; request: ImageGenerationRequest }
@@ -63,6 +69,7 @@ export const FAKE_PNG: ImageData = {
 export const FAKE_TEXT_MODEL = 'fake/text-model';
 export const FAKE_IMAGE_MODEL = 'fake/image-model';
 export const FAKE_EMBEDDING_MODEL = 'fake/embedding-model';
+export const FAKE_TRANSCRIPTION_MODEL = 'fake/transcription-model';
 
 const DEFAULT_CREDIT: RemainingCredit = {
     text: { remainingUsd: 22, limitUsd: 22 },
@@ -79,6 +86,7 @@ export class FakeModelGateway extends ModelGateway {
     private readonly textReplies = new Map<TextCallKind, FakeTextReply[]>();
     private readonly imageReplies = new Map<ImageCallKind, FakeImageReply[]>();
     private readonly embeddingReplies = new Map<EmbeddingCallKind, FakeEmbeddingReply[]>();
+    private readonly transcriptionReplies: FakeTranscriptionReply[] = [];
     private credit: RemainingCredit = structuredClone(DEFAULT_CREDIT);
 
     scriptText(kind: TextCallKind, ...replies: FakeTextReply[]): this {
@@ -94,6 +102,12 @@ export class FakeModelGateway extends ModelGateway {
     /** Queues what the next embedding calls of `kind` do, in order; unscripted calls answer. */
     scriptEmbedding(kind: EmbeddingCallKind, ...replies: FakeEmbeddingReply[]): this {
         this.embeddingReplies.set(kind, [...(this.embeddingReplies.get(kind) ?? []), ...replies]);
+        return this;
+    }
+
+    /** Queues what the next transcriptions answer, in order (Dictation, the one audio kind so far). */
+    scriptTranscription(...replies: FakeTranscriptionReply[]): this {
+        this.transcriptionReplies.push(...replies);
         return this;
     }
 
@@ -124,10 +138,19 @@ export class FakeModelGateway extends ModelGateway {
         );
     }
 
+    transcriptionCalls(): TranscriptionRequest[] {
+        return this.calls.flatMap((call) => (call.method === 'transcribe' ? [call.request] : []));
+    }
+
     /** Scripted replies not yet consumed, by kind. Handy for asserting a flow made no call. */
     pendingReplies(): Record<string, number> {
         const pending: Record<string, number> = {};
-        for (const [kind, replies] of [...this.textReplies, ...this.imageReplies, ...this.embeddingReplies]) {
+        for (const [kind, replies] of [
+            ...this.textReplies,
+            ...this.imageReplies,
+            ...this.embeddingReplies,
+            ['dictation', this.transcriptionReplies] as const,
+        ]) {
             if (replies.length > 0) pending[kind] = replies.length;
         }
         return pending;
@@ -138,6 +161,7 @@ export class FakeModelGateway extends ModelGateway {
         this.textReplies.clear();
         this.imageReplies.clear();
         this.embeddingReplies.clear();
+        this.transcriptionReplies.length = 0;
         this.credit = structuredClone(DEFAULT_CREDIT);
     }
 
@@ -216,6 +240,21 @@ export class FakeModelGateway extends ModelGateway {
             usage: { promptTokens: request.inputs.reduce((sum, input) => sum + Math.ceil(input.length / 4), 0) },
             costUsd: 0,
         };
+    }
+
+    /** The next scripted transcription, trimmed as the real gateway trims it. */
+    async transcribe(request: TranscriptionRequest): Promise<TranscriptionResult> {
+        this.calls.push({ method: 'transcribe', request });
+        const reply = this.transcriptionReplies.shift();
+        if (reply === undefined) {
+            throw new Error(`FakeModelGateway: no scripted reply for transcription "${request.kind}"`);
+        }
+        if (reply instanceof ModelGatewayError) throw reply;
+
+        const { delayMs, ...partial } = typeof reply === 'string' ? { text: reply } : reply;
+        if (delayMs) await new Promise((resolve) => setTimeout(resolve, delayMs));
+        const result = { text: '', model: FAKE_TRANSCRIPTION_MODEL, costUsd: 0, ...partial };
+        return { ...result, text: result.text.trim() };
     }
 
     async remainingCredit(): Promise<RemainingCredit> {

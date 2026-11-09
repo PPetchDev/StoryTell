@@ -7,7 +7,7 @@ import {
     ProviderOutageError,
     UnparseableOutputError,
 } from '../../../errors/model-gateway.errors.js';
-import { CreditBalance, ImageData } from '../model-gateway.js';
+import { AudioData, CreditBalance, DictationLanguage, ImageData } from '../model-gateway.js';
 import {
     defaultSleep,
     FetchLike,
@@ -35,8 +35,31 @@ export interface VeniceImageRequest {
     resolution?: '2K';
 }
 
+export interface VeniceTranscriptionRequest {
+    /** Venice's model id. */
+    modelId: string;
+    audio: AudioData;
+    language: DictationLanguage;
+}
+
+export interface VeniceTranscription {
+    text: string;
+    /** The audio's length in seconds, when Venice reports it. */
+    durationSeconds?: number;
+}
+
+/** The file extension a recording's type is sent under: some servers go by the name. */
+const AUDIO_EXTENSIONS: Array<[prefix: string, extension: string]> = [
+    ['audio/webm', 'webm'],
+    ['audio/mp4', 'm4a'],
+    ['audio/x-m4a', 'm4a'],
+    ['audio/ogg', 'ogg'],
+    ['audio/wav', 'wav'],
+    ['audio/x-wav', 'wav'],
+];
+
 /**
- * Venice image calls. Request fields per https://docs.venice.ai/swagger.yaml
+ * Venice image and audio calls. Image request fields per https://docs.venice.ai/swagger.yaml
  * (GenerateImageRequest, MultiEditImageRequest) and the ticket 18 check
  * (prototypes/image-check/check.mjs). A 402 is out of image credit; a 422, a blurred result
  * or a content-violation result is a refusal.
@@ -115,6 +138,41 @@ export class VeniceClient {
             throw new UnparseableOutputError(`${request.model.id} returned no image.`);
         }
         return { bytes: Buffer.from(base64, 'base64'), mimeType: 'image/jpeg' };
+    }
+
+    // Audio: transcription (Dictation) here, and Read aloud's speech and voice list beside it when they
+    // land. Same headers, retries and error mapping as images.
+
+    /**
+     * `POST /audio/transcriptions`, multipart, per
+     * https://docs.venice.ai/api-reference/endpoint/audio/transcriptions (read 2026-11-09):
+     * `file`, `model`, `language` (Whisper only), `response_format` and `timestamps`; the
+     * answer is `{ text, duration? }`. `fetch` writes the multipart boundary itself.
+     */
+    async transcribe(request: VeniceTranscriptionRequest): Promise<VeniceTranscription> {
+        const form = new FormData();
+        const file = new Blob([new Uint8Array(request.audio.bytes)], { type: request.audio.mimeType });
+        form.append('file', file, `dictation.${audioExtension(request.audio.mimeType)}`);
+        form.append('model', request.modelId);
+        form.append('language', request.language);
+        form.append('response_format', 'json');
+        form.append('timestamps', 'false');
+
+        const response = await this.send('/audio/transcriptions', {
+            method: 'POST',
+            headers: this.inferenceHeaders(),
+            body: form,
+        });
+        const json = await readJson(response);
+        if (!response.ok) throw this.toError(response.status, json);
+        if (typeof json?.text !== 'string') {
+            throw new UnparseableOutputError(`${request.modelId} returned no text.`);
+        }
+        const duration = json.duration;
+        return {
+            text: json.text,
+            ...(typeof duration === 'number' && Number.isFinite(duration) && duration > 0 ? { durationSeconds: duration } : {}),
+        };
     }
 
     /**
@@ -208,4 +266,9 @@ export class VeniceClient {
         if (status === 422) return new ModelRefusalError(`Venice: ${detail}`);
         return new ProviderOutageError(`Venice: ${detail}${details}`);
     }
+}
+
+function audioExtension(mimeType: string): string {
+    const type = mimeType.toLowerCase();
+    return AUDIO_EXTENSIONS.find(([prefix]) => type.startsWith(prefix))?.[1] ?? 'webm';
 }

@@ -43,7 +43,14 @@ import { SnapshotModelService } from '../../model/snapshot/snapshot.service.js';
 import { SettingsModelService } from '../../model/settings/settings.service.js';
 import { StoryEntity } from '../../model/story/entities/story.entity.js';
 import { StoryModelService } from '../../model/story/story.service.js';
-import { ModelGateway, playModelName, TextCompletionRequest, TextCompletionResult } from '../../service/model-gateway/model-gateway.js';
+import {
+    DictationLanguage,
+    ModelGateway,
+    playModelName,
+    TextCompletionRequest,
+    TextCompletionResult,
+} from '../../service/model-gateway/model-gateway.js';
+import { checkRecording } from './dictation/recording.js';
 import { latestLine } from '../excerpt.js';
 import { exchangeUserText } from './exchange.js';
 import { MissingField, playableStatus } from '../story/playable.js';
@@ -802,6 +809,29 @@ export class ChatManagerService {
         const names = [...story.characters.map((character) => character.name), wornIdentity(story, chat).name, message.identityName ?? ''];
         const text = await this.thaiReadings.make(message.id, source, fingerprint, names, { storyId: story.id, chatId: chat.id });
         return { messageId: message.id, text };
+    }
+
+    /**
+     * .scratch/dictation/spec.md, "API": one recording turned into text for the composer. Every
+     * check runs before the paid call. It takes no turn lock and stores nothing: the Chat is read
+     * only to check it exists and to tag the usage, and the audio lives in memory for this call.
+     */
+    async dictate(
+        storyId: number,
+        chatId: number,
+        recording: { bytes: Buffer; language: DictationLanguage; durationMs: number },
+    ): Promise<{ text: string }> {
+        const { story, chat } = await this.load(storyId, chatId);
+        const mimeType = checkRecording(recording.bytes, recording.durationMs);
+        if ((await this.creditOut()).image) throw new OutOfCreditError('image');
+        const { text } = await this.gateway.transcribe({
+            kind: 'dictation',
+            audio: { bytes: recording.bytes, mimeType },
+            language: recording.language,
+            durationSeconds: recording.durationMs / 1000,
+            servedFor: { storyId: story.id, chatId: chat.id },
+        });
+        return { text: text.trim() };
     }
 
     /**

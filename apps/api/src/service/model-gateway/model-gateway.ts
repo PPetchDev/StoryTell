@@ -26,6 +26,12 @@ export abstract class ModelGateway {
      */
     abstract embedTexts(request: EmbeddingRequest): Promise<EmbeddingResult>;
 
+    /**
+     * Transcription for Dictation (.scratch/dictation/spec.md, "Model Gateway"): one recording, transcribed
+     * in the language asked for. Venice pool; callers never name the model.
+     */
+    abstract transcribe(request: TranscriptionRequest): Promise<TranscriptionResult>;
+
     abstract remainingCredit(): Promise<RemainingCredit>;
 }
 
@@ -49,7 +55,13 @@ export type ImageCallKind = 'snapshot_image' | 'reference_image';
 /** A Document's passages turned into vectors on Add, and one query per turn. Both in the text pool. */
 export type EmbeddingCallKind = 'document_embedding' | 'document_search';
 
-export type CallKind = TextCallKind | ImageCallKind | EmbeddingCallKind;
+/**
+ * Venice audio, in the Venice (`image`) pool: one type shared by Dictation and Read aloud
+ * (.scratch/sillytavern-gaps/integration.md, "Venice audio in the Model Gateway").
+ */
+export type AudioCallKind = 'dictation' | 'read_aloud' | 'voice_preview';
+
+export type CallKind = TextCallKind | ImageCallKind | EmbeddingCallKind | AudioCallKind;
 
 export const MAX_REFERENCE_IMAGES = 3;
 
@@ -70,6 +82,9 @@ export type TextModel = PlayModel | typeof BACKGROUND_MODEL;
 /** The one embedding model: BAAI's bge-m3, pinned to DeepInfra (Spec: Documents). */
 export const EMBEDDING_MODEL = 'bge-m3';
 export type EmbeddingModel = typeof EMBEDDING_MODEL;
+/** The one speech-to-text model: Whisper Large V3 on Venice, the only one there that takes a language. */
+export const TRANSCRIPTION_MODEL = 'whisper-large-v3';
+export type TranscriptionModel = typeof TRANSCRIPTION_MODEL;
 
 export const SNAPSHOT_MODELS = ['seedream-v4-edit', 'seedream-v5-pro-edit', 'qwen-edit-uncensored'] as const;
 export type SnapshotModel = (typeof SNAPSHOT_MODELS)[number];
@@ -256,6 +271,29 @@ export interface EmbeddingResult {
     /** The model that made them. Stored with a Document's passages, so another model's are never compared. */
     model: string;
     usage: { promptTokens: number };
+    costUsd: number;
+}
+
+export type DictationLanguage = 'th' | 'en';
+
+export interface AudioData {
+    bytes: Buffer;
+    mimeType: string;
+}
+
+export interface TranscriptionRequest {
+    kind: 'dictation';
+    audio: AudioData;
+    language: DictationLanguage;
+    /** As the browser measured it. The price is worked from it when Venice reports no duration. */
+    durationSeconds: number;
+    servedFor?: ServedFor;
+}
+
+export interface TranscriptionResult {
+    /** Trimmed; empty when nothing was heard. */
+    text: string;
+    model: string;
     costUsd: number;
 }
 

@@ -1,6 +1,6 @@
 # 02 — 🎤 in the composer
 
-**Status:** ready-for-agent
+**Status:** done
 
 **What to build:** A 🎤 button in the composer's box row, between the box and the send slot. A tap asks for the microphone and records with `MediaRecorder`; the box row becomes the recording bar (✕ Cancel, a red dot with the elapsed time, the ไทย/EN switch remembered per device, ✓ Done). Done posts the recording to the dictation endpoint and appends the text to the draft; Cancel discards it with no call. Two minutes at most, with a warning from 1:45 and an automatic finish at 2:00. Per the spec's "Web: the composer": shown only where recording works, the disabled rules (Venice credit out included), ⚡ and ✍️ disabled while recording or transcribing, the permission and no-device notes, the under-a-second drop, the page-hidden finish, Retry with the same audio, and releasing the mic every time.
 

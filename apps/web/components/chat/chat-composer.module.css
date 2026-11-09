@@ -100,6 +100,95 @@
     outline-offset: 2px;
 }
 
+/* 🎤 Dictate, between the box and the send slot: as quiet as a tool, sized to sit beside Send. */
+.mic {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+}
+
+.mic[aria-busy='true'] {
+    background: var(--accent-soft);
+    color: var(--accent);
+}
+
+.mic:disabled {
+    color: var(--faint);
+    cursor: default;
+}
+
+.mic:focus-visible {
+    outline: 2px solid var(--text);
+    outline-offset: 2px;
+}
+
+/* The box row while recording: ✕ · red dot and time · ไทย/EN · ✓ Done. */
+.recordingBar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    padding-left: 0.1rem;
+}
+
+.recDot {
+    flex: none;
+    width: 0.65rem;
+    height: 0.65rem;
+    border-radius: 999px;
+    background: var(--danger);
+    animation: recPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes recPulse {
+    50% {
+        opacity: 0.35;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .recDot {
+        animation: none;
+    }
+}
+
+.recTime {
+    flex: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+}
+
+/* From 1:45: the two-minute finish is near. */
+.recTimeWarn {
+    color: var(--warning);
+    font-weight: 600;
+}
+
+.language {
+    flex: none;
+    min-width: 3.25rem;
+    height: 2.25rem;
+    padding: 0 0.75rem;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--surface-raised);
+    color: var(--text);
+    font: inherit;
+    cursor: pointer;
+}
+
+.language:focus-visible {
+    outline: 2px solid var(--text);
+    outline-offset: 2px;
+}
+
 /*
  * A tool in the tool row (⚡ Suggest replies, ✱ Write an action, and those that join them):
  * a quiet round icon button, tinted while pressed.

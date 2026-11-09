@@ -15,6 +15,7 @@ import {
     FakeModelGateway,
     FakeStreamOptions,
     FakeTextReply,
+    FakeTranscriptionReply,
 } from '../service/model-gateway/fake-model-gateway.js';
 import {
     CreditPool,
@@ -52,6 +53,11 @@ export interface ScriptImageBody {
 /** A page the fake page fetcher answers for `url`. */
 export interface ScriptPageBody extends FakePage {
     url: string;
+}
+
+/** Transcriptions for Dictation: a text, a partial result, or an error, as for text replies. */
+export interface ScriptTranscriptionBody {
+    replies: Array<string | { text?: string; delayMs?: number } | ScriptedErrorJson>;
 }
 
 export interface ScriptEmbeddingBody {
@@ -140,30 +146,34 @@ export class FakeGatewayControlController {
         );
     }
 
+    @Post('transcription')
+    @HttpCode(204)
+    scriptTranscription(@Body() body: ScriptTranscriptionBody): void {
+        this.fake.scriptTranscription(
+            ...body.replies.map((reply): FakeTranscriptionReply => (isScriptedError(reply) ? toError(reply) : reply)),
+        );
+    }
+
     @Put('credit')
     @HttpCode(204)
     setCredit(@Body() body: Partial<RemainingCredit>): void {
         this.fake.setRemainingCredit(body);
     }
 
-    /** Reference image bytes are summarised, not echoed back. */
+    /** Reference image and recording bytes are summarised, never echoed back. */
     @Get('calls')
     calls(): { calls: unknown[]; pendingReplies: Record<string, number> } {
+        const summary = (data: { mimeType: string; bytes: Buffer }) => ({ mimeType: data.mimeType, size: data.bytes.length });
         return {
-            calls: this.fake.calls.map((call: FakeGatewayCall) =>
-                call.method === 'generateImage'
-                    ? {
-                          ...call,
-                          request: {
-                              ...call.request,
-                              referenceImages: call.request.referenceImages?.map((image) => ({
-                                  mimeType: image.mimeType,
-                                  size: image.bytes.length,
-                              })),
-                          },
-                      }
-                    : call,
-            ),
+            calls: this.fake.calls.map((call: FakeGatewayCall) => {
+                if (call.method === 'generateImage') {
+                    return { ...call, request: { ...call.request, referenceImages: call.request.referenceImages?.map(summary) } };
+                }
+                if (call.method === 'transcribe') {
+                    return { ...call, request: { ...call.request, audio: summary(call.request.audio) } };
+                }
+                return call;
+            }),
             pendingReplies: this.fake.pendingReplies(),
         };
     }

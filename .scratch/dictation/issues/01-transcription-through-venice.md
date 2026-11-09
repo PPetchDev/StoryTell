@@ -1,6 +1,6 @@
 # 01 — Transcription through Venice's Whisper
 
-**Status:** ready-for-agent
+**Status:** done
 
 **What to build:** The API can turn a recording into text. The Model Gateway gains `transcribe` with the call kind `dictation` in the one Venice-audio call-kind type shared with Read aloud; the real gateway sends the audio to Venice's Whisper (`openai/whisper-large-v3`) from the Venice client's one audio section, with the chosen language, and writes one UsageRecord in the Venice (`image`) pool at list price; the fake gateway scripts transcriptions and the testing control exposes them to e2e without echoing the audio. `POST /api/stories/:storyId/chats/:chatId/dictation` (multipart: `audio`, `language`, `durationMs`) answers `{ text }` and stores nothing. The Usage page lists "Dictation", and the Venice pool is labelled "Images and audio (Venice)" everywhere. Per the spec's "Model Gateway" and "API" decisions.
 

@@ -25,6 +25,9 @@ import {
     TextStream,
     TextModel,
     TextStreamResult,
+    TRANSCRIPTION_MODEL,
+    TranscriptionRequest,
+    TranscriptionResult,
 } from '../model-gateway.js';
 import {
     drawnSize,
@@ -35,6 +38,7 @@ import {
     isPlayModelKind,
     isSampledKind,
     TEXT_MODELS,
+    TRANSCRIPTION_MODELS,
     VENICE_HOST,
 } from './model-table.js';
 import { defaultSleep, SleepFn } from './http.js';
@@ -261,6 +265,34 @@ export class RealModelGateway extends ModelGateway {
         });
 
         return { image, model: modelName, costUsd };
+    }
+
+    /**
+     * Whisper on Venice, in the language asked for. One Venice-pool UsageRecord per answered
+     * call at list price: Venice reports no cost, so it is the audio's length (Venice's when it
+     * reports one, else the browser's) in whole seconds, clamped to 1–120.
+     */
+    async transcribe(request: TranscriptionRequest): Promise<TranscriptionResult> {
+        const modelName = TRANSCRIPTION_MODEL;
+        const model = TRANSCRIPTION_MODELS[modelName];
+        const answer = await this.deps.venice.transcribe({ modelId: model.id, audio: request.audio, language: request.language });
+        const seconds = Math.min(120, Math.max(1, Math.ceil(answer.durationSeconds ?? request.durationSeconds)));
+        // Whole millionths of a dollar, so 13 s records as 0.0013.
+        const costUsd = Math.round(seconds * model.priceUsdPerSecond * 1e6) / 1e6;
+
+        await this.deps.usage.record({
+            kind: request.kind,
+            pool: 'image',
+            model: modelName,
+            host: VENICE_HOST,
+            promptTokens: null,
+            completionTokens: null,
+            images: null,
+            costUsd,
+            storyId: request.servedFor?.storyId ?? null,
+            chatId: request.servedFor?.chatId ?? null,
+        });
+        return { text: answer.text.trim(), model: modelName, costUsd };
     }
 
     async remainingCredit(): Promise<RemainingCredit> {

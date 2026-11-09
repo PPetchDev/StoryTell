@@ -30,6 +30,7 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | 006 | Personas |
 | 007 | Character cards |
 | 008 | Saved replies and Replace rules |
+| 009 | Audio (Dictation) |
 
 ## Codes
 
@@ -40,7 +41,7 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | `502.001.001` | `ProviderOutageError` | The model provider failed or is down, including a rate limit or host overload (OpenRouter 429 or 503) that outlasted the gateway's same-host retries. The message carries the host's own code, e.g. `(DeepInfra: engine_overloaded)`. Also raised when Sampling values were sent and OpenRouter finds no endpoint that takes them; the message then reads "DeepInfra no longer takes one of the Sampling values for <model>. Reset Sampling for it in Settings." Show with Retry. |
 | `422.001.002` | `ModelRefusalError` | The model refused, or the host stopped the output for content. Show with Retry. |
 | `402.001.003` | `OutOfCreditError` (text) | Text credit is used up: OpenRouter answered 402 (balance, key limit or the per-request credit reservation) or a 403 budget block, the only answers that carry a `limit_source`. Never raised for a 429, whatever its metadata says. Blocks play. |
-| `402.001.004` | `OutOfCreditError` (image) | Image credit is used up. Blocks only Snapshots and Reference images. A camera press answers it at once when the balance is known to be used up; a failed Snapshot job carries it as its error otherwise. |
+| `402.001.004` | `OutOfCreditError` (image) | The Venice pool ("Images and audio (Venice)") is used up. Blocks only Snapshots, Reference images and Dictation. A camera press answers it at once when the balance is known to be used up; a failed Snapshot job carries it as its error otherwise. |
 | `502.001.005` | `UnparseableOutputError` | The model's output could not be read. Show with Retry. |
 | `422.001.006` | `SamplerNotOfferedError` | A Sampling value (`PUT /api/settings/samplers/:playModel`) for a parameter that play model's host does not list. Nothing is saved. Resetting it with `null` is always allowed. |
 | `404.002.001` | `ImageNotFoundError` | No image file at that path. |
@@ -119,3 +120,7 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | `422.008.004` | `TooManyReplaceRulesError` | A 51st Replace rule in one scope (app-wide, or one Story). Nothing is added. |
 | `404.008.005` | `ReplaceRuleNotFoundError` | A Replace rule id that isn't in that scope. |
 | `422.008.006` | `InvalidReplaceRuleError` | A Replace rule refused at save (create or update), nothing saved; the message is the plain reason the editor shows under Find: the engine's message for a regex that doesn't compile, "This would match between every letter", "This pattern is too slow" (over 250 ms on the probe texts, in a worker thread), or, with On my Messages on, "This rule would change your text again if run twice". A Find over 500 characters, or empty, is a validation error (`400.000.000`). |
+| `400.009.001` | `NoAudioFileError` | A dictation (`POST /api/stories/:storyId/chats/:chatId/dictation`) with no file in its `audio` field. No call. |
+| `415.009.002` | `UnsupportedAudioError` | A dictation whose bytes are not a WebM, MP4/M4A, Ogg or WAV recording (read from the first bytes, not the label). No call. |
+| `413.009.003` | `AudioTooLargeError` | A dictation recording over 10 MB. No call. |
+| `422.009.004` | `RecordingTooLongError` | A dictation whose `durationMs` is over 125,000 (the two-minute limit and five seconds' grace). No call. A `language` other than `th` or `en`, or a missing duration, is a validation error (`400.000.000`); the Venice pool known to be used up answers `402.001.004`. |

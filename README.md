@@ -89,6 +89,7 @@ from the kind and Settings, and writes one `usage_record` row per answered call.
 | judge, memory_extraction, snapshot_prompt | DeepSeek V4 Flash | DeepInfra via OpenRouter | `reasoning: {enabled: false}`, `response_format: json_object` when asked |
 | snapshot_image | Snapshot model from Settings: `seedream-v4-edit` (default, $0.05), `seedream-v5-pro-edit` ($0.06, +$0.00345 per reference image past the first) or `qwen-edit-uncensored` ($0.04) | Venice `POST /image/multi-edit` | up to 3 reference images, `aspect_ratio: "2:3"`, `safe_mode: false` |
 | reference_image | `qwen-image-3` ($0.04 at 1K or 2K) | Venice `POST /image/generate` | `aspect_ratio: "2:3"`, `resolution: "2K"`, `safe_mode: false` |
+| dictation | `whisper-large-v3` ($0.0001 per audio second, list price; Venice pool) | Venice `POST /audio/transcriptions` | multipart `file`, `model: openai/whisper-large-v3`, `language` (`th` or `en`), `response_format: json` |
 
 - The gateway never switches model or host. A 429 or 503 is retried up to 3 times on the same
   host with backoff (`Retry-After` honoured); anything else fails with a typed error.
@@ -363,6 +364,7 @@ Browser tests can script and inspect the fake through test-only routes, mounted 
 |---|---|
 | `POST /api/testing/fake-gateway/text` | `{ kind, replies: [ "text" \| { text, model } \| { error: "outage" \| "refusal" \| "out_of_credit" \| "unparseable", pool? } ] }` |
 | `POST /api/testing/fake-gateway/image` | `{ kind, replies: [ { imageBase64?, mimeType? } \| { error, pool? } ] }` |
+| `POST /api/testing/fake-gateway/transcription` | `{ replies: [ "text" \| { text?, delayMs? } \| { error, pool? } ] }` (Dictation; the calls list shows a recording as `{ mimeType, size }`) |
 | `PUT /api/testing/fake-gateway/credit` | `{ text?: { remainingUsd, limitUsd }, image?: { ... } }` |
 | `GET /api/testing/fake-gateway/calls` | Returns the calls received and any replies not yet used |
 | `DELETE /api/testing/fake-gateway` | Resets the fake |

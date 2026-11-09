@@ -7,6 +7,7 @@ import { useConnection } from '@/components/connection';
 import { ApiUnreachableError } from '@/lib/api';
 import { backgroundNotice, Chat, chatApi, SuggestedReply } from '@/lib/chat';
 import { insertSavedReply, SavedReply, TraySavedReply } from '@/lib/saved-replies';
+import { DictateButton, DictationStatus, hasDictationStatus, RecordingBar, useDictation } from './dictation';
 import { SavedRepliesTray } from './saved-replies-tray';
 
 import styles from './chat-composer.module.css';
@@ -363,11 +364,20 @@ export function ChatComposer({
     const writer = useWriteForMe(chat, draft, onDraft, box, writing || busy);
     /** ✍️ is waiting: the box is read-only and nothing else may change or send it. */
     const writingForMe = writer.status === 'writing';
+    const dictation = useDictation(chat.storyId, chat.id, draft, onDraft);
+    /** A recording or its transcription is under way: ⚡ and ✍️ wait, and the box takes nothing new. */
+    const dictating = dictation.active;
+    // .scratch/dictation/spec.md: 🎤 waits like the box does, and says why when the Venice pool is out.
+    const micDisabledReason = chat.imageCreditOut
+        ? 'Venice credit is used up'
+        : writing || busy || writingForMe
+          ? 'Wait for the current write to finish'
+          : null;
     const empty = draft.trim() === '';
     const send = (event: FormEvent) => {
         event.preventDefault();
         // Enter on an empty box does nothing; only a tap on ▶ lets the story go on.
-        if (empty || writingForMe) return;
+        if (empty || writingForMe || dictating) return;
         suggestions.close();
         tray.setOpen(false);
         onSend();
@@ -413,14 +423,16 @@ export function ChatComposer({
             {/* Integration, "The composer, top to bottom": panel · Character row · tool row · box row. */}
             <form className={styles.form} onSubmit={send} aria-label="Composer">
                 {/* Band 1, the panel: one thing at a time. */}
-                {writer.status !== 'idle' ? (
+                {hasDictationStatus(dictation) ? (
+                    <DictationStatus dictation={dictation} />
+                ) : writer.status !== 'idle' ? (
                     <WriteForMeStatus status={writer.status} />
                 ) : tray.open ? (
                     <SavedRepliesTray
                         storyId={chat.storyId}
                         lines={tray.lines}
                         draft={draft}
-                        locked={writing || blocked || writingForMe}
+                        locked={writing || blocked || writingForMe || dictating}
                         onPick={pickSavedReply}
                         onSaved={tray.saved}
                     />
@@ -429,7 +441,7 @@ export function ChatComposer({
                 )}
                 {/* Band 2: the Nudge Portraits plug in here; it takes no height while empty. */}
                 <div className={styles.characters} data-band="characters">
-                    {characterRow?.(writingForMe)}
+                    {characterRow?.(writingForMe || dictating)}
                 </div>
                 {/* Band 3: small round tools, left-aligned, and a quiet text button at the right end. */}
                 <div className={styles.tools} role="toolbar" aria-label="Composer tools">
@@ -441,7 +453,7 @@ export function ChatComposer({
                         title="Suggest replies"
                         aria-pressed={suggestions.shown.status !== 'closed'}
                         aria-busy={suggestions.shown.status === 'loading'}
-                        disabled={writing || busy || blocked || writingForMe}
+                        disabled={writing || busy || blocked || writingForMe || dictating}
                         onClick={() => {
                             writer.dismiss();
                             tray.setOpen(false);
@@ -460,7 +472,7 @@ export function ChatComposer({
                         title="Write for me"
                         aria-pressed={writingForMe}
                         aria-busy={writingForMe}
-                        disabled={writing || busy || blocked}
+                        disabled={writing || busy || blocked || dictating}
                         onClick={() => {
                             suggestions.close();
                             void writer.toggle();
@@ -478,6 +490,7 @@ export function ChatComposer({
                         aria-label="Saved replies"
                         title="Saved replies"
                         aria-pressed={tray.open}
+                        disabled={dictation.recording}
                         // Keep the box's caret, where a Saved reply goes in.
                         onPointerDown={(event) => event.preventDefault()}
                         onClick={() => {
@@ -496,7 +509,7 @@ export function ChatComposer({
                         className={styles.tool}
                         aria-label="Write an action"
                         title="Action: *like this*"
-                        disabled={writing || blocked || writingForMe}
+                        disabled={writing || blocked || writingForMe || dictating}
                         // Keep the box's focus and selection: a tap on a button would otherwise take them.
                         onPointerDown={(event) => event.preventDefault()}
                         onClick={() => {
@@ -523,7 +536,10 @@ export function ChatComposer({
                         )}
                     </span>
                 </div>
-                {/* Band 4: the box and the send slot. */}
+                {/* Band 4: the box, 🎤 and the send slot; while recording, the recording bar. */}
+                {dictation.recording ? (
+                    <RecordingBar dictation={dictation} />
+                ) : (
                 <div className={styles.boxRow}>
                     <textarea
                         ref={box}
@@ -532,7 +548,7 @@ export function ChatComposer({
                         value={draft}
                         rows={1}
                         disabled={writing || blocked}
-                        readOnly={writingForMe}
+                        readOnly={writingForMe || dictating}
                         onChange={(event) => onDraft(event.target.value)}
                         onFocus={() => {
                             boxFocused.current = true;
@@ -545,6 +561,8 @@ export function ChatComposer({
                             event.currentTarget.form?.requestSubmit();
                         }}
                     />
+                    {/* .scratch/dictation/spec.md: only where the browser can record. */}
+                    {dictation.supported && <DictateButton dictation={dictation} disabledReason={micDisabledReason} />}
                     {writing ? (
                         // Spec: streaming replies. Ends the reply; the API keeps nothing of it.
                         <button type="button" className={`${styles.send} ${styles.stop}`} aria-label="Stop" title="Stop the reply" onClick={onStop}>
@@ -559,7 +577,7 @@ export function ChatComposer({
                             className={styles.send}
                             aria-label="Continue"
                             title="Let the story go on"
-                            disabled={writing || busy || blocked || chat.awaitingReply || writingForMe}
+                            disabled={writing || busy || blocked || chat.awaitingReply || writingForMe || dictating}
                             onClick={() => {
                                 suggestions.close();
                                 onContinue();
@@ -570,13 +588,14 @@ export function ChatComposer({
                             </svg>
                         </button>
                     ) : (
-                        <button type="submit" className={styles.send} aria-label="Send" disabled={writing || blocked || writingForMe}>
+                        <button type="submit" className={styles.send} aria-label="Send" disabled={writing || blocked || writingForMe || dictating}>
                             <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
                                 <path d="M3.4 20.4l17.4-7.5c.8-.4.8-1.5 0-1.8L3.4 3.6c-.7-.3-1.4.3-1.3 1l1.5 6.1c.1.4.5.7.9.8L12 12l-7.5.5c-.4 0-.8.4-.9.8l-1.5 6.1c-.1.7.6 1.3 1.3 1z" />
                             </svg>
                         </button>
                     )}
                 </div>
+                )}
             </form>
         </footer>
     );

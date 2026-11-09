@@ -43,6 +43,8 @@ export interface RecordedRequest {
     headers: Record<string, string>;
     /** The parsed JSON body, when there was one. */
     body: any;
+    /** A multipart body as sent (Venice's transcription), when there was one. */
+    form?: FormData;
 }
 
 export type ResponseScript = RecordedResponse | ((request: RecordedRequest) => RecordedResponse);
@@ -61,6 +63,7 @@ export function recordedFetch(script: ResponseScript[]) {
             method: init.method ?? 'GET',
             headers: (init.headers ?? {}) as Record<string, string>,
             body: typeof init.body === 'string' ? JSON.parse(init.body) : undefined,
+            ...(init.body instanceof FormData ? { form: init.body } : {}),
         };
         requests.push(request);
         const next = remaining.shift();
