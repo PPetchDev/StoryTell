@@ -44,7 +44,9 @@ export async function startDisposablePostgres(): Promise<DisposablePostgres> {
         // UTF-8 whatever the machine's locale: on Windows initdb otherwise picks WIN1252, which refuses Thai.
         initdbFlags: ['--encoding=UTF8', '--locale=C'],
         // PostgreSQL 18's io_worker processes can outlive stop() on Windows; sync I/O has none.
-        postgresFlags: ['-c', 'io_method=sync'],
+        // Vitest runs a test file per core at once, each app with a pool of up to 10 plus admin
+        // clients, which outgrew the default 100 connections ("sorry, too many clients already").
+        postgresFlags: ['-c', 'io_method=sync', '-c', 'max_connections=400'],
         onLog: () => {},
     });
     await server.initialise();
