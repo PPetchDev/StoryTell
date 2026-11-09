@@ -1,0 +1,31 @@
+{
+    "id": "gen-synthetic-0031",
+    "provider": "DeepInfra",
+    "model": "z-ai/glm-5.3",
+    "object": "chat.completion",
+    "created": 1762300006,
+    "choices": [
+        {
+            "logprobs": null,
+            "finish_reason": "stop",
+            "native_finish_reason": "stop",
+            "index": 0,
+            "message": {
+                "role": "assistant",
+                "content": "Ash: *You narrow your eyes.* \"Where did you put the key, Mira?\"",
+                "refusal": null,
+                "reasoning": null
+            }
+        }
+    ],
+    "usage": {
+        "prompt_tokens": 1500,
+        "completion_tokens": 24,
+        "total_tokens": 1524,
+        "cost": 0.000412,
+        "is_byok": false,
+        "prompt_tokens_details": { "cached_tokens": 0 },
+        "cost_details": { "upstream_inference_cost": null },
+        "completion_tokens_details": { "reasoning_tokens": 0 }
+    }
+}

@@ -236,8 +236,24 @@ const copySittingOut: CopyStep = async ({ manager, sourceChatId, chatId }) => {
     );
 };
 
+
+/**
+ * Thai readings (.scratch/write-for-me/spec.md): copied with the Messages the Branch keeps, to
+ * their new ids, fingerprints unchanged, since the copied Messages hold the same stored text.
+ */
+const copyThaiReadings: CopyStep = async ({ manager, sourceChatId, through, messageIds }) => {
+    const [olds, news] = oldAndNewIds(messageIds);
+    await manager.query(
+        `INSERT INTO "thai_reading" ("message_id", "source_fingerprint", "text", "created_at")
+         SELECT m."new_id", r."source_fingerprint", r."text", r."created_at"
+         FROM "thai_reading" r JOIN "message" s ON s."id" = r."message_id"
+         JOIN unnest($2::int[], $3::int[]) AS m("old_id", "new_id") ON m."old_id" = r."message_id"
+         WHERE s."chat_id" = $1 AND s."position" <= $4 ORDER BY r."id"`,
+        [sourceChatId, olds, news, through],
+    );
+};
 /** In order: Messages before anything that points at them, Memories before their changes. */
-const COPY_STEPS: CopyStep[] = [copyMessages, copyMessageParts, copyMemories, copyLedger, copySittingOut];
+const COPY_STEPS: CopyStep[] = [copyMessages, copyMessageParts, copyThaiReadings, copyMemories, copyLedger, copySittingOut];
 
 /** `count` fresh ids from `table`'s id sequence, ascending. */
 async function reserveIds(manager: EntityManager, table: string, count: number): Promise<number[]> {

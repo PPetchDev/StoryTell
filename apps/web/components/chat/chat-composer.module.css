@@ -5,14 +5,47 @@
     background: var(--bg);
 }
 
-/* One row: the box between ⚡ on the left and the send button on the right. */
+/*
+ * Four bands, top to bottom (integration, "The composer, top to bottom"): the panel, the
+ * Character row, the tool row and the box row. Same layout at phone width and on desktop.
+ */
 .form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+/* Band 2: the Nudge Portraits; no height while empty. */
+.characters:empty {
+    display: none;
+}
+
+/* Band 3: small round icon buttons, left-aligned, a quiet text button at the right end. */
+.tools {
+    display: flex;
+    align-items: center;
+    gap: 0.15rem;
+    min-width: 0;
+}
+
+.toolsEnd {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+}
+
+.toolsEnd:empty {
+    display: none;
+}
+
+/* Band 4: the box, then the send slot. */
+.boxRow {
     display: flex;
     align-items: flex-end;
     gap: 0.4rem;
 }
 
-.form textarea {
+.boxRow textarea {
     flex: 1;
     min-width: 0;
     box-sizing: border-box;
@@ -31,7 +64,7 @@
     max-height: calc(5 * 1.4em + 1.1rem + 2px);
 }
 
-.form textarea:focus-visible {
+.boxRow textarea:focus-visible {
     outline: none;
     border-color: var(--accent);
 }
@@ -67,13 +100,16 @@
     outline-offset: 2px;
 }
 
-/* * (write an action): a quiet round button between the box and send. */
-.action {
+/*
+ * A tool in the tool row (⚡ Suggest replies, ✱ Write an action, and those that join them):
+ * a quiet round icon button, tinted while pressed.
+ */
+.tool {
     flex: none;
     display: grid;
     place-items: center;
     width: 2.5rem;
-    height: 2.75rem;
+    height: 2.5rem;
     border: 0;
     border-radius: 999px;
     background: transparent;
@@ -81,41 +117,17 @@
     cursor: pointer;
 }
 
-.action:disabled {
-    color: var(--faint);
-    cursor: default;
-}
-
-.action:focus-visible {
-    outline: 2px solid var(--text);
-    outline-offset: 2px;
-}
-
-/* ⚡ (spec: "Suggested replies"): a quiet round button left of the box, tinted while its cards are open. */
-.suggest {
-    flex: none;
-    display: grid;
-    place-items: center;
-    width: 2.75rem;
-    height: 2.75rem;
-    border: 0;
-    border-radius: 999px;
-    background: transparent;
-    color: var(--muted);
-    cursor: pointer;
-}
-
-.suggest[aria-pressed='true'] {
+.tool[aria-pressed='true'] {
     background: var(--accent-soft);
     color: var(--accent);
 }
 
-.suggest:disabled {
+.tool:disabled {
     color: var(--faint);
     cursor: default;
 }
 
-.suggest:focus-visible {
+.tool:focus-visible {
     outline: 2px solid var(--text);
     outline-offset: 2px;
 }
@@ -123,7 +135,7 @@
 /* The three cards above the box. */
 .suggestions {
     list-style: none;
-    margin: 0 0 0.5rem;
+    margin: 0 0 0.25rem;
     padding: 0;
     display: flex;
     flex-direction: column;
@@ -165,7 +177,25 @@
 }
 
 .suggesting {
-    margin: 0 0 0.5rem;
+    margin: 0 0 0.25rem;
     font-size: 0.875rem;
     color: var(--muted);
+}
+
+/* ↶ Undo at the tool row's right end: a quiet text button, there only while the box holds what ✍️ wrote. */
+.undo {
+    border: 0;
+    background: transparent;
+    font: inherit;
+    font-size: 0.875rem;
+    color: var(--muted);
+    padding: 0.4rem 0.6rem;
+    min-height: 2.5rem;
+    border-radius: 999px;
+    cursor: pointer;
+}
+
+.undo:focus-visible {
+    outline: 2px solid var(--text);
+    outline-offset: 2px;
 }

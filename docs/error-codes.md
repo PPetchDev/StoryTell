@@ -54,7 +54,7 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | `413.002.010` | `ImageTooLargeError` | An uploaded picture over the size limit (15 MB for a Cover). |
 | `422.002.011` | `SnapshotSizeNotOfferedError` | A Settings change that asks for a Snapshot size the Snapshot model is not drawn at, such as 2K for Seedream V4.5 edit. |
 | `404.003.001` | `StoryNotFoundError` | No Story with that id. |
-| `404.003.002` | `CharacterNotFoundError` | No Character with that id in this Story, including an id outside the cast in a Chat's Sitting out set (nothing changes). |
+| `404.003.002` | `CharacterNotFoundError` | No Character with that id in this Story, including an id outside the cast in a Chat's Sitting out set or a turn's `nudgeCharacterId` (nothing changes). |
 | `404.003.003` | `SceneNotFoundError` | No Scene with that id in this Story. |
 | `404.003.004` | `StartingBondNotFoundError` | No StartingBond with that id in this Story. |
 | `422.003.005` | `CastFullError` | The Story already has 6 Characters. |
@@ -76,7 +76,7 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | `404.004.001` | `ChatNotFoundError` | No Chat with that id in this Story. |
 | `422.004.002` | `StoryNotPlayableError` | The Story has a required field empty. The message names the missing fields. Blocks starting a Chat, sending, Continue and Regenerate. |
 | `409.004.003` | `NoTurnToRetryError` | Retry when the Chat is not waiting for a reply to a User Message. |
-| `409.004.004` | `TurnInProgressError` | A send, a Continue, a Regenerate, Suggested replies, a Message edit, choosing a Reply version, a reset, a Branch or a manual Retry of the judge or Memory extraction while this Chat's turn is still being written, or while a manual Retry of either background call runs for it (a Retry holds the Chat's turn lock, so a Branch or another write meanwhile is refused, and a Retry tapped while a Branch copies the Chat is refused too). |
+| `409.004.004` | `TurnInProgressError` | A send, a Continue, a Regenerate, Suggested replies, Write for me, a Message edit, choosing a Reply version, a reset, a Branch or a manual Retry of the judge or Memory extraction while this Chat's turn is still being written, or while a manual Retry of either background call runs for it (a Retry holds the Chat's turn lock, so a Branch or another write meanwhile is refused, and a Retry tapped while a Branch copies the Chat is refused too). |
 | `422.004.005` | `EmptyMessageError` | A send or a Message edit with nothing but whitespace. |
 | `404.004.006` | `MessageNotFoundError` | No Message with that id in this Chat. |
 | `409.004.007` | `BackgroundStillSavingError` | A send, Retry, Continue, Regenerate, Message edit, choosing a Reply version, reset or Branch while one of the previous AI Message's background calls (the judge, Memory extraction) was still pending past the short wait. Try again in a moment. |
@@ -91,6 +91,9 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | `422.004.016` | `EmptyStorySoFarError` | The Story so far saved with nothing but whitespace. Nothing changes. |
 | `409.004.017` | `NoStorySoFarError` | The Story so far saved while the Chat has none yet: the whole Chat still fits in the turn prompt, so it would cover no Messages. Nothing changes. |
 | `404.004.018` | `ReplyVersionNotFoundError` | A Reply version chosen that the Message does not have: a number outside 1..m of its ‹ n/m ›. Only the newest AI Message has more than one version, so any number but 1 on another Message is refused too. Nothing changes and no call is made. |
+| `502.004.019` | `UnreadableWriteForMeError` | Write for me's answer held nothing once a leading label for the worn identity and everything from the first `@` line (a Character's line) were taken off. Nothing stored. The client shows "Couldn't write it, try again". |
+| `502.004.020` | `UnreadableThaiReadingError` | The background model answered a Thai reading with nothing. Nothing stored. The client shows "Couldn't make a Thai reading, try again". |
+| `409.004.021` | `NudgeSittingOutError` | A send, Retry, Continue, Regenerate or User Message edit whose `nudgeCharacterId` names a Character sitting out of the Chat. Checked before anything is stored; nothing changes. "<Name> is sitting out. Bring them back before nudging them." |
 | `502.005.001` | `UnreadableDraftError` | The model's draft or rewrite could not be read (no JSON object, or no text). Nothing saved. Show with Retry. |
 | `502.005.002` | `InvalidDraftError` | The draft does not fit a Story (0 or 7 Characters, a Style value outside its set, a required field empty, a bad StartingBond). Nothing saved. Show with Retry. |
 | `422.005.003` | `EmptyIdeaError` | A draft was asked for with a blank idea. |

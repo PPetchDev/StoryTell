@@ -40,7 +40,9 @@ export type TextCallKind =
     | 'story_assistant'
     | 'snapshot_prompt'
     | 'suggested_replies'
-    | 'story_summary';
+    | 'story_summary'
+    | 'write_for_me'
+    | 'thai_reading';
 
 export type ImageCallKind = 'snapshot_image' | 'reference_image';
 

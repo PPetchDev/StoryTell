@@ -148,6 +148,14 @@ export class MessageDTO {
 
     @ApiProperty()
     createdAt: string;
+
+    @ApiProperty({
+        type: String,
+        nullable: true,
+        description:
+            'Its current Thai reading: the one made from its stored text as it is now; null when none was made for this text. Never part of the Chat (no prompt, no Transcript).',
+    })
+    thaiReading: string | null;
 }
 
 export class CurrentSceneDTO {

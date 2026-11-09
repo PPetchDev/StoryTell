@@ -1,8 +1,10 @@
 import { AddressInfo } from 'node:net';
+import { ProviderOutageError } from '../src/errors/model-gateway.errors.js';
+import { STORY_SO_FAR_TRIGGER_MARGIN, storySoFarCoverage } from '../src/manager/chat/story-so-far/story-so-far-prompt.js';
 
 import { buildSuggestionsPrompt } from '../src/manager/chat/suggestions/suggestions-prompt.js';
 import { memoryLine } from '../src/manager/chat/memory/memory-prompt.js';
-import { buildTurnPrompt, estimateTokens, PromptLayersInput, PromptMemory, TurnPromptInput } from '../src/manager/chat/turn/prompt.js';
+import { buildTurnPrompt, estimateTokens, nudgeLine, PromptLayersInput, PromptMemory, TurnPromptInput } from '../src/manager/chat/turn/prompt.js';
 import { parseReply } from '../src/manager/chat/turn/reply-parser.js';
 import { TextCompletionRequest } from '../src/service/model-gateway/model-gateway.js';
 import { Pov, ReplyLength, Tense } from '../src/model/story/entities/story.entity.js';
@@ -139,6 +141,48 @@ Kai shrugs at Mira.`;
         expect(parseReply(reply, cast, 'Ash', { sittingOut: [] }).parts).toEqual(all.parts);
         expect(all.parts.filter((part) => part.kind === 'speech' && part.characterId === 1)).toHaveLength(2);
         expect(all.droppedSpeakers).toEqual([]);
+    });
+});
+
+const NUDGE_KAI = 'The user would like to hear from Kai this turn: give Kai a line or a moment if Kai could plausibly be there. If not, carry on naturally without forcing it.';
+
+describe('Nudge: the turn prompt (pure)', () => {
+    it('puts the line after "Where things stand" and before the final instruction, in the trailing message only', () => {
+        const prompt = buildTurnPrompt(input({ nudge: 'Kai', sittingOut: ['Mira'], authorsNote: 'Keep it moody.' }));
+        const trailing = trailingOf(prompt);
+        expect(nudgeLine('Kai')).toBe(NUDGE_KAI);
+        expect(trailing).toContain(`${SENTENCE} `);
+        expect(trailing.indexOf("# Author's note")).toBeLessThan(trailing.indexOf('Where things stand:'));
+        expect(trailing.indexOf('Where things stand:')).toBeLessThan(trailing.indexOf(NUDGE_KAI));
+        expect(trailing.indexOf(NUDGE_KAI)).toBeLessThan(trailing.indexOf('Write the next turn now.'));
+        expect(trailing.endsWith(`\n${NUDGE_KAI}\nWrite the next turn now.${trailing.split('Write the next turn now.')[1]}`)).toBe(true);
+        expect(prompt.messages.slice(0, -1).some((message) => message.content.includes('would like to hear from'))).toBe(false);
+    });
+
+    it('adds nothing without a nudge: the prompt equals one built without the field', () => {
+        const today = buildTurnPrompt(input());
+        expect(buildTurnPrompt(input({ nudge: null }))).toEqual(today);
+        expect(trailingOf(today)).not.toContain('would like to hear from');
+    });
+
+    it('leaves the system message, and with it the cached prefix, the same with a nudge', () => {
+        expect(buildTurnPrompt(input({ nudge: 'Kai' })).messages[0]).toEqual(buildTurnPrompt(input()).messages[0]);
+    });
+
+    it('is allowed for by the Story so far trigger: a nudged turn still fits inside the margin at the smallest budget that needs none', () => {
+        const messages = Array.from({ length: 20 }, (_, i) => ({ role: (i % 2 === 0 ? 'assistant' : 'user') as 'user' | 'assistant', text: `M${i} ${'x'.repeat(796)}` }));
+        let budget = 5_000;
+        while (storySoFarCoverage(layers(), messages, budget) !== null) budget += 1;
+        // The trigger stands in 300 tokens for the next user message, and the cast for who is present.
+        const turn = buildTurnPrompt({ ...layers(), history: messages, userText: 'u'.repeat(1_200), present: ['Mira', 'Kai'], nudge: 'Kai', tokenBudget: budget });
+        const total = turn.messages.reduce((sum, message) => sum + estimateTokens(message.content), 0);
+        expect(turn.trimmed).toBe(0);
+        expect(total + STORY_SO_FAR_TRIGGER_MARGIN).toBeLessThanOrEqual(budget);
+    });
+
+    it('is turn-only: Suggested replies never carry it', () => {
+        const withNudge = { ...layers(), nudge: 'Kai', history: [{ role: 'assistant' as const, text: '@Kai: Hm.' }] } as Parameters<typeof buildSuggestionsPrompt>[0];
+        expect(JSON.stringify(buildSuggestionsPrompt(withNudge))).not.toContain('would like to hear from');
     });
 });
 
@@ -663,6 +707,75 @@ describe('Sitting out: the API', () => {
             expect(named.characters).toEqual([{ characterId: miraId, name: 'Mira' }]);
             expect(writer()).toContain(`- Mira: ${MIRA_LOOKS}`);
             expect(named.prompt).toContain(MIRA_LOOKS);
+        });
+    });
+
+    // .scratch/speaker-controls/issues/03-nudge.md
+    describe('Nudge', () => {
+        const NUDGE = 'would like to hear from Kai this turn';
+        const textCalls = (from: number) =>
+            t.gateway.calls.slice(from).flatMap((call) => (call.method === 'completeText' ? [call.request] : []));
+
+        it('carries the line on a send, a Continue, a Retry, a Regenerate and a User Message edit; the next turn without one has none', async () => {
+            const { storyId, kaiId } = await createStory();
+            const chat = await createChat(storyId);
+            const from = t.gateway.calls.length;
+
+            script('@Kai: You called?');
+            await t.http.post(`/api/stories/${storyId}/chats/${chat.id}/messages`).send({ text: 'I look around.', nudgeCharacterId: kaiId }).expect(201);
+            await settled(storyId, chat.id);
+            script('The wind rises.');
+            await t.http.post(`/api/stories/${storyId}/chats/${chat.id}/continue`).send({ nudgeCharacterId: kaiId }).expect(200);
+            const continued = await settled(storyId, chat.id);
+            script('@Kai: Again?');
+            await t.http
+                .post(`/api/stories/${storyId}/chats/${chat.id}/messages/${continued.messages.at(-1)!.id}/regenerate`)
+                .send({ nudgeCharacterId: kaiId })
+                .expect(200);
+            await settled(storyId, chat.id);
+            // A failed turn, then Retry with the nudge.
+            t.gateway.scriptText('turn', new ProviderOutageError('DeepInfra answered 503.'));
+            await t.http.post(`/api/stories/${storyId}/chats/${chat.id}/messages`).send({ text: 'Hello?' }).expect(502);
+            script('@Kai: Here.');
+            await t.http.post(`/api/stories/${storyId}/chats/${chat.id}/retry`).send({ nudgeCharacterId: kaiId }).expect(200);
+            const retried = await settled(storyId, chat.id);
+            script('@Kai: Over here.');
+            await t.http
+                .patch(`/api/stories/${storyId}/chats/${chat.id}/messages/${retried.messages.at(-2)!.id}`)
+                .send({ text: 'Hello? Anyone?', nudgeCharacterId: kaiId })
+                .expect(200);
+            await settled(storyId, chat.id);
+            await send(storyId, chat.id, 'I sit down.');
+
+            const turns = textCalls(from).filter((call) => call.kind === 'turn');
+            expect(turns).toHaveLength(7);
+            const carried = turns.map((turn) => trailing(turn).includes(NUDGE));
+            // The failed send was sent without one, the last turn too.
+            expect(carried).toEqual([true, true, true, false, true, true, false]);
+            for (const turn of turns.filter((call) => trailing(call).includes(NUDGE))) {
+                expect(trailing(turn).indexOf('Where things stand:')).toBeLessThan(trailing(turn).indexOf(NUDGE));
+                expect(trailing(turn).indexOf(NUDGE)).toBeLessThan(trailing(turn).indexOf('Write the next turn now.'));
+                expect(turn.messages.slice(0, -1).some((message) => message.content.includes(NUDGE))).toBe(false);
+            }
+            // The judge and the extraction never hold it.
+            const background = textCalls(from).filter((call) => call.kind !== 'turn');
+            expect(background.length).toBeGreaterThan(0);
+            expect(background.some((call) => call.messages.some((message) => message.content.includes('would like to hear from')))).toBe(false);
+        });
+
+        it('refuses a nudge on someone sitting out (409) and an id outside the cast (404), storing nothing and making no call', async () => {
+            const { storyId, miraId, kaiId } = await createStory();
+            const chat = await createChat(storyId);
+            await setSittingOut(storyId, chat.id, [miraId]).expect(200);
+
+            const away = await t.http.post(`/api/stories/${storyId}/chats/${chat.id}/messages`).send({ text: 'Mira?', nudgeCharacterId: miraId }).expect(409);
+            expect(away.body.error.code).toBe('409.004.021');
+            expect(away.body.error.message).toBe('Mira is sitting out. Bring them back before nudging them.');
+            const unknown = await t.http.post(`/api/stories/${storyId}/chats/${chat.id}/continue`).send({ nudgeCharacterId: kaiId + 1_000 }).expect(404);
+            expect(unknown.body.error.code).toBe('404.003.002');
+
+            expect((await getChat(storyId, chat.id)).messages).toEqual(chat.messages);
+            expect(t.gateway.textCalls()).toHaveLength(0);
         });
     });
 });

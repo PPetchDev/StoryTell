@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
+import { CharacterRow } from '@/components/chat/character-row';
 import { ChatComposer } from '@/components/chat/chat-composer';
 import { ChatThread, PendingLine } from '@/components/chat/chat-thread';
 import { ChatTopBar } from '@/components/chat/chat-top-bar';
@@ -10,6 +11,7 @@ import { MemoryDrawer } from '@/components/chat/memory-drawer';
 import { SceneStrip } from '@/components/chat/scene-strip';
 import { SnapshotSheet } from '@/components/chat/snapshot-sheet';
 import { SnapshotViewer, useChatSnapshots } from '@/components/chat/snapshots';
+import { useThaiReadings } from '@/components/chat/thai-reading';
 import { useConnection } from '@/components/connection';
 import { ApiError, apiFetch, ApiUnreachableError, StreamBrokenError, StreamStoppedError } from '@/lib/api';
 import { handOffBranch, takeBranchHandoff } from '@/lib/branch';
@@ -61,6 +63,13 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes }: Cha
     const { reportUnreachable } = useConnection();
     const router = useRouter();
     const [chat, setChat] = useState(initial);
+    // A new Thai reading goes on its Message in place: nothing else in the Chat changed.
+    const thaiReadings = useThaiReadings(chat.storyId, chat.id, (messageId, text) =>
+        setChat((current) => ({
+            ...current,
+            messages: current.messages.map((message) => (message.id === messageId ? { ...message, thaiReading: text } : message)),
+        })),
+    );
     const [draft, setDraft] = useState('');
     /** The line just sent, shown in the thread until the turn settles. */
     const [pending, setPending] = useState<PendingLine | null>(null);
@@ -70,6 +79,13 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes }: Cha
     /** Stops the turn being written. */
     const stopRef = useRef<AbortController | null>(null);
     const [busy, setBusy] = useState(false);
+    /**
+     * The Character nudged for the next turn (.scratch/speaker-controls/spec.md, "Nudge"): sent with
+     * the next send, Continue, Retry, Again or User Message edit, never stored, gone on leaving.
+     */
+    const [nudge, setNudge] = useState<number | null>(null);
+    /** Each tap on the Character row's "Who's here" opens the sheet in the top bar. */
+    const [whoRequest, setWhoRequest] = useState(0);
     const [editing, setEditing] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [rollback, setRollback] = useState<string | null>(null);
@@ -127,6 +143,10 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes }: Cha
     }, [toasts]);
 
     const blocked = !chat.playable || chat.textCreditOut;
+    // A Character set sitting out can't stay nudged (.scratch/speaker-controls/spec.md).
+    useEffect(() => {
+        if (nudge !== null && chat.sittingOut.includes(nudge)) setNudge(null);
+    }, [nudge, chat.sittingOut]);
 
     const stripHidden = useSceneStripHidden();
 
@@ -180,6 +200,8 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes }: Cha
         setRollback(null);
         try {
             setChat(await turn({ signal: stop.signal, onParts: setReplySoFar }));
+            // The nudge rode on this turn, which answered with its reply; a failed or stopped one keeps it for Retry.
+            setNudge(null);
         } catch (caught) {
             setReplySoFar(null);
             if (caught instanceof ApiUnreachableError) {
@@ -238,7 +260,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes }: Cha
         setDraft('');
         setPending({ text, identityName: chat.identityName });
         void runTurn(
-            (stream) => chatApi.send(chat.storyId, chat.id, text, stream),
+            (stream) => chatApi.send(chat.storyId, chat.id, text, stream, nudge),
             () => setDraft((current) => (current === '' ? text : current)),
         );
     };
@@ -246,7 +268,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes }: Cha
     /** ▶ (spec: "Continue"): a turn with no User Message. A failed one stores nothing, so ▶ again is the way on. */
     const continueStory = () => {
         if (writing || busy || blocked || chat.awaitingReply) return;
-        void runTurn((stream) => chatApi.continue(chat.storyId, chat.id, stream));
+        void runTurn((stream) => chatApi.continue(chat.storyId, chat.id, stream, nudge));
     };
 
     /**
@@ -261,7 +283,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes }: Cha
         // Shown again only once the turn has settled, so the old reply never flashes back first.
         void runTurn(async (stream) => {
             try {
-                return refreshMemory(noteRollback(await chatApi.regenerate(chat.storyId, chat.id, messageId, stream)));
+                return refreshMemory(noteRollback(await chatApi.regenerate(chat.storyId, chat.id, messageId, stream, nudge)));
             } catch (caught) {
                 if (!(caught instanceof ApiUnreachableError)) refreshMemory(chat);
                 throw caught;
@@ -280,7 +302,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes }: Cha
         const edited = (next: EditedChat) => refreshMemory(noteRollback(next));
         // An edited User Message gets a fresh reply, so it runs as a turn; an AI Message does not.
         if (message.kind === 'user') {
-            void runTurn(async (stream) => edited(await chatApi.edit(chat.storyId, chat.id, message.id, text, stream)));
+            void runTurn(async (stream) => edited(await chatApi.edit(chat.storyId, chat.id, message.id, text, stream, nudge)));
         } else {
             void runWrite(async () => edited(await chatApi.edit(chat.storyId, chat.id, message.id, text)));
         }
@@ -363,6 +385,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes }: Cha
                     void runWrite(() => chatApi.setSittingOut(chat.storyId, chat.id, characterIds))
                 }
                 onReset={() => void runWrite(async () => refreshMemory(await chatApi.reset(chat.storyId, chat.id)))}
+                whoRequest={whoRequest}
             />
             {!stripHidden && (
                 <SceneStrip
@@ -417,6 +440,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes }: Cha
                 onSnapshot={() => setSnapshotSheet(true)}
                 onOpenSnapshot={setViewing}
                 onDismissSnapshot={(job) => void snaps.dismiss(job)}
+                thaiReadings={thaiReadings}
             />
 
             <ChatComposer
@@ -433,8 +457,20 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes }: Cha
                 onSend={send}
                 onContinue={continueStory}
                 onStop={stopTurn}
-                onRetry={() => void runTurn((stream) => chatApi.retry(chat.storyId, chat.id, stream))}
+                onRetry={() => void runTurn((stream) => chatApi.retry(chat.storyId, chat.id, stream, nudge))}
                 onRetryBackground={retryBackground}
+                characterRow={(writingForMe) => (
+                    <CharacterRow
+                        characters={characters}
+                        cast={cast}
+                        portraits={portraits}
+                        sittingOut={chat.sittingOut}
+                        nudge={nudge}
+                        disabled={writing || busy || writingForMe}
+                        onNudge={setNudge}
+                        onWhosHere={() => setWhoRequest((count) => count + 1)}
+                    />
+                )}
             />
 
             {snapshotSheet && (

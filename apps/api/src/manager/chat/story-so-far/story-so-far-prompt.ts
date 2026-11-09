@@ -2,6 +2,7 @@ import { PromptMessage } from '../../../service/model-gateway/model-gateway.js';
 import {
     authorsNoteBlock,
     estimateTokens,
+    NUDGE_RESERVE_TOKENS,
     PromptHistoryMessage,
     PromptLayersInput,
     stateReminder,
@@ -46,6 +47,8 @@ export function storySoFarCoverage(layers: PromptLayersInput, history: PromptHis
         loreReserveTokens(layers.lore ?? []) +
         // So is the Documents block's cap, when the Story has passages (.scratch/documents/spec.md: "Budget").
         documentsReserveTokens(layers.hasDocuments) +
+        // A Nudge line may ride on the next turn (.scratch/speaker-controls/spec.md): a small fixed allowance.
+        NUDGE_RESERVE_TOKENS +
         // The Author's note, as the Chat holds it when the check runs.
         estimateTokens(authorsNoteBlock(layers.authorsNote, layers.identity.name) ?? '') +
         estimateTokens(`${reminder}

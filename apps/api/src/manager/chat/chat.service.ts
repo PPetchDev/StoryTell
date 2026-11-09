@@ -12,6 +12,7 @@ import {
     NoFailedJudgeError,
     NoTurnToRetryError,
     NotRegenerableError,
+    NudgeSittingOutError,
     ReplyVersionNotFoundError,
     StoryNotPlayableError,
     TurnInProgressError,
@@ -22,6 +23,7 @@ import { CharacterNotFoundError, StoryNotFoundError } from '../../errors/story.e
 import { BranchModelService } from '../../model/branch/branch.service.js';
 import { ChatModelService } from '../../model/chat/chat.service.js';
 import { ChatEntity, ChatSummary, TimeOfDay } from '../../model/chat/entities/chat.entity.js';
+import { ThaiReadingEntity } from '../../model/chat/entities/thai-reading.entity.js';
 import {
     AUTHOR_MODEL,
     BackgroundCallResponse,
@@ -51,6 +53,9 @@ import { latestExtracted, MemoryExtractionManagerService } from './memory/extrac
 import { charactersInExchange } from './memory/present.js';
 import { promptStorySoFar, StorySoFarManagerService } from './story-so-far/story-so-far.service.js';
 import { SuggestedRepliesManagerService } from './suggestions/suggested-replies.service.js';
+import { WriteForMeManagerService } from './write-for-me/write-for-me.service.js';
+import { ThaiReadingManagerService } from './thai-reading/thai-reading.service.js';
+import { sourceFingerprint, thaiReadingSource } from './thai-reading/thai-reading.js';
 import { SuggestedReply } from './suggestions/suggestions-prompt.js';
 import { buildTurnPrompt, PromptArc, PromptBond, PromptHistoryMessage, PromptLayersInput, PromptMemory } from './turn/prompt.js';
 import { chosenLore, LoreInPlay, loreInPlayOf, promptLore, selectLoreAt } from './lore/lore-select.js';
@@ -69,6 +74,9 @@ export interface ChatListItem extends ChatSummary {
     branchedFrom: { chatId: number; title: string } | null;
 }
 
+/** A Message on the Chat screen: what it is, and its current Thai reading or null. */
+export type ChatMessageResponse = MessageResponse & { thaiReading: string | null };
+
 /** A Chat as the Chat screen reads it: its Messages plus everything the notice line needs. */
 export interface ChatDetail extends ChatSummary {
     /** The Scene the Chat is on; null means free play. */
@@ -81,7 +89,8 @@ export interface ChatDetail extends ChatSummary {
     personaId: number | null;
     /** The Story's Role's name, which the swap offers beside the Personas. */
     roleName: string;
-    messages: MessageResponse[];
+    /** Each with its current Thai reading (.scratch/write-for-me/spec.md), or null. */
+    messages: ChatMessageResponse[];
     /** True when the last Message is a User Message, so its turn failed and Retry applies. */
     awaitingReply: boolean;
     playable: boolean;
@@ -188,6 +197,8 @@ export class ChatManagerService {
         private readonly judge: JudgeManagerService,
         private readonly extraction: MemoryExtractionManagerService,
         private readonly suggestedReplies: SuggestedRepliesManagerService,
+        private readonly writeForMeWriter: WriteForMeManagerService,
+        private readonly thaiReadings: ThaiReadingManagerService,
         private readonly storySoFar: StorySoFarManagerService,
         private readonly documentSearch: DocumentSearchManagerService,
         private readonly gateway: ModelGateway,
@@ -266,13 +277,21 @@ export class ChatManagerService {
      * into parts from its `@Name:` text, and both background calls run again on it; the Chat
      * then waits for the user. The Opening copy is never judged or extracted from.
      */
-    async editMessage(storyId: number, chatId: number, messageId: number, text: string, stream?: TurnStream): Promise<EditResult> {
+    async editMessage(
+        storyId: number,
+        chatId: number,
+        messageId: number,
+        text: string,
+        stream?: TurnStream,
+        nudgeCharacterId?: number | null,
+    ): Promise<EditResult> {
         if (text.trim() === '') throw new EmptyMessageError();
         const { story, chat: loaded } = await this.load(storyId, chatId);
         const found = loaded.messages.find((message) => message.id === messageId);
         if (!found) throw new MessageNotFoundError();
 
         if (found.kind === MessageKind.User) {
+            const nudge = nudgeOf(story, loaded, nudgeCharacterId);
             const chat = await this.requireSendable(story, loaded);
             return this.writingTurn(chat.id, () =>
                 // The fresh reply is written to the identity worn now, so the edited text is stamped with it.
@@ -282,6 +301,7 @@ export class ChatManagerService {
                     found.position + 1,
                     () => this.chatModel.rewriteUserMessage(found, text, wornIdentity(story, chat)),
                     stream,
+                    nudge,
                 ),
             );
         }
@@ -315,7 +335,13 @@ export class ChatManagerService {
      * its Snapshots. On a failed or stopped turn the Message keeps the reply it had; since its
      * changes were rolled back for the new turn's prompt, both background calls run on it again.
      */
-    async regenerateMessage(storyId: number, chatId: number, messageId: number, stream?: TurnStream): Promise<EditResult> {
+    async regenerateMessage(
+        storyId: number,
+        chatId: number,
+        messageId: number,
+        stream?: TurnStream,
+        nudgeCharacterId?: number | null,
+    ): Promise<EditResult> {
         const { story, chat: loaded } = await this.load(storyId, chatId);
         // First: mid-turn, the Message may already be gone, deleted by the Regenerate under way.
         if (this.inFlight.has(loaded.id)) throw new TurnInProgressError();
@@ -325,6 +351,7 @@ export class ChatManagerService {
         if (message !== newest || message.kind !== MessageKind.Ai || message.model === AUTHOR_MODEL) {
             throw new NotRegenerableError();
         }
+        const nudge = nudgeOf(story, loaded, nudgeCharacterId);
         const chat = await this.requireSendable(story, loaded);
 
         return this.writingTurn(chat.id, async () => {
@@ -337,7 +364,7 @@ export class ChatManagerService {
             const replaced = rewound.messages.find((candidate) => candidate.id === message.id) ?? message;
             rewound.messages = rewound.messages.filter((candidate) => candidate.id !== message.id);
             try {
-                await this.writeTurn(story, rewound, stream, replaced);
+                await this.writeTurn(story, rewound, stream, replaced, nudge);
             } catch (error) {
                 await this.rerunBackground(story, chat.id, message.id);
                 throw error;
@@ -426,6 +453,7 @@ export class ChatManagerService {
         fromPosition: number,
         change: () => Promise<void>,
         stream: TurnStream | undefined,
+        nudge: string | null,
     ): Promise<EditResult> {
         // Stopped while the gate waited: nothing is rolled back or changed.
         if (stream?.signal.aborted) throw new TurnStoppedError();
@@ -433,7 +461,7 @@ export class ChatManagerService {
         await this.storySoFar.rewound(await this.reload(chatId), fromPosition);
         await change();
         // Reloaded: the rollback may have put the Chat back on an earlier Scene.
-        await this.writeTurn(story, await this.reload(chatId), stream);
+        await this.writeTurn(story, await this.reload(chatId), stream, undefined, nudge);
         return { ...(await this.getChat(story.id, chatId)), rolledBack };
     }
 
@@ -534,9 +562,10 @@ export class ChatManagerService {
     }
 
     /** Spec: "Send flow". */
-    async send(storyId: number, chatId: number, text: string, stream?: TurnStream): Promise<ChatDetail> {
+    async send(storyId: number, chatId: number, text: string, stream?: TurnStream, nudgeCharacterId?: number | null): Promise<ChatDetail> {
         if (text.trim() === '') throw new EmptyMessageError();
         const { story, chat: loaded } = await this.load(storyId, chatId);
+        const nudge = nudgeOf(story, loaded, nudgeCharacterId);
         const chat = await this.requireSendable(story, loaded);
 
         return this.writingTurn(chat.id, async () => {
@@ -551,19 +580,20 @@ export class ChatManagerService {
             chat.messages.push(userMessage);
             // The reply before it is settled on its shown version, even if this turn fails.
             await this.chatModel.dropReplyVersions(chat.id);
-            await this.writeTurn(story, chat, stream);
+            await this.writeTurn(story, chat, stream, undefined, nudge);
             return this.getChat(storyId, chatId);
         });
     }
 
     /** Runs the same turn again for a User Message whose turn failed. */
-    async retry(storyId: number, chatId: number, stream?: TurnStream): Promise<ChatDetail> {
+    async retry(storyId: number, chatId: number, stream?: TurnStream, nudgeCharacterId?: number | null): Promise<ChatDetail> {
         const { story, chat: loaded } = await this.load(storyId, chatId);
         if (!awaitingReply(loaded)) throw new NoTurnToRetryError();
+        const nudge = nudgeOf(story, loaded, nudgeCharacterId);
         const chat = await this.requireSendable(story, loaded);
 
         return this.writingTurn(chat.id, async () => {
-            await this.writeTurn(story, chat, stream);
+            await this.writeTurn(story, chat, stream, undefined, nudge);
             return this.getChat(storyId, chatId);
         });
     }
@@ -574,13 +604,14 @@ export class ChatManagerService {
      * from the last AI Message, the Opening included. A failed call stores nothing. (Not
      * named `continue`, beside `send` and `retry`, since that is a reserved word.)
      */
-    async continueChat(storyId: number, chatId: number, stream?: TurnStream): Promise<ChatDetail> {
+    async continueChat(storyId: number, chatId: number, stream?: TurnStream, nudgeCharacterId?: number | null): Promise<ChatDetail> {
         const { story, chat: loaded } = await this.load(storyId, chatId);
         if (awaitingReply(loaded)) throw new AwaitingReplyError();
+        const nudge = nudgeOf(story, loaded, nudgeCharacterId);
         const chat = await this.requireSendable(story, loaded);
 
         return this.writingTurn(chat.id, async () => {
-            await this.writeTurn(story, chat, stream);
+            await this.writeTurn(story, chat, stream, undefined, nudge);
             return this.getChat(storyId, chatId);
         });
     }
@@ -720,6 +751,50 @@ export class ChatManagerService {
     }
 
     /**
+     * .scratch/write-for-me/spec.md: the user's next Message, written as the worn identity from
+     * the composer's draft (or from nothing), with the same layers, Lore and Document passages
+     * Suggested replies read. Nothing is stored and no background call starts. Gated as
+     * Suggested replies are: refused while a turn is in flight or text credit is out, and never
+     * waiting for the previous reply's background calls.
+     */
+    async writeForMe(storyId: number, chatId: number, draft: string): Promise<string> {
+        const { story, chat } = await this.load(storyId, chatId);
+        if (this.inFlight.has(chat.id)) throw new TurnInProgressError();
+        if (await this.textCreditOut()) throw new OutOfCreditError('text');
+        const layers = await this.promptLayersFor(story, chat);
+        const history = promptHistory(chat.messages);
+        // The point after the newest Message, through the one Lore selection turns use.
+        const chosen = chosenLore(selectLoreAt(layers.lore ?? [], history));
+        // The passages the last turn found, still existing ones only, with no search call.
+        const documentPassages = await this.documentSearch.recorded(story.id, newestAiMessage(chat)?.documentPassages ?? null);
+        return this.writeForMeWriter.write(
+            { ...layers, chosenLore: chosen, documentPassages, history, draft },
+            { storyId: story.id, chatId: chat.id },
+        );
+    }
+
+    /**
+     * .scratch/write-for-me/spec.md, "Thai reading": a Thai translation of one Message's stored
+     * text, made once and kept. Answered from what is stored when this text has a reading;
+     * otherwise refused with text credit out, before any call. It takes no turn lock: a reading
+     * of a text that changes meanwhile is kept under the old fingerprint and just never shows.
+     */
+    async thaiReading(storyId: number, chatId: number, messageId: number): Promise<{ messageId: number; text: string }> {
+        const { story, chat } = await this.load(storyId, chatId);
+        const message = chat.messages.find((candidate) => candidate.id === messageId);
+        if (!message) throw new MessageNotFoundError();
+        const source = thaiReadingSource(message.toResponse());
+        const fingerprint = sourceFingerprint(source);
+        // Already read: no call, so a double tap costs once, and no credit is needed.
+        const stored = await this.chatModel.findThaiReading(message.id, fingerprint);
+        if (stored) return { messageId: message.id, text: stored.text };
+        if (await this.textCreditOut()) throw new OutOfCreditError('text');
+        const names = [...story.characters.map((character) => character.name), wornIdentity(story, chat).name, message.identityName ?? ''];
+        const text = await this.thaiReadings.make(message.id, source, fingerprint, names, { storyId: story.id, chatId: chat.id });
+        return { messageId: message.id, text };
+    }
+
+    /**
      * One play-model call for the Chat's next turn. When the last Message is a User Message
      * it is that Message's turn; when it is an AI Message it is a Continue turn, written on
      * from the whole history with the continue instruction in place of user text (spec:
@@ -728,7 +803,7 @@ export class ChatManagerService {
      * With a `stream`, the reply is streamed to it as it is written; a stopped stream throws
      * `TurnStoppedError` with nothing stored.
      */
-    private async writeTurn(story: StoryEntity, chat: ChatEntity, stream?: TurnStream, replacing?: MessageEntity): Promise<void> {
+    private async writeTurn(story: StoryEntity, chat: ChatEntity, stream?: TurnStream, replacing?: MessageEntity, nudge: string | null = null): Promise<void> {
         const userText = exchangeUserText(chat.messages, chat.messages.length);
         const history: PromptHistoryMessage[] = (userText !== null ? chat.messages.slice(0, -1) : chat.messages)
             .map((message) => ({
@@ -762,6 +837,7 @@ export class ChatManagerService {
             userText,
             present: inLatestExchange(story, chat, userText),
             sittingOut: sittingOut.map((character) => character.name),
+            nudge,
         });
         if (prompt.trimmed > 0) {
             this.logger.log(`Chat ${chat.id}: left out the ${prompt.trimmed} oldest Messages to fit the prompt budget`);
@@ -944,11 +1020,12 @@ export class ChatManagerService {
     }
 
     private async detail(story: StoryEntity, chat: ChatEntity): Promise<ChatDetail> {
-        const [settings, creditOut, source] = await Promise.all([
+        const [settings, creditOut, source, readings] = await Promise.all([
             this.settingsModel.get(),
             this.creditOut(),
             // Read live, so a rename of the source shows.
             chat.branchedFromChatId === null ? null : this.chatModel.findOne(chat.branchedFromChatId),
+            this.chatModel.findThaiReadings(chat.messages.map((message) => message.id)),
         ]);
         const scene = story.scenes.find((candidate) => candidate.id === chat.currentSceneId);
         const lastModel = lastAiModel(chat);
@@ -960,7 +1037,10 @@ export class ChatManagerService {
             identityName: identity.name,
             personaId: identity.personaId,
             roleName: story.role.name,
-            messages: chat.messages.map((message) => message.toResponse()),
+            messages: withThaiReadings(
+                chat.messages.map((message) => message.toResponse()),
+                readings,
+            ),
             awaitingReply: awaitingReply(chat),
             ...playableStatus(story),
             textCreditOut: creditOut.text,
@@ -1100,4 +1180,29 @@ function newestAiMessage(chat: ChatEntity): MessageEntity | null {
         if (chat.messages[i].kind === MessageKind.Ai) return chat.messages[i];
     }
     return null;
+}
+
+/**
+ * Each Message with its current Thai reading: the one whose fingerprint matches its stored text
+ * now. A changed text (an edit, another Reply version) simply finds none.
+ */
+function withThaiReadings(messages: MessageResponse[], readings: ThaiReadingEntity[]): ChatMessageResponse[] {
+    const byMessage = new Map<string, string>(readings.map((reading) => [`${reading.messageId}:${reading.sourceFingerprint}`, reading.text]));
+    return messages.map((message) => ({
+        ...message,
+        thaiReading: byMessage.get(`${message.id}:${sourceFingerprint(thaiReadingSource(message))}`) ?? null,
+    }));
+}
+
+/**
+ * The nudged Character's name for the turn prompt (.scratch/speaker-controls/spec.md, "Nudge"), or
+ * null for none. Checked before anything is stored: an id outside the cast is
+ * `CharacterNotFoundError`, a Character sitting out is `NudgeSittingOutError`.
+ */
+function nudgeOf(story: StoryEntity, chat: ChatEntity, characterId: number | null | undefined): string | null {
+    if (characterId === null || characterId === undefined) return null;
+    const character = story.characters.find((candidate) => candidate.id === characterId);
+    if (!character) throw new CharacterNotFoundError();
+    if (chat.sittingOutIds().includes(character.id)) throw new NudgeSittingOutError(character.name);
+    return character.name;
 }

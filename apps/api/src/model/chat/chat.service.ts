@@ -7,6 +7,7 @@ import { ChatEntity, StorySoFarAuthor } from './entities/chat.entity.js';
 import { MessagePartEntity, MessagePartKind } from './entities/message-part.entity.js';
 import { BackgroundStatus, DocumentPassagesUsed, MessageEntity, MessageKind } from './entities/message.entity.js';
 import { ReplyVersionEntity } from './entities/reply-version.entity.js';
+import { ThaiReadingEntity } from './entities/thai-reading.entity.js';
 
 /** The worn identity as a User Message records it: the Persona (null for the Role) and the name. */
 export interface StampedIdentity {
@@ -36,6 +37,7 @@ export class ChatModelService {
         @InjectRepository(ChatEntity) private readonly chats: Repository<ChatEntity>,
         @InjectRepository(MessageEntity) private readonly messages: Repository<MessageEntity>,
         @InjectRepository(ChatSittingOutEntity) private readonly sittingOut: Repository<ChatSittingOutEntity>,
+        @InjectRepository(ThaiReadingEntity) private readonly thaiReadings: Repository<ThaiReadingEntity>,
     ) {}
 
     /** A Story's Chats, most recently played first. */
@@ -368,6 +370,38 @@ export class ChatModelService {
     /** Deletes every Message of the Chat; their parts go through ON DELETE CASCADE. */
     async clearMessages(chatId: number): Promise<void> {
         await this.messages.delete({ chatId });
+    }
+
+    /** Every Thai reading of the given Messages, all fingerprints, in one query. */
+    async findThaiReadings(messageIds: number[]): Promise<ThaiReadingEntity[]> {
+        if (messageIds.length === 0) return [];
+        return this.thaiReadings.find({ where: { messageId: In(messageIds) } });
+    }
+
+    /** The reading of one Message's text under `fingerprint`, if one was made. */
+    findThaiReading(messageId: number, fingerprint: string): Promise<ThaiReadingEntity | null> {
+        return this.thaiReadings.findOne({ where: { messageId, sourceFingerprint: fingerprint } });
+    }
+
+    /**
+     * Inserts a reading under its fingerprint; one already there for that fingerprint (a double
+     * tap) is kept. Answers that Message's readings, newest first, or null when the Message is
+     * gone (deleted while its reading was being made).
+     */
+    async insertThaiReading(messageId: number, fingerprint: string, text: string): Promise<ThaiReadingEntity[] | null> {
+        try {
+            await this.thaiReadings.createQueryBuilder().insert().into(ThaiReadingEntity).values({ messageId, sourceFingerprint: fingerprint, text }).orIgnore().execute();
+        } catch (error) {
+            // 23503, foreign_key_violation: the Message went meanwhile, its readings with it.
+            const failed = error as { code?: string; driverError?: { code?: string } };
+            if ((failed.code ?? failed.driverError?.code) === '23503') return null;
+            throw error;
+        }
+        return this.thaiReadings.find({ where: { messageId }, order: { createdAt: 'DESC', id: 'DESC' } });
+    }
+
+    async deleteThaiReadings(ids: number[]): Promise<void> {
+        if (ids.length > 0) await this.thaiReadings.delete({ id: In(ids) });
     }
 }
 

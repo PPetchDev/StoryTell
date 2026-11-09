@@ -228,3 +228,30 @@ div.overflowRow {
         padding-top: 1.25rem;
     }
 }
+
+/* A Thai reading (.scratch/write-for-me/spec.md): set apart from the story text, upright, line breaks kept. */
+.thaiReading {
+    margin-top: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    color: var(--text);
+}
+
+.thaiLabel {
+    display: block;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    margin-bottom: 0.2rem;
+}
+
+.thaiText {
+    margin: 0;
+    white-space: pre-wrap;
+    font-style: normal;
+    font-size: calc(var(--story-size, 1rem) * 0.95);
+    line-height: 1.6;
+}

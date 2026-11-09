@@ -1,5 +1,6 @@
 import { storySoFarCoverage } from '../src/manager/chat/story-so-far/story-so-far-prompt.js';
 import { buildSuggestionsPrompt } from '../src/manager/chat/suggestions/suggestions-prompt.js';
+import { buildWriteForMePrompt } from '../src/manager/chat/write-for-me/write-for-me-prompt.js';
 import { buildTurnPrompt, estimateTokens, PromptLayersInput, TURN_PROMPT_TOKEN_BUDGET, TurnPromptInput } from '../src/manager/chat/turn/prompt.js';
 import { LedgerModelService } from '../src/model/ledger/ledger.service.js';
 import { TextCompletionRequest } from '../src/service/model-gateway/model-gateway.js';
@@ -140,6 +141,39 @@ describe("Author's note: Suggested replies (pure)", () => {
         const kept = (authorsNote: string | null) => suggestions({ authorsNote }, messages).messages.slice(1, -1).length;
         expect(kept(null)).toBe(3);
         // The note's ~330 tokens push one more out.
+        expect(kept('n'.repeat(1_000))).toBe(2);
+    });
+});
+
+// .scratch/authors-note/issues/03-write-for-me-reads-the-note.md
+describe("Author's note: Write for me (pure)", () => {
+    const lore = [{ id: 1, name: 'The lamp', keywords: [], text: 'The lamp burns whale oil.', alwaysOn: true }];
+    const written = (overrides: Partial<PromptLayersInput> = {}, messages = history(3, 50)) =>
+        buildWriteForMePrompt({ ...layers({ lore, chosenLore: lore, ...overrides }), history: messages, draft: 'ถามเรื่องตะเกียง' });
+
+    it('carries the block after the Lore and before its instruction, in the closing message only, in the words the turn uses', () => {
+        const prompt = written({ authorsNote: NOTE });
+        const closing = prompt.messages.at(-1)!.content;
+        expect(closing.indexOf('The lamp burns whale oil.')).toBeLessThan(closing.indexOf(HEADING));
+        expect(closing.indexOf(NOTE)).toBeLessThan(closing.indexOf('Step outside the story'));
+        expect(prompt.messages.slice(0, -1).some((message) => message.content.includes(NOTE))).toBe(false);
+        const turnBlock = buildTurnPrompt(input({ authorsNote: NOTE })).messages.at(-1)!.content;
+        const block = (text: string) => text.slice(text.indexOf(HEADING), text.indexOf('\n\n', text.indexOf(HEADING)));
+        expect(block(closing)).toBe(block(turnBlock));
+    });
+
+    it('carries none without a note, and equals the prompt built without the field', () => {
+        const today = written();
+        for (const authorsNote of [null, '', '  \n ']) expect(written({ authorsNote })).toEqual(today);
+        expect(today.messages.at(-1)!.content).not.toContain(HEADING);
+    });
+
+    it('reserves the note in its history budget: a long note trims one more old Message where the budget is tight', () => {
+        const empty = written({}, []);
+        const room = TURN_PROMPT_TOKEN_BUDGET - estimateTokens(empty.messages[0].content) - estimateTokens(empty.messages.at(-1)!.content);
+        const messages = [...history(5, 380), { role: 'assistant' as const, text: 'y'.repeat((room - 50 - 2 * 380) * 4) }];
+        const kept = (authorsNote: string | null) => written({ authorsNote }, messages).messages.slice(1, -1).length;
+        expect(kept(null)).toBe(3);
         expect(kept('n'.repeat(1_000))).toBe(2);
     });
 });
@@ -353,6 +387,32 @@ describe("Author's note: the API", () => {
         expect(closing.indexOf(NOTE)).toBeLessThan(closing.indexOf('Step outside the story'));
 
         // Without a note: the same call with the block taken out.
+        const block = closing.slice(closing.indexOf(HEADING), closing.indexOf('Step outside the story'));
+        expect(withoutNote.messages.at(-1)!.content).toBe(closing.replace(block, ''));
+        expect({ ...withoutNote, servedFor: null, messages: withoutNote.messages.slice(0, -1) }).toEqual({
+            ...withNote,
+            servedFor: null,
+            messages: withNote.messages.slice(0, -1),
+        });
+    });
+
+    // .scratch/authors-note/issues/03-write-for-me-reads-the-note.md
+    it('steers Write for me: the block after the Lore and before its instruction; none without a note', async () => {
+        const storyId = await createStory();
+        const noted = await createChat(storyId);
+        const plain = await createChat(storyId);
+        await setNote(storyId, noted.id, NOTE).expect(200);
+
+        t.gateway.scriptText('write_for_me', '"Well?"', '"Well?"');
+        await t.http.post(`/api/stories/${storyId}/chats/${noted.id}/write-for-me`).send({ draft: 'ถามว่าไง' }).expect(200);
+        await t.http.post(`/api/stories/${storyId}/chats/${plain.id}/write-for-me`).send({ draft: 'ถามว่าไง' }).expect(200);
+        const [withNote, withoutNote] = t.gateway.textCalls('write_for_me');
+
+        const closing = withNote.messages.at(-1)!.content;
+        expect(closing.indexOf('The lamp burns whale oil.')).toBeLessThan(closing.indexOf(HEADING));
+        expect(closing).toContain(`${HEADING} (the user's own direction for this Chat)\n${NOTE}\n`);
+        expect(closing.indexOf(NOTE)).toBeLessThan(closing.indexOf('Step outside the story'));
+
         const block = closing.slice(closing.indexOf(HEADING), closing.indexOf('Step outside the story'));
         expect(withoutNote.messages.at(-1)!.content).toBe(closing.replace(block, ''));
         expect({ ...withoutNote, servedFor: null, messages: withoutNote.messages.slice(0, -1) }).toEqual({

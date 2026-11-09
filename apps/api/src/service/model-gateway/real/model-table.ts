@@ -167,6 +167,7 @@ const PLAY_MODEL_KINDS: ReadonlySet<TextCallKind> = new Set<TextCallKind>([
     'field_rewrite',
     'story_assistant',
     'suggested_replies',
+    'write_for_me',
 ]);
 
 export function isPlayModelKind(kind: TextCallKind): boolean {
@@ -176,9 +177,9 @@ export function isPlayModelKind(kind: TextCallKind): boolean {
 /**
  * The play-model kinds that send the user's Sampling (spec: "Which calls use them"). Story
  * drafting, the Story assistant and field rewrites stay on host defaults: their JSON and
- * structured answers were tuned there. Write for me's kind joins this set when it lands.
+ * structured answers were tuned there.
  */
-const SAMPLED_KINDS: ReadonlySet<TextCallKind> = new Set<TextCallKind>(['turn', 'suggested_replies']);
+const SAMPLED_KINDS: ReadonlySet<TextCallKind> = new Set<TextCallKind>(['turn', 'suggested_replies', 'write_for_me']);
 
 export function isSampledKind(kind: TextCallKind): boolean {
     return SAMPLED_KINDS.has(kind);

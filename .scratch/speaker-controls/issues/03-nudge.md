@@ -1,6 +1,6 @@
 # 03 — Nudge a Character from the composer's Character row
 
-**Status:** ready-for-agent
+**Status:** done
 
 Part of: [Spec: Speaker controls](../spec.md)
 
@@ -11,11 +11,11 @@ Part of: [Spec: Speaker controls](../spec.md)
 
 **Blocked by:** [01 — Set a Character sitting out, and the turns leave them out](01-sitting-out-in-turns-and-the-sheet.md); [write-for-me 01 — Composer tool row](../../write-for-me/issues/01-composer-tool-row.md) (the composer's bands).
 
-- [ ] Pure prompt test: the nudge line's place (after "Where things stand", before the final instruction) and wording; no line without a nudge; the system message unchanged.
-- [ ] API tests (fake gateway): a send, a Continue, a Retry and a Regenerate with a nudge each carry the line; the next turn without one has none; a nudge on someone sitting out is the new 409 and stores no User Message; an unknown id is a 404; the judge's and extraction's calls never hold the line.
-- [ ] Every turn endpoint without the new field answers and streams exactly as before.
-- [ ] e2e (390 px, fake gateway): tapping a chip highlights it; ▶ Continue on an empty box sends the nudge and the highlight clears once the reply is in; a second tap before sending takes it back.
-- [ ] e2e: setting the nudged Character sitting out from "Who's here" removes their chip and the nudge; the last chip reads "1 sitting out".
-- [ ] A failed turn keeps the highlight, and Retry sends the nudge.
-- [ ] A one-Character Story shows no Character row; nothing in the composer overflows horizontally at 390 px.
-- [ ] `docs/error-codes.md` lists the new code; typecheck, the whole API suite and the whole e2e suite pass.
+- [x] Pure prompt test: the nudge line's place (after "Where things stand", before the final instruction) and wording; no line without a nudge; the system message unchanged.
+- [x] API tests (fake gateway): a send, a Continue, a Retry and a Regenerate with a nudge each carry the line; the next turn without one has none; a nudge on someone sitting out is the new 409 and stores no User Message; an unknown id is a 404; the judge's and extraction's calls never hold the line.
+- [x] Every turn endpoint without the new field answers and streams exactly as before.
+- [x] e2e (390 px, fake gateway): tapping a chip highlights it; ▶ Continue on an empty box sends the nudge and the highlight clears once the reply is in; a second tap before sending takes it back.
+- [x] e2e: setting the nudged Character sitting out from "Who's here" removes their chip and the nudge; the last chip reads "1 sitting out".
+- [x] A failed turn keeps the highlight, and Retry sends the nudge.
+- [x] A one-Character Story shows no Character row; nothing in the composer overflows horizontally at 390 px.
+- [x] `docs/error-codes.md` lists the new code; typecheck, the whole API suite and the whole e2e suite pass.

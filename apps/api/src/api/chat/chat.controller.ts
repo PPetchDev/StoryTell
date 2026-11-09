@@ -11,6 +11,8 @@ import {
     SetAuthorsNoteRequestBodyDTO,
     SetSittingOutRequestBodyDTO,
     SwapIdentityRequestBodyDTO,
+    TurnRequestBodyDTO,
+    WriteForMeRequestBodyDTO,
 } from './dto/chat.request.dto.js';
 import {
     BranchResponseBodyDTO,
@@ -22,6 +24,8 @@ import {
 import { LoreInPlayResponseBodyDTO } from './dto/lore-in-play.response.dto.js';
 import { DocumentsInPlayResponseBodyDTO } from './dto/documents-in-play.response.dto.js';
 import { SuggestionsResponseBodyDTO } from './dto/suggestions.response.dto.js';
+import { WriteForMeResponseBodyDTO } from './dto/write-for-me.response.dto.js';
+import { ThaiReadingResponseBodyDTO } from './dto/thai-reading.response.dto.js';
 import { answerTurn } from './turn-response.js';
 
 const Id = (name: string) => Param(name, ParseIntPipe);
@@ -119,7 +123,7 @@ export class ChatApiController {
         @Res() response: Response,
     ): Promise<void> {
         return answerTurn<ChatResponseBodyDTO>(request, response, 201, (stream) =>
-            this.chatManager.send(storyId, chatId, body.text, stream),
+            this.chatManager.send(storyId, chatId, body.text, stream, body.nudgeCharacterId),
         );
     }
 
@@ -129,11 +133,12 @@ export class ChatApiController {
     retry(
         @Id('storyId') storyId: number,
         @Id('chatId') chatId: number,
+        @Body() body: TurnRequestBodyDTO,
         @Req() request: Request,
         @Res() response: Response,
     ): Promise<void> {
         return answerTurn<ChatResponseBodyDTO>(request, response, 200, (stream) =>
-            this.chatManager.retry(storyId, chatId, stream),
+            this.chatManager.retry(storyId, chatId, stream, body?.nudgeCharacterId),
         );
     }
 
@@ -147,11 +152,12 @@ export class ChatApiController {
     continue(
         @Id('storyId') storyId: number,
         @Id('chatId') chatId: number,
+        @Body() body: TurnRequestBodyDTO,
         @Req() request: Request,
         @Res() response: Response,
     ): Promise<void> {
         return answerTurn<ChatResponseBodyDTO>(request, response, 200, (stream) =>
-            this.chatManager.continueChat(storyId, chatId, stream),
+            this.chatManager.continueChat(storyId, chatId, stream, body?.nudgeCharacterId),
         );
     }
 
@@ -173,7 +179,7 @@ export class ChatApiController {
         @Res() response: Response,
     ): Promise<void> {
         return answerTurn<EditMessageResponseBodyDTO>(request, response, 200, (stream) =>
-            this.chatManager.editMessage(storyId, chatId, messageId, body.text, stream),
+            this.chatManager.editMessage(storyId, chatId, messageId, body.text, stream, body.nudgeCharacterId),
         );
     }
 
@@ -191,11 +197,12 @@ export class ChatApiController {
         @Id('storyId') storyId: number,
         @Id('chatId') chatId: number,
         @Id('messageId') messageId: number,
+        @Body() body: TurnRequestBodyDTO,
         @Req() request: Request,
         @Res() response: Response,
     ): Promise<void> {
         return answerTurn<EditMessageResponseBodyDTO>(request, response, 200, (stream) =>
-            this.chatManager.regenerateMessage(storyId, chatId, messageId, stream),
+            this.chatManager.regenerateMessage(storyId, chatId, messageId, stream, body?.nudgeCharacterId),
         );
     }
 
@@ -290,6 +297,37 @@ export class ChatApiController {
     @ApiOkResponse({ type: SuggestionsResponseBodyDTO })
     async suggestions(@Id('storyId') storyId: number, @Id('chatId') chatId: number): Promise<SuggestionsResponseBodyDTO> {
         return { suggestions: await this.chatManager.suggestReplies(storyId, chatId) };
+    }
+
+    /**
+     * .scratch/write-for-me/spec.md: the user's next Message, written in English as the worn
+     * identity from the composer's draft, or from nothing. Nothing is stored in the Chat.
+     * Refused while a turn is in flight or text credit is out, as Suggested replies are.
+     */
+    @Post(':chatId/write-for-me')
+    @HttpCode(200)
+    @ApiOkResponse({ type: WriteForMeResponseBodyDTO })
+    async writeForMe(
+        @Id('storyId') storyId: number,
+        @Id('chatId') chatId: number,
+        @Body() body: WriteForMeRequestBodyDTO,
+    ): Promise<WriteForMeResponseBodyDTO> {
+        return { text: await this.chatManager.writeForMe(storyId, chatId, body.draft) };
+    }
+
+    /**
+     * .scratch/write-for-me/spec.md, "Thai reading": the Message's stored text in Thai, from the
+     * background model. A text already read is answered from what was kept, with no call.
+     */
+    @Post(':chatId/messages/:messageId/thai-reading')
+    @HttpCode(200)
+    @ApiOkResponse({ type: ThaiReadingResponseBodyDTO })
+    thaiReading(
+        @Id('storyId') storyId: number,
+        @Id('chatId') chatId: number,
+        @Id('messageId') messageId: number,
+    ): Promise<ThaiReadingResponseBodyDTO> {
+        return this.chatManager.thaiReading(storyId, chatId, messageId);
     }
 
     /** Clears every Message and copies the current Opening in again; title and identity stay. */

@@ -30,7 +30,7 @@ describe('Sampling through the real gateway', () => {
         });
     });
 
-    it.each(['turn', 'suggested_replies'] as const)(
+    it.each(['turn', 'suggested_replies', 'write_for_me'] as const)(
         'sends the play model’s values on %s under OpenRouter’s names, and requires them',
         async (kind) => {
             const net = recordedFetch([{ fixture: 'openrouter/chat-success.json' }]);

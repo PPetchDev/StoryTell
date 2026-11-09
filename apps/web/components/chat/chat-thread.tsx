@@ -4,6 +4,7 @@ import { CSSProperties, Fragment, KeyboardEvent, MouseEvent, PointerEvent, React
 
 import { AiMessageParts, MessageBody, UserLine } from '@/components/chat/message-body';
 import { MessageSnapshots } from '@/components/chat/snapshots';
+import { ThaiReadingAction, ThaiReadingBlock, ThaiReadings } from '@/components/chat/thai-reading';
 import { ConfirmButton } from '@/components/story-editor/fields';
 import { Cast, Portraits } from '@/lib/character-colour';
 import { isOpening, Message, MessagePart, messageText, ReplyVersions } from '@/lib/chat';
@@ -239,13 +240,15 @@ interface ActionRowProps {
     onBranch(): void;
     /** ‹ n/m ›; null while the reply has only one version. */
     versions: VersionSwitchProps | null;
+    /** ไทย, just before ⑂ Branch (integration: "Message actions"). */
+    thai: ReactNode;
 }
 
 /**
  * Under the newest AI Message while no turn is in flight (spec: "Action row"). ‹ n/m › goes
- * first when the reply has versions, then ↺ Again, never on the Opening; ⑂ Branch goes last.
+ * first when the reply has versions, then ↺ Again, never on the Opening; ไทย, then ⑂ Branch last.
  */
-function ActionRow({ onAgain, onEdit, onSnapshot, onBranch, versions }: ActionRowProps) {
+function ActionRow({ onAgain, onEdit, onSnapshot, onBranch, versions, thai }: ActionRowProps) {
     const items: OverflowItem[] = [];
     if (versions) items.push({ key: 'versions', node: <VersionSwitch {...versions} /> });
     if (onAgain) {
@@ -267,6 +270,7 @@ function ActionRow({ onAgain, onEdit, onSnapshot, onBranch, versions }: ActionRo
             </button>
         ),
     });
+    items.push({ key: 'thai', node: thai });
     items.push({ key: 'branch', node: <BranchAction onBranch={onBranch} /> });
     return <OverflowActions label="Message actions" className={styles.actions} items={items} />;
 }
@@ -279,6 +283,8 @@ interface MessageViewProps {
     editing: boolean;
     /** What shows under the Message: its Edit once tapped, or the action row. */
     tools: ReactNode;
+    /** Its Thai reading, or why one failed: under the story text, above the Snapshots. */
+    reading: ReactNode;
     /** Its Snapshots and Snapshot jobs, for an AI Message. */
     snapshots: ReactNode;
     /** A tap on the Message shows or hides its Edit; null when it has none to show. */
@@ -289,7 +295,7 @@ interface MessageViewProps {
     onCancel(): void;
 }
 
-function MessageView({ message, cast, portraits, later, editing, tools, snapshots, onTap, onSwipe, onSave, onCancel }: MessageViewProps) {
+function MessageView({ message, cast, portraits, later, editing, tools, reading, snapshots, onTap, onSwipe, onSave, onCancel }: MessageViewProps) {
     // Where a finger went down on a reply with versions; a sideways move past the threshold steps.
     const swipeRef = useRef<{ pointerId: number; x: number; y: number } | null>(null);
     const swipeStart = (event: PointerEvent<HTMLElement>) => {
@@ -337,6 +343,7 @@ function MessageView({ message, cast, portraits, later, editing, tools, snapshot
             ) : (
                 <MessageBody message={message} cast={cast} portraits={portraits} />
             )}
+            {!editing && reading}
             {snapshots}
             {!editing && tools}
         </article>
@@ -475,6 +482,8 @@ interface ChatThreadProps {
     onSnapshot(): void;
     onOpenSnapshot(snapshot: Snapshot): void;
     onDismissSnapshot(job: SnapshotJob): void;
+    /** ไทย on each Message, and which readings show. */
+    thaiReadings: ThaiReadings;
 }
 
 /** The Chat's Messages in order, as their own scroll area between the top bar and the composer. */
@@ -499,6 +508,7 @@ export function ChatThread({
     onSnapshot,
     onOpenSnapshot,
     onDismissSnapshot,
+    thaiReadings,
 }: ChatThreadProps) {
     // ↺ Again replaces the reply in place: it leaves the thread while the writing indicator shows.
     const shown = replacing === null ? messages : messages.filter((message) => message.id !== replacing);
@@ -544,11 +554,13 @@ export function ChatThread({
                                 onSnapshot={onSnapshot}
                                 onBranch={() => onBranch(message.id)}
                                 versions={versions ? { versions, onVersion: (version) => onVersion(message.id, version) } : null}
+                                thai={<ThaiReadingAction message={message} readings={thaiReadings} />}
                             />
                         );
                     } else if (canEdit && tapped === message.id) {
                         const items: OverflowItem[] = [];
                         if (editable) items.push({ key: 'edit', node: <EditAction onEdit={() => edit(message.id)} /> });
+                        items.push({ key: 'thai', node: <ThaiReadingAction message={message} readings={thaiReadings} /> });
                         items.push({ key: 'branch', node: <BranchAction onBranch={() => onBranch(message.id)} /> });
                         tools = <OverflowActions label="Message tools" className={styles.tools} items={items} />;
                     }
@@ -561,6 +573,7 @@ export function ChatThread({
                             later={shown.length - index - 1}
                             editing={editing === message.id}
                             tools={tools}
+                            reading={<ThaiReadingBlock message={message} readings={thaiReadings} />}
                             snapshots={
                                 message.kind === 'ai' && (
                                     <MessageSnapshots

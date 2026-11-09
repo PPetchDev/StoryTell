@@ -133,3 +133,24 @@ export class ReplyVersionNotFoundError extends AppError {
         super('404.004.018', 'That reply has no such version.');
     }
 }
+
+/** Write for me's answer held nothing for the user once its label and any Character line were taken off. Nothing stored. */
+export class UnreadableWriteForMeError extends AppError {
+    constructor() {
+        super('502.004.019', "Couldn't write it. Try again.");
+    }
+}
+
+/** The background model's Thai reading came back empty. Nothing stored. */
+export class UnreadableThaiReadingError extends AppError {
+    constructor() {
+        super('502.004.020', "Couldn't make a Thai reading. Try again.");
+    }
+}
+
+/** A nudge on a Character sitting out of the Chat (.scratch/speaker-controls/spec.md). Nothing stored. */
+export class NudgeSittingOutError extends AppError {
+    constructor(name: string) {
+        super('409.004.021', `${name} is sitting out. Bring them back before nudging them.`);
+    }
+}

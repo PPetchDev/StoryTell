@@ -8,7 +8,7 @@ import { Message, MessagePart } from '@/lib/chat';
 import styles from './message-body.module.css';
 
 /** `*…*` spans as italics, in the user's lines and in Characters' speech; the stored text is unchanged. */
-function withActions(text: string): ReactNode[] {
+export function withActions(text: string): ReactNode[] {
     return text.split(/(\*[^*\n]+\*)/g).map((piece, index) =>
         index % 2 === 1 ? <em key={index}>{piece.slice(1, -1)}</em> : piece,
     );

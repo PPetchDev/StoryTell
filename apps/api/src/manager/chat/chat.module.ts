@@ -15,12 +15,14 @@ import { JudgeManagerService } from './judge/judge.service.js';
 import { MemoryExtractionManagerService } from './memory/extraction.service.js';
 import { MemoryManagerService } from './memory/memory.service.js';
 import { SuggestedRepliesManagerService } from './suggestions/suggested-replies.service.js';
+import { WriteForMeManagerService } from './write-for-me/write-for-me.service.js';
+import { ThaiReadingManagerService } from './thai-reading/thai-reading.service.js';
 import { StorySoFarManagerService } from './story-so-far/story-so-far.service.js';
 import { ChatTranscriptManagerService } from './transcript.service.js';
 
 @Module({
     imports: [ChatModelModule, BranchModelModule, StoryModelModule, SettingsModelModule, LedgerModelModule, MemoryModelModule, PersonaModelModule, SnapshotModelModule, DocumentModelModule],
-    providers: [ChatManagerService, DocumentSearchManagerService, JudgeManagerService, MemoryExtractionManagerService, MemoryManagerService, SuggestedRepliesManagerService, StorySoFarManagerService, ChatTranscriptManagerService],
+    providers: [ChatManagerService, DocumentSearchManagerService, JudgeManagerService, MemoryExtractionManagerService, MemoryManagerService, SuggestedRepliesManagerService, WriteForMeManagerService, ThaiReadingManagerService, StorySoFarManagerService, ChatTranscriptManagerService],
     exports: [ChatManagerService, MemoryManagerService, StorySoFarManagerService, ChatTranscriptManagerService],
 })
 export class ChatManagerModule {}

@@ -113,6 +113,11 @@ export interface TurnPromptInput {
     history: PromptHistoryMessage[];
     /** The user's message; null for a Continue turn, whose user-role message is the continue instruction. */
     userText: string | null;
+    /**
+     * The Character the user nudged for this turn (.scratch/speaker-controls/spec.md, "Nudge"), by name;
+     * null or left out for none. Turn-only: never one of the shared layers.
+     */
+    nudge?: string | null;
     /** Total prompt budget in tokens; recent Messages are trimmed from the oldest to fit. */
     tokenBudget?: number;
     /**
@@ -356,7 +361,7 @@ export function continueInstruction(identity: string): string {
 }
 
 /** The layers a prompt is built on: everything of a turn's input but the Messages. */
-export type PromptLayersInput = Omit<TurnPromptInput, 'history' | 'userText' | 'tokenBudget'>;
+export type PromptLayersInput = Omit<TurnPromptInput, 'history' | 'userText' | 'tokenBudget' | 'nudge'>;
 
 /**
  * Layers 1–9 as the one system message, shared by the turn and by Suggested replies so they
@@ -434,6 +439,17 @@ export function sittingOutSentence(names: string[]): string {
 }
 
 /**
+ * The Nudge line (.scratch/speaker-controls/spec.md): a hint, never a forced speaker. It sits after
+ * "Where things stand" and before the final instruction.
+ */
+export function nudgeLine(name: string): string {
+    return `The user would like to hear from ${name} this turn: give ${name} a line or a moment if ${name} could plausibly be there. If not, carry on naturally without forcing it.`;
+}
+
+/** What the Story so far trigger reserves for a Nudge line, which it can't know in advance. */
+export const NUDGE_RESERVE_TOKENS = 60;
+
+/**
  * The Author's note block (.scratch/authors-note/spec.md), or null when the note is empty. It
  * sits after the Lore and before "Where things stand" in the turn's trailing message, and before
  * the instruction of Suggested replies, in the same words everywhere. It directs and is never a
@@ -476,12 +492,15 @@ export function buildTurnPrompt(input: TurnPromptInput): TurnPrompt {
     const userText = input.userText ?? continueInstruction(identity);
     const system = systemPrompt(input);
     const lore = loreBlock(input.chosenLore ?? []);
-    // One order (.scratch/sillytavern-gaps/integration.md): Lore, Documents, Author's note, Where things stand, the final instruction.
+    // One order (.scratch/sillytavern-gaps/integration.md): Lore, Documents, Author's note, Where things stand, Nudge, the final instruction.
     const finalInstruction = joinBlocks([
         lore,
         documentsBlock(input.documentPassages ?? []),
         authorsNoteBlock(input.authorsNote, identity),
-        `${stateReminder(input)}\n${turnFinalInstruction(identity)}`,
+        // Without a nudge, exactly the reminder and the final instruction as before.
+        [stateReminder(input), input.nudge ? nudgeLine(input.nudge) : null, turnFinalInstruction(identity)]
+            .filter((line): line is string => line !== null)
+            .join('\n'),
     ]);
 
     const budget = input.tokenBudget ?? TURN_PROMPT_TOKEN_BUDGET;

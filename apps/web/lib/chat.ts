@@ -34,6 +34,8 @@ export interface UserMessage {
     /** The Persona worn; null for the Role and once that Persona is deleted. */
     personaId: number | null;
     createdAt: string;
+    /** Its Thai reading for the text as it stands; null when none was made (.scratch/write-for-me/spec.md). */
+    thaiReading: string | null;
 }
 
 export type BackgroundStatus = 'pending' | 'done' | 'failed';
@@ -63,6 +65,8 @@ export interface AiMessage {
     /** Its Reply versions; null while it has only one. Only the newest AI Message has more. */
     versions: ReplyVersions | null;
     createdAt: string;
+    /** Its Thai reading for the text as it stands; null when none was made (.scratch/write-for-me/spec.md). */
+    thaiReading: string | null;
 }
 
 export type Message = UserMessage | AiMessage;
@@ -210,6 +214,14 @@ function turn<T>(method: 'POST' | 'PATCH', path: string, body: object | undefine
     });
 }
 
+/**
+ * The Character nudged for a turn (.scratch/speaker-controls/spec.md, "Nudge") as the turn's body
+ * field; with none the request is exactly as before, so Retry, Continue and Again send no body.
+ */
+function withNudge(body: object | undefined, nudge: number | null | undefined): object | undefined {
+    return nudge === null || nudge === undefined ? body : { ...body, nudgeCharacterId: nudge };
+}
+
 /** Writes answer with the whole Chat; the list and the Chat itself are read with useApiQuery. */
 export const chatApi = {
     create: (storyId: number) => apiSend<Chat>('POST', `/stories/${storyId}/chats`),
@@ -222,28 +234,34 @@ export const chatApi = {
     setSittingOut: (storyId: number, chatId: number, characterIds: number[]) =>
         apiSend<Chat>('PUT', `/stories/${storyId}/chats/${chatId}/sitting-out`, { characterIds }),
     remove: (storyId: number, chatId: number) => apiSend<void>('DELETE', `/stories/${storyId}/chats/${chatId}`),
-    send: (storyId: number, chatId: number, text: string, stream?: TurnStream) =>
-        turn<Chat>('POST', `/stories/${storyId}/chats/${chatId}/messages`, { text }, stream),
-    retry: (storyId: number, chatId: number, stream?: TurnStream) =>
-        turn<Chat>('POST', `/stories/${storyId}/chats/${chatId}/retry`, undefined, stream),
+    send: (storyId: number, chatId: number, text: string, stream?: TurnStream, nudge?: number | null) =>
+        turn<Chat>('POST', `/stories/${storyId}/chats/${chatId}/messages`, withNudge({ text }, nudge), stream),
+    retry: (storyId: number, chatId: number, stream?: TurnStream, nudge?: number | null) =>
+        turn<Chat>('POST', `/stories/${storyId}/chats/${chatId}/retry`, withNudge(undefined, nudge), stream),
     /** Lets the story go on without a line from the user: the Narrator writes the next reply. */
-    continue: (storyId: number, chatId: number, stream?: TurnStream) =>
-        turn<Chat>('POST', `/stories/${storyId}/chats/${chatId}/continue`, undefined, stream),
+    continue: (storyId: number, chatId: number, stream?: TurnStream, nudge?: number | null) =>
+        turn<Chat>('POST', `/stories/${storyId}/chats/${chatId}/continue`, withNudge(undefined, nudge), stream),
     /** Three things the user might write next, as the worn identity. Nothing is stored. */
     suggest: (storyId: number, chatId: number) =>
         apiSend<{ suggestions: SuggestedReply[] }>('POST', `/stories/${storyId}/chats/${chatId}/suggestions`),
+    /** The user's next Message in English, as the worn identity, from the composer's draft (or from nothing). Nothing is stored. */
+    writeForMe: (storyId: number, chatId: number, draft: string) =>
+        apiSend<{ text: string }>('POST', `/stories/${storyId}/chats/${chatId}/write-for-me`, { draft }),
+    /** The Message's stored text in Thai, made once by the background model and kept. */
+    thaiReading: (storyId: number, chatId: number, messageId: number) =>
+        apiSend<{ messageId: number; text: string }>('POST', `/stories/${storyId}/chats/${chatId}/messages/${messageId}/thai-reading`),
     /**
      * Rewrites a Message, discards every Message after it and rolls back their changes; a
      * User Message gets a new reply, an AI Message is judged again.
      */
-    edit: (storyId: number, chatId: number, messageId: number, text: string, stream?: TurnStream) =>
-        turn<EditedChat>('PATCH', `/stories/${storyId}/chats/${chatId}/messages/${messageId}`, { text }, stream),
+    edit: (storyId: number, chatId: number, messageId: number, text: string, stream?: TurnStream, nudge?: number | null) =>
+        turn<EditedChat>('PATCH', `/stories/${storyId}/chats/${chatId}/messages/${messageId}`, withNudge({ text }, nudge), stream),
     /**
      * ↺ Again: writes the newest AI Message again, rolling back its changes like an edit; the
      * replaced reply is kept as a Reply version. A failed turn keeps the reply it had.
      */
-    regenerate: (storyId: number, chatId: number, messageId: number, stream?: TurnStream) =>
-        turn<EditedChat>('POST', `/stories/${storyId}/chats/${chatId}/messages/${messageId}/regenerate`, undefined, stream),
+    regenerate: (storyId: number, chatId: number, messageId: number, stream?: TurnStream, nudge?: number | null) =>
+        turn<EditedChat>('POST', `/stories/${storyId}/chats/${chatId}/messages/${messageId}/regenerate`, withNudge(undefined, nudge), stream),
     /**
      * Shows another Reply version of the newest AI Message: what the shown one changed is rolled
      * back, and the chosen one is judged and extracted from again.

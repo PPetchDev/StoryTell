@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent, ReactNode, useState } from 'react';
+import { FormEvent, ReactNode, useEffect, useState } from 'react';
 
 import { useApiQuery } from '@/components/connection';
 import { CharacterPortrait } from '@/components/portrait/character-portrait';
@@ -293,6 +293,8 @@ interface ChatTopBarProps {
     /** Saves who is sitting out, the whole set at once. */
     onSetSittingOut(characterIds: number[]): void;
     onReset(): void;
+    /** Counts the asks for "Who's in this Chat" from outside the menu; each new one opens it. */
+    whoRequest?: number;
 }
 
 /**
@@ -315,11 +317,16 @@ export function ChatTopBar({
     onSetAuthorsNote,
     onSetSittingOut,
     onReset,
+    whoRequest = 0,
 }: ChatTopBarProps) {
     const [menu, setMenu] = useState<'closed' | 'menu' | 'rename' | 'note' | 'who'>('closed');
     const sittingOutNames = chat.sittingOut.flatMap((id) => characters.find((character) => character.id === id)?.name ?? []);
     const [confirming, setConfirming] = useState(false);
     const close = () => setMenu('closed');
+    // The Character row's "Who's here" opens the same sheet (.scratch/speaker-controls/spec.md).
+    useEffect(() => {
+        if (whoRequest) setMenu('who');
+    }, [whoRequest]);
     /** Closes the menu, then runs the choice, so a drawer or dialog it opens takes the focus. */
     const choose = (action: () => void) => () => {
         close();

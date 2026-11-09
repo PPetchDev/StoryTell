@@ -416,4 +416,44 @@ ${LIGHTHOUSE}`);
             expect(t.gateway.embeddingCalls()).toEqual([]);
         });
     });
+
+    // Spec: Documents, "Suggested replies and Write for me"; .scratch/sillytavern-gaps/integration.md, "Write for me's inputs".
+    describe('Write for me', () => {
+        async function writeForMe(storyId: number, chatId: number): Promise<string> {
+            t.gateway.scriptText('write_for_me', '"Show me the wick."');
+            await t.http.post(`/api/stories/${storyId}/chats/${chatId}/write-for-me`).send({ draft: 'ขอดูไส้ตะเกียง' }).expect(200);
+            return t.gateway.textCalls('write_for_me').at(-1)!.messages.at(-1)!.content;
+        }
+
+        it("carries the newest AI Message's passages before its instruction, with no search call", async () => {
+            const storyId = await playableStory();
+            await addDocument(storyId, 'Gull Point light', LIGHTHOUSE);
+            await addDocument(storyId, 'Valley bakers', BREAD);
+            const chatId = await newChat(storyId);
+            await send(storyId, chatId, QUESTION);
+            t.gateway.reset();
+
+            const closing = await writeForMe(storyId, chatId);
+
+            expect(closing).toContain(`## Gull Point light
+${LIGHTHOUSE}`);
+            expect(closing).not.toContain(BREAD);
+            expect(closing.indexOf(DOCUMENTS_HEADING)).toBeLessThan(closing.indexOf('Step outside the story'));
+            expect(t.gateway.embeddingCalls()).toEqual([]);
+        });
+
+        it("drops a removed Document's passages, and has no block before any turn searched", async () => {
+            const storyId = await playableStory();
+            const lighthouse = await addDocument(storyId, 'Gull Point light', LIGHTHOUSE);
+            const chatId = await newChat(storyId);
+            expect(await writeForMe(storyId, chatId)).not.toContain(DOCUMENTS_HEADING);
+
+            await send(storyId, chatId, QUESTION);
+            expect(await writeForMe(storyId, chatId)).toContain(DOCUMENTS_HEADING);
+            await t.http.delete(`/api/stories/${storyId}/documents/${lighthouse}`).expect(200);
+
+            expect(await writeForMe(storyId, chatId)).not.toContain(DOCUMENTS_HEADING);
+            expect(t.gateway.embeddingCalls('document_search')).toHaveLength(1);
+        });
+    });
 });

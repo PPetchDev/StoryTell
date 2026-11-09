@@ -16,6 +16,8 @@ const CALL_KINDS = Object.keys({
     snapshot_prompt: true,
     suggested_replies: true,
     story_summary: true,
+    write_for_me: true,
+    thai_reading: true,
     snapshot_image: true,
     reference_image: true,
     document_embedding: true,
