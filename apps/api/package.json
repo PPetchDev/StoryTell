@@ -11,7 +11,8 @@
         "migration:generate": "nest build && typeorm migration:generate -d dist/store/db/cli-data-source.js",
         "typecheck": "tsc --noEmit -p tsconfig.json",
         "test": "vitest run",
-        "test:watch": "vitest"
+        "test:watch": "vitest",
+        "smoke:live": "node scripts/smoke-live.mjs"
     },
     "dependencies": {
         "@nestjs/common": "^12.3.2",

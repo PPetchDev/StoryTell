@@ -8,7 +8,7 @@ import {
     ProviderOutageError,
     UnparseableOutputError,
 } from '../../../errors/model-gateway.errors.js';
-import { CreditBalance, PromptMessage, TextStream } from '../model-gateway.js';
+import { CreditBalance, PromptMessage, SamplerParam, SamplerValues, TextStream } from '../model-gateway.js';
 import {
     defaultSleep,
     FetchLike,
@@ -30,7 +30,24 @@ export interface OpenRouterChatRequest {
     maxTokens?: number;
     json?: boolean;
     stop?: string[];
+    /** The user's Sampling, for a sampled kind only. Absent keys are not sent. */
+    samplers?: SamplerValues;
 }
+
+/** OpenRouter's name for each sampler parameter. */
+const OPENROUTER_SAMPLER_NAMES: Record<SamplerParam, string> = {
+    temperature: 'temperature',
+    minP: 'min_p',
+    topP: 'top_p',
+    repetitionPenalty: 'repetition_penalty',
+};
+
+/**
+ * OpenRouter found no endpoint that takes the request as sent. With one host, no fallbacks and
+ * `require_parameters` on, that means the host stopped taking a sampler value. Still an outage
+ * (502.001.001); the gateway words it for the user.
+ */
+export class SamplerRefusedError extends ProviderOutageError {}
 
 /** What one call billed. */
 export interface TextBill {
@@ -42,6 +59,8 @@ export interface TextBill {
 export interface OpenRouterChatResult extends TextBill {
     text: string;
     finishReason: string | undefined;
+    /** Hidden thinking the model was billed for, where OpenRouter reports it (a whole call only). */
+    reasoningTokens?: number;
 }
 
 export interface OpenRouterStreamResult extends OpenRouterChatResult {
@@ -109,7 +128,21 @@ export class OpenRouterClient {
         if (request.maxTokens !== undefined) body.max_tokens = request.maxTokens;
         if (request.json) body.response_format = { type: 'json_object' };
         if (model.stopStrings && request.stop?.length) body.stop = request.stop;
+        let sentSamplers = false;
+        for (const [param, value] of Object.entries(request.samplers ?? {}) as Array<[SamplerParam, number | undefined]>) {
+            if (value === undefined) continue;
+            body[OPENROUTER_SAMPLER_NAMES[param]] = value;
+            sentSamplers = true;
+        }
+        // A host that stops taking a value then fails the call instead of silently ignoring it.
+        // With nothing set, the body stays exactly as it was before Sampling.
+        if (sentSamplers) body.provider = { ...(body.provider as Record<string, unknown>), require_parameters: true };
         return body;
+    }
+
+    /** True when the body asked OpenRouter to require its parameters. */
+    private static requiresParameters(body: Record<string, unknown>): boolean {
+        return (body.provider as { require_parameters?: boolean }).require_parameters === true;
     }
 
     async chat(request: OpenRouterChatRequest): Promise<OpenRouterChatResult> {
@@ -125,7 +158,7 @@ export class OpenRouterClient {
         });
         const json = await readJson(response);
         if (!response.ok || json?.error) {
-            throw this.toError(response.status, json);
+            throw this.toError(response.status, json, OpenRouterClient.requiresParameters(body));
         }
         return this.readChat(json ?? {}, request.model);
     }
@@ -179,7 +212,7 @@ export class OpenRouterClient {
         }
         if (signal.aborted) return stopped('', undefined);
         if (!response.ok || !response.body) {
-            throw this.toError(response.status, await readJson(response));
+            throw this.toError(response.status, await readJson(response), OpenRouterClient.requiresParameters(body));
         }
 
         let text = '';
@@ -331,15 +364,22 @@ export class OpenRouterClient {
             completionTokens: usage.completion_tokens ?? 0,
             costUsd: typeof usage.cost === 'number' ? usage.cost : 0,
             finishReason,
+            reasoningTokens: usage.completion_tokens_details?.reasoning_tokens ?? 0,
         };
     }
 
-    private toError(status: number, json: Record<string, any> | undefined): ModelGatewayError {
+    private toError(status: number, json: Record<string, any> | undefined, requiredParameters = false): ModelGatewayError {
         const error = json?.error ?? {};
         const message: string = typeof error.message === 'string' ? error.message : `HTTP ${status}`;
         const code: number = typeof error.code === 'number' ? error.code : status;
         const metadata = error.metadata ?? {};
         const described = `OpenRouter: ${message}${describeProvider(metadata)}`;
+
+        // OpenRouter's routing refusal, "No endpoints found that can handle the requested
+        // parameters" (a 404). Its exact status and wording are confirmed by the smoke run.
+        if (requiredParameters && (code === 404 || status === 404) && /no endpoints? found/i.test(message)) {
+            return new SamplerRefusedError(described);
+        }
 
         // A 429 is a rate limit, OpenRouter's own or the host's (DeepInfra's engine_overloaded
         // is relayed this way), and a 503 is an overloaded host. Both are transient: `send`

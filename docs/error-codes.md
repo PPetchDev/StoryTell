@@ -36,11 +36,12 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 |---|---|---|
 | `XXX.000.000` | (any `HttpException`) | Framework error with that HTTP status, e.g. `400.000.000` for a failed validation. |
 | `500.000.000` | (unhandled) | Unexpected server error. |
-| `502.001.001` | `ProviderOutageError` | The model provider failed or is down, including a rate limit or host overload (OpenRouter 429 or 503) that outlasted the gateway's same-host retries. The message carries the host's own code, e.g. `(DeepInfra: engine_overloaded)`. Show with Retry. |
+| `502.001.001` | `ProviderOutageError` | The model provider failed or is down, including a rate limit or host overload (OpenRouter 429 or 503) that outlasted the gateway's same-host retries. The message carries the host's own code, e.g. `(DeepInfra: engine_overloaded)`. Also raised when Sampling values were sent and OpenRouter finds no endpoint that takes them; the message then reads "DeepInfra no longer takes one of the Sampling values for <model>. Reset Sampling for it in Settings." Show with Retry. |
 | `422.001.002` | `ModelRefusalError` | The model refused, or the host stopped the output for content. Show with Retry. |
 | `402.001.003` | `OutOfCreditError` (text) | Text credit is used up: OpenRouter answered 402 (balance, key limit or the per-request credit reservation) or a 403 budget block, the only answers that carry a `limit_source`. Never raised for a 429, whatever its metadata says. Blocks play. |
 | `402.001.004` | `OutOfCreditError` (image) | Image credit is used up. Blocks only Snapshots and Reference images. A camera press answers it at once when the balance is known to be used up; a failed Snapshot job carries it as its error otherwise. |
 | `502.001.005` | `UnparseableOutputError` | The model's output could not be read. Show with Retry. |
+| `422.001.006` | `SamplerNotOfferedError` | A Sampling value (`PUT /api/settings/samplers/:playModel`) for a parameter that play model's host does not list. Nothing is saved. Resetting it with `null` is always allowed. |
 | `404.002.001` | `ImageNotFoundError` | No image file at that path. |
 | `400.002.002` | `InvalidImagePathError` | The path is absolute or leaves the image folder. |
 | `404.002.003` | `ReferenceCandidateNotFoundError` | No such Reference image candidate: it was picked, replaced by a newer round, expired, or never made. Generate again. |

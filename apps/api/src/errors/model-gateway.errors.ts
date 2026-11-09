@@ -1,6 +1,6 @@
 import { AppError } from './app-error.js';
 
-import type { CreditPool } from '../service/model-gateway/model-gateway.js';
+import type { CreditPool, SamplerParam } from '../service/model-gateway/model-gateway.js';
 
 /** A failure the Model Gateway maps a provider response to. Callers show it with Retry. */
 export abstract class ModelGatewayError extends AppError {}
@@ -30,6 +30,21 @@ export class OutOfCreditError extends ModelGatewayError {
         message = `Out of ${pool} credit.`,
     ) {
         super(pool === 'text' ? '402.001.003' : '402.001.004', message);
+    }
+}
+
+/** The names Settings shows for each sampler parameter. */
+const SAMPLER_NAMES: Record<SamplerParam, string> = {
+    temperature: 'Temperature',
+    minP: 'Min-p',
+    topP: 'Top-p',
+    repetitionPenalty: 'Repetition penalty',
+};
+
+/** A Sampling value for a parameter the play model's host does not list. Nothing is saved. */
+export class SamplerNotOfferedError extends AppError {
+    constructor(modelName: string, param: SamplerParam) {
+        super('422.001.006', `${modelName} is not offered ${SAMPLER_NAMES[param]}.`);
     }
 }
 

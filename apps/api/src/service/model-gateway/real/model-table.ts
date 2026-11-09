@@ -1,6 +1,7 @@
 import {
     ImageCallKind,
     ImageModel,
+    PlayModelFacts,
     REFERENCE_IMAGE_MODEL,
     SNAPSHOT_MODEL_PRICES,
     SnapshotModel,
@@ -9,6 +10,12 @@ import {
     TextCallKind,
     TextModel,
 } from '../model-gateway.js';
+
+/**
+ * How reasoning is turned off, or as low as it goes, on a host: `effort` where OpenRouter maps
+ * it (`none` or `minimal`), else `enabled: false`.
+ */
+export type ReasoningSetting = { effort: 'minimal' } | { effort: 'none' } | { enabled: false };
 
 /**
  * Spec: "Model Gateway", model table. Each text model is pinned to one OpenRouter host with
@@ -23,7 +30,7 @@ export interface TextModelSpec {
      * GLM-5.3 can't turn reasoning off on DeepInfra ("mandatory"), so it gets the minimal
      * effort; the DeepSeek models take `enabled: false`.
      */
-    reasoning: { effort: 'minimal' } | { enabled: false };
+    reasoning: ReasoningSetting;
     /** False for a host that ignores `stop` (GMICloud did), so stop strings are never sent there. */
     stopStrings: boolean;
 }
@@ -50,6 +57,81 @@ export const TEXT_MODELS: Record<TextModel, TextModelSpec> = {
     },
 };
 
+/**
+ * A candidate play model (.scratch/models-and-samplers/spec.md: "More play models"): a
+ * provisional, pinned entry that only the live smoke run reads. It is outside PLAY_MODELS and
+ * the catalogue, so neither Settings nor the DTO can choose it. A candidate that passes moves to
+ * PLAY_MODELS, TEXT_MODELS (with the reasoning setting and stop-string support the run
+ * confirmed) and PLAY_MODEL_CATALOGUE, and its entry here goes.
+ */
+export interface CandidateModelSpec {
+    /** The OpenRouter model id. */
+    id: string;
+    /** Always DeepInfra, whose terms are already checked, with no fallback. */
+    host: 'deepinfra';
+    /** The reasoning settings to try, in order; the smoke run plays on the one with fewest reasoning tokens. */
+    reasoningToTry: ReasoningSetting[];
+    /** Assumed on until the smoke run's stop probe says otherwise. */
+    stopStrings: boolean;
+    /** What the catalogue entry would hold: name, prices, offered samplers, the maker's suggestions. */
+    facts: PlayModelFacts;
+}
+
+/**
+ * Prices and `supported_parameters` from OpenRouter's endpoints API for the DeepInfra endpoint,
+ * read on 2026-11-09 (all three list the four sampler parameters). Reasoning settings and maker
+ * suggestions from docs/research/models-samplers-embeddings.md.
+ */
+export const CANDIDATE_MODELS = {
+    // No maker suggestion published.
+    'kimi-k3.1-pro': {
+        id: 'moonshotai/kimi-k3.1-pro',
+        host: 'deepinfra',
+        reasoningToTry: [{ effort: 'none' }, { effort: 'minimal' }, { enabled: false }],
+        stopStrings: true,
+        facts: {
+            name: 'Kimi K3.1-Pro',
+            priceUsdPerMillion: { input: 1.9, output: 9.5, cachedInput: 0.19 },
+            samplers: ['temperature', 'minP', 'topP', 'repetitionPenalty'],
+            suggested: {},
+        },
+    },
+    // The card's instant mode: temperature 0.6, top_p 0.95. Output is capped at 16,384 tokens.
+    'kimi-k2.6': {
+        id: 'moonshotai/kimi-k2.6',
+        host: 'deepinfra',
+        reasoningToTry: [{ enabled: false }, { effort: 'none' }],
+        stopStrings: true,
+        facts: {
+            name: 'Kimi K2.6',
+            priceUsdPerMillion: { input: 0.75, output: 3.5, cachedInput: 0.15 },
+            samplers: ['temperature', 'minP', 'topP', 'repetitionPenalty'],
+            suggested: { temperature: 0.6, topP: 0.95 },
+        },
+    },
+    // The card's non-thinking mode: temperature 0.7, top_p 0.8.
+    'qwen3.5-397b': {
+        id: 'qwen/qwen3.5-397b-a17b',
+        host: 'deepinfra',
+        reasoningToTry: [{ enabled: false }, { effort: 'none' }],
+        stopStrings: true,
+        facts: {
+            name: 'Qwen3.5-397B',
+            priceUsdPerMillion: { input: 0.45, output: 3, cachedInput: 0.22 },
+            samplers: ['temperature', 'minP', 'topP', 'repetitionPenalty'],
+            suggested: { temperature: 0.7, topP: 0.8 },
+        },
+    },
+} as const satisfies Record<string, CandidateModelSpec>;
+
+export type CandidateModel = keyof typeof CANDIDATE_MODELS;
+
+/** A candidate as the OpenRouter client takes a model, with one of its reasoning settings. */
+export function candidateTextModel(candidate: CandidateModel, reasoning: ReasoningSetting): TextModelSpec {
+    const spec: CandidateModelSpec = CANDIDATE_MODELS[candidate];
+    return { id: spec.id, host: spec.host, reasoning, stopStrings: spec.stopStrings };
+}
+
 /** The play model serves these kinds; every other text kind is a background call. */
 const PLAY_MODEL_KINDS: ReadonlySet<TextCallKind> = new Set<TextCallKind>([
     'turn',
@@ -61,6 +143,17 @@ const PLAY_MODEL_KINDS: ReadonlySet<TextCallKind> = new Set<TextCallKind>([
 
 export function isPlayModelKind(kind: TextCallKind): boolean {
     return PLAY_MODEL_KINDS.has(kind);
+}
+
+/**
+ * The play-model kinds that send the user's Sampling (spec: "Which calls use them"). Story
+ * drafting, the Story assistant and field rewrites stay on host defaults: their JSON and
+ * structured answers were tuned there. Write for me's kind joins this set when it lands.
+ */
+const SAMPLED_KINDS: ReadonlySet<TextCallKind> = new Set<TextCallKind>(['turn', 'suggested_replies']);
+
+export function isSampledKind(kind: TextCallKind): boolean {
+    return SAMPLED_KINDS.has(kind);
 }
 
 export interface ImageModelSpec {

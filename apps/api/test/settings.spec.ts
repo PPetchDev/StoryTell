@@ -1,3 +1,4 @@
+import { CANDIDATE_MODELS } from '../src/service/model-gateway/real/model-table.js';
 import { startTestApp, TestApp } from './harness/test-app.js';
 
 describe('Settings', () => {
@@ -24,6 +25,16 @@ describe('Settings', () => {
             snapshotSize: '1K',
         });
         expect(body.playModels.map((m: { id: string }) => m.id)).toEqual(['glm-5.3', 'deepseek-v4-pro']);
+        // List prices per million tokens from OpenRouter's endpoints API on DeepInfra, and a long
+        // turn: 16k prompt tokens uncached plus the Long reply's 1,400 output tokens, to the cent.
+        // GLM-5.3: 16,000 × $0.5625/M + 1,400 × $2.50/M = $0.0125 → $0.01.
+        // DeepSeek V4 Pro: 16,000 × $1.30/M + 1,400 × $2.60/M = $0.02444 → $0.02.
+        expect(
+            body.playModels.map((m: Record<string, unknown>) => [m.id, m.label, m.priceUsdPerMillion, m.longTurnUsd]),
+        ).toEqual([
+            ['glm-5.3', 'GLM-5.3 (DeepInfra)', { input: 0.5625, output: 2.5, cachedInput: 0.125 }, 0.01],
+            ['deepseek-v4-pro', 'DeepSeek V4 Pro (DeepInfra)', { input: 1.3, output: 2.6, cachedInput: 0.1 }, 0.02],
+        ]);
         expect(body.imageModels.map((m: { id: string }) => m.id)).toEqual([
             'seedream-v4-edit',
             'seedream-v5-pro-edit',
@@ -92,6 +103,20 @@ describe('Settings', () => {
             textCreditCapUsd: 25.5,
             imageCreditCapUsd: 8,
         });
+    });
+
+    it('never offers or takes a candidate play model before it has passed the smoke run', async () => {
+        const candidates = Object.keys(CANDIDATE_MODELS);
+        expect(candidates).toEqual(['kimi-k3.1-pro', 'kimi-k2.6', 'qwen3.5-397b']);
+
+        const { body } = await t.http.get('/api/settings').expect(200);
+        expect(body.playModels.map((m: { id: string }) => m.id).filter((id: string) => candidates.includes(id))).toEqual([]);
+        for (const candidate of candidates) {
+            const refused = await t.http.put('/api/settings').send({ playModel: candidate }).expect(400);
+            expect(refused.body.error.code).toBe('400.000.000');
+            await t.http.put(`/api/settings/samplers/${candidate}`).send({ temperature: 0.7 }).expect(400);
+        }
+        expect((await t.http.get('/api/settings').expect(200)).body.settings.playModel).toBe(body.settings.playModel);
     });
 
     it.each([

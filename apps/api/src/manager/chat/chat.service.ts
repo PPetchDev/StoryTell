@@ -41,7 +41,7 @@ import { SnapshotModelService } from '../../model/snapshot/snapshot.service.js';
 import { SettingsModelService } from '../../model/settings/settings.service.js';
 import { StoryEntity } from '../../model/story/entities/story.entity.js';
 import { StoryModelService } from '../../model/story/story.service.js';
-import { ModelGateway, TextCompletionRequest, TextCompletionResult } from '../../service/model-gateway/model-gateway.js';
+import { ModelGateway, playModelName, TextCompletionRequest, TextCompletionResult } from '../../service/model-gateway/model-gateway.js';
 import { latestLine } from '../excerpt.js';
 import { exchangeUserText } from './exchange.js';
 import { MissingField, playableStatus } from '../story/playable.js';
@@ -90,7 +90,7 @@ export interface ChatDetail extends ChatSummary {
     imageCreditOut: boolean;
     playModel: string;
     /** Set when the last AI Message came from a different model than the current play model. */
-    drift: { lastModel: string; playModel: string } | null;
+    drift: { lastModel: string; playModel: string; lastModelLabel: string; playModelLabel: string } | null;
     /**
      * The Chat it was branched from, with that Chat's title now and the Message the user tapped
      * there (null once that Message is gone); null when never branched or that Chat is gone.
@@ -947,7 +947,12 @@ export class ChatManagerService {
             playModel: settings.playModel,
             drift:
                 lastModel !== null && lastModel !== settings.playModel
-                    ? { lastModel, playModel: settings.playModel }
+                    ? {
+                          lastModel,
+                          playModel: settings.playModel,
+                          lastModelLabel: playModelName(lastModel),
+                          playModelLabel: playModelName(settings.playModel),
+                      }
                     : null,
             branchedFrom: source ? { chatId: source.id, title: source.title, messageId: chat.branchedFromMessageId } : null,
             authorsNote: chat.authorsNote,

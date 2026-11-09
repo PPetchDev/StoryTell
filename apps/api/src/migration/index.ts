@@ -23,6 +23,7 @@ import { LoreRecursable1763930000000 } from './1763930000000-LoreRecursable.js';
 import { LoreTimedEffects1763940000000 } from './1763940000000-LoreTimedEffects.js';
 import { LoreChance1763950000000 } from './1763950000000-LoreChance.js';
 import { LoreGroup1763960000000 } from './1763960000000-LoreGroup.js';
+import { Samplers1763970000000 } from './1763970000000-Samplers.js';
 
 // Listed by hand, oldest first, so migrations load the same way from compiled JS, the
 // TypeORM CLI and Vitest. Add every new migration here.
@@ -52,4 +53,5 @@ export const migrations = [
     LoreTimedEffects1763940000000,
     LoreChance1763950000000,
     LoreGroup1763960000000,
+    Samplers1763970000000,
 ];

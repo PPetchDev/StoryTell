@@ -1,7 +1,12 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsInt, IsNumber, IsOptional, Max, Min } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsIn, IsInt, IsNumber, IsOptional, Max, Min, ValidateIf } from 'class-validator';
 
-import { PLAY_MODELS, SNAPSHOT_MODELS, SNAPSHOT_SIZES } from '../../../service/model-gateway/model-gateway.js';
+import {
+    PLAY_MODELS,
+    SAMPLER_RANGES,
+    SNAPSHOT_MODELS,
+    SNAPSHOT_SIZES,
+} from '../../../service/model-gateway/model-gateway.js';
 
 import type { PlayModel, SnapshotModel, SnapshotSize } from '../../../service/model-gateway/model-gateway.js';
 
@@ -71,4 +76,40 @@ export class UpdateSettingsRequestBodyDTO {
     @IsNumber({ maxDecimalPlaces: 2 })
     @Min(0)
     imageCreditCapUsd?: number;
+}
+
+export class SamplersPathDTO {
+    @ApiProperty({ description: 'The play model whose Sampling changes.', enum: PLAY_MODELS })
+    @IsIn(PLAY_MODELS)
+    playModel: PlayModel;
+}
+
+/**
+ * One sampler value: a number sets it, null resets it to default (not sent), absent leaves it.
+ * Inclusive range, at most two decimal places.
+ */
+function SamplerValue(param: keyof typeof SAMPLER_RANGES, description: string): PropertyDecorator {
+    const { min, max } = SAMPLER_RANGES[param];
+    return (target, key) => {
+        ApiPropertyOptional({ description: `${description} ${min}–${max}; null resets it.`, minimum: min, maximum: max, nullable: true, type: Number })(target, key);
+        ValidateIf((_, value) => value !== undefined && value !== null)(target, key);
+        IsNumber({ maxDecimalPlaces: 2, allowNaN: false, allowInfinity: false })(target, key);
+        Min(min)(target, key);
+        Max(max)(target, key);
+    };
+}
+
+/** Only the fields sent change. */
+export class UpdateSamplersRequestBodyDTO {
+    @SamplerValue('temperature', 'Higher is more surprising, lower more predictable.')
+    temperature?: number | null;
+
+    @SamplerValue('minP', 'Trims unlikely word choices; higher trims more.')
+    minP?: number | null;
+
+    @SamplerValue('topP', 'Keeps only the likeliest words; lower is narrower.')
+    topP?: number | null;
+
+    @SamplerValue('repetitionPenalty', 'Above 1 pushes back on repeated words and details.')
+    repetitionPenalty?: number | null;
 }

@@ -5,7 +5,7 @@ import { FormEvent, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { useConnection } from '@/components/connection';
 import { ApiUnreachableError } from '@/lib/api';
-import { backgroundNotice, Chat, chatApi, modelLabel, SuggestedReply } from '@/lib/chat';
+import { backgroundNotice, Chat, chatApi, SuggestedReply } from '@/lib/chat';
 
 import styles from './chat-composer.module.css';
 
@@ -46,8 +46,8 @@ function Notices({ chat, failedSnapshots, onRetryBackground, retrying }: Notices
             )}
             {chat.drift && (
                 <p className="notice" role="status">
-                    Drift notice: the last reply came from {modelLabel(chat.drift.lastModel)}; the play model is now{' '}
-                    {modelLabel(chat.drift.playModel)}. Characters may sound different from here on.
+                    Drift notice: the last reply came from {chat.drift.lastModelLabel}; the play model is now{' '}
+                    {chat.drift.playModelLabel}. Characters may sound different from here on.
                 </p>
             )}
         </>

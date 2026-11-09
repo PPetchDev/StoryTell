@@ -5,12 +5,19 @@ import { useState } from 'react';
 import { BackupBanner } from '@/components/backup-banner';
 import { useApiQuery } from '@/components/connection';
 import { Autosave, useAutosave } from '@/components/story-editor/autosave';
+import { SamplingFold } from '@/components/settings/sampling-fold';
 import { SaveStatus } from '@/components/story-editor/save-status';
 import { TextSizeSetting } from '@/components/text-size-setting';
 import { apiSend } from '@/lib/api';
-import { ImageModelOption, ModelOption, Settings, SettingsResponse, SnapshotSize } from '@/lib/types';
+import { ImageModelOption, ModelOption, PlayModelOption, Settings, SettingsResponse, SnapshotSize } from '@/lib/types';
 
 type ModelKey = 'playModel' | 'imageModel';
+
+/** "$0.56 in / $2.50 out per million tokens · a long turn about $0.01" */
+function priceLine(option: PlayModelOption): string {
+    const { input, output } = option.priceUsdPerMillion;
+    return `$${input.toFixed(2)} in / $${output.toFixed(2)} out per million tokens · a long turn about $${option.longTurnUsd.toFixed(2)}`;
+}
 
 /** The size kept when the Snapshot model changes: the same one if the new model has it, else its smallest. */
 function sizeFor(option: ImageModelOption | undefined, size: SnapshotSize): SnapshotSize {
@@ -51,24 +58,38 @@ function ModelSelect({
     label,
     value,
     options,
+    note,
     onChange,
 }: {
     id: string;
     label: string;
     value: string;
     options: ModelOption[];
+    /** A line under the select, read with it. */
+    note?: string;
     onChange(value: string): void;
 }) {
+    const noteId = `${id}-note`;
     return (
         <div className="field">
             <label htmlFor={id}>{label}</label>
-            <select id={id} value={value} onChange={(event) => onChange(event.target.value)}>
+            <select
+                id={id}
+                value={value}
+                aria-describedby={note ? noteId : undefined}
+                onChange={(event) => onChange(event.target.value)}
+            >
                 {options.map((option) => (
                     <option key={option.id} value={option.id}>
                         {option.label}
                     </option>
                 ))}
             </select>
+            {note && (
+                <p id={noteId} className="muted">
+                    {note}
+                </p>
+            )}
         </div>
     );
 }
@@ -149,6 +170,7 @@ function SettingsForm({ initial, autosave }: { initial: SettingsResponse; autosa
     });
     const [snapshotSize, setSnapshotSize] = useState<SnapshotSize>(initial.settings.snapshotSize);
     const imageOption = initial.imageModels.find((option) => option.id === models.imageModel);
+    const playOption = initial.playModels.find((option) => option.id === models.playModel);
 
     const changeModel = (key: ModelKey, value: string) => {
         setModels((current) => ({ ...current, [key]: value }));
@@ -188,6 +210,7 @@ function SettingsForm({ initial, autosave }: { initial: SettingsResponse; autosa
                     label="Play model"
                     value={models.playModel}
                     options={initial.playModels}
+                    note={playOption && priceLine(playOption)}
                     onChange={(value) => changeModel('playModel', value)}
                 />
                 {models.playModel !== loadedPlayModel && (
@@ -197,6 +220,7 @@ function SettingsForm({ initial, autosave }: { initial: SettingsResponse; autosa
                         Drift notice before the next send.
                     </p>
                 )}
+                {playOption && <SamplingFold option={playOption} initial={initial.settings.samplers} autosave={autosave} />}
                 <ModelSelect
                     id="image-model"
                     label="Snapshot model"

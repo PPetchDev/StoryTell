@@ -40,7 +40,7 @@ interface Chat {
     missing: Array<{ field: string; label: string }>;
     textCreditOut: boolean;
     playModel: string;
-    drift: { lastModel: string; playModel: string } | null;
+    drift: { lastModel: string; playModel: string; lastModelLabel: string; playModelLabel: string } | null;
 }
 
 interface Story {
@@ -1079,13 +1079,46 @@ A Character knows only the Memories it is tagged on and acts as if the rest neve
             expect(played.playModel).toBe('glm-5.3');
 
             await t.http.put('/api/settings').send({ playModel: 'deepseek-v4-pro' }).expect(200);
-            expect((await getChat(story.id, chat.id)).drift).toEqual({ lastModel: 'glm-5.3', playModel: 'deepseek-v4-pro' });
+            expect((await getChat(story.id, chat.id)).drift).toEqual({
+                lastModel: 'glm-5.3',
+                playModel: 'deepseek-v4-pro',
+                lastModelLabel: 'GLM-5.3',
+                playModelLabel: 'DeepSeek V4 Pro',
+            });
 
             // A turn from the new model clears it.
             const next = await send(story.id, chat.id, 'Still here.', { text: 'Mira blinks.', model: 'deepseek-v4-pro' });
             expect(next.drift).toBeNull();
 
             await t.http.put('/api/settings').send({ playModel: 'glm-5.3' }).expect(200);
+        });
+
+        it('does not appear for a Sampling change', async () => {
+            const story = await createStory();
+            const chat = await createChat(story.id);
+            await send(story.id, chat.id, 'Hello?', { text: 'Mira nods.', model: 'glm-5.3' });
+
+            try {
+                await t.http.put('/api/settings/samplers/glm-5.3').send({ temperature: 1.3, minP: 0.1 }).expect(200);
+
+                expect((await getChat(story.id, chat.id)).drift).toBeNull();
+            } finally {
+                await t.http.put('/api/settings/samplers/glm-5.3').send({ temperature: null, minP: null }).expect(200);
+            }
+        });
+
+        it('names a model that has left the list by its stored id', async () => {
+            const story = await createStory();
+            const chat = await createChat(story.id);
+
+            await send(story.id, chat.id, 'Hello?', { text: 'Mira nods.', model: 'retired-model-9' });
+
+            expect((await getChat(story.id, chat.id)).drift).toEqual({
+                lastModel: 'retired-model-9',
+                playModel: 'glm-5.3',
+                lastModelLabel: 'retired-model-9',
+                playModelLabel: 'GLM-5.3',
+            });
         });
     });
 });
@@ -1212,5 +1245,39 @@ describe('Chats through the real gateway', () => {
         await awaitJudge(t.http, storyId, chatId);
 
         await t.http.put('/api/settings').send({ playModel: 'glm-5.3' }).expect(200);
+    });
+
+    it('sends the Sampling saved for the play model on a turn, and none on its background calls', async () => {
+        const { storyId, chatId } = await playableChat();
+        await t.http.put('/api/settings').send({ playModel: 'deepseek-v4-pro' }).expect(200);
+        await t.http.put('/api/settings/samplers/glm-5.3').send({ temperature: 0.3 }).expect(200);
+        await t.http.put('/api/settings/samplers/deepseek-v4-pro').send({ temperature: 1.15, repetitionPenalty: 1.05 }).expect(200);
+        const before = turnRequests().length;
+
+        try {
+            await t.http.post(`/api/stories/${storyId}/chats/${chatId}/messages`).send({ text: 'Hello?' }).expect(201);
+            await awaitJudge(t.http, storyId, chatId);
+
+            const [turn, ...background] = turnRequests().slice(before);
+            expect(turn.body).toMatchObject({
+                model: 'deepseek/deepseek-v4-pro',
+                temperature: 1.15,
+                repetition_penalty: 1.05,
+                provider: { only: ['deepinfra'], allow_fallbacks: false, require_parameters: true },
+            });
+            expect(turn.body).not.toHaveProperty('min_p');
+            expect(background).toHaveLength(2);
+            for (const request of background) {
+                expect(request.body).not.toHaveProperty('temperature');
+                expect(request.body.provider).toEqual({ only: ['deepinfra'], allow_fallbacks: false });
+            }
+        } finally {
+            await t.http.put('/api/settings/samplers/glm-5.3').send({ temperature: null }).expect(200);
+            await t.http
+                .put('/api/settings/samplers/deepseek-v4-pro')
+                .send({ temperature: null, repetitionPenalty: null })
+                .expect(200);
+            await t.http.put('/api/settings').send({ playModel: 'glm-5.3' }).expect(200);
+        }
     });
 });

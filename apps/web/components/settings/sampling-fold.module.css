@@ -1,0 +1,6 @@
+/* The Sampling fold sits between the Play model and the Snapshot model: keep it apart from the next field. */
+.sampling {
+    margin: 0.25rem 0 1.25rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--line);
+}

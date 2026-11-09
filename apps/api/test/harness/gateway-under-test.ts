@@ -33,6 +33,7 @@ export function gatewayUnderTest(
         playModel: 'glm-5.3',
         imageModel: 'seedream-v4-edit',
         snapshotSize: '1K',
+        samplers: {},
         ...options.settings,
     };
     const records: NewUsageRecord[] = [];

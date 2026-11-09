@@ -6,8 +6,14 @@ import {
     DEFAULT_PLAY_MODEL,
     DEFAULT_SNAPSHOT_MODEL,
     DEFAULT_SNAPSHOT_SIZE,
+    PlayModel,
+    SamplerParam,
+    SamplerValues,
 } from '../../service/model-gateway/model-gateway.js';
 import { SETTINGS_ROW_ID, SettingsEntity } from './entities/settings.entity.js';
+
+/** A number sets a value, null resets it to default (not sent), and an absent key leaves it. */
+export type SamplersPatch = Partial<Record<SamplerParam, number | null>>;
 
 export type SettingsPatch = Partial<
     Pick<
@@ -47,6 +53,21 @@ export class SettingsModelService {
     async update(patch: SettingsPatch): Promise<SettingsEntity> {
         const current = await this.get();
         Object.assign(current, patch);
+        return this.settings.save(current);
+    }
+
+    /** Changes one play model's Sampling; a model left with no value set loses its key. */
+    async updateSamplers(model: PlayModel, patch: SamplersPatch): Promise<SettingsEntity> {
+        const current = await this.get();
+        const values: SamplerValues = { ...current.samplers[model] };
+        for (const [param, value] of Object.entries(patch) as Array<[SamplerParam, number | null | undefined]>) {
+            if (value === null) delete values[param];
+            else if (value !== undefined) values[param] = value;
+        }
+        const samplers = { ...current.samplers };
+        if (Object.keys(values).length > 0) samplers[model] = values;
+        else delete samplers[model];
+        current.samplers = samplers;
         return this.settings.save(current);
     }
 }

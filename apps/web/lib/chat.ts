@@ -88,7 +88,8 @@ export interface Chat extends ChatSummary {
     /** Image credit is used up: only the camera is off. */
     imageCreditOut: boolean;
     playModel: string;
-    drift: { lastModel: string; playModel: string } | null;
+    /** Both names come from the API; a model that has left the list shows its stored id. */
+    drift: { lastModel: string; playModel: string; lastModelLabel: string; playModelLabel: string } | null;
     /** The Chat menu's link back to where a Branch came from: null when never branched, or once that Chat is deleted. */
     branchedFrom: { chatId: number; title: string; messageId: number | null } | null;
     /** The Author's note: the user's standing direction for this Chat; empty when there is none. */
@@ -330,15 +331,6 @@ export function messageText(message: Message): string {
     return message.parts
         .map((part) => (part.kind === 'speech' ? `@${part.speakerName}: ${part.text}` : part.text))
         .join('\n\n');
-}
-
-const MODEL_LABELS: Record<string, string> = {
-    'glm-5.3': 'GLM-5.3',
-    'deepseek-v4-pro': 'DeepSeek V4 Pro',
-};
-
-export function modelLabel(model: string): string {
-    return MODEL_LABELS[model] ?? model;
 }
 
 export function formatWhen(iso: string): string {

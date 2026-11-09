@@ -1,6 +1,6 @@
 import { Logger } from '@nestjs/common';
 
-import { ModelGatewayError, ProviderBusyError } from '../../../errors/model-gateway.errors.js';
+import { ModelGatewayError, ProviderBusyError, ProviderOutageError } from '../../../errors/model-gateway.errors.js';
 import {
     BACKGROUND_FALLBACK_MODEL,
     BACKGROUND_MODEL,
@@ -12,6 +12,8 @@ import {
     MAX_REFERENCE_IMAGES,
     ModelGateway,
     PlayModel,
+    playModelName,
+    PlaySamplers,
     RemainingCredit,
     SnapshotModel,
     SnapshotSize,
@@ -21,9 +23,24 @@ import {
     TextModel,
     TextStreamResult,
 } from '../model-gateway.js';
-import { drawnSize, IMAGE_MODELS, imageModelForKind, ImageModelSpec, isPlayModelKind, TEXT_MODELS, VENICE_HOST } from './model-table.js';
+import {
+    drawnSize,
+    IMAGE_MODELS,
+    imageModelForKind,
+    ImageModelSpec,
+    isPlayModelKind,
+    isSampledKind,
+    TEXT_MODELS,
+    VENICE_HOST,
+} from './model-table.js';
 import { defaultSleep, SleepFn } from './http.js';
-import { OpenRouterChatRequest, OpenRouterChatResult, OpenRouterClient, TextBill } from './openrouter-client.js';
+import {
+    OpenRouterChatRequest,
+    OpenRouterChatResult,
+    OpenRouterClient,
+    SamplerRefusedError,
+    TextBill,
+} from './openrouter-client.js';
 import { VeniceClient } from './venice-client.js';
 
 /** The Settings the gateway reads before each call. */
@@ -31,6 +48,8 @@ export interface GatewayModelSettings {
     playModel: PlayModel;
     imageModel: SnapshotModel;
     snapshotSize: SnapshotSize;
+    /** Sampling per play model; only the current play model's values are ever read. */
+    samplers: PlaySamplers;
 }
 
 export interface NewUsageRecord {
@@ -88,7 +107,7 @@ export class RealModelGateway extends ModelGateway {
         try {
             result = await this.deps.openRouter.chat(chat);
         } catch (error) {
-            if (!(error instanceof ProviderBusyError) || modelName !== BACKGROUND_MODEL) throw error;
+            if (!(error instanceof ProviderBusyError) || modelName !== BACKGROUND_MODEL) throw forUser(error, modelName);
             this.logger.warn(
                 `${request.kind} on ${BACKGROUND_MODEL} stayed busy (${error.message}); sending it to ${BACKGROUND_FALLBACK_MODEL}.`,
             );
@@ -114,7 +133,9 @@ export class RealModelGateway extends ModelGateway {
      */
     async streamText(request: TextCompletionRequest, stream: TextStream): Promise<TextStreamResult> {
         const { modelName, chat } = await this.textCall(request);
-        const result = await this.deps.openRouter.chatStream(chat, stream);
+        const result = await this.deps.openRouter.chatStream(chat, stream).catch((error: unknown) => {
+            throw forUser(error, modelName);
+        });
         if (!result.stopped) {
             await this.recordText(request, modelName, result);
         } else if (result.generationId) {
@@ -136,11 +157,18 @@ export class RealModelGateway extends ModelGateway {
 
     /** The model a text call runs on, from its kind and Settings, and the request OpenRouter gets. */
     private async textCall(request: TextCompletionRequest): Promise<{ modelName: TextModel; chat: OpenRouterChatRequest }> {
-        const modelName: TextModel = isPlayModelKind(request.kind)
-            ? (await this.deps.settings.current()).playModel
-            : BACKGROUND_MODEL;
         const { messages, maxTokens, json, stop } = request;
-        return { modelName, chat: { model: TEXT_MODELS[modelName], messages, maxTokens, json, stop } };
+        if (!isPlayModelKind(request.kind)) {
+            return { modelName: BACKGROUND_MODEL, chat: { model: TEXT_MODELS[BACKGROUND_MODEL], messages, maxTokens, json, stop } };
+        }
+        const settings = await this.deps.settings.current();
+        const modelName = settings.playModel;
+        // Only the current play model's values, and only on a sampled kind.
+        const samplers = isSampledKind(request.kind) ? settings.samplers[modelName] : undefined;
+        return {
+            modelName,
+            chat: { model: TEXT_MODELS[modelName], messages, maxTokens, json, stop, ...(samplers ? { samplers } : {}) },
+        };
     }
 
     /** One text-pool UsageRecord for what a call billed. */
@@ -230,6 +258,14 @@ export class RealModelGateway extends ModelGateway {
             throw error;
         }
     }
+}
+
+/** A host refusing a Sampling value, worded so the user knows what to do about it. */
+function forUser(error: unknown, modelName: TextModel): unknown {
+    if (!(error instanceof SamplerRefusedError)) return error;
+    return new ProviderOutageError(
+        `DeepInfra no longer takes one of the Sampling values for ${playModelName(modelName)}. Reset Sampling for it in Settings.`,
+    );
 }
 
 /** An image's list price: the model's price, plus each input image past the first where the model charges for them. */

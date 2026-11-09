@@ -8,9 +8,13 @@ test('changing the play model shows a Drift warning and saves it at once', async
     const playModel = page.getByLabel('Play model');
     await expect(playModel).toHaveValue('glm-5.3');
     await expect(page.getByText('Drift warning.')).toHaveCount(0);
+    // The chosen model's price, under the select.
+    await expect(page.getByText('$0.56 in / $2.50 out per million tokens · a long turn about $0.01')).toBeVisible();
 
     try {
         await playModel.selectOption('deepseek-v4-pro');
+        await expect(page.getByText('$1.30 in / $2.60 out per million tokens · a long turn about $0.02')).toBeVisible();
+        await expect(page.getByText('$0.56 in', { exact: false })).toHaveCount(0);
 
         // Next.js adds its own role="alert" route announcer, so filter on the text.
         await expect(page.getByRole('alert').filter({ hasText: 'Drift warning.' })).toBeVisible();

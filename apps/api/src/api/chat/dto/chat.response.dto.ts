@@ -164,6 +164,12 @@ export class DriftDTO {
 
     @ApiProperty({ description: 'The play model in Settings now.' })
     playModel: string;
+
+    @ApiProperty({ description: "The last model's proper name, or its stored id once it has left the list." })
+    lastModelLabel: string;
+
+    @ApiProperty({ description: "The play model's proper name." })
+    playModelLabel: string;
 }
 
 /** The whole Chat as the Chat screen reads it. Every write answers with this. */

@@ -45,6 +45,7 @@ export class ModelGatewayModule {
                                         playModel: current.playModel,
                                         imageModel: current.imageModel,
                                         snapshotSize: current.snapshotSize,
+                                        samplers: current.samplers,
                                     };
                                 },
                             },

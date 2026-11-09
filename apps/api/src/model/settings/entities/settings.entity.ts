@@ -2,7 +2,7 @@ import { Column, Entity, PrimaryColumn, UpdateDateColumn } from 'typeorm';
 
 import { decimalColumn } from '../../../store/db/decimal.js';
 
-import type { PlayModel, SnapshotModel, SnapshotSize } from '../../../service/model-gateway/model-gateway.js';
+import type { PlayModel, PlaySamplers, SnapshotModel, SnapshotSize } from '../../../service/model-gateway/model-gateway.js';
 
 /** The one Settings row, as the API returns it. */
 export interface SettingsResponse {
@@ -16,6 +16,8 @@ export interface SettingsResponse {
     /** What each prepaid pool holds when topped up; the base the percent is taken of. */
     textCreditCapUsd: number;
     imageCreditCapUsd: number;
+    /** Sampling per play model: only the values that are set; a model with none has no key. */
+    samplers: PlaySamplers;
     updatedAt: string;
 }
 
@@ -48,6 +50,9 @@ export class SettingsEntity {
     @Column({ name: 'image_credit_cap_usd', ...decimalColumn(10, 2) })
     imageCreditCapUsd: number;
 
+    @Column({ type: 'jsonb', default: () => "'{}'" })
+    samplers: PlaySamplers;
+
     @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
     updatedAt: Date;
 
@@ -60,6 +65,7 @@ export class SettingsEntity {
             imageLowCreditPercent: this.imageLowCreditPercent,
             textCreditCapUsd: this.textCreditCapUsd,
             imageCreditCapUsd: this.imageCreditCapUsd,
+            samplers: this.samplers,
             updatedAt: this.updatedAt.toISOString(),
         };
     }

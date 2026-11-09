@@ -10,7 +10,23 @@ export interface Settings {
     imageLowCreditPercent: number;
     textCreditCapUsd: number;
     imageCreditCapUsd: number;
+    /** Sampling per play model: only the values that are set; a model with none has no key. */
+    samplers: Record<string, SamplerValues>;
     updatedAt: string;
+}
+
+/** The sampler parameters, in the order Settings shows them (apps/api's SAMPLER_PARAMS). */
+export type SamplerParam = 'temperature' | 'minP' | 'topP' | 'repetitionPenalty';
+/** Only the values that are set: an absent key is not sent and the host's default applies. */
+export type SamplerValues = Partial<Record<SamplerParam, number>>;
+
+export interface SamplerOption {
+    param: SamplerParam;
+    min: number;
+    max: number;
+    step: number;
+    /** The maker's suggested value, or null. A hint only. */
+    suggested: number | null;
 }
 
 export interface ModelOption {
@@ -26,9 +42,18 @@ export interface ImageModelOption extends ModelOption {
     sizes: Array<{ size: SnapshotSize; priceUsd: number }>;
 }
 
+export interface PlayModelOption extends ModelOption {
+    /** List price in USD per million tokens. */
+    priceUsdPerMillion: { input: number; output: number; cachedInput: number };
+    /** Roughly what a long turn costs, in USD, to the cent. */
+    longTurnUsd: number;
+    /** The parameters this model is offered, in order. */
+    samplers: SamplerOption[];
+}
+
 export interface SettingsResponse {
     settings: Settings;
-    playModels: ModelOption[];
+    playModels: PlayModelOption[];
     imageModels: ImageModelOption[];
 }
 

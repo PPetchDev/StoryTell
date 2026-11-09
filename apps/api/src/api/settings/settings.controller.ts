@@ -1,16 +1,12 @@
-import { Body, Controller, Get, Put } from '@nestjs/common';
+import { Body, Controller, Get, Param, Put } from '@nestjs/common';
 import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 
+import { playModelOptions } from '../../manager/settings/play-model-options.js';
 import { SettingsManagerService } from '../../manager/settings/settings.service.js';
 import { SettingsResponse } from '../../model/settings/entities/settings.entity.js';
-import { UpdateSettingsRequestBodyDTO } from './dto/settings.request.dto.js';
+import { SamplersPathDTO, UpdateSamplersRequestBodyDTO, UpdateSettingsRequestBodyDTO } from './dto/settings.request.dto.js';
 import { SNAPSHOT_MODEL_PRICES, SnapshotModel, snapshotSizesOf } from '../../service/model-gateway/model-gateway.js';
-import { ImageModelOptionDTO, ModelOptionDTO, SettingsResponseBodyDTO } from './dto/settings.response.dto.js';
-
-const PLAY_MODEL_OPTIONS: ModelOptionDTO[] = [
-    { id: 'glm-5.3', label: 'GLM-5.3 (DeepInfra)' },
-    { id: 'deepseek-v4-pro', label: 'DeepSeek V4 Pro (DeepInfra)' },
-];
+import { ImageModelOptionDTO, SettingsResponseBodyDTO } from './dto/settings.response.dto.js';
 
 const IMAGE_MODEL_NAMES: Record<SnapshotModel, string> = {
     'seedream-v4-edit': 'Seedream V4.5 edit',
@@ -40,8 +36,18 @@ export class SettingsApiController {
     async update(@Body() body: UpdateSettingsRequestBodyDTO): Promise<SettingsResponseBodyDTO> {
         return respond(await this.settingsManager.updateSettings(body));
     }
+
+    /** Sampling for one play model. "Reset to defaults" is this with all four null. */
+    @Put('samplers/:playModel')
+    @ApiOkResponse({ type: SettingsResponseBodyDTO })
+    async updateSamplers(
+        @Param() path: SamplersPathDTO,
+        @Body() body: UpdateSamplersRequestBodyDTO,
+    ): Promise<SettingsResponseBodyDTO> {
+        return respond(await this.settingsManager.updateSamplers(path.playModel, body));
+    }
 }
 
 function respond(settings: SettingsResponse): SettingsResponseBodyDTO {
-    return { settings, playModels: PLAY_MODEL_OPTIONS, imageModels: IMAGE_MODEL_OPTIONS };
+    return { settings, playModels: playModelOptions(), imageModels: IMAGE_MODEL_OPTIONS };
 }

@@ -72,6 +72,74 @@ export const TEXT_ONLY_SNAPSHOT_MODELS = {
 } as const satisfies Record<SnapshotModel, string>;
 export type ImageModel = SnapshotModel | typeof REFERENCE_IMAGE_MODEL | (typeof TEXT_ONLY_SNAPSHOT_MODELS)[SnapshotModel];
 
+/**
+ * The sampler values a play model may be sent, in the order Settings shows them. The app's
+ * names; the real gateway sends them under OpenRouter's (`min_p` and so on).
+ */
+export const SAMPLER_PARAMS = ['temperature', 'minP', 'topP', 'repetitionPenalty'] as const;
+export type SamplerParam = (typeof SAMPLER_PARAMS)[number];
+/** A value is set only when its key is present; an absent key is never sent. */
+export type SamplerValues = Partial<Record<SamplerParam, number>>;
+/** Sampling as Settings stores it: per play model. A key for a model that has left the list is kept but never read. */
+export type PlaySamplers = Partial<Record<PlayModel, SamplerValues>>;
+
+/**
+ * What each parameter may be set to, inclusive, at most two decimal places, and the step the
+ * Settings field moves by. Narrower than OpenRouter's where the extremes only break prose.
+ */
+export const SAMPLER_RANGES: Record<SamplerParam, { min: number; max: number; step: number }> = {
+    temperature: { min: 0, max: 2, step: 0.05 },
+    minP: { min: 0, max: 0.5, step: 0.01 },
+    topP: { min: 0.05, max: 1, step: 0.01 },
+    repetitionPenalty: { min: 1, max: 1.5, step: 0.01 },
+};
+
+/** A play model's facts that callers outside the gateway read, with the real or the fake gateway. */
+export interface PlayModelFacts {
+    /** Its proper name, as Settings and the Drift notice show it. */
+    name: string;
+    /** List price in USD per million tokens, for display only: UsageRecords keep what OpenRouter reports. */
+    priceUsdPerMillion: { input: number; output: number; cachedInput: number };
+    /** The sampler parameters its host lists in `supported_parameters`, in SAMPLER_PARAMS order. */
+    samplers: SamplerParam[];
+    /** The maker's suggested values, where the maker publishes any. A hint only: never sent unless set. */
+    suggested: SamplerValues;
+}
+
+/**
+ * Every play model's display facts, read with SNAPSHOT_MODEL_PRICES's reasoning: Settings and
+ * the Chat read them, so they sit here rather than in the real model table. Typed over
+ * PlayModel, so a play model without an entry does not compile.
+ *
+ * Prices and `supported_parameters` from OpenRouter's endpoints API for the DeepInfra endpoint,
+ * read on 2026-11-09. Suggestions from docs/research/models-samplers-embeddings.md.
+ */
+export const PLAY_MODEL_CATALOGUE: Record<PlayModel, PlayModelFacts> = {
+    // The model card gives no single recommendation, only benchmark settings.
+    'glm-5.3': {
+        name: 'GLM-5.3',
+        priceUsdPerMillion: { input: 0.5625, output: 2.5, cachedInput: 0.125 },
+        samplers: ['temperature', 'minP', 'topP', 'repetitionPenalty'],
+        suggested: {},
+    },
+    // The V4-Pro card: temperature 1.0 and top_p 1.0 for local deployment.
+    'deepseek-v4-pro': {
+        name: 'DeepSeek V4 Pro',
+        priceUsdPerMillion: { input: 1.3, output: 2.6, cachedInput: 0.1 },
+        samplers: ['temperature', 'minP', 'topP', 'repetitionPenalty'],
+        suggested: { temperature: 1, topP: 1 },
+    },
+};
+
+/** A model's proper name; a model no longer in the catalogue (an old AI Message's) keeps its stored id. */
+export function playModelName(model: string): string {
+    return isPlayModel(model) ? PLAY_MODEL_CATALOGUE[model].name : model;
+}
+
+export function isPlayModel(model: string): model is PlayModel {
+    return (PLAY_MODELS as readonly string[]).includes(model);
+}
+
 export const DEFAULT_PLAY_MODEL: PlayModel = 'glm-5.3';
 export const DEFAULT_SNAPSHOT_MODEL: SnapshotModel = 'seedream-v4-edit';
 
