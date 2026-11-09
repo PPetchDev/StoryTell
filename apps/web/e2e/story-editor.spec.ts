@@ -58,7 +58,7 @@ test('writes a Story by hand, sees it become playable, and the edits survive a r
     await character.getByLabel('Personality').fill('Guarded and dry.');
     await expect(status).toContainText('Mira: Voice');
     await expect(character.getByText('Needed to play')).toHaveCount(1);
-    await character.getByLabel('Voice').fill('Short sentences.');
+    await character.getByLabel('Voice', { exact: true }).fill('Short sentences.');
     await character.getByRole('button', { name: 'Add example line' }).click();
     await character.getByLabel('Example line 1', { exact: true }).fill('Go away.');
     await expectSaved(page);
@@ -107,7 +107,7 @@ test('writes a Story by hand, sees it become playable, and the edits survive a r
     await expect(page.getByRole('region', { name: 'Role' }).getByLabel('Name')).toHaveValue('The new keeper');
     await openTab(page, 'Characters');
     const reloaded = page.getByRole('region', { name: 'Character 1' });
-    await expect(reloaded.getByLabel('Voice')).toHaveValue('Short sentences.');
+    await expect(reloaded.getByLabel('Voice', { exact: true })).toHaveValue('Short sentences.');
     await expect(reloaded.getByLabel('Example line 1', { exact: true })).toHaveValue('Go away.');
     await openTab(page, 'Bonds');
     await expect(

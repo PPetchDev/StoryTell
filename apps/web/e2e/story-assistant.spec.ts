@@ -147,9 +147,9 @@ test('an instruction changes fields, lit up with Undo; a removal asks first; reo
     await expect(changes).toHaveText([/Setting/, /Mira: Voice/, /Added Scene The lamp/]);
     const link = (name: string) => changes.getByRole('button', { name, exact: true });
     await link('Mira: Voice').click();
-    await expect(mira.getByLabel('Voice')).toHaveValue('Clipped. Drops the subject when it hurts.');
-    await expect(mira.getByLabel('Voice')).toBeFocused();
-    await expect(page.getByRole('region', { name: 'Character 2' }).getByLabel('Voice')).toHaveValue('Rambles.');
+    await expect(mira.getByLabel('Voice', { exact: true })).toHaveValue('Clipped. Drops the subject when it hurts.');
+    await expect(mira.getByLabel('Voice', { exact: true })).toBeFocused();
+    await expect(page.getByRole('region', { name: 'Character 2' }).getByLabel('Voice', { exact: true })).toHaveValue('Rambles.');
     await expect(mira.getByText(marked)).toHaveCount(1);
     await link('Added Scene The lamp').click();
     const scene2 = page.getByRole('region', { name: 'Scene 2' });
@@ -179,7 +179,7 @@ test('an instruction changes fields, lit up with Undo; a removal asks first; reo
     await link('Mira: Voice').click();
     await expect(mira.getByText(marked)).toHaveCount(1);
     await changes.filter({ hasText: 'Mira: Voice' }).getByRole('button', { name: 'Undo' }).click();
-    await expect(mira.getByLabel('Voice')).toHaveValue(VOICE);
+    await expect(mira.getByLabel('Voice', { exact: true })).toHaveValue(VOICE);
     await expect(mira.getByText(marked)).toHaveCount(0);
     // Undo of an added Scene removes it again, after asking; it is no longer a link then.
     await link('Added Scene The lamp').click();
@@ -196,7 +196,7 @@ test('an instruction changes fields, lit up with Undo; a removal asks first; reo
     await page.getByRole('tab', { name: 'Story' }).click();
     await expect(page.getByRole('region', { name: 'Story' }).getByLabel('Setting')).toHaveValue(SETTING);
     await page.getByRole('tab', { name: 'Characters' }).click();
-    await expect(page.getByRole('region', { name: 'Character 1' }).getByLabel('Voice')).toHaveValue(VOICE);
+    await expect(page.getByRole('region', { name: 'Character 1' }).getByLabel('Voice', { exact: true })).toHaveValue(VOICE);
 
     // A removal is not applied until confirmed; Cancel keeps Tomas, Apply removes him for good.
     await scriptText(request, 'story_assistant', [

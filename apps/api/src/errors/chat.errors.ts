@@ -148,6 +148,20 @@ export class UnreadableThaiReadingError extends AppError {
     }
 }
 
+/** Read aloud on a User Message: only AI Messages have a play queue (.scratch/read-aloud/spec.md). */
+export class NotReadableError extends AppError {
+    constructor() {
+        super('404.004.022', 'Only AI Messages can be read aloud.');
+    }
+}
+
+/** A Read aloud item outside the Message's play queue as it stands now. No call is made. */
+export class SpeechItemNotFoundError extends AppError {
+    constructor() {
+        super('404.004.023', 'That part of the Message is not in its reading. Start reading it again.');
+    }
+}
+
 /** A nudge on a Character sitting out of the Chat (.scratch/speaker-controls/spec.md). Nothing stored. */
 export class NudgeSittingOutError extends AppError {
     constructor(name: string) {

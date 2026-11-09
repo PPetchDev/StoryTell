@@ -26,6 +26,8 @@ export interface TestApp {
     gateway: FakeModelGateway;
     /** This app's temporary image folder. */
     imageDir: string;
+    /** This app's speech folder: its own temporary one unless `speechDir` was given. */
+    speechDir: string;
     /** Connection URL of this app's own database. */
     databaseUrl: string;
     close(): Promise<void>;
@@ -47,6 +49,12 @@ export interface TestAppOptions {
     backgroundRetryMs?: number;
     /** The backup job's status file. Default: unset, as in dev. */
     backupStatusFile?: string;
+    /**
+     * The speech folder. Default: a fresh temporary folder, removed on close. Without one, every
+     * test app would share the default `speech` folder beside their image folders in the system
+     * temp folder, and parallel tests would see each other's audio.
+     */
+    speechDir?: string;
 }
 
 async function admin(sql: string): Promise<void> {
@@ -69,6 +77,8 @@ export async function startTestApp(options: TestAppOptions = {}): Promise<TestAp
     await admin(`CREATE DATABASE "${database}" TEMPLATE "${inject('templateDatabase')}"`);
     const databaseUrl = inject('postgresAdminUrl').replace(/\/postgres$/, `/${database}`);
     const imageDir = await mkdtemp(path.join(os.tmpdir(), 'storytell-images-'));
+    const ownSpeechDir = options.speechDir === undefined;
+    const speechDir = options.speechDir ?? (await mkdtemp(path.join(os.tmpdir(), 'storytell-speech-')));
 
     const noNetwork: FetchLike = async (url) => {
         throw new Error(`Test app has no network, but the gateway tried ${url}`);
@@ -79,6 +89,7 @@ export async function startTestApp(options: TestAppOptions = {}): Promise<TestAp
                 port: 0,
                 databaseUrl,
                 imageDir,
+                speechDir,
                 modelGateway: options.modelGateway ?? 'fake',
                 // Short, so a test of the "still saving" path does not sit through the real wait.
                 backgroundWaitMs: options.backgroundWaitMs ?? 1_500,
@@ -106,11 +117,13 @@ export async function startTestApp(options: TestAppOptions = {}): Promise<TestAp
         http: request(app.getHttpServer()),
         gateway: app.get(ModelGateway) as FakeModelGateway,
         imageDir,
+        speechDir,
         databaseUrl,
         close: async () => {
             await app.close();
             await admin(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
             await rm(imageDir, { recursive: true, force: true });
+            if (ownSpeechDir) await rm(speechDir, { recursive: true, force: true });
         },
     };
 }

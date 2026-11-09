@@ -30,6 +30,8 @@ import { Pov, ReplyLength, Tense } from '../../../model/story/entities/story.ent
 
 // Long enough for any passage an author writes, short enough to refuse a runaway client.
 const TEXT_MAX = 20_000;
+// Far longer than any Kokoro voice id ("af_sky"); the voice list decides what is known.
+const VOICE_ID_MAX = 100;
 
 /** Fields of the Story itself. Every field is optional, so autosave can send one at a time. */
 export class StoryRequestBodyDTO implements StoryFields {
@@ -71,6 +73,16 @@ export class StoryRequestBodyDTO implements StoryFields {
     @IsString()
     @MaxLength(TEXT_MAX)
     imageStyle?: string;
+
+    @ApiPropertyOptional({
+        type: String,
+        nullable: true,
+        description: 'The voice narration is read aloud in: an id from GET /api/voices, or null for the default.',
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(VOICE_ID_MAX)
+    narrationVoice?: string | null;
 }
 
 export class RoleRequestBodyDTO implements RoleFields {
@@ -137,6 +149,16 @@ export class CharacterRequestBodyDTO implements CharacterFields {
     @IsString()
     @MaxLength(TEXT_MAX)
     arcDirections?: string;
+
+    @ApiPropertyOptional({
+        type: String,
+        nullable: true,
+        description: 'The voice their lines are read aloud in: an id from GET /api/voices, or null to use the Narration voice.',
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(VOICE_ID_MAX)
+    speakingVoice?: string | null;
 }
 
 export class CharacterOrderRequestBodyDTO {

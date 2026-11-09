@@ -23,6 +23,7 @@ import { inThreadOrder, Snapshot, snapshotApi } from '@/lib/snapshot';
 import { Scene } from '@/lib/story';
 
 import { applyReplaceRules, onMineRules } from '@/lib/replace-rules';
+import { ReadAloudProvider, useReadAloudPlayer } from './read-aloud';
 import { ShownTextProvider } from './shown-text';
 import styles from './chat-screen.module.css';
 
@@ -100,6 +101,18 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes }: Cha
     const [replacing, setReplacing] = useState<number | null>(null);
     /** The reply whose finished extraction was already announced, so a re-read never toasts twice. */
     const announcedRef = useRef<number | null>(latestReply(initial)?.id ?? null);
+    /** Read aloud's one player: the screen owns it, so it outlives whatever shows the Messages. Leaving stops it. */
+    const player = useReadAloudPlayer(initial.storyId, initial.id);
+    /** Stops the reading when it is this Message's: ↺ Again, an edit or another version changes its words. */
+    const stopReading = (messageId: number) => {
+        if (player.messageId === messageId) player.stop();
+    };
+
+    // A Message an edit or a Reset took away is no longer read.
+    const { messageId: readingId, stop: stopPlayer } = player;
+    useEffect(() => {
+        if (readingId !== null && !chat.messages.some((message) => message.id === readingId)) stopPlayer();
+    }, [chat.messages, readingId, stopPlayer]);
 
     // A Chat just made by ⑂ Branch: the quiet "Branched from" line, and a User Message's text in the composer.
     useEffect(() => {
@@ -201,9 +214,11 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes }: Cha
         setError(null);
         setRollback(null);
         try {
-            setChat(await turn({ signal: stop.signal, onParts: setReplySoFar }));
+            const next = await turn({ signal: stop.signal, onParts: setReplySoFar });
+            setChat(next);
             // The nudge rode on this turn, which answered with its reply; a failed or stopped one keeps it for Retry.
             setNudge(null);
+            readNewReply(next);
         } catch (caught) {
             setReplySoFar(null);
             if (caught instanceof ApiUnreachableError) {
@@ -231,6 +246,16 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes }: Cha
             setWriting(false);
             setPending(null);
         }
+    };
+
+    /**
+     * Read replies aloud (.scratch/read-aloud/spec.md, "Auto-read"): a reply that a turn started
+     * here has just stored, once the turn has settled. Never on load, a version change, a Reset,
+     * a stopped or failed turn, or a reply from another tab: only runTurn's success calls this.
+     */
+    const readNewReply = (next: Chat) => {
+        const reply = next.messages[next.messages.length - 1];
+        if (next.autoRead && reply?.kind === 'ai') player.play(reply.id);
     };
 
     /** ■ Stop: ends the reply being written; the API keeps nothing of it. */
@@ -267,6 +292,8 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes }: Cha
             return;
         }
         setDraft('');
+        // Inside the tap, so iOS lets the reply play by itself later.
+        player.unlock();
         setPending({ text, identityName: chat.identityName });
         void runTurn(
             (stream) => chatApi.send(chat.storyId, chat.id, text, stream, nudge),
@@ -277,6 +304,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes }: Cha
     /** ▶ (spec: "Continue"): a turn with no User Message. A failed one stores nothing, so ▶ again is the way on. */
     const continueStory = () => {
         if (writing || busy || blocked || chat.awaitingReply) return;
+        player.unlock();
         void runTurn((stream) => chatApi.continue(chat.storyId, chat.id, stream, nudge));
     };
 
@@ -288,6 +316,8 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes }: Cha
      */
     const again = (messageId: number) => {
         if (writing || busy || blocked) return;
+        stopReading(messageId);
+        player.unlock();
         setReplacing(messageId);
         // Shown again only once the turn has settled, so the old reply never flashes back first.
         void runTurn(async (stream) => {
@@ -303,14 +333,23 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes }: Cha
     /** ‹ n/m › or a swipe: shows another Reply version, with the rollback notice like an edit. */
     const chooseVersion = (messageId: number, version: number) => {
         if (writing || busy) return;
+        stopReading(messageId);
         void runWrite(async () => refreshMemory(noteRollback(await chatApi.chooseVersion(chat.storyId, chat.id, messageId, version))));
+    };
+
+    /** Opening a Message's edit stops reading it. */
+    const startEdit = (messageId: number) => {
+        stopReading(messageId);
+        setEditing(messageId);
     };
 
     const saveEdit = (message: Message, text: string) => {
         setEditing(null);
+        stopReading(message.id);
         const edited = (next: EditedChat) => refreshMemory(noteRollback(next));
         // An edited User Message gets a fresh reply, so it runs as a turn; an AI Message does not.
         if (message.kind === 'user') {
+            player.unlock();
             void runTurn(async (stream) => edited(await chatApi.edit(chat.storyId, chat.id, message.id, text, stream, nudge)));
         } else {
             void runWrite(async () => edited(await chatApi.edit(chat.storyId, chat.id, message.id, text)));
@@ -390,10 +429,14 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes }: Cha
                 onSetAuthorsNote={(text) =>
                     void runWrite(() => chatApi.setAuthorsNote(chat.storyId, chat.id, text))
                 }
+                onSetAutoRead={(autoRead) => void runWrite(() => chatApi.setAutoRead(chat.storyId, chat.id, autoRead))}
                 onSetSittingOut={(characterIds) =>
                     void runWrite(() => chatApi.setSittingOut(chat.storyId, chat.id, characterIds))
                 }
-                onReset={() => void runWrite(async () => refreshMemory(await chatApi.reset(chat.storyId, chat.id)))}
+                onReset={() => {
+                    player.stop();
+                    void runWrite(async () => refreshMemory(await chatApi.reset(chat.storyId, chat.id)));
+                }}
                 whoRequest={whoRequest}
             />
             {!stripHidden && (
@@ -429,6 +472,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes }: Cha
             )}
 
             <ShownTextProvider rules={chat.replaceRules}>
+            <ReadAloudProvider player={player}>
             <ChatThread
                 messages={chat.messages}
                 cast={cast}
@@ -443,7 +487,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes }: Cha
                 replacing={replacing}
                 onAgain={again}
                 onVersion={chooseVersion}
-                onEdit={setEditing}
+                onEdit={startEdit}
                 onBranch={branchFrom}
                 onSave={saveEdit}
                 onCancelEdit={() => setEditing(null)}
@@ -452,6 +496,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes }: Cha
                 onDismissSnapshot={(job) => void snaps.dismiss(job)}
                 thaiReadings={thaiReadings}
             />
+            </ReadAloudProvider>
             </ShownTextProvider>
 
             <ChatComposer
@@ -468,7 +513,10 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes }: Cha
                 onSend={send}
                 onContinue={continueStory}
                 onStop={stopTurn}
-                onRetry={() => void runTurn((stream) => chatApi.retry(chat.storyId, chat.id, stream, nudge))}
+                onRetry={() => {
+                    player.unlock();
+                    void runTurn((stream) => chatApi.retry(chat.storyId, chat.id, stream, nudge));
+                }}
                 onRetryBackground={retryBackground}
                 characterRow={(writingForMe) => (
                     <CharacterRow

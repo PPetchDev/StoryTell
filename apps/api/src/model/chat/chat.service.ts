@@ -87,6 +87,22 @@ export class ChatModelService {
         return inOrder(chat);
     }
 
+    /** One Message of a Chat with its parts and its Reply versions in order, or null when the Chat has no such Message. */
+    async findMessageWithVersions(chatId: number, messageId: number): Promise<MessageEntity | null> {
+        const message = await this.messages.findOne({ where: { id: messageId, chatId }, relations: { parts: true, versions: true } });
+        if (!message) return null;
+        message.parts = [...message.parts].sort((a, b) => a.position - b.position);
+        message.versions = [...(message.versions ?? [])].sort((a, b) => a.ordinal - b.ordinal);
+        return message;
+    }
+
+    /** Which of these Message ids still exist. */
+    async existingMessageIds(ids: number[]): Promise<Set<number>> {
+        if (ids.length === 0) return new Set();
+        const rows = await this.messages.find({ select: { id: true }, where: { id: In(ids) } });
+        return new Set(rows.map((row) => row.id));
+    }
+
     /** The Chat row alone, without its Messages. */
     findOne(chatId: number): Promise<ChatEntity | null> {
         return this.chats.findOne({ where: { id: chatId } });
@@ -145,6 +161,10 @@ export class ChatModelService {
     /** Swaps the worn identity: a Persona's id, or null for the Story's Role. */
     async setPersona(chatId: number, personaId: number | null): Promise<void> {
         await this.chats.update({ id: chatId }, { personaId });
+    }
+
+    async setAutoRead(chatId: number, autoRead: boolean): Promise<void> {
+        await this.chats.update({ id: chatId }, { autoRead });
     }
 
     async setAuthorsNote(chatId: number, authorsNote: string): Promise<void> {

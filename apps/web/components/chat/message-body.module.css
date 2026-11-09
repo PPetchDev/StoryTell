@@ -141,3 +141,14 @@
     outline: 2px solid var(--accent);
     outline-offset: 2px;
 }
+
+/* The part Read aloud is reading: outlined in the speaker's colour, or the accent for narration. */
+.readingNow {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: 0.6rem;
+}
+
+.speech.readingNow {
+    outline-color: var(--speaker-colour, var(--accent));
+}

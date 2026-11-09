@@ -1,17 +1,25 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsInt, IsOptional, IsString, MaxLength, Min, ValidateIf } from 'class-validator';
+import { IsArray, IsBoolean, IsInt, IsOptional, IsString, MaxLength, Min, ValidateIf } from 'class-validator';
 
+import type { ChatFields } from '../../../manager/chat/chat.service.js';
 import { WRITE_FOR_ME_DRAFT_MAX } from '../../../manager/chat/write-for-me/write-for-me-prompt.js';
 
 const TITLE_MAX = 200;
 // Long enough for any turn the user writes, short enough to refuse a runaway client.
 const TEXT_MAX = 20_000;
 
-export class RenameChatRequestBodyDTO {
-    @ApiProperty({ description: 'The new title. Whitespace only keeps the current title.' })
+/** The Chat's own settings; each is changed only when sent. */
+export class UpdateChatRequestBodyDTO implements ChatFields {
+    @ApiPropertyOptional({ description: 'The new title. Whitespace only keeps the current title.' })
+    @IsOptional()
     @IsString()
     @MaxLength(TITLE_MAX)
-    title: string;
+    title?: string;
+
+    @ApiPropertyOptional({ description: 'Read replies aloud: new replies of turns started in a tab play by themselves there.' })
+    @IsOptional()
+    @IsBoolean()
+    autoRead?: boolean;
 }
 
 /** .scratch/speaker-controls/spec.md, "Nudge": who the user would like to hear from in this turn. */

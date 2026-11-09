@@ -2,7 +2,13 @@ import {
     ModelRefusalError,
     OutOfCreditError,
 } from '../src/errors/model-gateway.errors.js';
-import { FAKE_PNG, FAKE_TEXT_MODEL } from '../src/service/model-gateway/fake-model-gateway.js';
+import {
+    FAKE_MP3,
+    FAKE_PNG,
+    FAKE_SPEECH_MODEL,
+    FAKE_TEXT_MODEL,
+    silentMp3,
+} from '../src/service/model-gateway/fake-model-gateway.js';
 import { startTestApp, TestApp } from './harness/test-app.js';
 
 // The fake is the harness every later ticket scripts, so its own contract is pinned here.
@@ -130,5 +136,84 @@ describe('Fake Model Gateway', () => {
 
         expect(result).toMatchObject({ text: 'Rain on th', stopped: true });
         expect(t.gateway.calls[0]).toMatchObject({ method: 'streamText', stopped: true });
+    });
+
+    // .scratch/read-aloud/spec.md, "Fake gateway".
+    describe('speech', () => {
+        it('answers scripted speech per kind, in order, with FAKE_MP3 and the text length by default', async () => {
+            t.gateway.scriptSpeech('read_aloud', {}, { characters: 99 });
+            t.gateway.scriptSpeech('voice_preview', new OutOfCreditError('image'));
+
+            const first = await t.gateway.synthesizeSpeech({ kind: 'read_aloud', text: 'Hello there.', voice: 'af_sky' });
+            const second = await t.gateway.synthesizeSpeech({ kind: 'read_aloud', text: 'Again.', voice: 'bm_george' });
+            const refused = t.gateway.synthesizeSpeech({ kind: 'voice_preview', text: 'Sample.', voice: 'af_sky' });
+
+            expect(first).toEqual({ audio: FAKE_MP3, model: FAKE_SPEECH_MODEL, characters: 12, costUsd: 0 });
+            expect(second.characters).toBe(99);
+            await expect(refused).rejects.toMatchObject({ code: '402.001.004', pool: 'image' });
+            expect(t.gateway.speechCalls('read_aloud').map((call) => call.voice)).toEqual(['af_sky', 'bm_george']);
+            expect(t.gateway.speechCalls('voice_preview')).toHaveLength(1);
+            expect(t.gateway.pendingReplies()).toEqual({});
+        });
+
+        it('fails loudly when a speech call has no scripted reply, and refuses text over the limit', async () => {
+            await expect(t.gateway.synthesizeSpeech({ kind: 'read_aloud', text: 'Hi.', voice: 'af_sky' })).rejects.toThrow(
+                /no scripted reply for speech call "read_aloud"/,
+            );
+            t.gateway.scriptSpeech('read_aloud', {});
+            await expect(
+                t.gateway.synthesizeSpeech({ kind: 'read_aloud', text: 'a'.repeat(4097), voice: 'af_sky' }),
+            ).rejects.toBeInstanceOf(RangeError);
+        });
+
+        it('answers four voices, two American and two British, female and male, unless scripted', async () => {
+            const voices = await t.gateway.speechVoices();
+            expect(voices.map((voice) => [voice.accent, voice.gender])).toEqual([
+                ['american', 'female'],
+                ['american', 'male'],
+                ['british', 'female'],
+                ['british', 'male'],
+            ]);
+            expect(t.gateway.calls).toEqual([]);
+
+            t.gateway.setSpeechVoices([{ id: 'af_nova', label: 'Nova — American, female', accent: 'american', gender: 'female' }]);
+            expect((await t.gateway.speechVoices()).map((voice) => voice.id)).toEqual(['af_nova']);
+            t.gateway.reset();
+            expect(await t.gateway.speechVoices()).toEqual(voices);
+        });
+
+        it('can be scripted over HTTP, held back, failed, and listed by kind, voice and text without bytes', async () => {
+            await t.http
+                .post('/api/testing/fake-gateway/speech')
+                .send({ kind: 'read_aloud', replies: [{ delayMs: 50 }, { error: 'refusal' }] })
+                .expect(204);
+
+            const startedAt = Date.now();
+            const answered = await t.gateway.synthesizeSpeech({ kind: 'read_aloud', text: 'Rain.', voice: 'bf_emma' });
+            expect(Date.now() - startedAt).toBeGreaterThanOrEqual(45);
+            expect(Buffer.compare(answered.audio.bytes, FAKE_MP3.bytes)).toBe(0);
+            await expect(
+                t.gateway.synthesizeSpeech({ kind: 'read_aloud', text: 'Sea.', voice: 'bf_emma' }),
+            ).rejects.toBeInstanceOf(ModelRefusalError);
+
+            const { body } = await t.http.get('/api/testing/fake-gateway/calls').expect(200);
+            expect(body.calls).toEqual([
+                { method: 'synthesizeSpeech', request: { kind: 'read_aloud', text: 'Rain.', voice: 'bf_emma' } },
+                { method: 'synthesizeSpeech', request: { kind: 'read_aloud', text: 'Sea.', voice: 'bf_emma' } },
+            ]);
+        });
+
+        it('plays scripted audio sent as base64 over HTTP', async () => {
+            const longer = silentMp3(40);
+            await t.http
+                .post('/api/testing/fake-gateway/speech')
+                .send({ kind: 'voice_preview', replies: [{ audioBase64: longer.toString('base64') }] })
+                .expect(204);
+
+            const result = await t.gateway.synthesizeSpeech({ kind: 'voice_preview', text: 'Sample.', voice: 'af_sky' });
+
+            expect(Buffer.compare(result.audio.bytes, longer)).toBe(0);
+            expect(result.audio.mimeType).toBe('audio/mpeg');
+        });
     });
 });

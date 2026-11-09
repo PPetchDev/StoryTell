@@ -18,6 +18,7 @@ import { StoryAssistantApiModule } from './story-assistant/story-assistant.modul
 import { StoryDraftingApiModule } from './story-drafting/story-drafting.module.js';
 import { StoryApiModule } from './story/story.module.js';
 import { UsageApiModule } from './usage/usage.module.js';
+import { VoiceApiModule } from './voice/voice.module.js';
 
 @Module({
     imports: [
@@ -32,6 +33,7 @@ import { UsageApiModule } from './usage/usage.module.js';
         StorySoFarApiModule,
         SettingsApiModule,
         UsageApiModule,
+        VoiceApiModule,
         ReferenceImageApiModule,
         PersonaApiModule,
         SavedReplyApiModule,

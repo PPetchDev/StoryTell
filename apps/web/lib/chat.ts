@@ -100,6 +100,8 @@ export interface Chat extends ChatSummary {
     branchedFrom: { chatId: number; title: string; messageId: number | null } | null;
     /** The Author's note: the user's standing direction for this Chat; empty when there is none. */
     authorsNote: string;
+    /** Read replies aloud: new replies of turns started in this tab play by themselves. Off by default. */
+    autoRead: boolean;
     /** The ids of the Characters sitting out of this Chat's turns, in cast order; empty when everyone is in. */
     sittingOut: number[];
     /** The composer tray's Saved replies: the Story's own, then the app-wide ones, each in add order. */
@@ -241,6 +243,9 @@ export const chatApi = {
     create: (storyId: number) => apiSend<Chat>('POST', `/stories/${storyId}/chats`),
     rename: (storyId: number, chatId: number, title: string) =>
         apiSend<Chat>('PATCH', `/stories/${storyId}/chats/${chatId}`, { title }),
+    /** Read replies aloud (.scratch/read-aloud/spec.md, "Auto-read"), on or off. */
+    setAutoRead: (storyId: number, chatId: number, autoRead: boolean) =>
+        apiSend<Chat>('PATCH', `/stories/${storyId}/chats/${chatId}`, { autoRead }),
     /** Sets the Author's note, read from the next turn on; an empty text clears it. */
     setAuthorsNote: (storyId: number, chatId: number, text: string) =>
         apiSend<Chat>('PUT', `/stories/${storyId}/chats/${chatId}/authors-note`, { text }),

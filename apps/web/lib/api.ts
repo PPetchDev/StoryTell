@@ -157,6 +157,22 @@ async function* serverSentEvents(body: ReadableStream<Uint8Array>): AsyncGenerat
     }
 }
 
+/**
+ * A POST answered with audio (a voice sample, a Read aloud item): the audio as a Blob, or the
+ * typed error the API answered with instead. Aborting `signal` rejects with an AbortError.
+ */
+export async function apiAudio(path: string, signal?: AbortSignal): Promise<Blob> {
+    let response: Response;
+    try {
+        response = await fetch(`/api${path}`, { method: 'POST', cache: 'no-store', signal });
+    } catch (error) {
+        if (signal?.aborted) throw error;
+        throw new ApiUnreachableError();
+    }
+    if (response.ok && (response.headers.get('content-type') ?? '').startsWith('audio/')) return response.blob();
+    return readJsonAnswer<never>(response);
+}
+
 /** A JSON write. `body` is sent as the request body; a 204 answer resolves to `undefined`. */
 export function apiSend<T>(method: 'POST' | 'PATCH' | 'PUT' | 'DELETE', path: string, body?: object): Promise<T> {
     return apiFetch<T>(path, jsonWrite(method, body));

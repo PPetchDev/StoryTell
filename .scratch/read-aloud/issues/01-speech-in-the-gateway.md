@@ -1,6 +1,6 @@
 # 01 — Speech in the Model Gateway, counted in the Venice pool
 
-**Status:** ready-for-agent
+**Status:** done
 
 **What to build:** The Model Gateway can make speech and list English voices, through Venice's Kokoro model, and every answered call shows on the Usage page. Per the spec's "Provider and the Model Gateway":
 

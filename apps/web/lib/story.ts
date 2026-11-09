@@ -70,6 +70,8 @@ export interface Character {
     referenceImagePath: string | null;
     /** The square of the Reference image shown beside their lines in a Chat; null while none is chosen. */
     portraitCrop: PortraitCrop | null;
+    /** The voice their lines are read aloud in; null reads them in the Narration voice. Apart from `voice`. */
+    speakingVoice: string | null;
 }
 
 export interface StartingBond {
@@ -193,13 +195,15 @@ export interface Story {
     replaceRules: ReplaceRule[];
     /** Null while the author has chosen none. */
     cover: StoryCover | null;
+    /** The voice narration is read aloud in; null for the default (.scratch/read-aloud/spec.md). */
+    narrationVoice: string | null;
     playable: boolean;
     missing: MissingField[];
     createdAt: string;
     updatedAt: string;
 }
 
-export type StoryFields = Partial<Pick<Story, 'title' | 'setting' | 'opening'> & Style>;
+export type StoryFields = Partial<Pick<Story, 'title' | 'setting' | 'opening' | 'narrationVoice'> & Style>;
 export type CharacterFields = Partial<Omit<Character, 'id' | 'referenceImagePath' | 'portraitCrop'>>;
 export type SceneFields = Partial<Omit<Scene, 'id'>>;
 export type StartingBondFields = Partial<Pick<StartingBond, 'label' | 'description'>>;

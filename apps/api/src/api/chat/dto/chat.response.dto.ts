@@ -233,6 +233,9 @@ export class ChatResponseBodyDTO extends ChatSummaryDTO implements Omit<ChatDeta
     @ApiProperty({ description: "The Chat's Author's note, the user's standing direction; empty when there is none." })
     authorsNote: string;
 
+    @ApiProperty({ description: 'Read replies aloud: new replies of turns started in a tab play by themselves there. Off by default.' })
+    autoRead: boolean;
+
     @ApiProperty({ type: [Number], description: 'The ids of the Characters sitting out of this Chat, in cast order; empty when everyone is in.' })
     sittingOut: number[];
 

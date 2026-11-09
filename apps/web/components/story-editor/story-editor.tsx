@@ -12,6 +12,7 @@ import { FROM_CARD_PARAM, tidyMessage } from '@/lib/character-card';
 import { characterColour, portraitsOf } from '@/lib/character-colour';
 import { isFolded, setFolded } from '@/lib/folds';
 import { AppliedChange } from '@/lib/story-assistant';
+import { DEFAULT_NARRATION_VOICE, useVoices, voiceName } from '@/lib/voices';
 import {
     LoreEntry,
     LoreEntryFields,
@@ -31,6 +32,7 @@ import { CharacterCard } from './character-card';
 import { DocumentsSection } from './documents-section';
 import { EditorHeader } from './editor-header';
 import { CoverBanner, CoverSheet } from './story-cover';
+import { VoiceField } from './voice-field';
 import {
     ADD_CHARACTER_ID,
     FieldPlace,
@@ -94,6 +96,9 @@ function fitsInView(target: HTMLElement): boolean {
     return target.offsetHeight <= window.innerHeight - padding;
 }
 
+/** Under the first ▶ Sample on a page (.scratch/read-aloud/spec.md, "Story editor"). */
+const SAMPLE_COST_HINT = 'A sample costs a fraction of a cent, once per voice; after that it plays for free.';
+
 /**
  * The Story editor (spec: "Story authoring module", and Friendly UI's "Story editor"). The
  * local Story is what the author sees; every edit is saved on its own, and each answer brings
@@ -108,6 +113,10 @@ export function StoryEditor({ initial }: { initial: Story }) {
     const [story, setStory] = useState<Story>(initial);
     const autosave = useAutosave();
     const { state, queue, commit, flush } = autosave;
+    const voices = useVoices();
+    const defaultNarration = voices?.defaultNarrationVoice ?? DEFAULT_NARRATION_VOICE;
+    /** The voice narration reads in now: the Story's, else the default. */
+    const narrationVoice = story.narrationVoice ?? defaultNarration;
     const [deleteError, setDeleteError] = useState<string | null>(null);
     const [rewrites, setRewrites] = useState<RewriteStates>({});
     const [tab, setTab] = useState<TabKey>(() => tabFrom(searchParams.get('tab')));
@@ -250,6 +259,10 @@ export function StoryEditor({ initial }: { initial: Story }) {
     const setStyle = <K extends StyleKey>(field: K, value: Story['style'][K]) => {
         setStory((current) => ({ ...current, style: { ...current.style, [field]: value } }));
         queue(`style.${field}`, () => storyApi.update(storyId, { [field]: value }), applyStatus);
+    };
+    const setNarrationVoice = (voice: string | null) => {
+        setStory((current) => ({ ...current, narrationVoice: voice }));
+        queue('story.narrationVoice', () => storyApi.update(storyId, { narrationVoice: voice }), applyStatus);
     };
     const setRoleText = (field: 'name' | 'description', value: string) => {
         setStory((current) => ({ ...current, role: { ...current.role, [field]: value } }));
@@ -516,6 +529,15 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                     onChange={(v) => setStyle('imageStyle', v)}
                                     {...rewritable({ target: 'story', field: 'imageStyle' })}
                                 />
+                                <VoiceField
+                                    label="Narration voice"
+                                    value={story.narrationVoice}
+                                    noneLabel={`Default (${voiceName(defaultNarration, voices?.voices)})`}
+                                    voices={voices}
+                                    sampleVoice={narrationVoice}
+                                    onChange={setNarrationVoice}
+                                    hint={SAMPLE_COST_HINT}
+                                />
                             </section>
                             <FoldingCard foldKey={`saved-replies:${storyId}`} label="Saved replies" title="Saved replies" fieldPrefixes={[]}>
                                 <p className={styles.note}>
@@ -584,6 +606,10 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                     rewrites={fieldRewrites}
                                     onText={(field, value) => setCharacterField(character.id, field, value)}
                                     onExampleLines={(lines) => setCharacterField(character.id, 'exampleLines', lines)}
+                                    voices={voices}
+                                    narrationVoice={narrationVoice}
+                                    onSpeakingVoice={(voice) => setCharacterField(character.id, 'speakingVoice', voice)}
+                                    sampleHint={index === 0 ? SAMPLE_COST_HINT : undefined}
                                     onMove={(direction) =>
                                         void commit(
                                             () => storyApi.reorderCharacters(storyId, moved(story.characters, character.id, direction)),

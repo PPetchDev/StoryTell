@@ -39,6 +39,10 @@ export class UsageRecordEntity {
     @Column({ type: 'integer', nullable: true })
     images: number | null;
 
+    /** Characters sent, for speech (Read aloud and voice samples); null for every other kind. */
+    @Column({ type: 'integer', nullable: true })
+    characters: number | null;
+
     @Column({ name: 'cost_usd', ...decimalColumn(12, 6) })
     costUsd: number;
 

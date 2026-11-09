@@ -67,9 +67,10 @@ The API reads its environment only through `apps/api/src/config/app-config.ts`:
 | `PORT` | yes | API port |
 | `DATABASE_URL` | yes | PostgreSQL connection URL |
 | `IMAGE_DIR` | yes | Image folder. The database stores image paths relative to it. |
+| `SPEECH_DIR` | no | Read aloud's audio and voice samples. Default: a folder named `speech` beside the image folder. It must not be inside the image folder: backups copy that folder, and audio is never backed up (it is made again on the next reading). |
 | `MODEL_GATEWAY` | no | `real` (default) or `fake`. `fake` is for tests only. |
 | `OPENROUTER_API_KEY` | for `real` | OpenRouter key: every text call, and the text credit balance |
-| `VENICE_API_KEY` (or `VENICE_INFERENCE_KEY`) | for `real` | Venice inference key: Snapshots and Reference images |
+| `VENICE_API_KEY` (or `VENICE_INFERENCE_KEY`) | for `real` | Venice inference key: Snapshots, Reference images, Dictation and Read aloud |
 | `VENICE_ADMIN_KEY` | no | Venice Admin key, only to read the image credit balance. Without it the Usage view shows image spend but no remaining credit. |
 | `ENV_FILE` | no | Load the variables above from this file at startup |
 
@@ -171,6 +172,7 @@ LIVE_HOME/            C:\StorytellLive by default; keep it outside this checkout
   backup/             status.json (what the app's banner reads), last-run, staging
   live.env            a copy of .env.live, made by each deploy
   images/             Reference images and Snapshots (LIVE_IMAGE_DIR moves it)
+  speech/             Read aloud audio and voice samples, beside images/; never backed up
   logs/               live.log (the supervisor), api.log, web.log, backup.log
 ```
 
@@ -365,6 +367,7 @@ Browser tests can script and inspect the fake through test-only routes, mounted 
 | `POST /api/testing/fake-gateway/text` | `{ kind, replies: [ "text" \| { text, model } \| { error: "outage" \| "refusal" \| "out_of_credit" \| "unparseable", pool? } ] }` |
 | `POST /api/testing/fake-gateway/image` | `{ kind, replies: [ { imageBase64?, mimeType? } \| { error, pool? } ] }` |
 | `POST /api/testing/fake-gateway/transcription` | `{ replies: [ "text" \| { text?, delayMs? } \| { error, pool? } ] }` (Dictation; the calls list shows a recording as `{ mimeType, size }`) |
+| `POST /api/testing/fake-gateway/speech` | `{ kind: "read_aloud" \| "voice_preview", replies: [ { audioBase64?, characters?, delayMs? } \| { error, pool? } ] }` (Read aloud and voice samples; an unscripted call fails, and the calls list shows each request's kind, voice and text) |
 | `PUT /api/testing/fake-gateway/credit` | `{ text?: { remainingUsd, limitUsd }, image?: { ... } }` |
 | `GET /api/testing/fake-gateway/calls` | Returns the calls received and any replies not yet used |
 | `DELETE /api/testing/fake-gateway` | Resets the fake |

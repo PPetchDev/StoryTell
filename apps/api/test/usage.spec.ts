@@ -1,3 +1,5 @@
+import { DataSource } from 'typeorm';
+
 import { FAKE_PNG } from '../src/service/model-gateway/fake-model-gateway.js';
 import { ModelGateway } from '../src/service/model-gateway/model-gateway.js';
 import { TEST_KEYS } from './harness/gateway-under-test.js';
@@ -62,6 +64,53 @@ describe('Usage', () => {
                 lowCreditPercent: 20,
                 lowCredit: false,
             });
+        });
+    });
+
+    // .scratch/read-aloud/spec.md, "Usage": speech is counted with Venice's credit, one line per kind.
+    describe('speech', () => {
+        let t: TestApp;
+
+        beforeAll(async () => {
+            const spoken = { bytes: Buffer.from([0xff, 0xfb, 0x10, 0xc0]), contentType: 'audio/mpeg' };
+            const net = recordedFetch([
+                { fixture: 'venice/models-tts.json' },
+                spoken,
+                spoken,
+                spoken,
+                { fixture: 'openrouter/credits.json' },
+                { fixture: 'venice/balance.json' },
+            ]);
+            t = await startTestApp({ modelGateway: 'real', fetch: net.fetch, providerKeys: TEST_KEYS });
+        });
+
+        afterAll(async () => {
+            await t.close();
+        });
+
+        it('counts Read aloud and Voice samples in the image pool, with the characters sent stored', async () => {
+            const gateway = t.app.get(ModelGateway);
+            // At the fixture's $4 per million characters.
+            await gateway.synthesizeSpeech({ kind: 'read_aloud', text: 'a'.repeat(1000), voice: 'af_test', servedFor: { storyId: 1, chatId: 2 } });
+            await gateway.synthesizeSpeech({ kind: 'read_aloud', text: 'b'.repeat(500), voice: 'af_test' });
+            await gateway.synthesizeSpeech({ kind: 'voice_preview', text: 'c'.repeat(50), voice: 'bm_fixture' });
+
+            const { body } = await t.http.get('/api/usage').expect(200);
+
+            expect(body.pools.text).toMatchObject({ spentUsd: 0, calls: 0, byKind: [] });
+            expect(body.pools.image).toMatchObject({ spentUsd: 0.0062, calls: 3 });
+            expect(body.pools.image.byKind).toEqual([
+                { kind: 'read_aloud', spentUsd: 0.006, calls: 2 },
+                { kind: 'voice_preview', spentUsd: 0.0002, calls: 1 },
+            ]);
+            const rows = await t.app
+                .get(DataSource)
+                .query(`SELECT kind, characters, images FROM usage_record ORDER BY id`);
+            expect(rows).toEqual([
+                { kind: 'read_aloud', characters: 1000, images: null },
+                { kind: 'read_aloud', characters: 500, images: null },
+                { kind: 'voice_preview', characters: 50, images: null },
+            ]);
         });
     });
 

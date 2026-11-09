@@ -182,7 +182,7 @@ test.describe('on a phone', () => {
             await expect(jonah.getByText('Needs filling in')).toBeVisible();
             await page.getByRole('region', { name: 'Playable status' }).getByRole('button', { name: /Jonah: Voice/ }).click();
             await expect(jonah.getByRole('button', { name: 'Jonah', exact: true })).toHaveAttribute('aria-expanded', 'true');
-            await expect(jonah.getByLabel('Voice')).toBeFocused();
+            await expect(jonah.getByLabel('Voice', { exact: true })).toBeFocused();
             await expect(jonah.getByText('Needs filling in')).toHaveCount(0);
         } finally {
             await request.delete(`/api/stories/${storyId}`);

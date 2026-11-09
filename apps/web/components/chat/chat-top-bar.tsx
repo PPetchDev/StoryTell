@@ -292,6 +292,8 @@ interface ChatTopBarProps {
     onSetAuthorsNote(text: string): void;
     /** Saves who is sitting out, the whole set at once. */
     onSetSittingOut(characterIds: number[]): void;
+    /** Turns Read replies aloud on or off. */
+    onSetAutoRead(autoRead: boolean): void;
     onReset(): void;
     /** Counts the asks for "Who's in this Chat" from outside the menu; each new one opens it. */
     whoRequest?: number;
@@ -316,6 +318,7 @@ export function ChatTopBar({
     onRename,
     onSetAuthorsNote,
     onSetSittingOut,
+    onSetAutoRead,
     onReset,
     whoRequest = 0,
 }: ChatTopBarProps) {
@@ -483,6 +486,22 @@ export function ChatTopBar({
                             <MenuButton onClick={() => setMenu('who')}>
                                 <MenuText label="Who's in this Chat" sub={sittingOutSummary(sittingOutNames)} />
                             </MenuButton>
+                            {/* The last of the new rows (.scratch/sillytavern-gaps/integration.md). The menu stays open. */}
+                            <button
+                                type="button"
+                                role="switch"
+                                aria-checked={chat.autoRead}
+                                className={`${styles.item} ${styles.switchItem}`}
+                                disabled={busy}
+                                onClick={() => onSetAutoRead(!chat.autoRead)}
+                            >
+                                <span className={styles.switchText}>
+                                    <MenuText label="Read replies aloud" sub="New replies play by themselves" />
+                                </span>
+                                <span className={chat.autoRead ? `${styles.switchMark} ${styles.switchOn}` : styles.switchMark} aria-hidden="true">
+                                    {chat.autoRead ? 'On' : 'Off'}
+                                </span>
+                            </button>
                             <hr className={styles.rule} />
                             <MenuButton
                                 danger

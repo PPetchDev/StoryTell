@@ -6,7 +6,7 @@ import { ChatManagerService } from '../../manager/chat/chat.service.js';
 import {
     ChooseReplyVersionRequestBodyDTO,
     EditMessageRequestBodyDTO,
-    RenameChatRequestBodyDTO,
+    UpdateChatRequestBodyDTO,
     SendMessageRequestBodyDTO,
     SetAuthorsNoteRequestBodyDTO,
     SetSittingOutRequestBodyDTO,
@@ -63,12 +63,12 @@ export class ChatApiController {
 
     @Patch(':chatId')
     @ApiOkResponse({ type: ChatResponseBodyDTO })
-    rename(
+    update(
         @Id('storyId') storyId: number,
         @Id('chatId') chatId: number,
-        @Body() body: RenameChatRequestBodyDTO,
+        @Body() body: UpdateChatRequestBodyDTO,
     ): Promise<ChatResponseBodyDTO> {
-        return this.chatManager.renameChat(storyId, chatId, body.title);
+        return this.chatManager.updateChat(storyId, chatId, body);
     }
 
     /** Wears a Persona, or the Story's Role for null, from the next User Message on. Never rolled back. */

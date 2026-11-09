@@ -142,3 +142,10 @@ export class PageFetchError extends AppError {
         super('502.003.020', `${reason} Paste the page's text instead.`);
     }
 }
+
+/** A voice id that is not one of the English voices `speechVoices()` lists (.scratch/read-aloud/spec.md). */
+export class UnknownVoiceError extends AppError {
+    constructor(voice: string) {
+        super('422.003.021', `"${voice}" is not one of the voices this app can read aloud in.`);
+    }
+}

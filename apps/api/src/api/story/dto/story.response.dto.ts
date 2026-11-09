@@ -194,6 +194,13 @@ export class CharacterDTO implements CharacterResponse {
         description: 'The square of the Reference image shown beside their lines in a Chat; null while none is chosen.',
     })
     portraitCrop: PortraitCrop | null;
+
+    @ApiProperty({
+        type: String,
+        nullable: true,
+        description: 'The voice their lines are read aloud in; null reads them in the Narration voice. Apart from `voice`.',
+    })
+    speakingVoice: string | null;
 }
 
 export class StartingBondDTO implements StartingBondResponse {
@@ -345,6 +352,9 @@ export class StoryResponseBodyDTO implements StoryDetail {
 
     @ApiProperty({ type: StoryCoverDTO, nullable: true, description: 'The picture the author chose; null while there is none.' })
     cover: StoryCoverDTO | null;
+
+    @ApiProperty({ type: String, nullable: true, description: 'The voice narration is read aloud in; null for the default (GET /api/voices).' })
+    narrationVoice: string | null;
 
     @ApiProperty({ description: 'True when `missing` is empty.' })
     playable: boolean;

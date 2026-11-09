@@ -49,8 +49,12 @@ export class BranchModelService {
         private readonly ledger: LedgerModelService,
     ) {}
 
-    /** Copies Chat `sourceChatId` as it stood at the Message at position `through`; returns the new Chat's id. */
-    copy(sourceChatId: number, through: number, fields: BranchFields): Promise<number> {
+    /**
+     * Copies Chat `sourceChatId` as it stood at the Message at position `through`. Answers the
+     * new Chat's id, and the old → new ids of the Messages it kept, for copies made outside the
+     * database once the transaction has committed (Read aloud's audio).
+     */
+    copy(sourceChatId: number, through: number, fields: BranchFields): Promise<{ chatId: number; messageIds: IdMap }> {
         return this.dataSource.transaction('REPEATABLE READ', async (manager) => {
             const chatId = await copyChat(manager, sourceChatId, through, fields);
             const context: CopyContext = { manager, sourceChatId, chatId, through, messageIds: new Map(), memoryIds: new Map() };
@@ -58,7 +62,9 @@ export class BranchModelService {
             // The ledger's step ends here: undo every change the Messages after N caused.
             await this.ledger.rollbackFrom(chatId, through + 1, manager);
             await manager.delete(MessageEntity, { chatId, position: MoreThan(through) });
-            return chatId;
+            const kept: Array<{ id: number }> = await manager.query('SELECT "id" FROM "message" WHERE "chat_id" = $1', [chatId]);
+            const keptIds = new Set(kept.map((row) => row.id));
+            return { chatId, messageIds: new Map([...context.messageIds].filter(([, copied]) => keptIds.has(copied))) };
         });
     }
 }
@@ -81,6 +87,8 @@ async function copyChat(manager: EntityManager, sourceChatId: number, through: n
         personaId: source.personaId,
         // The user's own direction, not story state: copied as it stands now (.scratch/authors-note/spec.md).
         authorsNote: source.authorsNote,
+        // A setting, not story state: copied as it stands (.scratch/read-aloud/spec.md, "Auto-read").
+        autoRead: source.autoRead,
         ...(keepStorySoFar
             ? {
                   storySoFar: source.storySoFar,

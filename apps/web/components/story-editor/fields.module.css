@@ -201,3 +201,19 @@ textarea.input {
     color: var(--muted);
     font-size: 0.9375rem;
 }
+
+/* A voice select and its ▶ Sample button (Read aloud). */
+.voiceRow {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.voiceRow select {
+    flex: 1;
+    min-width: 0;
+}
+
+.voiceRow button {
+    flex: none;
+}

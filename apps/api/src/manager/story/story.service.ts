@@ -42,6 +42,8 @@ import { ImageData } from '../../service/model-gateway/model-gateway.js';
 import { ImageStoreService } from '../../store/image/image-store.service.js';
 import { parseReply, ReplyPart } from '../chat/turn/reply-parser.js';
 import { storyHook } from '../excerpt.js';
+import { ReadAloudManagerService } from '../read-aloud/read-aloud.service.js';
+import { VoiceManagerService } from '../voice/voice.service.js';
 import { MAX_CHARACTERS, playableStatus, PlayableStatus } from './playable.js';
 
 /** A Story as the editor and the list read it: its fields plus the derived playable status. */
@@ -84,6 +86,8 @@ export interface StoryFields {
     tense?: Tense;
     replyLength?: ReplyLength;
     imageStyle?: string;
+    /** A voice id from the voice list, or null for the default. */
+    narrationVoice?: string | null;
 }
 
 export interface RoleFields {
@@ -100,6 +104,8 @@ export interface CharacterFields {
     background?: string;
     secrets?: string;
     arcDirections?: string;
+    /** A voice id from the voice list, or null to be read in the Narration voice. */
+    speakingVoice?: string | null;
 }
 
 export interface StartingBondFields {
@@ -198,6 +204,8 @@ export class StoryManagerService {
         private readonly imageStore: ImageStoreService,
         private readonly snapshotModel: SnapshotModelService,
         private readonly documentModel: DocumentModelService,
+        private readonly voices: VoiceManagerService,
+        private readonly readAloud: ReadAloudManagerService,
     ) {}
 
     async listStories(): Promise<StoryListItem[]> {
@@ -245,6 +253,7 @@ export class StoryManagerService {
 
     async updateStory(storyId: number, fields: StoryFields): Promise<StoryDetail> {
         const story = await this.load(storyId);
+        await this.voices.requireKnown(fields.narrationVoice);
         assignSent(story, fields, [
             'title',
             'setting',
@@ -253,6 +262,7 @@ export class StoryManagerService {
             'tense',
             'replyLength',
             'imageStyle',
+            'narrationVoice',
         ]);
         await this.storyModel.saveStory(story);
         return this.reload(storyId);
@@ -323,6 +333,8 @@ export class StoryManagerService {
         for (const character of story.characters) await this.removeReferenceImageFile(character);
         for (const imagePath of galleryFiles) await this.removeFile(imagePath);
         if (story.coverImagePath) await this.removeFile(story.coverImagePath);
+        // Its Messages went with it through CASCADE; their Read aloud audio goes too.
+        await this.readAloud.sweep();
     }
 
     /**
@@ -425,6 +437,7 @@ export class StoryManagerService {
     ): Promise<StoryDetail> {
         const story = await this.load(storyId);
         const character = this.findCharacter(story, characterId);
+        await this.voices.requireKnown(fields.speakingVoice);
         this.assignCharacter(character, fields);
         await this.storyModel.saveCharacter(character);
         // The editor adds a Character blank and its Arc directions are typed afterwards, so the
@@ -672,6 +685,7 @@ export class StoryManagerService {
             'background',
             'secrets',
             'arcDirections',
+            'speakingVoice',
         ]);
     }
 

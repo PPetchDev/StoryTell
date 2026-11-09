@@ -1,0 +1,31 @@
+{
+    "object": "list",
+    "type": "tts",
+    "data": [
+        {
+            "id": "tts-orpheus",
+            "type": "tts",
+            "object": "model",
+            "created": 1762000000,
+            "owned_by": "venice.ai",
+            "model_spec": {
+                "pricing": { "input": { "usd": 62.5, "diem": 62.5 } },
+                "default_format": "mp3",
+                "voices": ["tara", "leo"]
+            }
+        },
+        {
+            "id": "tts-kokoro",
+            "type": "tts",
+            "object": "model",
+            "created": 1762000000,
+            "owned_by": "venice.ai",
+            "model_spec": {
+                "pricing": { "input": { "usd": 4, "diem": 4 } },
+                "default_format": "mp3",
+                "supported_formats": ["mp3", "opus", "wav"],
+                "voices": ["af_test", "am_probe", "bf_sample", "bm_fixture", "ef_dora", "jf_alpha", "zm_yunxi", "af"]
+            }
+        }
+    ]
+}

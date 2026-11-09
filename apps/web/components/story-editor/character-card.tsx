@@ -3,11 +3,13 @@
 import { CharacterPortrait } from '@/components/portrait/character-portrait';
 import { Portrait } from '@/lib/character-colour';
 import { Character, characterRemovalWarning, Story } from '@/lib/story';
+import { VoiceList } from '@/lib/voices';
 import { useFieldMarks } from './field-marks';
 import { ExportCardButton } from './export-card';
 import { ChangedMark, ConfirmButton, OrderButtons, TextField, Toolbar } from './fields';
 import { FoldingCard } from './folding-card';
 import { ReferenceImage } from './reference-image';
+import { VoiceField } from './voice-field';
 import { fieldDomId, FieldRewrites, rewritableField, rewriteKey } from './rewrite';
 import styles from './story-editor.module.css';
 
@@ -25,6 +27,12 @@ interface CharacterCardProps {
     portrait?: Portrait;
     rewrites: FieldRewrites;
     onText(field: TextKey, value: string): void;
+    /** Read aloud: the voice list (null while it loads), and the Story's Narration voice as it reads. */
+    voices: VoiceList | null;
+    narrationVoice: string;
+    onSpeakingVoice(voice: string | null): void;
+    /** The cost hint goes under the first sample button on the page: the first Character's. */
+    sampleHint?: string;
     onExampleLines(lines: string[]): void;
     onMove(direction: -1 | 1): void;
     onRemove(): void;
@@ -118,6 +126,15 @@ export function CharacterCard(props: CharacterCardProps) {
                 hint="How they talk: rhythm, words they use, what they never say."
                 onChange={(v) => props.onText('voice', v)}
                 {...ofCharacter('voice')}
+            />
+            <VoiceField
+                label="Speaking voice"
+                value={character.speakingVoice}
+                noneLabel="Same as narration"
+                voices={props.voices}
+                sampleVoice={character.speakingVoice ?? props.narrationVoice}
+                onChange={props.onSpeakingVoice}
+                hint={props.sampleHint ?? 'How their lines sound when read aloud.'}
             />
 
             <fieldset id={linesId} className={linesFlashed ? `subsection ${styles.linesFlash}` : 'subsection'}>

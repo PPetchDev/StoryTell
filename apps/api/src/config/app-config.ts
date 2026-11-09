@@ -11,6 +11,11 @@ export abstract class AppConfig {
     abstract readonly databaseUrl: string;
     /** Absolute path. The database stores image paths relative to this folder. */
     abstract readonly imageDir: string;
+    /**
+     * Absolute path of the speech folder (Read aloud's audio and voice samples). Never inside the
+     * image folder: the backup job copies that folder, and audio is not backed up.
+     */
+    abstract readonly speechDir: string;
     /** `fake` is for tests and E2E runs only; it also mounts the fake's control routes. */
     abstract readonly modelGateway: ModelGatewayMode;
     abstract readonly providerKeys: ProviderKeys;
@@ -71,10 +76,21 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
         throw new ConfigError(`BACKGROUND_RETRY_MS must be a non-negative integer, got "${env.BACKGROUND_RETRY_MS}"`);
     }
 
+    const imageDir = path.resolve(env.IMAGE_DIR!);
+    // Default: a folder named `speech` beside the image folder.
+    const speechDir = env.SPEECH_DIR ? path.resolve(env.SPEECH_DIR) : path.join(path.dirname(imageDir), 'speech');
+    const fromImages = path.relative(imageDir, speechDir);
+    if (fromImages === '' || (!fromImages.startsWith('..') && !path.isAbsolute(fromImages))) {
+        throw new ConfigError(
+            `SPEECH_DIR (${speechDir}) must not be inside IMAGE_DIR (${imageDir}): the backup copies the image folder, and audio is not backed up.`,
+        );
+    }
+
     return {
         port,
         databaseUrl: env.DATABASE_URL!,
-        imageDir: path.resolve(env.IMAGE_DIR!),
+        imageDir,
+        speechDir,
         modelGateway,
         backgroundWaitMs,
         backgroundRetryMs,

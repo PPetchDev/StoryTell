@@ -7,6 +7,8 @@ import {
     SNAPSHOT_MODEL_PRICES,
     SnapshotModel,
     SnapshotSize,
+    SPEECH_CHARACTER_LIMIT,
+    SpeechModel,
     TEXT_ONLY_SNAPSHOT_MODELS,
     TextCallKind,
     TextModel,
@@ -258,6 +260,60 @@ export interface TranscriptionModelSpec {
 /** Venice's pricing page, read 2026-11-08: Whisper Large V3 at $0.0001 per audio second. */
 export const TRANSCRIPTION_MODELS: Record<TranscriptionModel, TranscriptionModelSpec> = {
     'whisper-large-v3': { id: 'openai/whisper-large-v3', priceUsdPerSecond: 0.0001 },
+};
+
+export interface SpeechModelSpec {
+    /** Venice's model id. */
+    id: string;
+    /** USD per million characters, used when `GET /models?type=tts` can't be read. */
+    fallbackPriceUsdPerMillion: number;
+    /** Every voice id, used when `GET /models?type=tts` can't be read; the English ones are offered. */
+    fallbackVoices: readonly string[];
+    /** The most characters one request may carry. */
+    requestCharacterLimit: number;
+}
+
+/**
+ * .scratch/read-aloud/spec.md, "Model table". Venice's `GET /models?type=tts`, read 2026-11-09:
+ * `tts-kokoro` at $3.50 per million characters. Its English voices differ a little from
+ * upstream VOICES.md (Venice adds af_jadzia and has no bf_isabella), so the fallback is Venice's.
+ */
+export const SPEECH_MODELS: Record<SpeechModel, SpeechModelSpec> = {
+    kokoro: {
+        id: 'tts-kokoro',
+        fallbackPriceUsdPerMillion: 3.5,
+        fallbackVoices: [
+            'af_alloy',
+            'af_aoede',
+            'af_bella',
+            'af_heart',
+            'af_jadzia',
+            'af_jessica',
+            'af_kore',
+            'af_nicole',
+            'af_nova',
+            'af_river',
+            'af_sarah',
+            'af_sky',
+            'am_adam',
+            'am_echo',
+            'am_eric',
+            'am_fenrir',
+            'am_liam',
+            'am_michael',
+            'am_onyx',
+            'am_puck',
+            'am_santa',
+            'bf_alice',
+            'bf_emma',
+            'bf_lily',
+            'bm_daniel',
+            'bm_fable',
+            'bm_george',
+            'bm_lewis',
+        ],
+        requestCharacterLimit: SPEECH_CHARACTER_LIMIT,
+    },
 };
 
 /**

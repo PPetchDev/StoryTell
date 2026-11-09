@@ -3,6 +3,7 @@
 import { CSSProperties, Fragment, KeyboardEvent, MouseEvent, PointerEvent, ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { AiMessageParts, MessageBody, UserLine } from '@/components/chat/message-body';
+import { ReadAloudAction, ReadAloudControls, useReadAloud, useReadingNow } from '@/components/chat/read-aloud';
 import { MessageSnapshots } from '@/components/chat/snapshots';
 import { ThaiReadingAction, ThaiReadingBlock, ThaiReadings } from '@/components/chat/thai-reading';
 import { ConfirmButton } from '@/components/story-editor/fields';
@@ -240,15 +241,17 @@ interface ActionRowProps {
     onBranch(): void;
     /** ‹ n/m ›; null while the reply has only one version. */
     versions: VersionSwitchProps | null;
+    /** ▶ Read aloud, after the existing actions; null while this Message is the one being read. */
+    read: ReactNode;
     /** ไทย, just before ⑂ Branch (integration: "Message actions"). */
     thai: ReactNode;
 }
 
 /**
  * Under the newest AI Message while no turn is in flight (spec: "Action row"). ‹ n/m › goes
- * first when the reply has versions, then ↺ Again, never on the Opening; ไทย, then ⑂ Branch last.
+ * first when the reply has versions, then ↺ Again, never on the Opening; ▶ Read aloud, ไทย, then ⑂ Branch last.
  */
-function ActionRow({ onAgain, onEdit, onSnapshot, onBranch, versions, thai }: ActionRowProps) {
+function ActionRow({ onAgain, onEdit, onSnapshot, onBranch, versions, read, thai }: ActionRowProps) {
     const items: OverflowItem[] = [];
     if (versions) items.push({ key: 'versions', node: <VersionSwitch {...versions} /> });
     if (onAgain) {
@@ -270,6 +273,7 @@ function ActionRow({ onAgain, onEdit, onSnapshot, onBranch, versions, thai }: Ac
             </button>
         ),
     });
+    if (read) items.push({ key: 'read', node: read });
     items.push({ key: 'thai', node: thai });
     items.push({ key: 'branch', node: <BranchAction onBranch={onBranch} /> });
     return <OverflowActions label="Message actions" className={styles.actions} items={items} />;
@@ -287,6 +291,8 @@ interface MessageViewProps {
     reading: ReactNode;
     /** Its Snapshots and Snapshot jobs, for an AI Message. */
     snapshots: ReactNode;
+    /** Read aloud's Pause, Resume and Stop while it is being read, whether or not its tools show. */
+    readAloud: ReactNode;
     /** A tap on the Message shows or hides its Edit; null when it has none to show. */
     onTap: (() => void) | null;
     /** A sideways swipe: 1 for the next Reply version (a swipe left), -1 for the one before; null when it has none. */
@@ -295,7 +301,8 @@ interface MessageViewProps {
     onCancel(): void;
 }
 
-function MessageView({ message, cast, portraits, later, editing, tools, reading, snapshots, onTap, onSwipe, onSave, onCancel }: MessageViewProps) {
+function MessageView({ message, cast, portraits, later, editing, tools, reading, snapshots, readAloud, onTap, onSwipe, onSave, onCancel }: MessageViewProps) {
+    const readingNow = useReadingNow(message.id);
     // Where a finger went down on a reply with versions; a sideways move past the threshold steps.
     const swipeRef = useRef<{ pointerId: number; x: number; y: number } | null>(null);
     const swipeStart = (event: PointerEvent<HTMLElement>) => {
@@ -341,11 +348,12 @@ function MessageView({ message, cast, portraits, later, editing, tools, reading,
             {editing ? (
                 <EditForm message={message} later={later} onSave={onSave} onCancel={onCancel} />
             ) : (
-                <MessageBody message={message} cast={cast} portraits={portraits} />
+                <MessageBody message={message} cast={cast} portraits={portraits} readingNow={readingNow} />
             )}
             {!editing && reading}
             {snapshots}
             {!editing && tools}
+            {!editing && readAloud}
         </article>
     );
 }
@@ -520,6 +528,10 @@ export function ChatThread({
     const { threadRef, contentRef } = useFollowEnd(`${shown.length}:${newest}:${pending !== null}:${writing}`, streaming, writing);
     const storySize = { '--story-size': STORY_TEXT_SIZE[useTextSize()] } as CSSProperties;
     const [tapped, setTapped] = useTappedMessage(canEdit);
+    const player = useReadAloud();
+    /** ▶ Read aloud for an AI Message, unless it is the one being read (its controls show instead). */
+    const readAction = (message: Message) =>
+        message.kind === 'ai' && player && player.messageId !== message.id ? <ReadAloudAction messageId={message.id} /> : null;
     // The action row goes under the latest AI Message (the Opening counts), the one a Snapshot is taken of.
     const newestAiMessage = shown.findLast((message) => message.kind === 'ai');
 
@@ -554,12 +566,15 @@ export function ChatThread({
                                 onSnapshot={onSnapshot}
                                 onBranch={() => onBranch(message.id)}
                                 versions={versions ? { versions, onVersion: (version) => onVersion(message.id, version) } : null}
+                                read={readAction(message)}
                                 thai={<ThaiReadingAction message={message} readings={thaiReadings} />}
                             />
                         );
                     } else if (canEdit && tapped === message.id) {
                         const items: OverflowItem[] = [];
                         if (editable) items.push({ key: 'edit', node: <EditAction onEdit={() => edit(message.id)} /> });
+                        const read = readAction(message);
+                        if (read) items.push({ key: 'read', node: read });
                         items.push({ key: 'thai', node: <ThaiReadingAction message={message} readings={thaiReadings} /> });
                         items.push({ key: 'branch', node: <BranchAction onBranch={() => onBranch(message.id)} /> });
                         tools = <OverflowActions label="Message tools" className={styles.tools} items={items} />;
@@ -584,6 +599,7 @@ export function ChatThread({
                                     />
                                 )
                             }
+                            readAloud={message.kind === 'ai' && <ReadAloudControls messageId={message.id} />}
                             onTap={canEdit && !withRow ? () => setTapped((current) => (current === message.id ? null : message.id)) : null}
                             onSwipe={editing === message.id ? null : step}
                             onSave={(text) => onSave(message, text)}

@@ -31,6 +31,8 @@ export interface CharacterResponse {
     referenceImagePath: string | null;
     /** The square of the Reference image shown beside their lines in a Chat; null while none is chosen. */
     portraitCrop: PortraitCrop | null;
+    /** The Kokoro voice their lines are read aloud in; null reads them in the Narration voice. Apart from `voice`, how they talk on the page. */
+    speakingVoice: string | null;
 }
 
 /** An AI-played figure in one Story's cast. Ordered by `position` within the Story. */
@@ -83,6 +85,10 @@ export class CharacterEntity {
     @Column({ name: 'portrait_crop', type: 'jsonb', nullable: true })
     portraitCrop: PortraitCrop | null;
 
+    /** A Kokoro voice id; null means "read in the Narration voice". */
+    @Column({ name: 'speaking_voice', type: 'text', nullable: true })
+    speakingVoice: string | null;
+
     toResponse(): CharacterResponse {
         return {
             id: this.id,
@@ -96,6 +102,7 @@ export class CharacterEntity {
             arcDirections: this.arcDirections,
             referenceImagePath: this.referenceImagePath,
             portraitCrop: this.portraitCrop ? { ...this.portraitCrop } : null,
+            speakingVoice: this.speakingVoice,
         };
     }
 }

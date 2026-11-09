@@ -1,6 +1,6 @@
 # 03 — Read a Message aloud
 
-**Status:** ready-for-agent
+**Status:** done
 
 **What to build:** ▶ Read aloud on any AI Message plays the text as the thread shows it (the Chat's Replace rules applied), in order: narration and `*actions*` in the Narration voice, and each line in its speaker's Speaking voice. The part being read is highlighted, and Pause, Resume and Stop work. A second play of the same words costs nothing, and a Branch replays the audio of the Messages it copies for free. Per the spec's "The play queue", "Audio cache" and "The player (web)":
 

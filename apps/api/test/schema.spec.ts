@@ -7,6 +7,7 @@ import { DocumentPassageEntity } from '../src/model/document/entities/document-p
 import { DocumentEntity } from '../src/model/document/entities/document.entity.js';
 import { SavedReplyEntity } from '../src/model/saved-reply/entities/saved-reply.entity.js';
 import { ReplaceRuleEntity } from '../src/model/replace-rule/entities/replace-rule.entity.js';
+import { UsageRecordEntity } from '../src/model/usage-record/entities/usage-record.entity.js';
 
 import { startTestApp, TestApp } from './harness/test-app.js';
 
@@ -38,7 +39,7 @@ describe('Database schema', () => {
 
     // Older migrations name their constraints their own way, so the whole schema can't be diffed
     // against the entities. Newer tables are checked column by column instead.
-    it.each([DocumentEntity, DocumentPassageEntity, ThaiReadingEntity, SavedReplyEntity, ReplaceRuleEntity])('migrates every column %o declares, with its type and nullability', async (entity) => {
+    it.each([DocumentEntity, DocumentPassageEntity, ThaiReadingEntity, SavedReplyEntity, ReplaceRuleEntity, UsageRecordEntity])('migrates every column %o declares, with its type and nullability', async (entity) => {
         const metadata = t.app.get(DataSource).getMetadata(entity);
         const client = new pg.Client({ connectionString: t.databaseUrl });
         await client.connect();

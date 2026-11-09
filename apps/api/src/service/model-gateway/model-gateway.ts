@@ -32,6 +32,17 @@ export abstract class ModelGateway {
      */
     abstract transcribe(request: TranscriptionRequest): Promise<TranscriptionResult>;
 
+    /**
+     * Speech for Read aloud and voice samples (.scratch/read-aloud/spec.md, "Provider and the
+     * Model Gateway"). Venice pool; callers never name the model. Text longer than
+     * SPEECH_CHARACTER_LIMIT is a programming error (`RangeError`), never sent: the play queue
+     * splits text first.
+     */
+    abstract synthesizeSpeech(request: SpeechRequest): Promise<SpeechResult>;
+
+    /** The English voices speech can be made in. Makes no paid call. */
+    abstract speechVoices(): Promise<SpeechVoice[]>;
+
     abstract remainingCredit(): Promise<RemainingCredit>;
 }
 
@@ -61,6 +72,9 @@ export type EmbeddingCallKind = 'document_embedding' | 'document_search';
  */
 export type AudioCallKind = 'dictation' | 'read_aloud' | 'voice_preview';
 
+/** The audio kinds that make speech: reading a Message aloud, and a voice's sample in the Story editor. */
+export type SpeechCallKind = Extract<AudioCallKind, 'read_aloud' | 'voice_preview'>;
+
 export type CallKind = TextCallKind | ImageCallKind | EmbeddingCallKind | AudioCallKind;
 
 export const MAX_REFERENCE_IMAGES = 3;
@@ -85,6 +99,13 @@ export type EmbeddingModel = typeof EMBEDDING_MODEL;
 /** The one speech-to-text model: Whisper Large V3 on Venice, the only one there that takes a language. */
 export const TRANSCRIPTION_MODEL = 'whisper-large-v3';
 export type TranscriptionModel = typeof TRANSCRIPTION_MODEL;
+/** The one text-to-speech model: Kokoro on Venice, English voices only. */
+export const SPEECH_MODEL = 'kokoro';
+export type SpeechModel = typeof SPEECH_MODEL;
+/** The most characters one speech request may carry (Venice's limit for `input`). */
+export const SPEECH_CHARACTER_LIMIT = 4096;
+/** The voice a Story with no Narration voice is read in. */
+export const DEFAULT_NARRATION_VOICE = 'af_sky';
 
 export const SNAPSHOT_MODELS = ['seedream-v4-edit', 'seedream-v5-pro-edit', 'qwen-edit-uncensored'] as const;
 export type SnapshotModel = (typeof SNAPSHOT_MODELS)[number];
@@ -295,6 +316,57 @@ export interface TranscriptionResult {
     text: string;
     model: string;
     costUsd: number;
+}
+
+export interface SpeechRequest {
+    kind: SpeechCallKind;
+    /** At most SPEECH_CHARACTER_LIMIT characters. */
+    text: string;
+    /** A voice id from `speechVoices()`. */
+    voice: string;
+    servedFor?: ServedFor;
+}
+
+export interface SpeechResult {
+    audio: { bytes: Buffer; mimeType: 'audio/mpeg' };
+    model: string;
+    /** The characters sent, which the price is worked from. */
+    characters: number;
+    costUsd: number;
+}
+
+export type VoiceAccent = 'american' | 'british';
+export type VoiceGender = 'female' | 'male';
+
+/** A Kokoro voice, as the Story editor lists it. */
+export interface SpeechVoice {
+    /** Kokoro's id, e.g. `af_sky`: accent letter, gender letter, name. */
+    id: string;
+    /** Built from the id, e.g. "Sky — American, female". */
+    label: string;
+    accent: VoiceAccent;
+    gender: VoiceGender;
+}
+
+const VOICE_ACCENTS: Record<string, VoiceAccent> = { a: 'american', b: 'british' };
+const VOICE_GENDERS: Record<string, VoiceGender> = { f: 'female', m: 'male' };
+
+/**
+ * The voice an English Kokoro id names, or undefined for any other id: the first letter is the
+ * accent (`a` American, `b` British), the second the gender, and the rest the name.
+ */
+export function englishVoice(id: string): SpeechVoice | undefined {
+    const match = /^([ab])([fm])_([a-z]+)$/.exec(id);
+    if (!match) return undefined;
+    const [, accentLetter, genderLetter, name] = match;
+    const accent = VOICE_ACCENTS[accentLetter];
+    const gender = VOICE_GENDERS[genderLetter];
+    const label = `${capitalise(name)} — ${capitalise(accent)}, ${gender}`;
+    return { id, label, accent, gender };
+}
+
+function capitalise(word: string): string {
+    return `${word[0].toUpperCase()}${word.slice(1)}`;
 }
 
 export interface CreditBalance {

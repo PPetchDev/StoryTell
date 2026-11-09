@@ -37,14 +37,31 @@ export function UserLine({ identityName, text }: { identityName: string; text: s
  * A Character's line: their picture, their name in their colour, and the line in a bubble. In a
  * Chat, a tap on the picture opens the Character's profile.
  */
-function Speech({ part, cast, portraits }: { part: Extract<MessagePart, { kind: 'speech' }>; cast: Cast; portraits: Portraits }) {
+function Speech({
+    part,
+    cast,
+    portraits,
+    reading = false,
+}: {
+    part: Extract<MessagePart, { kind: 'speech' }>;
+    cast: Cast;
+    portraits: Portraits;
+    /** Read aloud is reading this line: outlined in the Character's colour. */
+    reading?: boolean;
+}) {
     const nameId = useId();
     const colour = characterColour(part.characterId, cast);
     const portrait = part.characterId === null ? undefined : portraits[part.characterId];
     const openProfile = useCharacterProfile(part.characterId);
     const avatar = <Avatar name={part.speakerName} colour={colour} portrait={portrait} />;
     return (
-        <div className={styles.speech} style={{ '--speaker-colour': colour } as CSSProperties} role="group" aria-labelledby={nameId}>
+        <div
+            className={reading ? `${styles.speech} ${styles.readingNow}` : styles.speech}
+            style={{ '--speaker-colour': colour } as CSSProperties}
+            role="group"
+            aria-labelledby={nameId}
+            aria-current={reading ? 'true' : undefined}
+        >
             {openProfile ? (
                 <button type="button" className={styles.avatarButton} aria-label={`Profile of ${part.speakerName}`} onClick={openProfile}>
                     {avatar}
@@ -63,9 +80,9 @@ function Speech({ part, cast, portraits }: { part: Extract<MessagePart, { kind: 
 }
 
 /** Narration: an italic line marked with ≡, outside any bubble. */
-function Narration({ text }: { text: string }) {
+function Narration({ text, reading = false }: { text: string; reading?: boolean }) {
     return (
-        <div className={styles.narration}>
+        <div className={reading ? `${styles.narration} ${styles.readingNow}` : styles.narration} aria-current={reading ? 'true' : undefined}>
             <svg className={styles.mark} viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
                 <path d="M2 4h12M2 8h12M2 12h8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
             </svg>
@@ -79,6 +96,14 @@ interface MessageBodyProps {
     cast: Cast;
     /** The cast's Reference images by Character id; a Character without one shows their initial. */
     portraits?: Portraits;
+    /** The part Read aloud is reading, highlighted; null while it isn't reading this Message. */
+    readingNow?: ReadingNow | null;
+}
+
+/** Where Read aloud is in a Message: a part, and for narration its paragraph as split below. */
+export interface ReadingNow {
+    partIndex: number;
+    paragraph: number | null;
 }
 
 /**
@@ -86,9 +111,9 @@ interface MessageBodyProps {
  * look): an AI Message as its parts in order, narration as italic lines and each speech part as
  * its speaker's bubble; a User Message as a bubble on the right.
  */
-export function MessageBody({ message, cast, portraits = {} }: MessageBodyProps) {
+export function MessageBody({ message, cast, portraits = {}, readingNow = null }: MessageBodyProps) {
     if (message.kind === 'user') return <UserLine identityName={message.identityName} text={message.text} />;
-    return <AiMessageParts parts={message.parts} cast={cast} portraits={portraits} />;
+    return <AiMessageParts parts={message.parts} cast={cast} portraits={portraits} readingNow={readingNow} />;
 }
 
 /**
@@ -98,7 +123,17 @@ export function MessageBody({ message, cast, portraits = {} }: MessageBodyProps)
  * paragraphs (so a rule can remove one) and on speech before `*…*` becomes italics. Speakers'
  * names are never touched; a part a rule leaves blank isn't drawn.
  */
-export function AiMessageParts({ parts, cast, portraits = {} }: { parts: MessagePart[]; cast: Cast; portraits?: Portraits }) {
+export function AiMessageParts({
+    parts,
+    cast,
+    portraits = {},
+    readingNow = null,
+}: {
+    parts: MessagePart[];
+    cast: Cast;
+    portraits?: Portraits;
+    readingNow?: ReadingNow | null;
+}) {
     const shown = useShownText();
     return (
         <div className={styles.story}>
@@ -109,10 +144,16 @@ export function AiMessageParts({ parts, cast, portraits = {} }: { parts: Message
                     return text
                         .split(/\n\s*\n/)
                         .filter((paragraph) => paragraph.trim() !== '')
-                        .map((paragraph, line) => <Narration key={`${index}-${line}`} text={paragraph.trim()} />);
+                        .map((paragraph, line) => (
+                            <Narration
+                                key={`${index}-${line}`}
+                                text={paragraph.trim()}
+                                reading={readingNow?.partIndex === index && readingNow.paragraph === line}
+                            />
+                        ));
                 }
                 if (text.trim() === '') return null;
-                return <Speech key={index} part={{ ...part, text }} cast={cast} portraits={portraits} />;
+                return <Speech key={index} part={{ ...part, text }} cast={cast} portraits={portraits} reading={readingNow?.partIndex === index} />;
             })}
         </div>
     );

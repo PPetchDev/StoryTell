@@ -50,6 +50,7 @@ import {
     TextCompletionRequest,
     TextCompletionResult,
 } from '../../service/model-gateway/model-gateway.js';
+import { ReadAloudManagerService } from '../read-aloud/read-aloud.service.js';
 import { checkRecording } from './dictation/recording.js';
 import { latestLine } from '../excerpt.js';
 import { exchangeUserText } from './exchange.js';
@@ -120,6 +121,8 @@ export interface ChatDetail extends ChatSummary {
     branchedFrom: { chatId: number; title: string; messageId: number | null } | null;
     /** The Author's note (.scratch/authors-note/spec.md); empty when there is none. */
     authorsNote: string;
+    /** Read replies aloud (.scratch/read-aloud/spec.md, "Auto-read"); off by default. */
+    autoRead: boolean;
     /** The ids of the Characters sitting out (.scratch/speaker-controls/spec.md), in cast order. */
     sittingOut: number[];
     /** The composer tray's lines (.scratch/saved-replies-and-replace-rules/spec.md): the Story's, then the app-wide ones. */
@@ -194,6 +197,14 @@ export const DASHBOARD_BACKGROUND_MESSAGES = 10;
  * whole turn; the reply is parsed and guarded, and an AI Message is stored only once it is
  * complete, after which the judge and Memory extraction run in the background in parallel.
  */
+
+/** The Chat's own settings (PATCH): each is changed only when sent. */
+export interface ChatFields {
+    /** Whitespace only keeps the current title. */
+    title?: string;
+    /** Read replies aloud (.scratch/read-aloud/spec.md, "Auto-read"). */
+    autoRead?: boolean;
+}
 @Injectable()
 export class ChatManagerService {
     private readonly logger = new Logger(ChatManagerService.name);
@@ -203,6 +214,7 @@ export class ChatManagerService {
     constructor(
         private readonly chatModel: ChatModelService,
         private readonly branchModel: BranchModelService,
+        private readonly readAloud: ReadAloudManagerService,
         private readonly storyModel: StoryModelService,
         private readonly settingsModel: SettingsModelService,
         private readonly ledger: LedgerModelService,
@@ -282,6 +294,7 @@ export class ChatManagerService {
             await this.chatModel.clearMessages(chat.id);
             await this.copyOpening(story, chat.id);
             await this.seedLedger(story, chat.id);
+            await this.readAloud.sweep();
             return this.getChat(storyId, chatId);
         });
     }
@@ -310,7 +323,8 @@ export class ChatManagerService {
         if (found.kind === MessageKind.User) {
             const nudge = nudgeOf(story, loaded, nudgeCharacterId);
             const chat = await this.requireSendable(story, loaded);
-            return this.writingTurn(chat.id, () =>
+            // The Messages after it are gone even when the fresh reply fails: their audio goes with them.
+            return this.sweepingSpeech(() => this.writingTurn(chat.id, () =>
                 // The fresh reply is written to the identity worn now, so the edited text is stamped with it.
                 this.rewindAndWrite(
                     story,
@@ -320,7 +334,7 @@ export class ChatManagerService {
                     stream,
                     nudge,
                 ),
-            );
+            ));
         }
 
         if (this.inFlight.has(loaded.id)) throw new TurnInProgressError();
@@ -332,7 +346,7 @@ export class ChatManagerService {
             this.logger.warn(`Chat ${chat.id}: unknown speaker "${name}" in the edited Message; kept by name with no Character link`);
         }
         // Under the turn lock, so a Branch never copies a half-made edit.
-        return this.writingTurn(chat.id, async () => {
+        return this.sweepingSpeech(() => this.writingTurn(chat.id, async () => {
             const rolledBack = await this.ledger.rollbackFrom(chat.id, message.position);
             await this.storySoFar.rewound(chat, message.position);
             await this.chatModel.rewriteAiMessage(message, reply.parts);
@@ -340,7 +354,16 @@ export class ChatManagerService {
             await this.snapshotModel.clearMessageLinks([message.id]);
             if (message.model !== AUTHOR_MODEL) await this.rerunBackground(story, chat.id, message.id);
             return { ...(await this.getChat(storyId, chatId)), rolledBack };
-        });
+        }));
+    }
+
+    /** Runs a write that may discard Messages, then sweeps the audio of any Message that is gone, whatever the write's outcome. */
+    private async sweepingSpeech<T>(write: () => Promise<T>): Promise<T> {
+        try {
+            return await write();
+        } finally {
+            await this.readAloud.sweep();
+        }
     }
 
     /**
@@ -443,10 +466,12 @@ export class ChatManagerService {
             // A User Message is never first (the Opening is), so there is always a Message before it.
             const through = fromUser ? message.position - 1 : message.position;
             const taken = (await this.chatModel.findByStory(storyId)).map((other) => other.title);
-            const branchId = await this.branchModel.copy(chat.id, through, {
+            const { chatId: branchId, messageIds } = await this.branchModel.copy(chat.id, through, {
                 title: branchTitle(chat.title, taken),
                 branchedFromMessageId: message.id,
             });
+            // After the copy commits: the kept Messages' audio, so the Branch replays it for free.
+            await this.readAloud.copyForBranch(messageIds);
             const draft = fromUser ? (message.text ?? '') : null;
             return { ...(await this.getChat(storyId, branchId)), draft };
         });
@@ -520,12 +545,20 @@ export class ChatManagerService {
         return this.detail(story, chat);
     }
 
-    async renameChat(storyId: number, chatId: number, title: string): Promise<ChatDetail> {
+    /**
+     * The Chat's own settings: its title (whitespace only keeps the current one) and Read replies
+     * aloud. Each is written only when sent.
+     */
+    async updateChat(storyId: number, chatId: number, fields: ChatFields): Promise<ChatDetail> {
         const { story, chat } = await this.load(storyId, chatId);
-        if (title.trim() !== '') {
-            chat.title = title.trim();
+        if (fields.title !== undefined && fields.title.trim() !== '') {
+            chat.title = fields.title.trim();
             // Only the title: saving the loaded Chat could write back a Story so far updated meanwhile.
             await this.chatModel.setTitle(chat.id, chat.title);
+        }
+        if (fields.autoRead !== undefined) {
+            chat.autoRead = fields.autoRead;
+            await this.chatModel.setAutoRead(chat.id, chat.autoRead);
         }
         return this.detail(story, chat);
     }
@@ -576,6 +609,7 @@ export class ChatManagerService {
     async deleteChat(storyId: number, chatId: number): Promise<void> {
         const { chat } = await this.load(storyId, chatId);
         await this.chatModel.deleteChat(chat.id);
+        await this.readAloud.sweep();
     }
 
     /** Spec: "Send flow". */
@@ -1099,6 +1133,7 @@ export class ChatManagerService {
                     : null,
             branchedFrom: source ? { chatId: source.id, title: source.title, messageId: chat.branchedFromMessageId } : null,
             authorsNote: chat.authorsNote,
+            autoRead: chat.autoRead,
             sittingOut: sittingOutOf(story, chat).map((character) => character.id),
             savedReplies: trayLines(story.savedReplies, appSavedReplies),
             replaceRules: chatReplaceRules(appReplaceRules, story.replaceRules),

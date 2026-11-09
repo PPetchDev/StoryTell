@@ -255,3 +255,22 @@ div.overflowRow {
     font-size: calc(var(--story-size, 1rem) * 0.95);
     line-height: 1.6;
 }
+
+/* Read aloud's controls under the Message being read: Pause or Resume, Stop, and why it stopped. */
+.reading {
+    display: grid;
+    gap: 0.35rem;
+    margin-top: 0.5rem;
+}
+
+.readingButtons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.readingError {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--warning);
+}

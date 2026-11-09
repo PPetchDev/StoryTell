@@ -1,6 +1,6 @@
 # 04 — Read new replies aloud by themselves
 
-**Status:** ready-for-agent
+**Status:** done
 
 **What to build:** A Chat setting, off by default, that plays each new reply as soon as its turn settles, but only for turns started in this tab. It works on an iPhone after a tap. A Branch keeps the setting, and Reset leaves it as it was. Per the spec's "Auto-read":
 

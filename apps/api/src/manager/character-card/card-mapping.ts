@@ -28,7 +28,7 @@ export interface CardChoices {
 export interface CardStoryPlan {
     story: Required<Pick<StoryFields, 'title' | 'setting' | 'opening'>> & Pick<StoryFields, 'pov' | 'tense' | 'replyLength' | 'imageStyle'>;
     role: { name: string; description: string };
-    character: Required<CharacterFields>;
+    character: Required<Omit<CharacterFields, 'speakingVoice'>>;
     lore: Required<LoreEntryFields>[];
     /** Plain lines for the "Won't come along" list. */
     leftOut: string[];
@@ -204,7 +204,7 @@ export function mapCard(card: CardData, choices: CardChoices): CardStoryPlan {
         exampleLines = exampleLines.slice(0, MAX_EXAMPLE_LINES);
     }
 
-    const character: Required<CharacterFields> = block
+    const character: Required<Omit<CharacterFields, 'speakingVoice'>> = block
         ? {
               name: characterName,
               appearance: field('Appearance', block.character.appearance),

@@ -11,6 +11,11 @@ import {
     MAX_REFERENCE_IMAGES,
     ModelGateway,
     RemainingCredit,
+    SPEECH_CHARACTER_LIMIT,
+    SpeechCallKind,
+    SpeechRequest,
+    SpeechResult,
+    SpeechVoice,
     TextCallKind,
     TextCompletionRequest,
     TextCompletionResult,
@@ -48,10 +53,14 @@ export type FakeEmbeddingReply = 'answer' | ModelGatewayError;
 /** A transcription is its text, a partial result (`delayMs` holds it back, as for images), or an error. */
 export type FakeTranscriptionReply = string | (Partial<TranscriptionResult> & { delayMs?: number }) | ModelGatewayError;
 
+/** A speech reply is a partial result (`delayMs` holds it back, as for images) or an error. */
+export type FakeSpeechReply = (Partial<SpeechResult> & { delayMs?: number }) | ModelGatewayError;
+
 export type FakeGatewayCall =
     | { method: 'completeText'; request: TextCompletionRequest }
     | { method: 'embedTexts'; request: EmbeddingRequest }
     | { method: 'transcribe'; request: TranscriptionRequest }
+    | { method: 'synthesizeSpeech'; request: SpeechRequest }
     /** `stopped` turns true when the caller's signal ended the stream. */
     | { method: 'streamText'; request: TextCompletionRequest; stopped: boolean }
     | { method: 'generateImage'; request: ImageGenerationRequest }
@@ -66,10 +75,32 @@ export const FAKE_PNG: ImageData = {
     mimeType: 'image/png',
 };
 
+/**
+ * Silent MPEG-1 Layer III frames (32 kb/s, 44.1 kHz, mono): a 4-byte header and zeros, about
+ * 26 ms each. A browser plays them to the end, so a test can follow the player's states.
+ */
+export function silentMp3(frames: number): Buffer {
+    const frame = Buffer.alloc(104);
+    frame.set([0xff, 0xfb, 0x10, 0xc0]);
+    return Buffer.concat(Array.from({ length: frames }, () => frame));
+}
+
+/** The default audio a scripted speech call answers: about a quarter of a second of silence. */
+export const FAKE_MP3: SpeechResult['audio'] = { bytes: silentMp3(10), mimeType: 'audio/mpeg' };
+
+/** The voices `speechVoices()` answers unless scripted: two American, two British; female and male. */
+export const FAKE_SPEECH_VOICES: SpeechVoice[] = [
+    { id: 'af_sky', label: 'Sky — American, female', accent: 'american', gender: 'female' },
+    { id: 'am_adam', label: 'Adam — American, male', accent: 'american', gender: 'male' },
+    { id: 'bf_emma', label: 'Emma — British, female', accent: 'british', gender: 'female' },
+    { id: 'bm_george', label: 'George — British, male', accent: 'british', gender: 'male' },
+];
+
 export const FAKE_TEXT_MODEL = 'fake/text-model';
 export const FAKE_IMAGE_MODEL = 'fake/image-model';
 export const FAKE_EMBEDDING_MODEL = 'fake/embedding-model';
 export const FAKE_TRANSCRIPTION_MODEL = 'fake/transcription-model';
+export const FAKE_SPEECH_MODEL = 'fake/speech-model';
 
 const DEFAULT_CREDIT: RemainingCredit = {
     text: { remainingUsd: 22, limitUsd: 22 },
@@ -87,6 +118,8 @@ export class FakeModelGateway extends ModelGateway {
     private readonly imageReplies = new Map<ImageCallKind, FakeImageReply[]>();
     private readonly embeddingReplies = new Map<EmbeddingCallKind, FakeEmbeddingReply[]>();
     private readonly transcriptionReplies: FakeTranscriptionReply[] = [];
+    private readonly speechReplies = new Map<SpeechCallKind, FakeSpeechReply[]>();
+    private voices: SpeechVoice[] = structuredClone(FAKE_SPEECH_VOICES);
     private credit: RemainingCredit = structuredClone(DEFAULT_CREDIT);
 
     scriptText(kind: TextCallKind, ...replies: FakeTextReply[]): this {
@@ -108,6 +141,18 @@ export class FakeModelGateway extends ModelGateway {
     /** Queues what the next transcriptions answer, in order (Dictation, the one audio kind so far). */
     scriptTranscription(...replies: FakeTranscriptionReply[]): this {
         this.transcriptionReplies.push(...replies);
+        return this;
+    }
+
+    /** Queues what the next speech calls of `kind` answer, in order. */
+    scriptSpeech(kind: SpeechCallKind, ...replies: FakeSpeechReply[]): this {
+        this.speechReplies.set(kind, [...(this.speechReplies.get(kind) ?? []), ...replies]);
+        return this;
+    }
+
+    /** Replaces the voices `speechVoices()` answers, until `reset()`. */
+    setSpeechVoices(voices: SpeechVoice[]): this {
+        this.voices = structuredClone(voices);
         return this;
     }
 
@@ -142,6 +187,12 @@ export class FakeModelGateway extends ModelGateway {
         return this.calls.flatMap((call) => (call.method === 'transcribe' ? [call.request] : []));
     }
 
+    speechCalls(kind?: SpeechCallKind): SpeechRequest[] {
+        return this.calls.flatMap((call) =>
+            call.method === 'synthesizeSpeech' && (!kind || call.request.kind === kind) ? [call.request] : [],
+        );
+    }
+
     /** Scripted replies not yet consumed, by kind. Handy for asserting a flow made no call. */
     pendingReplies(): Record<string, number> {
         const pending: Record<string, number> = {};
@@ -149,6 +200,7 @@ export class FakeModelGateway extends ModelGateway {
             ...this.textReplies,
             ...this.imageReplies,
             ...this.embeddingReplies,
+            ...this.speechReplies,
             ['dictation', this.transcriptionReplies] as const,
         ]) {
             if (replies.length > 0) pending[kind] = replies.length;
@@ -162,6 +214,8 @@ export class FakeModelGateway extends ModelGateway {
         this.imageReplies.clear();
         this.embeddingReplies.clear();
         this.transcriptionReplies.length = 0;
+        this.speechReplies.clear();
+        this.voices = structuredClone(FAKE_SPEECH_VOICES);
         this.credit = structuredClone(DEFAULT_CREDIT);
     }
 
@@ -255,6 +309,28 @@ export class FakeModelGateway extends ModelGateway {
         if (delayMs) await new Promise((resolve) => setTimeout(resolve, delayMs));
         const result = { text: '', model: FAKE_TRANSCRIPTION_MODEL, costUsd: 0, ...partial };
         return { ...result, text: result.text.trim() };
+    }
+
+    /** The next scripted speech reply for the call's kind; `characters` is the text's length unless scripted. */
+    async synthesizeSpeech(request: SpeechRequest): Promise<SpeechResult> {
+        this.calls.push({ method: 'synthesizeSpeech', request });
+        if (request.text.length === 0 || request.text.length > SPEECH_CHARACTER_LIMIT) {
+            throw new RangeError(`FakeModelGateway: speech text must be 1 to ${SPEECH_CHARACTER_LIMIT} characters, got ${request.text.length}`);
+        }
+        const reply = this.speechReplies.get(request.kind)?.shift();
+        if (reply === undefined) {
+            throw new Error(`FakeModelGateway: no scripted reply for speech call "${request.kind}"`);
+        }
+        if (reply instanceof ModelGatewayError) throw reply;
+
+        const { delayMs, ...partial } = reply;
+        if (delayMs) await new Promise((resolve) => setTimeout(resolve, delayMs));
+        return { audio: FAKE_MP3, model: FAKE_SPEECH_MODEL, characters: request.text.length, costUsd: 0, ...partial };
+    }
+
+    /** The scripted voices, else FAKE_SPEECH_VOICES. Not recorded as a call: it costs nothing. */
+    async speechVoices(): Promise<SpeechVoice[]> {
+        return structuredClone(this.voices);
     }
 
     async remainingCredit(): Promise<RemainingCredit> {

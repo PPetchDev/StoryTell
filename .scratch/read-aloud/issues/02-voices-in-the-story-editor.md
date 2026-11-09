@@ -1,6 +1,6 @@
 # 02 — Narration voice and Speaking voices in the Story editor, with samples
 
-**Status:** ready-for-agent
+**Status:** done
 
 **What to build:** The author picks the Story's Narration voice on the Style tab and each Character's Speaking voice on their card, hears a short sample of any voice with one tap, and both choices autosave. Per the spec's "Voices on the Story and its Characters" and "Audio cache" (the speech folder):
 

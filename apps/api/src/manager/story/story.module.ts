@@ -6,10 +6,12 @@ import { LedgerModelModule } from '../../model/ledger/ledger.module.js';
 import { SnapshotModelModule } from '../../model/snapshot/snapshot.module.js';
 import { StoryModelModule } from '../../model/story/story.module.js';
 import { ImageStoreModule } from '../../store/image/image-store.module.js';
+import { ReadAloudManagerModule } from '../read-aloud/read-aloud.module.js';
+import { VoiceManagerModule } from '../voice/voice.module.js';
 import { StoryManagerService } from './story.service.js';
 
 @Module({
-    imports: [StoryModelModule, DocumentModelModule, ChatModelModule, LedgerModelModule, SnapshotModelModule, ImageStoreModule],
+    imports: [StoryModelModule, DocumentModelModule, ChatModelModule, LedgerModelModule, SnapshotModelModule, ImageStoreModule, ReadAloudManagerModule, VoiceManagerModule],
     providers: [StoryManagerService],
     exports: [StoryManagerService],
 })

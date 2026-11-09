@@ -20,6 +20,11 @@ import {
     RemainingCredit,
     SnapshotModel,
     SnapshotSize,
+    englishVoice,
+    SPEECH_MODEL,
+    SpeechRequest,
+    SpeechResult,
+    SpeechVoice,
     TextCompletionRequest,
     TextCompletionResult,
     TextStream,
@@ -37,6 +42,7 @@ import {
     ImageModelSpec,
     isPlayModelKind,
     isSampledKind,
+    SPEECH_MODELS,
     TEXT_MODELS,
     TRANSCRIPTION_MODELS,
     VENICE_HOST,
@@ -68,6 +74,8 @@ export interface NewUsageRecord {
     promptTokens: number | null;
     completionTokens: number | null;
     images: number | null;
+    /** Characters sent, for speech; left out (null) for every other kind. */
+    characters?: number | null;
     costUsd: number;
     storyId: number | null;
     chatId: number | null;
@@ -293,6 +301,46 @@ export class RealModelGateway extends ModelGateway {
             chatId: request.servedFor?.chatId ?? null,
         });
         return { text: answer.text.trim(), model: modelName, costUsd };
+    }
+
+    /**
+     * Kokoro on Venice. One Venice-pool UsageRecord per answered call at list price: Venice
+     * reports no cost, so it is the characters sent times `pricing.input` (or the stored price
+     * when the models list can't be read), in whole millionths of a dollar.
+     */
+    async synthesizeSpeech(request: SpeechRequest): Promise<SpeechResult> {
+        const modelName = SPEECH_MODEL;
+        const model = SPEECH_MODELS[modelName];
+        const characters = request.text.length;
+        if (characters === 0 || characters > model.requestCharacterLimit) {
+            throw new RangeError(`Speech text must be 1 to ${model.requestCharacterLimit} characters, got ${characters}`);
+        }
+        const listed = await this.deps.venice.speechModel(model.id);
+        const priceUsdPerMillion = listed?.priceUsdPerMillion ?? model.fallbackPriceUsdPerMillion;
+        const bytes = await this.deps.venice.speak({ modelId: model.id, input: request.text, voice: request.voice });
+        const costUsd = Math.round(characters * priceUsdPerMillion) / 1e6;
+
+        await this.deps.usage.record({
+            kind: request.kind,
+            pool: 'image',
+            model: modelName,
+            host: VENICE_HOST,
+            promptTokens: null,
+            completionTokens: null,
+            images: null,
+            characters,
+            costUsd,
+            storyId: request.servedFor?.storyId ?? null,
+            chatId: request.servedFor?.chatId ?? null,
+        });
+        return { audio: { bytes, mimeType: 'audio/mpeg' }, model: modelName, characters, costUsd };
+    }
+
+    /** The English voices Venice lists for Kokoro, or the stored ones when the list can't be read. */
+    async speechVoices(): Promise<SpeechVoice[]> {
+        const model = SPEECH_MODELS[SPEECH_MODEL];
+        const ids = (await this.deps.venice.speechModel(model.id))?.voices ?? model.fallbackVoices;
+        return ids.flatMap((id) => englishVoice(id) ?? []);
     }
 
     async remainingCredit(): Promise<RemainingCredit> {

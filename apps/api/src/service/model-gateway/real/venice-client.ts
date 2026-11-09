@@ -48,6 +48,21 @@ export interface VeniceTranscription {
     durationSeconds?: number;
 }
 
+export interface VeniceSpeechRequest {
+    /** Venice's model id. */
+    modelId: string;
+    input: string;
+    voice: string;
+}
+
+/** What `GET /models?type=tts` says about one speech model. */
+export interface VeniceSpeechModel {
+    /** Every voice id it lists, in any language. */
+    voices: string[];
+    /** USD per million input characters. */
+    priceUsdPerMillion: number;
+}
+
 /** The file extension a recording's type is sent under: some servers go by the name. */
 const AUDIO_EXTENSIONS: Array<[prefix: string, extension: string]> = [
     ['audio/webm', 'webm'],
@@ -67,6 +82,7 @@ const AUDIO_EXTENSIONS: Array<[prefix: string, extension: string]> = [
 export class VeniceClient {
     private readonly logger = new Logger(VeniceClient.name);
     private promptLimits: Promise<Map<string, number>> | undefined;
+    private speechModels: Promise<Map<string, VeniceSpeechModel>> | undefined;
 
     constructor(
         private readonly apiKey: string | undefined,
@@ -140,8 +156,73 @@ export class VeniceClient {
         return { bytes: Buffer.from(base64, 'base64'), mimeType: 'image/jpeg' };
     }
 
-    // Audio: transcription (Dictation) here, and Read aloud's speech and voice list beside it when they
-    // land. Same headers, retries and error mapping as images.
+    // Audio: transcription (Dictation), and speech and the voice list (Read aloud). Same headers,
+    // retries and error mapping as images.
+
+    /**
+     * `POST /audio/speech`, per https://docs.venice.ai/api-reference/endpoint/audio/speech (read
+     * 2026-11-09): `model`, `input`, `voice`, `response_format`, `speed`; the answer is the audio's
+     * bytes. Not streamed.
+     */
+    async speak(request: VeniceSpeechRequest): Promise<Buffer> {
+        const response = await this.send('/audio/speech', {
+            method: 'POST',
+            headers: { ...this.inferenceHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                model: request.modelId,
+                input: request.input,
+                voice: request.voice,
+                response_format: 'mp3',
+                speed: 1,
+            }),
+        });
+        if (!response.ok) throw this.toError(response.status, await readJson(response));
+        const contentType = response.headers.get('content-type') ?? '';
+        if (!contentType.startsWith('audio/')) {
+            throw new UnparseableOutputError(`${request.modelId} returned no audio.`);
+        }
+        return Buffer.from(await response.arrayBuffer());
+    }
+
+    /**
+     * A speech model's voices and price from `GET /models?type=tts`: its `voices` array and
+     * `pricing.input` (USD per million characters). Read once per process, like the image prompt
+     * limits, and read again after a failure. Undefined when the list can't be read or doesn't
+     * carry the model, so the caller uses its stored fallback.
+     */
+    async speechModel(modelId: string): Promise<VeniceSpeechModel | undefined> {
+        this.speechModels ??= this.loadSpeechModels().catch((error: Error) => {
+            this.logger.warn(`Could not read Venice speech models (${error.message}); using fallbacks.`);
+            this.speechModels = undefined; // try again on the next call
+            return new Map<string, VeniceSpeechModel>();
+        });
+        return (await this.speechModels).get(modelId);
+    }
+
+    private async loadSpeechModels(): Promise<Map<string, VeniceSpeechModel>> {
+        const response = await sendRequest(this.fetchImpl, `${this.baseUrl}/models?type=tts`, {
+            method: 'GET',
+            headers: this.inferenceHeaders(),
+        });
+        const json = await readJson(response);
+        if (!response.ok || !Array.isArray(json?.data)) {
+            throw new Error(`GET /models?type=tts answered ${response.status}`);
+        }
+        const models = new Map<string, VeniceSpeechModel>();
+        for (const entry of json.data) {
+            const spec = entry?.model_spec;
+            const voices = spec?.voices;
+            // `pricing.input` is `{ usd, diem }` today; a bare number is read the same.
+            const input = spec?.pricing?.input;
+            const price = typeof input === 'number' ? input : input?.usd;
+            if (typeof entry?.id !== 'string' || !Array.isArray(voices) || typeof price !== 'number') continue;
+            models.set(entry.id, {
+                voices: voices.filter((voice: unknown): voice is string => typeof voice === 'string'),
+                priceUsdPerMillion: price,
+            });
+        }
+        return models;
+    }
 
     /**
      * `POST /audio/transcriptions`, multipart, per

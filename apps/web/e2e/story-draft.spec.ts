@@ -115,7 +115,7 @@ test('drafts a playable Story from an idea after one failed try, then rewrites a
     await expect(storySection.getByLabel('Opening')).toHaveValue(draft.opening);
     await expect(page.getByRole('status').filter({ hasText: /Saved|Saving/ })).toHaveText('Saved');
     await page.getByRole('tab', { name: 'Characters' }).click();
-    await expect(mira.getByLabel('Voice')).toHaveValue('Short sentences. Never says please.');
+    await expect(mira.getByLabel('Voice', { exact: true })).toHaveValue('Short sentences. Never says please.');
     await page.getByRole('tab', { name: 'Story' }).click();
 
     // The rewrite is saved: it survives a reload, and Home shows the Story without the Draft badge.

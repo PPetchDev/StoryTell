@@ -90,6 +90,8 @@ export interface StoryResponse extends StorySummary {
     replaceRules: ReplaceRuleResponse[];
     /** Null while the author has chosen none. */
     cover: StoryCover | null;
+    /** The Kokoro voice narration is read aloud in; null for the default (.scratch/read-aloud/spec.md). */
+    narrationVoice: string | null;
 }
 
 @Entity('story')
@@ -123,6 +125,10 @@ export class StoryEntity {
 
     @Column({ name: 'image_style', type: 'text', default: '' })
     imageStyle: string;
+
+    /** A Kokoro voice id; null means DEFAULT_NARRATION_VOICE. */
+    @Column({ name: 'narration_voice', type: 'text', nullable: true })
+    narrationVoice: string | null;
 
     // The Cover is at most one of the next three (CHECK chk_story_one_cover); see cover().
     // Written only by StoryModelService.setCover(); saveStory() writes the authored fields alone,
@@ -210,6 +216,7 @@ export class StoryEntity {
             savedReplies: this.savedReplies.map((line) => line.toResponse()),
             replaceRules: this.replaceRules.map((rule) => rule.toResponse()),
             cover: this.cover(),
+            narrationVoice: this.narrationVoice,
         };
     }
 

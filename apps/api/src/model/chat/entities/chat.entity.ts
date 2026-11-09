@@ -129,6 +129,13 @@ export class ChatEntity {
     @Column({ name: 'authors_note', type: 'text', default: '' })
     authorsNote: string;
 
+    /**
+     * Read replies aloud (.scratch/read-aloud/spec.md, "Auto-read"): new replies of turns started
+     * in a tab play by themselves there. Off by default; Reset keeps it, a Branch copies it.
+     */
+    @Column({ name: 'auto_read', type: 'boolean', default: false })
+    autoRead: boolean;
+
     // Loaded only through ChatModelService.findWithMessages(); never auto-loaded.
     @OneToMany('MessageEntity', 'chat')
     messages: Relation<MessageEntity[]>;

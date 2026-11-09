@@ -13,6 +13,7 @@ import {
     FakeGatewayCall,
     FakeImageReply,
     FakeModelGateway,
+    FakeSpeechReply,
     FakeStreamOptions,
     FakeTextReply,
     FakeTranscriptionReply,
@@ -23,6 +24,7 @@ import {
     ImageCallKind,
     ModelGateway,
     RemainingCredit,
+    SpeechCallKind,
     TextCallKind,
     TextCompletionResult,
 } from '../service/model-gateway/model-gateway.js';
@@ -58,6 +60,12 @@ export interface ScriptPageBody extends FakePage {
 /** Transcriptions for Dictation: a text, a partial result, or an error, as for text replies. */
 export interface ScriptTranscriptionBody {
     replies: Array<string | { text?: string; delayMs?: number } | ScriptedErrorJson>;
+}
+
+/** Speech for Read aloud and voice samples: a partial result (audio as base64), a hold-back, or an error. */
+export interface ScriptSpeechBody {
+    kind: SpeechCallKind;
+    replies: Array<{ audioBase64?: string; characters?: number; costUsd?: number; delayMs?: number } | ScriptedErrorJson>;
 }
 
 export interface ScriptEmbeddingBody {
@@ -152,6 +160,17 @@ export class FakeGatewayControlController {
         this.fake.scriptTranscription(
             ...body.replies.map((reply): FakeTranscriptionReply => (isScriptedError(reply) ? toError(reply) : reply)),
         );
+    }
+
+    @Post('speech')
+    @HttpCode(204)
+    scriptSpeech(@Body() body: ScriptSpeechBody): void {
+        const replies: FakeSpeechReply[] = body.replies.map((reply) => {
+            if (isScriptedError(reply)) return toError(reply);
+            const { audioBase64, ...rest } = reply;
+            return audioBase64 ? { ...rest, audio: { bytes: Buffer.from(audioBase64, 'base64'), mimeType: 'audio/mpeg' as const } } : rest;
+        });
+        this.fake.scriptSpeech(body.kind, ...replies);
     }
 
     @Put('credit')

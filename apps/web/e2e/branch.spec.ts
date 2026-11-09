@@ -86,10 +86,10 @@ test('⑂ Branch on an earlier reply opens "Chat 1 (branch)" ending on it, and t
         const replies = page.getByRole('article', { name: 'AI reply' });
         await expect(replies).toHaveCount(2);
 
-        // An earlier reply shows ✎ Edit · ไทย · ⑂ Branch once tapped, ⑂ last (integration: "Message actions").
+        // An earlier reply shows ✎ Edit · ▶ Read aloud · ไทย · ⑂ Branch once tapped, ⑂ last (integration: "Message actions").
         await replies.first().tap();
         const tools = replies.first().getByRole('group', { name: 'Message tools' });
-        await expect(tools.getByRole('button')).toHaveText(['✎Edit', 'ไทย', '⑂Branch']);
+        await expect(tools.getByRole('button')).toHaveText(['✎Edit', '▶Read aloud', 'ไทย', '⑂Branch']);
         await tapBranch(tools);
 
         const branchId = await openedChat(page, played);
