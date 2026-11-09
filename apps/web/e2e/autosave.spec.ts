@@ -18,7 +18,7 @@ test('a Persona description saves as it is typed and is kept after a reload, wit
         const card = page.getByRole('list', { name: 'Personas' }).getByRole('listitem', { name: 'Rin' });
         await card.getByLabel('Description').fill('A drifter with salt in her hair.');
         await expect(saveStatus(page)).toHaveText('Saved');
-        await expect(page.getByRole('button', { name: 'Save' })).toHaveCount(0);
+        await expect(page.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0);
 
         await page.reload();
         await expect(
@@ -104,7 +104,7 @@ test('a Memory edit and a Memory add save as they are typed and are kept after a
         await memory.getByRole('button', { name: 'Edit' }).click();
         await memory.getByRole('textbox', { name: 'Memory text' }).fill('{user} left the grey horse at the ferry.');
         await expect(saveStatus(drawer)).toHaveText('Saved');
-        await expect(drawer.getByRole('button', { name: 'Save' })).toHaveCount(0);
+        await expect(drawer.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0);
         await memory.getByRole('button', { name: 'Done' }).click();
         await expect(memory).toContainText('Ash left the grey horse at the ferry.');
 
@@ -170,7 +170,7 @@ test('a Settings change saves once it is valid and is kept after a reload; an in
         const warning = page.getByLabel('Text warning (%)');
         await warning.fill('35');
         await expect(saveStatus(page)).toHaveText('Saved');
-        await expect(page.getByRole('button', { name: 'Save' })).toHaveCount(0);
+        await expect(page.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0);
 
         // Typed one key at a time into an out-of-range value: the error shows at the field and the
         // typed value stays, but neither it nor the valid "4" and "40" on the way is sent.

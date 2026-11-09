@@ -199,3 +199,88 @@
     outline: 2px solid var(--text);
     outline-offset: 2px;
 }
+
+/* The Saved replies tray, a panel: up to about 40% of the screen, scrolling inside. */
+.tray {
+    max-height: 40vh;
+    max-height: 40dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    margin: 0 0 0.25rem;
+    padding: 0.5rem 0.6rem;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 0.9rem;
+}
+
+.trayEmpty {
+    margin: 0 0 0.5rem;
+    font-size: 0.875rem;
+    color: var(--muted);
+}
+
+.trayHeading {
+    margin: 0 0 0.3rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+.trayLines {
+    list-style: none;
+    margin: 0 0 0.5rem;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+/* A line shows at most two lines of its text. */
+.trayLine {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    width: 100%;
+    text-align: left;
+    font: inherit;
+    font-size: 0.9375rem;
+    line-height: 1.35;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+    padding: 0.45rem 0.75rem;
+    cursor: pointer;
+}
+
+.trayLine:active {
+    background: var(--surface-raised);
+}
+
+.trayLine:disabled {
+    color: var(--muted);
+    cursor: default;
+}
+
+.trayLine:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+.traySave {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.875rem;
+    color: var(--muted);
+}
+
+.traySave > span {
+    margin-right: auto;
+}

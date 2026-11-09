@@ -1,5 +1,7 @@
 import { apiSend, apiSendStream } from './api';
 import { MissingField } from './story';
+import type { TraySavedReply } from './saved-replies';
+import type { ChatReplaceRule } from './replace-rules';
 
 // Mirrors the API's Chat response DTOs (apps/api/src/api/chat/dto/chat.response.dto.ts).
 
@@ -100,6 +102,10 @@ export interface Chat extends ChatSummary {
     authorsNote: string;
     /** The ids of the Characters sitting out of this Chat's turns, in cast order; empty when everyone is in. */
     sittingOut: number[];
+    /** The composer tray's Saved replies: the Story's own, then the app-wide ones, each in add order. */
+    savedReplies: TraySavedReply[];
+    /** The Chat's Replace rules in apply order, app-wide then the Story's; parked ones left out. */
+    replaceRules: ChatReplaceRule[];
 }
 
 export interface RollbackCounts {

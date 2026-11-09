@@ -117,7 +117,7 @@ test('shows a scripted Bond change with its event on the dashboard, and editing 
         // Editing the causing Message rolls its Bond change back, with a notice.
         await reply.getByRole('button', { name: 'Edit' }).click();
         await page.getByRole('textbox', { name: 'Message text' }).fill('Mira does not look up.\n\n@Mira: Boots.');
-        await page.getByRole('button', { name: 'Save' }).click();
+        await page.getByRole('button', { name: 'Save', exact: true }).click();
         await expect(page.getByRole('status').filter({ hasText: 'Rolled back: 1 Bond change.' })).toBeVisible();
         await expect(reply).toContainText('Boots.');
 

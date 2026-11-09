@@ -49,7 +49,7 @@ test("an Author's note written from the Chat menu shows its first line there, su
         await expect(sheet.getByText('0 / 1,000')).toBeVisible();
         await box.fill('Keep it a slow burn.\nIt rains all day.');
         await expect(sheet.getByText('38 / 1,000')).toBeVisible();
-        await sheet.getByRole('button', { name: 'Save' }).tap();
+        await sheet.getByRole('button', { name: 'Save', exact: true }).tap();
         await expect(sheet).toHaveCount(0);
 
         const written = await noteRow(page);
@@ -91,7 +91,7 @@ test("the Author's note stops at 1,000 characters, typed or pasted, and Cancel k
         await expect(box).toHaveValue('p'.repeat(1_000));
         await expect(sheet.getByText('1,000 / 1,000')).toBeVisible();
 
-        await sheet.getByRole('button', { name: 'Save' }).tap();
+        await sheet.getByRole('button', { name: 'Save', exact: true }).tap();
         await expect(sheet).toHaveCount(0);
         const saved = await request.get(`/api/stories/${storyId}/chats/${chatId}`);
         expect((await saved.json()).authorsNote).toBe('p'.repeat(1_000));

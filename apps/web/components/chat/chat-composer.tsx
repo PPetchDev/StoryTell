@@ -6,6 +6,8 @@ import { FormEvent, ReactNode, RefObject, useEffect, useLayoutEffect, useRef, us
 import { useConnection } from '@/components/connection';
 import { ApiUnreachableError } from '@/lib/api';
 import { backgroundNotice, Chat, chatApi, SuggestedReply } from '@/lib/chat';
+import { insertSavedReply, SavedReply, TraySavedReply } from '@/lib/saved-replies';
+import { SavedRepliesTray } from './saved-replies-tray';
 
 import styles from './chat-composer.module.css';
 
@@ -240,6 +242,29 @@ function SuggestionCards({ suggestions, onPick }: { suggestions: Suggestions; on
     );
 }
 
+/**
+ * The Saved replies tray's lines and whether it is open (.scratch/saved-replies-and-replace-rules/spec.md:
+ * "Composer"). The lines come with the Chat; a draft saved from the tray joins its group at once.
+ */
+function useSavedRepliesTray(chat: Chat) {
+    const [open, setOpen] = useState(false);
+    const chatKey = JSON.stringify(chat.savedReplies);
+    const [lines, setLines] = useState<{ key: string; lines: TraySavedReply[] }>({ key: chatKey, lines: chat.savedReplies });
+    // A fresh Chat answer (after a send, say) carries the lines as stored.
+    if (lines.key !== chatKey) setLines({ key: chatKey, lines: chat.savedReplies });
+
+    const saved = (scope: TraySavedReply['scope'], scopeLines: SavedReply[]) =>
+        setLines((current) => ({
+            key: current.key,
+            lines: [
+                ...(scope === 'story' ? scopeLines.map((line) => ({ ...line, scope })) : current.lines.filter((line) => line.scope === 'story')),
+                ...(scope === 'app' ? scopeLines.map((line) => ({ ...line, scope })) : current.lines.filter((line) => line.scope === 'app')),
+            ],
+        }));
+
+    return { open, setOpen, lines: lines.lines, saved };
+}
+
 /** Sets the box's height to its text's, which the CSS max-height caps. */
 function fitToText(box: HTMLTextAreaElement) {
     box.style.height = 'auto';
@@ -332,6 +357,9 @@ export function ChatComposer({
 }: ChatComposerProps) {
     const box = useAutoGrow(draft);
     const suggestions = useSuggestedReplies(chat);
+    const tray = useSavedRepliesTray(chat);
+    /** Whether the box has been focused since the Chat opened: until then a Saved reply goes at the end. */
+    const boxFocused = useRef(false);
     const writer = useWriteForMe(chat, draft, onDraft, box, writing || busy);
     /** ✍️ is waiting: the box is read-only and nothing else may change or send it. */
     const writingForMe = writer.status === 'writing';
@@ -341,7 +369,20 @@ export function ChatComposer({
         // Enter on an empty box does nothing; only a tap on ▶ lets the story go on.
         if (empty || writingForMe) return;
         suggestions.close();
+        tray.setOpen(false);
         onSend();
+    };
+    /** A Saved reply goes in at the caret (spec: "Composer"); nothing is sent. */
+    const pickSavedReply = (line: string) => {
+        const el = box.current;
+        const selection = el && boxFocused.current ? { start: el.selectionStart, end: el.selectionEnd } : { start: draft.length, end: draft.length };
+        const { next, caret } = insertSavedReply(draft, line, chat.identityName, selection);
+        onDraft(next);
+        requestAnimationFrame(() => {
+            if (!el) return;
+            el.focus();
+            el.setSelectionRange(caret, caret);
+        });
     };
     return (
         <footer className={styles.composer}>
@@ -372,7 +413,20 @@ export function ChatComposer({
             {/* Integration, "The composer, top to bottom": panel · Character row · tool row · box row. */}
             <form className={styles.form} onSubmit={send} aria-label="Composer">
                 {/* Band 1, the panel: one thing at a time. */}
-                {writer.status !== 'idle' ? <WriteForMeStatus status={writer.status} /> : <SuggestionCards suggestions={suggestions.shown} onPick={onDraft} />}
+                {writer.status !== 'idle' ? (
+                    <WriteForMeStatus status={writer.status} />
+                ) : tray.open ? (
+                    <SavedRepliesTray
+                        storyId={chat.storyId}
+                        lines={tray.lines}
+                        draft={draft}
+                        locked={writing || blocked || writingForMe}
+                        onPick={pickSavedReply}
+                        onSaved={tray.saved}
+                    />
+                ) : (
+                    <SuggestionCards suggestions={suggestions.shown} onPick={onDraft} />
+                )}
                 {/* Band 2: the Nudge Portraits plug in here; it takes no height while empty. */}
                 <div className={styles.characters} data-band="characters">
                     {characterRow?.(writingForMe)}
@@ -390,6 +444,7 @@ export function ChatComposer({
                         disabled={writing || busy || blocked || writingForMe}
                         onClick={() => {
                             writer.dismiss();
+                            tray.setOpen(false);
                             void suggestions.toggle();
                         }}
                     >
@@ -414,6 +469,25 @@ export function ChatComposer({
                         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                             <path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17v3z" />
                             <path d="M14.5 7.5l3 3" />
+                        </svg>
+                    </button>
+                    {/* .scratch/saved-replies-and-replace-rules/spec.md: lines kept for this Story or all; opening it closes ⚡'s cards. */}
+                    <button
+                        type="button"
+                        className={styles.tool}
+                        aria-label="Saved replies"
+                        title="Saved replies"
+                        aria-pressed={tray.open}
+                        // Keep the box's caret, where a Saved reply goes in.
+                        onPointerDown={(event) => event.preventDefault()}
+                        onClick={() => {
+                            writer.dismiss();
+                            suggestions.close();
+                            tray.setOpen(!tray.open);
+                        }}
+                    >
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M6 3.5h12a1 1 0 0 1 1 1V21l-7-4.5L5 21V4.5a1 1 0 0 1 1-1z" />
                         </svg>
                     </button>
                     {/* Wraps the selection in *…* (an action, shown in italics), or opens an empty pair at the caret. */}
@@ -460,6 +534,9 @@ export function ChatComposer({
                         disabled={writing || blocked}
                         readOnly={writingForMe}
                         onChange={(event) => onDraft(event.target.value)}
+                        onFocus={() => {
+                            boxFocused.current = true;
+                        }}
                         onKeyDown={(event) => {
                             if (event.key !== 'Enter' || event.shiftKey || !enterSends()) return;
                             // An Enter that confirms an input method's word (Thai, say) only confirms it; Safari reports it as 229.

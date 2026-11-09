@@ -16,6 +16,8 @@ import { BondChangeResponse } from '../../../model/ledger/entities/bond-change.e
 import { SceneAdvanceResponse } from '../../../model/ledger/entities/scene-advance.entity.js';
 import { RollbackCounts } from '../../../model/ledger/ledger.service.js';
 import { MissingFieldDTO } from '../../story/dto/story.response.dto.js';
+import { TraySavedReplyDTO } from '../../saved-reply/dto/saved-reply.response.dto.js';
+import { ChatReplaceRuleDTO } from '../../replace-rule/dto/replace-rule.response.dto.js';
 
 export class BackgroundCallDTO implements BackgroundCallResponse {
     @ApiProperty({ enum: BackgroundStatus, description: 'pending while the call runs; failed blocks the next send until Retry.' })
@@ -233,6 +235,12 @@ export class ChatResponseBodyDTO extends ChatSummaryDTO implements Omit<ChatDeta
 
     @ApiProperty({ type: [Number], description: 'The ids of the Characters sitting out of this Chat, in cast order; empty when everyone is in.' })
     sittingOut: number[];
+
+    @ApiProperty({ type: [TraySavedReplyDTO], description: "The composer tray's Saved replies: the Story's own, then the app-wide ones, each in add order." })
+    savedReplies: TraySavedReplyDTO[];
+
+    @ApiProperty({ type: [ChatReplaceRuleDTO], description: "The Chat's Replace rules in apply order, app-wide then the Story's; parked rules (both targets off) left out." })
+    replaceRules: ChatReplaceRuleDTO[];
 }
 
 /** A Branch answers with the new Chat, plus the User Message's text when it was branched from one. */

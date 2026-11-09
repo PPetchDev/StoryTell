@@ -57,6 +57,10 @@ import { WriteForMeManagerService } from './write-for-me/write-for-me.service.js
 import { ThaiReadingManagerService } from './thai-reading/thai-reading.service.js';
 import { sourceFingerprint, thaiReadingSource } from './thai-reading/thai-reading.js';
 import { SuggestedReply } from './suggestions/suggestions-prompt.js';
+import { TraySavedReply, trayLines } from '../saved-reply/tray.js';
+import { ChatReplaceRule, chatReplaceRules } from '../replace-rule/chat-rules.js';
+import { ReplaceRuleModelService } from '../../model/replace-rule/replace-rule.service.js';
+import { SavedReplyModelService } from '../../model/saved-reply/saved-reply.service.js';
 import { buildTurnPrompt, PromptArc, PromptBond, PromptHistoryMessage, PromptLayersInput, PromptMemory } from './turn/prompt.js';
 import { chosenLore, LoreInPlay, loreInPlayOf, promptLore, selectLoreAt } from './lore/lore-select.js';
 import { documentQuery } from '../document/document-search.js';
@@ -111,6 +115,10 @@ export interface ChatDetail extends ChatSummary {
     authorsNote: string;
     /** The ids of the Characters sitting out (.scratch/speaker-controls/spec.md), in cast order. */
     sittingOut: number[];
+    /** The composer tray's lines (.scratch/saved-replies-and-replace-rules/spec.md): the Story's, then the app-wide ones. */
+    savedReplies: TraySavedReply[];
+    /** The Chat's Replace rules in apply order, app-wide then the Story's, parked ones left out. */
+    replaceRules: ChatReplaceRule[];
 }
 
 /** What a Branch answers with: the new Chat, plus the User Message's text when it was branched from one. */
@@ -193,6 +201,8 @@ export class ChatManagerService {
         private readonly ledger: LedgerModelService,
         private readonly memoryModel: MemoryModelService,
         private readonly personaModel: PersonaModelService,
+        private readonly savedReplyModel: SavedReplyModelService,
+        private readonly replaceRuleModel: ReplaceRuleModelService,
         private readonly snapshotModel: SnapshotModelService,
         private readonly judge: JudgeManagerService,
         private readonly extraction: MemoryExtractionManagerService,
@@ -1020,12 +1030,14 @@ export class ChatManagerService {
     }
 
     private async detail(story: StoryEntity, chat: ChatEntity): Promise<ChatDetail> {
-        const [settings, creditOut, source, readings] = await Promise.all([
+        const [settings, creditOut, source, readings, appSavedReplies, appReplaceRules] = await Promise.all([
             this.settingsModel.get(),
             this.creditOut(),
             // Read live, so a rename of the source shows.
             chat.branchedFromChatId === null ? null : this.chatModel.findOne(chat.branchedFromChatId),
             this.chatModel.findThaiReadings(chat.messages.map((message) => message.id)),
+            this.savedReplyModel.findByScope(null),
+            this.replaceRuleModel.findByScope(null),
         ]);
         const scene = story.scenes.find((candidate) => candidate.id === chat.currentSceneId);
         const lastModel = lastAiModel(chat);
@@ -1058,6 +1070,8 @@ export class ChatManagerService {
             branchedFrom: source ? { chatId: source.id, title: source.title, messageId: chat.branchedFromMessageId } : null,
             authorsNote: chat.authorsNote,
             sittingOut: sittingOutOf(story, chat).map((character) => character.id),
+            savedReplies: trayLines(story.savedReplies, appSavedReplies),
+            replaceRules: chatReplaceRules(appReplaceRules, story.replaceRules),
         };
     }
 

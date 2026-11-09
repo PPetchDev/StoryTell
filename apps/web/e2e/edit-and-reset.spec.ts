@@ -71,7 +71,7 @@ test('edits an earlier User Message, sees the later Messages gone and a new repl
         const box = page.getByRole('textbox', { name: 'Message text' });
         await expect(box).toHaveValue('I set my boots by the door.');
         await box.fill('I keep my boots on.');
-        await page.getByRole('button', { name: 'Save' }).tap();
+        await page.getByRole('button', { name: 'Save', exact: true }).tap();
         await expect(page.getByText('This discards the 3 Messages after it')).toBeVisible();
         await page.getByRole('button', { name: 'Save and rewind' }).tap();
 

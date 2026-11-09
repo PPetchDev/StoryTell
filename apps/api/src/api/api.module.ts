@@ -9,6 +9,8 @@ import { ImageApiModule } from './image/image.module.js';
 import { MemoryApiModule } from './memory/memory.module.js';
 import { StorySoFarApiModule } from './story-so-far/story-so-far.module.js';
 import { PersonaApiModule } from './persona/persona.module.js';
+import { SavedReplyApiModule } from './saved-reply/saved-reply.module.js';
+import { ReplaceRuleApiModule } from './replace-rule/replace-rule.module.js';
 import { ReferenceImageApiModule } from './reference-image/reference-image.module.js';
 import { SettingsApiModule } from './settings/settings.module.js';
 import { SnapshotApiModule } from './snapshot/snapshot.module.js';
@@ -32,6 +34,8 @@ import { UsageApiModule } from './usage/usage.module.js';
         UsageApiModule,
         ReferenceImageApiModule,
         PersonaApiModule,
+        SavedReplyApiModule,
+        ReplaceRuleApiModule,
         SnapshotApiModule,
         BackupApiModule,
     ],

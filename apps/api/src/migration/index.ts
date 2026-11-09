@@ -27,6 +27,8 @@ import { Samplers1763970000000 } from './1763970000000-Samplers.js';
 import { Documents1763980000000 } from './1763980000000-Documents.js';
 import { DocumentPassagesUsed1763990000000 } from './1763990000000-DocumentPassagesUsed.js';
 import { ThaiReadings1764000000000 } from './1764000000000-ThaiReadings.js';
+import { SavedReplies1764010000000 } from './1764010000000-SavedReplies.js';
+import { ReplaceRules1764020000000 } from './1764020000000-ReplaceRules.js';
 
 // Listed by hand, oldest first, so migrations load the same way from compiled JS, the
 // TypeORM CLI and Vitest. Add every new migration here.
@@ -60,4 +62,6 @@ export const migrations = [
     Documents1763980000000,
     DocumentPassagesUsed1763990000000,
     ThaiReadings1764000000000,
+    SavedReplies1764010000000,
+    ReplaceRules1764020000000,
 ];

@@ -6,6 +6,8 @@ import { DOCUMENT_SOURCES, DocumentSummary } from '../../../model/document/entit
 import type { DocumentSource } from '../../../model/document/entities/document.entity.js';
 import { CharacterResponse, PortraitCrop } from '../../../model/story/entities/character.entity.js';
 import { RoleResponse } from '../../../model/story/entities/role.entity.js';
+import { SavedReplyDTO } from '../../saved-reply/dto/saved-reply.response.dto.js';
+import { ReplaceRuleDTO } from '../../replace-rule/dto/replace-rule.response.dto.js';
 import { LORE_SECONDARY_MODES, LoreEntryResponse } from '../../../model/story/entities/lore-entry.entity.js';
 import type { LoreSecondaryMode } from '../../../model/story/entities/lore-entry.entity.js';
 import { SceneResponse } from '../../../model/story/entities/scene.entity.js';
@@ -334,6 +336,12 @@ export class StoryResponseBodyDTO implements StoryDetail {
 
     @ApiProperty({ type: [DocumentSummaryDTO], description: 'In add order, without text or vectors.' })
     documents: DocumentSummaryDTO[];
+
+    @ApiProperty({ type: [SavedReplyDTO], description: "The Story's own Saved replies, in add order." })
+    savedReplies: SavedReplyDTO[];
+
+    @ApiProperty({ type: [ReplaceRuleDTO], description: "The Story's own Replace rules, in order; they run after the app-wide ones." })
+    replaceRules: ReplaceRuleDTO[];
 
     @ApiProperty({ type: StoryCoverDTO, nullable: true, description: 'The picture the author chose; null while there is none.' })
     cover: StoryCoverDTO | null;

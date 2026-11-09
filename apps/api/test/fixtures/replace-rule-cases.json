@@ -1,0 +1,91 @@
+{
+    "about": "What applyReplaceRules gives, for the API copy (test/replace-rules.spec.ts) and the web copy (apps/web/e2e/replace-rules.spec.ts, through \"Try it\"). A case's text is `text` repeated `repeat` times (default 1); `unchanged` means the output is that text. Rules run in the order listed (app-wide ones first, then the Story's, as the Chat detail lists them).",
+    "cases": [
+        {
+            "name": "plain: every occurrence, matched literally, the replacement taken literally",
+            "rules": [{ "find": "a.b", "replace": "$1 costs $5", "regex": false, "ignoreCase": false }],
+            "text": "a.b and axb and a.b",
+            "expected": "$1 costs $5 and axb and $1 costs $5"
+        },
+        {
+            "name": "plain: case matters unless Ignore case",
+            "rules": [{ "find": "shiver", "replace": "chill", "regex": false, "ignoreCase": false }],
+            "text": "A Shiver, a shiver.",
+            "expected": "A Shiver, a chill."
+        },
+        {
+            "name": "plain: Ignore case catches every spelling",
+            "rules": [{ "find": "a shiver ran down her spine", "replace": "she tensed", "regex": false, "ignoreCase": true }],
+            "text": "A Shiver ran down her spine. Then a shiver RAN down her spine.",
+            "expected": "she tensed. Then she tensed."
+        },
+        {
+            "name": "regex: $1 groups in the replacement",
+            "rules": [{ "find": "(\\w+) smirked", "replace": "$1 smiled", "regex": true, "ignoreCase": false }],
+            "text": "Mira smirked. Kai smirked too.",
+            "expected": "Mira smiled. Kai smiled too."
+        },
+        {
+            "name": "regex: named groups, $& and $$",
+            "rules": [{ "find": "(?<amount>\\d+) coins", "replace": "[$&] = $$$<amount>", "regex": true, "ignoreCase": false }],
+            "text": "She paid 12 coins.",
+            "expected": "She paid [12 coins] = $12."
+        },
+        {
+            "name": "regex: Ignore case adds the i flag",
+            "rules": [{ "find": "colou?r", "replace": "hue", "regex": true, "ignoreCase": true }],
+            "text": "Colour, COLOR, color.",
+            "expected": "hue, hue, hue."
+        },
+        {
+            "name": "an empty replacement deletes what was found",
+            "rules": [{ "find": " *smirks*", "replace": "", "regex": false, "ignoreCase": false }],
+            "text": "Fine. *smirks* Let's go.",
+            "expected": "Fine. Let's go."
+        },
+        {
+            "name": "regex: [\\s\\S] crosses line breaks",
+            "rules": [{ "find": "\\(OOC:[\\s\\S]*?\\)", "replace": "", "regex": true, "ignoreCase": false }],
+            "text": "She waits.(OOC: a note\nover two lines) Then nods.",
+            "expected": "She waits. Then nods."
+        },
+        {
+            "name": "Thai text",
+            "rules": [{ "find": "ขนลุก", "replace": "สะดุ้ง", "regex": false, "ignoreCase": false }],
+            "text": "เธอรู้สึกขนลุกไปทั้งตัว และขนลุกอีกครั้ง",
+            "expected": "เธอรู้สึกสะดุ้งไปทั้งตัว และสะดุ้งอีกครั้ง"
+        },
+        {
+            "name": "order: app-wide first, then the Story's, each on the output of the one before",
+            "rules": [
+                { "find": "grin", "replace": "smile", "regex": false, "ignoreCase": false },
+                { "find": "smile", "replace": "laugh", "regex": false, "ignoreCase": false }
+            ],
+            "text": "A grin. A smile.",
+            "expected": "A laugh. A laugh."
+        },
+        {
+            "name": "a rule that throws when run is skipped, the others still run",
+            "rules": [
+                { "find": "(unclosed", "replace": "x", "regex": true, "ignoreCase": false },
+                { "find": "dusk", "replace": "dawn", "regex": false, "ignoreCase": false }
+            ],
+            "text": "At dusk (unclosed",
+            "expected": "At dawn (unclosed"
+        },
+        {
+            "name": "the guard: a text over 20,000 characters is left as it is",
+            "rules": [{ "find": "a", "replace": "b", "regex": false, "ignoreCase": false }],
+            "text": "a",
+            "repeat": 20001,
+            "unchanged": true
+        },
+        {
+            "name": "the guard: 20,000 characters is still replaced",
+            "rules": [{ "find": "aaaa", "replace": "b", "regex": false, "ignoreCase": false }],
+            "text": "aaaa",
+            "repeat": 5000,
+            "expectedRepeat": { "text": "b", "repeat": 5000 }
+        }
+    ]
+}

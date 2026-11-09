@@ -80,7 +80,7 @@ test('a long Chat shows its Story so far and what it covers, and the user\'s edi
         const text = card.getByRole('textbox', { name: 'Story so far text' });
         await expect(text).toHaveValue(ACCOUNT);
         await text.fill('Ash promised Mira the red lantern before the storm broke.');
-        await card.getByRole('button', { name: 'Save' }).tap();
+        await card.getByRole('button', { name: 'Save', exact: true }).tap();
 
         await expect(card.getByText('Ash promised Mira the red lantern before the storm broke.')).toBeVisible();
         await expect(card.getByText(/Written by you/)).toBeVisible();

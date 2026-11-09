@@ -203,7 +203,7 @@ test('saving an edit to the newest reply brings the end back into view', async (
         await page.getByRole('textbox', { name: 'Message text' }).fill('She points at the stairs.\n\nThe last step is missing.');
         // Read back up the Chat, then save without scrolling to the button.
         await page.getByRole('region', { name: 'Messages' }).evaluate((thread) => (thread.scrollTop = 0));
-        await page.getByRole('button', { name: 'Save' }).evaluate((button: HTMLButtonElement) => button.click());
+        await page.getByRole('button', { name: 'Save', exact: true }).evaluate((button: HTMLButtonElement) => button.click());
 
         const edited = reply.getByText('The last step is missing.');
         await expect(edited).toBeVisible();

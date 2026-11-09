@@ -12,6 +12,8 @@ import {
 import type { Relation } from 'typeorm';
 
 import type { DocumentEntity, DocumentSummary } from '../../document/entities/document.entity.js';
+import type { ReplaceRuleEntity, ReplaceRuleResponse } from '../../replace-rule/entities/replace-rule.entity.js';
+import type { SavedReplyEntity, SavedReplyResponse } from '../../saved-reply/entities/saved-reply.entity.js';
 import type { SnapshotEntity } from '../../snapshot/entities/snapshot.entity.js';
 import type { CharacterEntity, CharacterResponse } from './character.entity.js';
 import type { LoreEntryEntity, LoreEntryResponse } from './lore-entry.entity.js';
@@ -82,6 +84,10 @@ export interface StoryResponse extends StorySummary {
     lore: LoreEntryResponse[];
     /** In add order, without text or vectors (.scratch/documents/spec.md). */
     documents: DocumentSummary[];
+    /** The Story's own Saved replies, in add order (.scratch/saved-replies-and-replace-rules/spec.md). */
+    savedReplies: SavedReplyResponse[];
+    /** The Story's own Replace rules, in apply order (after the app-wide ones). */
+    replaceRules: ReplaceRuleResponse[];
     /** Null while the author has chosen none. */
     cover: StoryCover | null;
 }
@@ -161,6 +167,14 @@ export class StoryEntity {
     @OneToMany('DocumentEntity', 'story')
     documents: Relation<DocumentEntity[]>;
 
+    /** The Story's own Saved replies; app-wide ones have no Story. */
+    @OneToMany('SavedReplyEntity', 'story')
+    savedReplies: Relation<SavedReplyEntity[]>;
+
+    /** The Story's own Replace rules; app-wide ones have no Story. */
+    @OneToMany('ReplaceRuleEntity', 'story')
+    replaceRules: Relation<ReplaceRuleEntity[]>;
+
     /** ON DELETE SET NULL: a deleted Snapshot leaves the Story without a Cover. */
     @ManyToOne('SnapshotEntity', { onDelete: 'SET NULL', nullable: true })
     @JoinColumn({ name: 'cover_snapshot_id' })
@@ -193,6 +207,8 @@ export class StoryEntity {
             scenes: this.scenes.map((scene) => scene.toResponse()),
             lore: this.lore.map((entry) => entry.toResponse()),
             documents: this.documents.map((document) => document.toSummary()),
+            savedReplies: this.savedReplies.map((line) => line.toResponse()),
+            replaceRules: this.replaceRules.map((rule) => rule.toResponse()),
             cover: this.cover(),
         };
     }

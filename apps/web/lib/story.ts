@@ -1,5 +1,7 @@
 import { apiFetch, apiSend } from './api';
 import type { MessagePart } from './chat';
+import type { SavedReply } from './saved-replies';
+import type { ReplaceRule } from './replace-rules';
 
 // Mirrors the API's Story response DTOs (apps/api/src/api/story/dto/story.response.dto.ts).
 
@@ -185,6 +187,10 @@ export interface Story {
     lore: LoreEntry[];
     /** In add order. */
     documents: DocumentSummary[];
+    /** The Story's own Saved replies, in add order (.scratch/saved-replies-and-replace-rules/spec.md). */
+    savedReplies: SavedReply[];
+    /** The Story's own Replace rules, in order; they run after the app-wide ones. */
+    replaceRules: ReplaceRule[];
     /** Null while the author has chosen none. */
     cover: StoryCover | null;
     playable: boolean;

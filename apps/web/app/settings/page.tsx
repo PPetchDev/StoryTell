@@ -6,6 +6,8 @@ import { BackupBanner } from '@/components/backup-banner';
 import { useApiQuery } from '@/components/connection';
 import { Autosave, useAutosave } from '@/components/story-editor/autosave';
 import { SamplingFold } from '@/components/settings/sampling-fold';
+import { AppSavedRepliesCard } from '@/components/saved-replies/app-saved-replies-card';
+import { AppReplaceRulesCard } from '@/components/replace-rules/app-replace-rules-card';
 import { SaveStatus } from '@/components/story-editor/save-status';
 import { TextSizeSetting } from '@/components/text-size-setting';
 import { apiSend } from '@/lib/api';
@@ -249,6 +251,9 @@ function SettingsForm({ initial, autosave }: { initial: SettingsResponse; autosa
                     )}
                 </div>
             </section>
+
+            <AppSavedRepliesCard autosave={autosave} />
+            <AppReplaceRulesCard autosave={autosave} />
 
             <section className="card">
                 <h2>Credit</h2>

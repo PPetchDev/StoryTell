@@ -209,7 +209,7 @@ test('Rename from the ⋯ menu changes the title in the top bar and keeps it aft
         await title.fill('The night of the storm');
         await page
             .getByRole('dialog', { name: 'Rename Chat' })
-            .getByRole('button', { name: 'Save' })
+            .getByRole('button', { name: 'Save', exact: true })
             .tap();
         await expect(page.getByRole('dialog', { name: 'Rename Chat' })).toHaveCount(0);
         await expect(page.getByRole('heading', { name: 'The night of the storm' })).toBeVisible();

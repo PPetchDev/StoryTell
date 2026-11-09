@@ -29,6 +29,7 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | 005 | Story drafting |
 | 006 | Personas |
 | 007 | Character cards |
+| 008 | Saved replies and Replace rules |
 
 ## Codes
 
@@ -60,7 +61,7 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | `422.003.005` | `CastFullError` | The Story already has 6 Characters. |
 | `409.003.006` | `DuplicateStartingBondError` | That Character already has a StartingBond in that direction. |
 | `422.003.007` | `SelfStartingBondError` | A StartingBond from a Character toward itself. |
-| `422.003.008` | `InvalidOrderError` | A reorder that does not list every Character (or Scene) of the Story exactly once. |
+| `422.003.008` | `InvalidOrderError` | A reorder that does not list every Character (or Scene) of the Story exactly once, or every Replace rule of its scope: the message names "the Story's" Replace rules, or "your app-wide" ones. |
 | `409.003.009` | `NoReferenceImageError` | A Portrait crop for a Character with no Reference image. Add one first. |
 | `422.003.010` | `InvalidCoverChoiceError` | A Cover pick that names both a Snapshot and a Character, or neither. |
 | `409.003.011` | `NoCoverError` | A Cover focus point for a Story with no Cover. |
@@ -112,3 +113,9 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | `422.007.005` | `InvalidGreetingError` | An import asking for a greeting the card doesn't have (0 is the first message, 1..n the alternate greetings). Nothing is made. |
 | `422.007.006` | `NoCardInPictureError` | A PNG with neither a `ccv3` nor a `chara` text chunk: an ordinary picture. Nothing is made. |
 | `415.007.007` | `NotAPngError` | A Character card export whose uploaded picture is not a PNG (the web draws one; a JPEG or a broken PNG is refused). |
+| `422.008.001` | `EmptySavedReplyError` | A Saved reply added or edited with nothing but whitespace. Over 1,000 characters is a validation error (`400.000.000`). |
+| `422.008.002` | `TooManySavedRepliesError` | A 51st Saved reply in one scope (app-wide, or one Story). Nothing is added. |
+| `404.008.003` | `SavedReplyNotFoundError` | A Saved reply id that isn't in that scope: an app-wide route given a Story's line, or a Story's route given another Story's or an app-wide one. |
+| `422.008.004` | `TooManyReplaceRulesError` | A 51st Replace rule in one scope (app-wide, or one Story). Nothing is added. |
+| `404.008.005` | `ReplaceRuleNotFoundError` | A Replace rule id that isn't in that scope. |
+| `422.008.006` | `InvalidReplaceRuleError` | A Replace rule refused at save (create or update), nothing saved; the message is the plain reason the editor shows under Find: the engine's message for a regex that doesn't compile, "This would match between every letter", "This pattern is too slow" (over 250 ms on the probe texts, in a worker thread), or, with On my Messages on, "This rule would change your text again if run twice". A Find over 500 characters, or empty, is a validation error (`400.000.000`). |

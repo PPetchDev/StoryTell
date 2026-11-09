@@ -3,6 +3,8 @@ import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 
 import { copyDocuments } from '../document/document.service.js';
+import { ReplaceRuleEntity } from '../replace-rule/entities/replace-rule.entity.js';
+import { SavedReplyEntity } from '../saved-reply/entities/saved-reply.entity.js';
 import { CharacterEntity, PortraitCrop } from './entities/character.entity.js';
 import { LoreEntryEntity } from './entities/lore-entry.entity.js';
 import { RoleEntity } from './entities/role.entity.js';
@@ -18,6 +20,8 @@ const FULL_RELATIONS = {
     scenes: true,
     lore: true,
     documents: true,
+    savedReplies: true,
+    replaceRules: true,
     coverSnapshot: true,
 };
 
@@ -39,6 +43,8 @@ function sorted(story: StoryEntity): StoryEntity {
     story.scenes = byPosition(story.scenes);
     story.lore = byPosition(story.lore);
     story.documents = byPosition(story.documents);
+    story.savedReplies = byPosition(story.savedReplies);
+    story.replaceRules = byPosition(story.replaceRules);
     story.startingBonds = [...story.startingBonds].sort((a, b) => a.id - b.id);
     return story;
 }
@@ -65,6 +71,10 @@ export class StoryModelService {
         return stories.map(sorted);
     }
 
+    exists(id: number): Promise<boolean> {
+        return this.stories.existsBy({ id });
+    }
+
     async findFull(id: number): Promise<StoryEntity | null> {
         const story = await this.stories.findOne({ where: { id }, relations: FULL_RELATIONS });
         return story && sorted(story);
@@ -81,7 +91,7 @@ export class StoryModelService {
 
     /**
      * A new Story holding a copy of everything authored under `source` (loaded by `findFull`):
-     * its text and style, Role, Characters, StartingBonds, Scenes and Lore, in one transaction. Reference
+     * its text and style, Role, Characters, StartingBonds, Scenes, Lore, Documents, Saved replies and Replace rules, in one transaction. Reference
      * images (with their Portrait crops) and the Cover are left empty for the caller, who copies the files. Answers the new
      * Story's id and each source Character's id mapped to its copy's.
      */
@@ -135,6 +145,15 @@ export class StoryModelService {
             }
             // With their passages and vectors, so the copy is complete and costs nothing (.scratch/documents/spec.md).
             await copyDocuments(manager, source.id, story.id);
+            // Saved replies go with the Story (.scratch/saved-replies-and-replace-rules/spec.md).
+            for (const line of source.savedReplies) {
+                await manager.save(manager.create(SavedReplyEntity, { storyId: story.id, text: line.text, position: line.position }));
+            }
+            // So do its Replace rules, so the copy reads the same.
+            for (const rule of source.replaceRules) {
+                const { id: _id, ...fields } = rule.toResponse();
+                await manager.save(manager.create(ReplaceRuleEntity, { ...fields, storyId: story.id, position: rule.position }));
+            }
             return { storyId: story.id, characterIds };
         });
     }

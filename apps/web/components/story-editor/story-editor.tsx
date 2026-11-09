@@ -47,6 +47,11 @@ import { ConfirmButton, SegmentedField, TextField } from './fields';
 import { OpeningPreview } from './opening-preview';
 import { fieldDomId, FieldRewrites, rewritableField, rewriteKey, RewriteStates } from './rewrite';
 import { LoreCard } from './lore-card';
+import { FoldingCard } from './folding-card';
+import { SavedReplyList } from '@/components/saved-replies/saved-reply-list';
+import { storySavedReplies } from '@/lib/saved-replies';
+import { ReplaceRuleList } from '@/components/replace-rules/replace-rule-list';
+import { storyReplaceRules } from '@/lib/replace-rules';
 import { SceneCard } from './scene-card';
 import { StartingBondsCard } from './starting-bonds-card';
 import { StatusBox } from './status-box';
@@ -101,7 +106,8 @@ export function StoryEditor({ initial }: { initial: Story }) {
     const searchParams = useSearchParams();
     const { reportUnreachable } = useConnection();
     const [story, setStory] = useState<Story>(initial);
-    const { state, queue, commit, flush } = useAutosave();
+    const autosave = useAutosave();
+    const { state, queue, commit, flush } = autosave;
     const [deleteError, setDeleteError] = useState<string | null>(null);
     const [rewrites, setRewrites] = useState<RewriteStates>({});
     const [tab, setTab] = useState<TabKey>(() => tabFrom(searchParams.get('tab')));
@@ -473,43 +479,69 @@ export function StoryEditor({ initial }: { initial: Story }) {
                     )}
 
                     {tab === 'style' && (
-                        <section className={styles.card} aria-label="Style">
-                            <SegmentedField
-                                label="Point of view"
-                                value={story.style.pov}
-                                options={POV_LABELS}
-                                hint='Who tells the story: "I", "you" or "they".'
-                                onChange={(v) => setStyle('pov', v)}
-                                highlighted={styleHighlighted('pov')}
-                                domId={fieldDomId({ target: 'story', field: 'pov' })}
-                            />
-                            <SegmentedField
-                                label="Tense"
-                                value={story.style.tense}
-                                options={TENSE_LABELS}
-                                hint="Told as it happens, or looking back."
-                                onChange={(v) => setStyle('tense', v)}
-                                highlighted={styleHighlighted('tense')}
-                                domId={fieldDomId({ target: 'story', field: 'tense' })}
-                            />
-                            <SegmentedField
-                                label="Reply length"
-                                value={story.style.replyLength}
-                                options={REPLY_LENGTH_LABELS}
-                                hint="How much the AI writes each turn."
-                                onChange={(v) => setStyle('replyLength', v)}
-                                highlighted={styleHighlighted('replyLength')}
-                                domId={fieldDomId({ target: 'story', field: 'replyLength' })}
-                            />
-                            <TextField
-                                label="Image style"
-                                value={story.style.imageStyle}
-                                placeholder='e.g. "anime, soft colours"'
-                                hint="Optional. One look for every Snapshot and Reference image."
-                                onChange={(v) => setStyle('imageStyle', v)}
-                                {...rewritable({ target: 'story', field: 'imageStyle' })}
-                            />
-                        </section>
+                        <>
+                            <section className={styles.card} aria-label="Style">
+                                <SegmentedField
+                                    label="Point of view"
+                                    value={story.style.pov}
+                                    options={POV_LABELS}
+                                    hint='Who tells the story: "I", "you" or "they".'
+                                    onChange={(v) => setStyle('pov', v)}
+                                    highlighted={styleHighlighted('pov')}
+                                    domId={fieldDomId({ target: 'story', field: 'pov' })}
+                                />
+                                <SegmentedField
+                                    label="Tense"
+                                    value={story.style.tense}
+                                    options={TENSE_LABELS}
+                                    hint="Told as it happens, or looking back."
+                                    onChange={(v) => setStyle('tense', v)}
+                                    highlighted={styleHighlighted('tense')}
+                                    domId={fieldDomId({ target: 'story', field: 'tense' })}
+                                />
+                                <SegmentedField
+                                    label="Reply length"
+                                    value={story.style.replyLength}
+                                    options={REPLY_LENGTH_LABELS}
+                                    hint="How much the AI writes each turn."
+                                    onChange={(v) => setStyle('replyLength', v)}
+                                    highlighted={styleHighlighted('replyLength')}
+                                    domId={fieldDomId({ target: 'story', field: 'replyLength' })}
+                                />
+                                <TextField
+                                    label="Image style"
+                                    value={story.style.imageStyle}
+                                    placeholder='e.g. "anime, soft colours"'
+                                    hint="Optional. One look for every Snapshot and Reference image."
+                                    onChange={(v) => setStyle('imageStyle', v)}
+                                    {...rewritable({ target: 'story', field: 'imageStyle' })}
+                                />
+                            </section>
+                            <FoldingCard foldKey={`saved-replies:${storyId}`} label="Saved replies" title="Saved replies" fieldPrefixes={[]}>
+                                <p className={styles.note}>
+                                    Lines for this Story only, listed first in the composer&apos;s Saved replies tray. {'{user}'} becomes the
+                                    name you wear in that Chat.
+                                </p>
+                                <SavedReplyList
+                                    initial={story.savedReplies}
+                                    store={storySavedReplies(storyId, applyStatus)}
+                                    autosave={autosave}
+                                    saveKey="savedReplies.story"
+                                />
+                            </FoldingCard>
+                            <FoldingCard foldKey={`replace-rules:${storyId}`} label="Replace rules" title="Replace rules" fieldPrefixes={[]}>
+                                <p className={styles.note}>
+                                    Find and replace for this Story only, run after the app-wide rules in Settings. On AI Messages
+                                    changes how replies read, never what is stored; On my Messages fixes what you send.
+                                </p>
+                                <ReplaceRuleList
+                                    initial={story.replaceRules}
+                                    store={storyReplaceRules(storyId, applyStatus)}
+                                    autosave={autosave}
+                                    saveKey="replaceRules.story"
+                                />
+                            </FoldingCard>
+                        </>
                     )}
 
                     {tab === 'role' && (

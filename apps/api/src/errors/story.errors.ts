@@ -47,8 +47,10 @@ export class SelfStartingBondError extends AppError {
 
 /** A reorder that is not a permutation of the Story's own Characters or Scenes. */
 export class InvalidOrderError extends AppError {
-    constructor(what: 'Characters' | 'Scenes') {
-        super('422.003.008', `The order must list every one of the Story's ${what} exactly once.`);
+    /** `app`: the user's app-wide list (Replace rules); `story`: one Story's. */
+    constructor(what: 'Characters' | 'Scenes' | 'Replace rules', scope: 'story' | 'app' = 'story') {
+        const whose = scope === 'app' ? 'your app-wide' : "the Story's";
+        super('422.003.008', `The order must list every one of ${whose} ${what} exactly once.`);
     }
 }
 

@@ -6,6 +6,7 @@ import { Cast, characterColour, Portrait, Portraits } from '@/lib/character-colo
 import { Message, MessagePart } from '@/lib/chat';
 
 import styles from './message-body.module.css';
+import { useShownText } from './shown-text';
 
 /** `*…*` spans as italics, in the user's lines and in Characters' speech; the stored text is unchanged. */
 export function withActions(text: string): ReactNode[] {
@@ -90,21 +91,29 @@ export function MessageBody({ message, cast, portraits = {} }: MessageBodyProps)
     return <AiMessageParts parts={message.parts} cast={cast} portraits={portraits} />;
 }
 
-/** An AI Message's parts in order, stored or still being written (spec: streaming replies). */
+/**
+ * An AI Message's parts in order, stored or still being written (spec: streaming replies), as
+ * shown: the Chat's On AI Messages Replace rules run on each part's text first
+ * (.scratch/saved-replies-and-replace-rules/spec.md), on narration before it is split into
+ * paragraphs (so a rule can remove one) and on speech before `*…*` becomes italics. Speakers'
+ * names are never touched; a part a rule leaves blank isn't drawn.
+ */
 export function AiMessageParts({ parts, cast, portraits = {} }: { parts: MessagePart[]; cast: Cast; portraits?: Portraits }) {
+    const shown = useShownText();
     return (
         <div className={styles.story}>
-            {parts.map((part, index) =>
-                part.kind === 'narration' ? (
+            {parts.map((part, index) => {
+                const text = shown(part.text);
+                if (part.kind === 'narration') {
                     // One ≡ line per paragraph: the parser merges narration paragraphs into one part.
-                    part.text
+                    return text
                         .split(/\n\s*\n/)
                         .filter((paragraph) => paragraph.trim() !== '')
-                        .map((paragraph, line) => <Narration key={`${index}-${line}`} text={paragraph.trim()} />)
-                ) : (
-                    <Speech key={index} part={part} cast={cast} portraits={portraits} />
-                ),
-            )}
+                        .map((paragraph, line) => <Narration key={`${index}-${line}`} text={paragraph.trim()} />);
+                }
+                if (text.trim() === '') return null;
+                return <Speech key={index} part={{ ...part, text }} cast={cast} portraits={portraits} />;
+            })}
         </div>
     );
 }

@@ -22,6 +22,8 @@ import { SceneEntity } from '../../model/story/entities/scene.entity.js';
 import { StartingBondEntity } from '../../model/story/entities/starting-bond.entity.js';
 import { StoryEntity } from '../../model/story/entities/story.entity.js';
 import { UsageRecordEntity } from '../../model/usage-record/entities/usage-record.entity.js';
+import { ReplaceRuleEntity } from '../../model/replace-rule/entities/replace-rule.entity.js';
+import { SavedReplyEntity } from '../../model/saved-reply/entities/saved-reply.entity.js';
 import { PersonaEntity } from '../../model/persona/entities/persona.entity.js';
 import { SnapshotCharacterEntity } from '../../model/snapshot/entities/snapshot-character.entity.js';
 import { SnapshotEntity } from '../../model/snapshot/entities/snapshot.entity.js';
@@ -55,4 +57,6 @@ export const entities = [
     PersonaEntity,
     SnapshotEntity,
     SnapshotCharacterEntity,
+    SavedReplyEntity,
+    ReplaceRuleEntity,
 ];

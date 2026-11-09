@@ -22,6 +22,8 @@ import { setSceneStripHidden, useSceneStripHidden } from '@/lib/scene-strip';
 import { inThreadOrder, Snapshot, snapshotApi } from '@/lib/snapshot';
 import { Scene } from '@/lib/story';
 
+import { applyReplaceRules, onMineRules } from '@/lib/replace-rules';
+import { ShownTextProvider } from './shown-text';
 import styles from './chat-screen.module.css';
 
 /** A "Memory added" toast (spec: story 83): one per Memory the AI added in the latest turn. */
@@ -251,17 +253,24 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes }: Cha
 
     /**
      * Sends at once (spec: "Send feedback"): the composer clears and the line shows in the
-     * thread while the reply is written. If the API never stored it, the text goes back in
-     * the composer.
+     * thread while the reply is written. If the API never stored it, the draft goes back in
+     * the composer. The Chat's On my Messages Replace rules run first, and their result is what
+     * is sent, shown and stored (.scratch/saved-replies-and-replace-rules/spec.md: "Where my-side
+     * rules run"); a result with nothing left sends nothing and keeps the draft.
      */
     const send = () => {
         if (draft.trim() === '' || writing || blocked) return;
-        const text = draft;
+        const typed = draft;
+        const text = applyReplaceRules(typed, onMineRules(chat.replaceRules));
+        if (text.trim() === '') {
+            setError('Your Replace rules left nothing to send.');
+            return;
+        }
         setDraft('');
         setPending({ text, identityName: chat.identityName });
         void runTurn(
             (stream) => chatApi.send(chat.storyId, chat.id, text, stream, nudge),
-            () => setDraft((current) => (current === '' ? text : current)),
+            () => setDraft((current) => (current === '' ? typed : current)),
         );
     };
 
@@ -419,6 +428,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes }: Cha
                 />
             )}
 
+            <ShownTextProvider rules={chat.replaceRules}>
             <ChatThread
                 messages={chat.messages}
                 cast={cast}
@@ -442,6 +452,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes }: Cha
                 onDismissSnapshot={(job) => void snaps.dismiss(job)}
                 thaiReadings={thaiReadings}
             />
+            </ShownTextProvider>
 
             <ChatComposer
                 chat={chat}

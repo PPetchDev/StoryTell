@@ -96,7 +96,7 @@ test('ไทย reads the newest reply and a User Message in Thai, toggles with 
         await line.tap();
         await line.getByRole('button', { name: 'Edit' }).tap();
         await line.getByRole('textbox').fill('Where did you put the key?');
-        await line.getByRole('button', { name: 'Save' }).tap();
+        await line.getByRole('button', { name: 'Save', exact: true }).tap();
         await page.getByRole('button', { name: 'Save and rewind' }).tap();
         await expect(page.getByRole('article', { name: 'AI reply' }).last()).toContainText('Still in my pocket.');
         await expect(page.getByRole('article', { name: 'AI reply' })).toHaveCount(1);
