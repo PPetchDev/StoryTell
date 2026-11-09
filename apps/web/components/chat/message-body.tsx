@@ -1,9 +1,10 @@
 import { CSSProperties, ReactNode, useId } from 'react';
 
-import { useCharacterProfile } from '@/components/chat/character-profile';
+import { useCastCharacter, useCharacterProfile } from '@/components/chat/character-profile';
 import { CharacterPortrait } from '@/components/portrait/character-portrait';
 import { Cast, characterColour, Portrait, Portraits } from '@/lib/character-colour';
 import { Message, MessagePart } from '@/lib/chat';
+import { linePicture } from '@/lib/expressions';
 
 import styles from './message-body.module.css';
 import { useShownText } from './shown-text';
@@ -51,7 +52,17 @@ function Speech({
 }) {
     const nameId = useId();
     const colour = characterColour(part.characterId, cast);
-    const portrait = part.characterId === null ? undefined : portraits[part.characterId];
+    // In a Chat the cast is at hand, so the line shows its Expression (.scratch/expressions/spec.md); elsewhere
+    // (the Opening preview, never judged) the Portrait.
+    const character = useCastCharacter(part.characterId);
+    const round = character ? linePicture(character, part.emotion).round : null;
+    const portrait = round
+        ? round.kind === 'initial'
+            ? undefined
+            : { src: round.src, crop: round.crop }
+        : part.characterId === null
+          ? undefined
+          : portraits[part.characterId];
     const openProfile = useCharacterProfile(part.characterId);
     const avatar = <Avatar name={part.speakerName} colour={colour} portrait={portrait} />;
     return (

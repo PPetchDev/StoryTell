@@ -1,4 +1,5 @@
 import { ProviderOutageError } from '../src/errors/model-gateway.errors.js';
+import { ChatManagerService } from '../src/manager/chat/chat.service.js';
 import { storySoFarCoverage } from '../src/manager/chat/story-so-far/story-so-far-prompt.js';
 import { buildTurnPrompt, PROMPT_LAYERS, PromptLayersInput } from '../src/manager/chat/turn/prompt.js';
 import { buildSuggestionsPrompt } from '../src/manager/chat/suggestions/suggestions-prompt.js';
@@ -135,14 +136,12 @@ describe('Story so far', () => {
 
     /** Sends a turn and waits for its judge and extraction, and then for any Story so far update. */
     async function send(storyId: number, chatId: number, text: string, reply: string): Promise<Chat> {
-        const summariesBefore = t.gateway.textCalls('story_summary').length;
         t.gateway.scriptText('turn', reply);
         t.gateway.scriptText('judge', NO_CHANGE);
         t.gateway.scriptText('memory_extraction', NO_OPS);
         await t.http.post(`/api/stories/${storyId}/chats/${chatId}/messages`).send({ text }).expect(201);
-        const chat = await settled(storyId, chatId);
-        await quiet(storyId, chatId, summariesBefore);
-        return chat;
+        await t.app.get(ChatManagerService).backgroundIdle(chatId);
+        return settled(storyId, chatId);
     }
 
     async function settled(storyId: number, chatId: number): Promise<Chat> {
@@ -154,22 +153,6 @@ describe('Story so far', () => {
             if (!last || (last.judge?.status !== 'pending' && last.memory?.status !== 'pending')) return chat;
             if (Date.now() > deadline) throw new Error('The background calls did not settle in time');
             await new Promise((resolve) => setTimeout(resolve, 20));
-        }
-    }
-
-    /** Waits until a Story so far call that started after the turn has been answered and stored. */
-    async function quiet(storyId: number, chatId: number, callsBefore: number): Promise<void> {
-        // The check runs after the judge and the extraction, so give it a moment to start.
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        if (t.gateway.textCalls('story_summary').length === callsBefore) return;
-        const deadline = Date.now() + 5_000;
-        let last = JSON.stringify(await storySoFar(storyId, chatId));
-        for (;;) {
-            await new Promise((resolve) => setTimeout(resolve, 50));
-            const now = JSON.stringify(await storySoFar(storyId, chatId));
-            if (now === last) return;
-            last = now;
-            if (Date.now() > deadline) throw new Error('The Story so far did not settle in time');
         }
     }
 
@@ -278,6 +261,7 @@ describe('Story so far', () => {
         t.gateway.scriptText('memory_extraction', NO_OPS);
         await t.http.patch(`/api/stories/${storyId}/chats/${chat.id}/messages/${firstUser.id}`).send({ text: 'A different start.' }).expect(200);
         expect(await storySoFar(storyId, chat.id)).toMatchObject({ text: null, coveredMessages: 0 });
+        await t.app.get(ChatManagerService).backgroundIdle(chat.id);
         await settled(storyId, chat.id);
 
         await playUntilSummarised(storyId, chat.id, 'Another account.');

@@ -1,0 +1,51 @@
+/* The Expressions on a Character card: one row per emotion, the round picture first. */
+.rows {
+    list-style: none;
+    margin: 0.5rem 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.4rem 0.6rem;
+}
+
+.thumb {
+    flex: none;
+    width: 2.75rem;
+    height: 2.75rem;
+}
+
+.empty {
+    display: block;
+    border-radius: 999px;
+    border: 1px dashed var(--faint);
+}
+
+.text {
+    flex: 1;
+    min-width: 6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+}
+
+.label {
+    font-weight: 600;
+}
+
+.tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+}
+
+.error {
+    flex-basis: 100%;
+    margin: 0;
+}

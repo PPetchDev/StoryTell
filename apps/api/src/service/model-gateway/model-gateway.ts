@@ -61,7 +61,8 @@ export type TextCallKind =
     | 'write_for_me'
     | 'thai_reading';
 
-export type ImageCallKind = 'snapshot_image' | 'reference_image';
+/** `expression_image`: a Character's Expression, drawn from their Reference image (.scratch/expressions/spec.md). */
+export type ImageCallKind = 'snapshot_image' | 'reference_image' | 'expression_image';
 
 /** A Document's passages turned into vectors on Add, and one query per turn. Both in the text pool. */
 export type EmbeddingCallKind = 'document_embedding' | 'document_search';

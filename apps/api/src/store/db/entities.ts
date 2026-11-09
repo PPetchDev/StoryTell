@@ -13,6 +13,7 @@ import { TimeChangeEntity } from '../../model/ledger/entities/time-change.entity
 import { MemoryKnownByEntity } from '../../model/memory/entities/memory-known-by.entity.js';
 import { MemoryEntity } from '../../model/memory/entities/memory.entity.js';
 import { SettingsEntity } from '../../model/settings/entities/settings.entity.js';
+import { CharacterExpressionEntity } from '../../model/story/entities/character-expression.entity.js';
 import { CharacterEntity } from '../../model/story/entities/character.entity.js';
 import { LoreEntryEntity } from '../../model/story/entities/lore-entry.entity.js';
 import { DocumentPassageEntity } from '../../model/document/entities/document-passage.entity.js';
@@ -33,6 +34,7 @@ export const entities = [
     StoryEntity,
     RoleEntity,
     CharacterEntity,
+    CharacterExpressionEntity,
     StartingBondEntity,
     SceneEntity,
     LoreEntryEntity,

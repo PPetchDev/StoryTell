@@ -9,6 +9,7 @@ const speech = (characterId: number | null, text: string, speakerName = 'Mira'):
     characterId,
     speakerName,
     text,
+    emotion: null,
 });
 
 // .scratch/read-aloud/spec.md, "The play queue".

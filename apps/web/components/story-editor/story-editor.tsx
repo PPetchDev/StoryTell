@@ -160,6 +160,19 @@ export function StoryEditor({ initial }: { initial: Story }) {
     /** A structural change: the API's Story becomes the editor's. */
     const applyWhole = useCallback((saved: Story) => setStory(saved), []);
     /**
+     * A drawn Expression, which lands outside the save queue: only the Characters' Expressions are
+     * taken from the answer, so nothing typed while it drew is put back.
+     */
+    const applyExpressions = useCallback((saved: Story) => {
+        setStory((current) => ({
+            ...current,
+            characters: current.characters.map((character) => {
+                const answered = saved.characters.find((other) => other.id === character.id);
+                return answered ? { ...character, expressions: answered.expressions } : character;
+            }),
+        }));
+    }, []);
+    /**
      * The assistant (ticket 23): its answers land through the same chain as structural changes,
      * and the editor shows the first changed field, without taking focus from the sheet.
      */
@@ -599,6 +612,7 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                     imageStyle={story.style.imageStyle}
                                     flush={flush}
                                     commit={(run, onError) => commit(run, applyWhole, onError)}
+                                    onExpressionDrawn={applyExpressions}
                                     index={index}
                                     count={story.characters.length}
                                     colour={characterColour(character.id, castIds)}

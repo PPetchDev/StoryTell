@@ -6,6 +6,7 @@ import { Character, characterRemovalWarning, Story } from '@/lib/story';
 import { VoiceList } from '@/lib/voices';
 import { useFieldMarks } from './field-marks';
 import { ExportCardButton } from './export-card';
+import { Expressions } from './expressions';
 import { ChangedMark, ConfirmButton, OrderButtons, TextField, Toolbar } from './fields';
 import { FoldingCard } from './folding-card';
 import { ReferenceImage } from './reference-image';
@@ -39,6 +40,8 @@ interface CharacterCardProps {
     /** For the Reference image: send pending edits, and run a whole-Story write after them. */
     flush(): Promise<void>;
     commit(run: () => Promise<Story>, onError: (message: string) => void): Promise<Story | undefined>;
+    /** A drawn Expression's answer, of which only the Expressions are taken. */
+    onExpressionDrawn(story: Story): void;
 }
 
 /** One Character on the Characters tab, folding. Their starting Bonds are on the Bonds tab. */
@@ -110,6 +113,13 @@ export function CharacterCard(props: CharacterCardProps) {
                 imageStyle={props.imageStyle}
                 flush={props.flush}
                 commit={props.commit}
+            />
+            <Expressions
+                storyId={props.storyId}
+                character={character}
+                commit={props.commit}
+                flush={props.flush}
+                onDrawn={props.onExpressionDrawn}
             />
             <TextField
                 label="Personality"

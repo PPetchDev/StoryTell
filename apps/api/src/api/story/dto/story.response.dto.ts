@@ -4,6 +4,9 @@ import { MissingField } from '../../../manager/story/playable.js';
 import { LatestChat, StoryDetail, StoryListItem } from '../../../manager/story/story.service.js';
 import { DOCUMENT_SOURCES, DocumentSummary } from '../../../model/document/entities/document.entity.js';
 import type { DocumentSource } from '../../../model/document/entities/document.entity.js';
+import { EXPRESSION_EMOTIONS } from '../../../model/story/emotion.js';
+import type { ExpressionEmotion } from '../../../model/story/emotion.js';
+import { ExpressionResponse } from '../../../model/story/entities/character-expression.entity.js';
 import { CharacterResponse, PortraitCrop } from '../../../model/story/entities/character.entity.js';
 import { RoleResponse } from '../../../model/story/entities/role.entity.js';
 import { SavedReplyDTO } from '../../saved-reply/dto/saved-reply.response.dto.js';
@@ -151,6 +154,20 @@ export class PortraitCropDTO implements PortraitCrop {
     size: number;
 }
 
+export class ExpressionDTO implements ExpressionResponse {
+    @ApiProperty({ enum: EXPRESSION_EMOTIONS, description: 'The emotion it shows. "neutral" never has one: the Portrait is the neutral face.' })
+    emotion: ExpressionEmotion;
+
+    @ApiProperty({ description: 'Relative to the image folder, served at `GET /api/images/{path}`.' })
+    imagePath: string;
+
+    @ApiProperty({ type: PortraitCropDTO, nullable: true, description: "Its own square of its picture; null uses the Portrait's." })
+    crop: PortraitCrop | null;
+
+    @ApiProperty({ description: 'Drawn from a Reference image the Character no longer has. Never true for an upload.' })
+    outdated: boolean;
+}
+
 export class CharacterDTO implements CharacterResponse {
     @ApiProperty()
     id: number;
@@ -201,6 +218,9 @@ export class CharacterDTO implements CharacterResponse {
         description: 'The voice their lines are read aloud in; null reads them in the Narration voice. Apart from `voice`.',
     })
     speakingVoice: string | null;
+
+    @ApiProperty({ type: [ExpressionDTO], description: 'Their picture per emotion, in the fixed order of the emotions.' })
+    expressions: ExpressionDTO[];
 }
 
 export class StartingBondDTO implements StartingBondResponse {

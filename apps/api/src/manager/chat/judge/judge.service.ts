@@ -13,7 +13,7 @@ import { exchangeUserText } from '../exchange.js';
 import { exchangeIdentityName } from '../identity.js';
 import { Attempt, BackgroundRuns } from '../background-runs.js';
 import { partsToText } from '../turn/reply-parser.js';
-import { applyJudgement } from './apply-judgement.js';
+import { applyJudgement, emotionsOfParts } from './apply-judgement.js';
 import { buildJudgePrompt, JUDGE_CONTEXT_MESSAGES, parseJudgement } from './judge-prompt.js';
 
 /** What a send found when it looked at the previous AI Message's judge. */
@@ -44,7 +44,8 @@ export function latestJudged(chat: ChatEntity): MessageEntity | null {
 
 /**
  * The Bond, Arc and Scene judge (spec: "Background judge"): one V4 Flash call in JSON mode
- * after every turn, run in the background against the AI Message it judges. The result goes
+ * after every turn, run in the background against the AI Message it judges. When the Story has an
+ * Expression, the same call also tags the emotion of each line a Character speaks. The result goes
  * through the apply rules into the ledger. A failure of any kind is tried once more after
  * `backgroundRetryMs`; if that fails too, the Message is marked failed with the reason, and
  * the next send is blocked until Retry runs the judge again (.scratch/background-retry/spec.md).
@@ -125,6 +126,9 @@ export class JudgeManagerService {
             const scene = story.scenes.find((candidate) => candidate.id === chat.currentSceneId) ?? null;
             // Read with the Chat as it is now, like the Scene: who sits out when the judge runs.
             const sittingOut = chat.sittingOutIds();
+            const replyParts = message.parts.map((part) => part.toResponse());
+            // Lines are tagged only where a tag can show (.scratch/expressions/spec.md): otherwise the prompt is as before.
+            const tagLines = story.characters.some((character) => (character.expressions ?? []).length > 0);
             const prompt = buildJudgePrompt({
                 cast: story.characters.map((character) => ({
                     name: character.name,
@@ -148,7 +152,8 @@ export class JudgeManagerService {
                 timeOfDay: chat.timeOfDay,
                 recent: context.map((entry) => messageLine(entry, identityName)),
                 userText,
-                aiText: partsToText(message.parts.map((part) => part.toResponse())),
+                aiText: partsToText(replyParts),
+                ...(tagLines ? { expressionParts: replyParts } : {}),
             });
 
             const result = await this.gateway.completeText({
@@ -174,7 +179,10 @@ export class JudgeManagerService {
             for (const reason of applied.rejected) {
                 this.logger.log(`Chat ${chat.id}, Message ${message.id}: judge item dropped: ${reason}`);
             }
-            await this.ledger.record(chat.id, message.id, applied);
+            // Written with the rest of the judgement, in its one transaction, never after it. Without
+            // Expressions the parts are not touched, so the record is exactly as before.
+            const emotions = tagLines ? emotionsOfParts(message.parts, judgement.expressions) : undefined;
+            await this.ledger.record(chat.id, message.id, { ...applied, ...(emotions ? { emotions } : {}) });
             return { ok: true };
         } catch (error) {
             const reason = error instanceof AppError ? error.message : `Unexpected error: ${String(error)}`;

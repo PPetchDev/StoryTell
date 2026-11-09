@@ -390,7 +390,7 @@ describe('Sitting out: the API', () => {
         const played = await send(storyId, chat.id, 'Evening.', MIRA_REPLY);
         expect(played.messages[2].parts).toEqual([
             { kind: 'narration', text: 'Mira sets down the logbook.' },
-            { kind: 'speech', characterId: kaiId, speakerName: 'Kai', text: "Don't mind her." },
+            { kind: 'speech', characterId: kaiId, speakerName: 'Kai', text: "Don't mind her.", emotion: null },
         ]);
         // Older lines by her show as they always did.
         expect(speakers(played.messages[0])).toEqual(['Mira', 'Kai']);
@@ -429,7 +429,7 @@ describe('Sitting out: the API', () => {
         }
         expect(parts.at(-1)).toEqual([
             { kind: 'narration', text: 'Mira sets down the logbook.' },
-            { kind: 'speech', characterId: kaiId, speakerName: 'Kai', text: "Don't mind her." },
+            { kind: 'speech', characterId: kaiId, speakerName: 'Kai', text: "Don't mind her.", emotion: null },
         ]);
         await settled(storyId, chat.id);
     });
@@ -470,7 +470,7 @@ describe('Sitting out: the API', () => {
         expect(trailing(lastTurn())).toContain('Sitting out: Mira.');
         expect(edited.body.messages.at(-1).parts).toEqual([
             { kind: 'narration', text: 'Mira sets down the logbook.' },
-            { kind: 'speech', characterId: kaiId, speakerName: 'Kai', text: "Don't mind her." },
+            { kind: 'speech', characterId: kaiId, speakerName: 'Kai', text: "Don't mind her.", emotion: null },
         ]);
         await settled(storyId, chat.id);
     });

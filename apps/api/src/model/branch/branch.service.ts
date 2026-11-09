@@ -135,12 +135,12 @@ const copyMessages: CopyStep = async ({ manager, sourceChatId, chatId, through, 
     );
 };
 
-/** The parts of the Messages the Branch keeps; later Messages need only their rows. */
+/** The parts of the Messages the Branch keeps, with their emotions; later Messages need only their rows. */
 const copyMessageParts: CopyStep = async ({ manager, sourceChatId, through, messageIds }) => {
     const [olds, news] = oldAndNewIds(messageIds);
     await manager.query(
-        `INSERT INTO "message_part" ("message_id", "position", "kind", "character_id", "speaker_name", "text")
-         SELECT m."new_id", p."position", p."kind", p."character_id", p."speaker_name", p."text"
+        `INSERT INTO "message_part" ("message_id", "position", "kind", "character_id", "speaker_name", "text", "emotion")
+         SELECT m."new_id", p."position", p."kind", p."character_id", p."speaker_name", p."text", p."emotion"
          FROM "message_part" p JOIN "message" s ON s."id" = p."message_id"
          JOIN unnest($2::int[], $3::int[]) AS m("old_id", "new_id") ON m."old_id" = p."message_id"
          WHERE s."chat_id" = $1 AND s."position" <= $4 ORDER BY p."id"`,

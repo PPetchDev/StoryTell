@@ -129,6 +129,47 @@ describe('Venice contract', () => {
         expect(records[0]).toMatchObject({ kind: 'snapshot_image', model: 'seedream-v5-pro-edit', costUsd: 0.0669 });
     });
 
+    // .scratch/expressions/spec.md, "Authoring API": Draw.
+    describe('Expression pictures', () => {
+        it('draws with the Settings Snapshot model on multi-edit, from the one Reference image, at 1K and its list price', async () => {
+            const net = recordedFetch([...modelLists, edited]);
+            const { gateway, records } = gatewayUnderTest(net.fetch, { settings: { imageModel: 'seedream-v5-pro-edit', snapshotSize: '2K' } });
+
+            const result = await gateway.generateImage({
+                kind: 'expression_image',
+                prompt: 'The same person, smiling.',
+                referenceImages: [FAKE_PNG],
+                servedFor: { storyId: 5 },
+            });
+
+            expect(net.requests[2].url).toBe(`${BASE}/image/multi-edit`);
+            expect(net.requests[2].body).toEqual({
+                modelId: 'seedream-v5-pro-edit',
+                prompt: 'The same person, smiling.',
+                images: [FAKE_PNG.bytes.toString('base64')],
+                aspect_ratio: '2:3',
+                output_format: 'jpeg',
+                safe_mode: false,
+            });
+            // 1K whatever the Snapshot size says: 2K costs more on this model.
+            expect(result).toMatchObject({ model: 'seedream-v5-pro-edit', costUsd: 0.06 });
+            expect(records).toEqual([
+                expect.objectContaining({ kind: 'expression_image', pool: 'image', model: 'seedream-v5-pro-edit', host: 'venice', images: 1, costUsd: 0.06, storyId: 5, chatId: null }),
+            ]);
+        });
+
+        it('uses the default Snapshot model at its 1K price', async () => {
+            const net = recordedFetch([...modelLists, edited]);
+            const { gateway, records } = gatewayUnderTest(net.fetch);
+
+            await gateway.generateImage({ kind: 'expression_image', prompt: 'p', referenceImages: [FAKE_PNG] });
+
+            expect(net.requests[2].body).toMatchObject({ modelId: 'seedream-v4-edit' });
+            expect(net.requests[2].body.resolution).toBeUndefined();
+            expect(records[0]).toMatchObject({ kind: 'expression_image', costUsd: 0.05 });
+        });
+    });
+
     describe('Snapshot size', () => {
         it('draws Seedream V5 Pro edit at 2K when Settings ask for it, and records the 2K price', async () => {
             const net = recordedFetch([...modelLists, edited]);

@@ -20,6 +20,7 @@ const CALL_KINDS = Object.keys({
     thai_reading: true,
     snapshot_image: true,
     reference_image: true,
+    expression_image: true,
     document_embedding: true,
     document_search: true,
     dictation: true,

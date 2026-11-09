@@ -76,6 +76,8 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | `422.003.019` | `InvalidPageAddressError` | A fetch-page address that isn't `http:` or `https:`, carries credentials, or names the PC itself (`localhost`, `*.localhost`, `127.0.0.0/8`, `::1`, `::ffff:127.x.x.x`), given or reached by a redirect. Refused before it is fetched. The message says which, and to paste the text instead. |
 | `502.003.020` | `PageFetchError` | A page that couldn't be fetched or read: unreachable, a timeout (15 s), a non-2xx answer, more than 5 redirects, a type other than `text/html` or `text/plain`, a body over 2 MB, or no text. The message says which, and to paste the text instead. |
 | `422.003.021` | `UnknownVoiceError` | A Narration voice, Speaking voice or voice sample (`POST /api/voices/:voiceId/preview`) naming a voice that `GET /api/voices` doesn't list. Nothing changes and no call is made; `null` (the default) is always allowed. |
+| `404.003.022` | `ExpressionNotFoundError` | Setting or resetting the square of, or removing, an Expression the Character does not have for that emotion. An emotion outside the seven (`neutral` included) is a validation error (`400.000.000`). |
+| `409.003.023` | `NoReferenceImageToDrawError` | Drawing an Expression (`POST .../expressions/:emotion/draw`) for a Character with no Reference image. No call is made. Add a Reference image first. |
 | `404.004.001` | `ChatNotFoundError` | No Chat with that id in this Story. |
 | `422.004.002` | `StoryNotPlayableError` | The Story has a required field empty. The message names the missing fields. Blocks starting a Chat, sending, Continue and Regenerate. |
 | `409.004.003` | `NoTurnToRetryError` | Retry when the Chat is not waiting for a reply to a User Message. |

@@ -37,7 +37,7 @@ import {
     StorySummary,
     Tense,
 } from '../../model/story/entities/story.entity.js';
-import { CoverColumns, StoryModelService } from '../../model/story/story.service.js';
+import { CoverColumns, ExpressionColumns, StoryModelService } from '../../model/story/story.service.js';
 import { ImageData } from '../../service/model-gateway/model-gateway.js';
 import { ImageStoreService } from '../../store/image/image-store.service.js';
 import { parseReply, ReplyPart } from '../chat/turn/reply-parser.js';
@@ -270,7 +270,7 @@ export class StoryManagerService {
 
     /**
      * Spec: "Duplicate Story". A new Story, "<title> (copy)", with everything the author wrote:
-     * text and style, Role, Characters with their Reference images and Portraits, StartingBonds,
+     * text and style, Role, Characters with their Reference images, Portraits and Expressions, StartingBonds,
      * Scenes, Lore and the Cover. Chats and Snapshots are not copied, so a Cover that is a Snapshot
      * is dropped. Every file is copied to a path of the new Story's own, so deleting either
      * Story never removes the other's files. A failure part-way leaves no copy behind.
@@ -305,6 +305,27 @@ export class StoryManagerService {
             }
             await this.storyModel.setReferenceImages(images);
 
+            // Each Expression to a file of the copy's own (.scratch/expressions/spec.md, "Duplicate Story"). One
+            // drawn from the source's current Reference image is pointed at the copy's, so it stays current.
+            const expressions: ExpressionColumns[] = [];
+            for (const character of source.characters) {
+                const id = characterIds.get(character.id)!;
+                for (const expression of character.expressions) {
+                    const token = randomBytes(6).toString('hex');
+                    const copied = await copyFile(expression.imagePath, (ext) => `expressions/story-${copyId}/character-${id}-${expression.emotion}-${token}.${ext}`);
+                    if (!copied) continue;
+                    const current = expression.drawnFrom !== null && expression.drawnFrom === character.referenceImagePath;
+                    expressions.push({
+                        characterId: id,
+                        emotion: expression.emotion,
+                        imagePath: copied,
+                        crop: expression.crop ? { ...expression.crop } : null,
+                        drawnFrom: current ? (images.get(id)?.path ?? expression.drawnFrom) : expression.drawnFrom,
+                    });
+                }
+            }
+            await this.storyModel.insertExpressions(expressions);
+
             const cover = source.cover();
             const focus = cover?.focus ?? null;
             if (cover?.source === CoverSource.Upload && source.coverImagePath) {
@@ -322,7 +343,7 @@ export class StoryManagerService {
         return this.reload(copyId);
     }
 
-    /** Removes the Story and everything under it, Reference image, Gallery and Cover files included (spec: "Delete Story"). */
+    /** Removes the Story and everything under it, Reference image, Expression, Gallery and Cover files included (spec: "Delete Story"). */
     async deleteStory(storyId: number): Promise<void> {
         const story = await this.load(storyId);
         // Read before the delete: the Gallery's records go with the Story through CASCADE.
@@ -330,7 +351,10 @@ export class StoryManagerService {
         await this.storyModel.deleteStory(storyId);
         // Its Documents went with it through CASCADE; their passages leave memory too.
         this.documentModel.forget(storyId);
-        for (const character of story.characters) await this.removeReferenceImageFile(character);
+        for (const character of story.characters) {
+            await this.removeReferenceImageFile(character);
+            await this.removeExpressionFiles(character);
+        }
         for (const imagePath of galleryFiles) await this.removeFile(imagePath);
         if (story.coverImagePath) await this.removeFile(story.coverImagePath);
         // Its Messages went with it through CASCADE; their Read aloud audio goes too.
@@ -461,13 +485,15 @@ export class StoryManagerService {
      * Spec: "Remove Character". In every Chat its Bonds both ways with their history, its Arc
      * steps, its copied Arc directions and its Known-by entries go by ON DELETE CASCADE, and
      * speech parts keep its stamped name with their Character link cleared (SET NULL).
-     * StartingBonds pointing at it cascade too; its Reference image file goes here.
+     * StartingBonds pointing at it cascade too, and so do its Expressions; its Reference image and
+     * Expression files go here.
      */
     async removeCharacter(storyId: number, characterId: number): Promise<StoryDetail> {
         const story = await this.load(storyId);
         const character = this.findCharacter(story, characterId);
         await this.storyModel.removeCharacter(character);
         await this.removeReferenceImageFile(character);
+        await this.removeExpressionFiles(character);
         const rest = story.characters.filter((other) => other.id !== characterId);
         await this.storyModel.setCharacterOrder(rest.map((other) => other.id));
         return this.saved(storyId);
@@ -528,6 +554,11 @@ export class StoryManagerService {
 
     private async removeReferenceImageFile(character: CharacterEntity): Promise<void> {
         if (character.referenceImagePath) await this.removeFile(character.referenceImagePath);
+    }
+
+    /** Their rows go with the Character through ON DELETE CASCADE; the files go here. */
+    private async removeExpressionFiles(character: CharacterEntity): Promise<void> {
+        for (const expression of character.expressions) await this.removeFile(expression.imagePath);
     }
 
     /** The record is already gone or updated, so a file that can't be deleted is logged, not an error. */

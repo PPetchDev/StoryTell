@@ -1,4 +1,5 @@
 import { apiFetch, apiSend, apiSendStream } from './api';
+import type { Emotion } from './expressions';
 import { MissingField } from './story';
 import type { TraySavedReply } from './saved-replies';
 import type { ChatReplaceRule } from './replace-rules';
@@ -25,7 +26,14 @@ export interface ChatListItem extends ChatSummary {
 
 export type MessagePart =
     | { kind: 'narration'; text: string }
-    | { kind: 'speech'; characterId: number | null; speakerName: string; text: string };
+    | {
+          kind: 'speech';
+          characterId: number | null;
+          speakerName: string;
+          text: string;
+          /** What the Judge tagged the line with (.scratch/expressions/spec.md); null until then. */
+          emotion: Emotion | null;
+      };
 
 export interface UserMessage {
     id: number;

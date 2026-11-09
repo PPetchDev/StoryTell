@@ -175,7 +175,7 @@ describe('Streaming replies', () => {
             expect(done.messages[1]).toMatchObject({ kind: 'user', text: 'Evening.' });
             expect(reply.parts).toEqual([
                 { kind: 'narration', text: 'Rain lashes the glass.' },
-                { kind: 'speech', characterId: miraId, speakerName: 'Mira', text: "You're late, keeper. Boots off." },
+                { kind: 'speech', characterId: miraId, speakerName: 'Mira', text: "You're late, keeper. Boots off.", emotion: null },
                 { kind: 'narration', text: 'She slides the logbook across the table.' },
             ]);
             expect(parts[parts.length - 1]).toEqual(reply.parts);
@@ -217,7 +217,7 @@ describe('Streaming replies', () => {
             }
             const expected = [
                 { kind: 'narration', text: 'Ashes drift past the window.' },
-                { kind: 'speech', characterId: miraId, speakerName: 'Mira', text: "Who's there?" },
+                { kind: 'speech', characterId: miraId, speakerName: 'Mira', text: "Who's there?", emotion: null },
             ];
             const parts = partsEvents(events);
             // Not even the start of the line shows: every event is the stored reply, cut shorter.

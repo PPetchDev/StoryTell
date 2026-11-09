@@ -53,6 +53,8 @@ export class StorySoFarManagerService {
     private readonly logger = new Logger(StorySoFarManagerService.name);
     /** The update running for each Chat; at most one at a time. */
     private readonly running = new Map<number, Promise<void>>();
+    /** A check asked for while one runs, by Chat: it runs once that one ends, against the Chat as it is then. */
+    private readonly again = new Map<number, () => void>();
     /** Bumped by every clear and every user save; an update started before one is dropped. */
     private readonly generations = new Map<number, number>();
 
@@ -67,14 +69,24 @@ export class StorySoFarManagerService {
      * prompt's system layers for the Chat as it stands, Story so far included.
      */
     start(story: StoryEntity, chatId: number, layersFor: (chat: ChatEntity) => Promise<PromptLayersInput>): void {
-        if (this.running.has(chatId)) return;
-        const work = this.update(story, chatId, layersFor).finally(() => this.running.delete(chatId));
+        // A turn that settles while an update runs still gets its check, once that update ends:
+        // dropping it would leave the next update a turn late, or never due when no turn follows.
+        if (this.running.has(chatId)) {
+            this.again.set(chatId, () => this.start(story, chatId, layersFor));
+            return;
+        }
+        const work = this.update(story, chatId, layersFor).finally(() => {
+            this.running.delete(chatId);
+            const next = this.again.get(chatId);
+            this.again.delete(chatId);
+            next?.();
+        });
         this.running.set(chatId, work);
     }
 
-    /** Resolves once the Chat's running update, if any, has finished. For tests and shutdown. */
+    /** Resolves once the Chat has no update running or waiting to run. For tests and shutdown. */
     async idle(chatId: number): Promise<void> {
-        await this.running.get(chatId);
+        while (this.running.has(chatId)) await this.running.get(chatId);
     }
 
     /** Spec: "Edits, Regenerate, Reset". The Chat has no Story so far again; a running update is dropped. */

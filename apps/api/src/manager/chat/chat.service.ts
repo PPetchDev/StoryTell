@@ -210,6 +210,8 @@ export class ChatManagerService {
     private readonly logger = new Logger(ChatManagerService.name);
     /** Chats whose turn is being written right now. */
     private readonly inFlight = new Set<number>();
+    /** Each Chat's latest background chain: the judge and the extraction, then the Story so far check. */
+    private readonly background = new Map<number, Promise<void>>();
 
     constructor(
         private readonly chatModel: ChatModelService,
@@ -512,9 +514,23 @@ export class ChatManagerService {
         const judged = this.judge.run(story, chatId, messageId);
         const extracted = this.extraction.run(story, chatId, messageId);
         // Spec: "Story so far". Once both are done, so it measures the Memory they leave; never awaited.
-        void Promise.allSettled([judged, extracted]).then(() =>
+        const chain = Promise.allSettled([judged, extracted]).then(() =>
             this.storySoFar.start(story, chatId, (chat) => this.promptLayersFor(story, chat)),
         );
+        this.background.set(chatId, chain);
+        void chain.finally(() => {
+            if (this.background.get(chatId) === chain) this.background.delete(chatId);
+        });
+    }
+
+    /**
+     * Resolves once everything a turn started in the background has finished: the judge, the
+     * extraction and the Story so far check they lead to, with any update it ran. For tests and
+     * shutdown; play never waits on it.
+     */
+    async backgroundIdle(chatId: number): Promise<void> {
+        while (this.background.has(chatId)) await this.background.get(chatId);
+        await this.storySoFar.idle(chatId);
     }
 
     /** The Opening becomes Message 1 with model "author", split by the same parser as replies. */

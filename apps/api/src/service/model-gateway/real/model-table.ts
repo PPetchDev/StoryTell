@@ -318,7 +318,7 @@ export const SPEECH_MODELS: Record<SpeechModel, SpeechModelSpec> = {
 
 /**
  * The size an image is drawn at: the one asked for when the model has it, and 2K whenever it
- * costs no more than 1K. Reference images ask for 2K; Snapshots ask for the Settings size.
+ * costs no more than 1K. Reference images ask for 2K, Expressions 1K; Snapshots ask for the Settings size.
  */
 export function drawnSize(model: ImageModelSpec, wanted: SnapshotSize): SnapshotSize {
     const twoK = model.prices['2K'];

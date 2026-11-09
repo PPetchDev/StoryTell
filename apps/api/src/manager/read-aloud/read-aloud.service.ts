@@ -5,7 +5,7 @@ import { ChatNotFoundError, MessageNotFoundError, NotReadableError, SpeechItemNo
 import { OutOfCreditError } from '../../errors/model-gateway.errors.js';
 import { StoryNotFoundError } from '../../errors/story.errors.js';
 import { ChatModelService } from '../../model/chat/chat.service.js';
-import type { MessagePartResponse } from '../../model/chat/entities/message-part.entity.js';
+import type { StoredMessagePart } from '../../model/chat/entities/message-part.entity.js';
 import { MessageKind } from '../../model/chat/entities/message.entity.js';
 import { ReplaceRuleModelService } from '../../model/replace-rule/replace-rule.service.js';
 import type { StoryEntity } from '../../model/story/entities/story.entity.js';
@@ -163,7 +163,7 @@ export class ReadAloudManagerService implements OnApplicationBootstrap {
 
         const rules = [...(await this.replaceRuleModel.findByScope(null)), ...story.replaceRules].filter((rule) => rule.onAi);
         const voices = storyVoices(story);
-        const keyed = (parts: MessagePartResponse[]): KeyedItem[] =>
+        const keyed = (parts: StoredMessagePart[]): KeyedItem[] =>
             readAloudQueue(
                 parts.map((part) => ({ ...part, text: applyReplaceRules(part.text, rules) })),
                 voices,

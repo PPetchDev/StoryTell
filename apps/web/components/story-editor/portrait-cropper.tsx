@@ -35,13 +35,17 @@ interface PortraitCropperProps {
     error: string | null;
     onSave(crop: PortraitCrop): void;
     onClose(): void;
+    /** The sheet's name, title and the picture's alt text; the Portrait's own by default. */
+    sheetLabel?: string;
+    title?: string;
+    imageAlt?: string;
 }
 
 /**
  * Picks the Portrait: drag the square over the face, size it with the slider, and see the
  * round picture the Chat will show.
  */
-export function PortraitCropper({ name, src, initial, saving, error, onSave, onClose }: PortraitCropperProps) {
+export function PortraitCropper({ name, src, initial, saving, error, onSave, onClose, sheetLabel, title, imageAlt }: PortraitCropperProps) {
     const stage = useRef<HTMLDivElement>(null);
     /** The image's height in widths, once it has loaded. */
     const [heightUnits, setHeightUnits] = useState<number | null>(null);
@@ -83,14 +87,14 @@ export function PortraitCropper({ name, src, initial, saving, error, onSave, onC
     };
 
     return (
-        <Sheet label={`Chat picture of ${name}`} title="Chat picture" onClose={onClose}>
+        <Sheet label={sheetLabel ?? `Chat picture of ${name}`} title={title ?? 'Chat picture'} onClose={onClose}>
             <p className="hint">Drag the square over {name}&apos;s face. The slider zooms.</p>
             <div className={styles.stage} ref={stage}>
                 {/* eslint-disable-next-line @next/next/no-img-element -- served by the API from the image folder */}
                 <img
                     className={styles.image}
                     src={src}
-                    alt={`Reference image of ${name}`}
+                    alt={imageAlt ?? `Reference image of ${name}`}
                     draggable={false}
                     onLoad={(event) => onLoad(event.currentTarget)}
                 />

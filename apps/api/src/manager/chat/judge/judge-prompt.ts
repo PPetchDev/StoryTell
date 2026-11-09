@@ -1,7 +1,9 @@
 import { UnparseableOutputError } from '../../../errors/model-gateway.errors.js';
 import { TimeOfDay, TIMES_OF_DAY } from '../../../model/chat/entities/chat.entity.js';
+import { Emotion, isEmotion } from '../../../model/story/emotion.js';
 import { PromptMessage } from '../../../service/model-gateway/model-gateway.js';
 import { exchangeUserLine } from '../exchange.js';
+import { ReplyPart } from '../turn/reply-parser.js';
 
 /**
  * The Bond, Arc, Scene and Time of day judge's prompt and output (spec: "Background judge"), from the turn
@@ -44,6 +46,12 @@ export interface JudgePromptInput {
     /** The exchange to judge: what the user wrote (null after a Continue) and the AI's reply as `@Name:` text. */
     userText: string | null;
     aiText: string;
+    /**
+     * The AI reply's parts, given only when the Story has an Expression (.scratch/expressions/spec.md,
+     * "The Judge tags each line"): its speech lines are then numbered in place of `aiText`, and the
+     * judge tags each with an emotion. Left out, the prompt is exactly as it was before Expressions.
+     */
+    expressionParts?: ReplyPart[];
 }
 
 /** How a Character sitting out is marked in the judge's cast (.scratch/speaker-controls/spec.md). */
@@ -53,6 +61,20 @@ export const SITTING_OUT_MARK =
 /** How many Messages before the exchange the judge sees for context. */
 export const JUDGE_CONTEXT_MESSAGES = 6;
 export const JUDGE_MAX_TOKENS = 700;
+/** What tagging the lines adds to the judge's token cap. */
+export const EXPRESSION_EXTRA_TOKENS = 200;
+
+/** What each emotion means to the judge (.scratch/expressions/spec.md, "The emotions"). */
+export const EMOTION_MEANINGS: Record<Emotion, string> = {
+    neutral: 'calm, plain talk, no strong feeling',
+    joy: 'happy, amused, laughing, pleased, excited',
+    love: 'tender, affectionate, flirtatious, aroused, longing',
+    embarrassment: 'shy, embarrassed, ashamed, awkward',
+    sadness: 'sad, hurt, grieving, disappointed',
+    anger: 'angry, annoyed, disgusted, contemptuous',
+    fear: 'afraid, nervous, anxious',
+    surprise: 'surprised, shocked, confused, realising',
+};
 
 const SYSTEM = `You track hidden feelings (Bonds) and lasting personality changes (Arcs) for Characters in an interactive story. You judge only what CHANGED in the latest exchange.
 
@@ -87,6 +109,29 @@ Reply with JSON only:
  "scene":{"reason":"...","move_on":false},
  "time_of_day":null}
 Empty arrays when nothing changed.`;
+
+const EXPRESSION_RULE = `Expression rule:
+- In the latest exchange, each line a Character speaks is numbered: [1], [2], and so on. For each numbered line in the latest exchange, give the emotion its speaker shows in it, one of:
+${Object.entries(EMOTION_MEANINGS)
+    .map(([emotion, meaning]) => `  - "${emotion}": ${meaning}`)
+    .join('\n')}
+- When unsure, "neutral".
+
+`;
+
+/** The system prompt when the lines are tagged: the Expression rule before the reply shape, and the shape's `expressions` field. */
+const SYSTEM_WITH_EXPRESSIONS = SYSTEM.replace('Reply with JSON only:', `${EXPRESSION_RULE}Reply with JSON only:`).replace(
+    ' "time_of_day":null}',
+    ' "time_of_day":null,\n "expressions":[{"line":1,"emotion":"joy"}]}',
+);
+
+/** The reply as `partsToText` writes it, with each speech line numbered in order: `[1] @Name: …`. */
+export function numberedReplyText(parts: ReplyPart[]): string {
+    let line = 0;
+    return parts
+        .map((part) => (part.kind === 'speech' ? `[${++line}] @${part.speakerName}: ${part.text}` : part.text))
+        .join('\n\n');
+}
 
 export function buildJudgePrompt(input: JudgePromptInput): { messages: PromptMessage[]; maxTokens: number } {
     const cast = input.cast
@@ -126,13 +171,13 @@ ${input.recent.join('\n\n') || '(start)'}
 # LATEST EXCHANGE (judge this)
 ${exchangeUserLine(input.identityName, input.userText)}
 
-${input.aiText}`;
+${input.expressionParts ? numberedReplyText(input.expressionParts) : input.aiText}`;
     return {
         messages: [
-            { role: 'system', content: SYSTEM },
+            { role: 'system', content: input.expressionParts ? SYSTEM_WITH_EXPRESSIONS : SYSTEM },
             { role: 'user', content: user },
         ],
-        maxTokens: JUDGE_MAX_TOKENS,
+        maxTokens: input.expressionParts ? JUDGE_MAX_TOKENS + EXPRESSION_EXTRA_TOKENS : JUDGE_MAX_TOKENS,
     };
 }
 
@@ -163,6 +208,14 @@ export interface Judgement {
     scenes: JudgedScene[];
     /** The Time of day the story moved on to; null when the judge gave none (unchanged). */
     timeOfDay: TimeOfDay | null;
+    /** The emotion of each numbered speech line, as written; empty when the judge gave none. */
+    expressions: JudgedExpression[];
+}
+
+/** One numbered line's emotion (.scratch/expressions/spec.md). */
+export interface JudgedExpression {
+    line: number;
+    emotion: Emotion;
 }
 
 const str = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
@@ -202,7 +255,13 @@ export function parseJudgement(text: string): Judgement {
     const scenes = (Array.isArray(json.scene) ? json.scene : [json.scene]).flatMap((item): JudgedScene[] =>
         isObject(item) ? [{ moveOn: item.move_on === true, reason: str(item.reason) }] : [],
     );
-    return { bondChanges, arcSteps, scenes, timeOfDay: readTimeOfDay(json.time_of_day) };
+    // Read loosely: an item without a whole `line` or a known emotion (any case) is dropped.
+    const expressions = list(json.expressions).flatMap((item): JudgedExpression[] => {
+        if (!isObject(item) || typeof item.line !== 'number' || !Number.isInteger(item.line)) return [];
+        const emotion = str(item.emotion).toLowerCase();
+        return isEmotion(emotion) ? [{ line: item.line, emotion }] : [];
+    });
+    return { bondChanges, arcSteps, scenes, timeOfDay: readTimeOfDay(json.time_of_day), expressions };
 }
 
 /** One of the six, in any case; a missing field, a null or anything else means unchanged. */

@@ -216,6 +216,7 @@ describe('Chats', () => {
                     characterId: story.characters[0].id,
                     speakerName: 'Mira',
                     text: "You're late. Boots off, keeper.",
+                    emotion: null,
                 },
                 { kind: 'narration', text: "She doesn't look up from the logbook." },
             ]);
@@ -341,12 +342,14 @@ Nobody moves to help.`;
                     characterId: mira.id,
                     speakerName: 'Mira',
                     text: "Shut it. You're letting the storm in.\nShe finally looks up, taking you in from boots to hat.",
+                    emotion: null,
                 },
                 {
                     kind: 'speech',
                     characterId: kai.id,
                     speakerName: "Kai O'Rourke",
                     text: 'Friend! You made it up the cliff path in this?',
+                    emotion: null,
                 },
                 {
                     kind: 'narration',
@@ -374,8 +377,8 @@ Nobody moves to help.`;
             );
 
             expect(lastAi(played).parts).toEqual([
-                { kind: 'speech', characterId: story.characters[0].id, speakerName: 'Mira', text: 'Nobody.' },
-                { kind: 'speech', characterId: null, speakerName: 'The Stranger', text: 'That is not quite true.' },
+                { kind: 'speech', characterId: story.characters[0].id, speakerName: 'Mira', text: 'Nobody.', emotion: null },
+                { kind: 'speech', characterId: null, speakerName: 'The Stranger', text: 'That is not quite true.', emotion: null },
                 { kind: 'narration', text: 'A cough from the stairwell.' },
             ]);
         });
@@ -399,7 +402,7 @@ Nobody moves to help.`;
 
             expect(lastAi(played).parts).toEqual([
                 { kind: 'narration', text: 'Mira stands.' },
-                { kind: 'speech', characterId: story.characters[0].id, speakerName: 'Mira', text: 'Well?' },
+                { kind: 'speech', characterId: story.characters[0].id, speakerName: 'Mira', text: 'Well?', emotion: null },
             ]);
         });
 
@@ -414,7 +417,7 @@ Nobody moves to help.`;
 
             expect(chat.messages[0].parts).toEqual([
                 { kind: 'narration', text: 'The door is open.\n\nAsh: Hello?' },
-                { kind: 'speech', characterId: story.characters[0].id, speakerName: 'Mira', text: 'Boots off.' },
+                { kind: 'speech', characterId: story.characters[0].id, speakerName: 'Mira', text: 'Boots off.', emotion: null },
             ]);
         });
     });
@@ -553,7 +556,7 @@ A Character knows only the Memories it is tagged on and acts as if the rest neve
             expect(retried.body.awaitingReply).toBe(false);
             expect(retried.body.messages).toHaveLength(3);
             expect(lastAi(retried.body as Chat).parts).toEqual([
-                { kind: 'speech', characterId: story.characters[0].id, speakerName: 'Mira', text: 'Took you long enough.' },
+                { kind: 'speech', characterId: story.characters[0].id, speakerName: 'Mira', text: 'Took you long enough.', emotion: null },
             ]);
             // The same turn: the retried call carries the same User Message.
             const calls = t.gateway.textCalls('turn');
@@ -697,7 +700,7 @@ A Character knows only the Memories it is tagged on and acts as if the rest neve
             expect(chat.messages[1]).toMatchObject({ kind: 'user', text: 'I shake the rain off my coat.', identityName: 'Ash' });
             expect(lastAi(chat).parts).toEqual([
                 { kind: 'narration', text: 'Rain drips from your hat.' },
-                { kind: 'speech', characterId: story.characters[0].id, speakerName: 'Mira', text: 'Took you long enough.' },
+                { kind: 'speech', characterId: story.characters[0].id, speakerName: 'Mira', text: 'Took you long enough.', emotion: null },
             ]);
             // Exactly one turn, and its prompt carries the new text after the Opening only.
             const calls = t.gateway.textCalls('turn');
@@ -765,9 +768,9 @@ A Character knows only the Memories it is tagged on and acts as if the rest neve
             expect(chat.messages[2]).toMatchObject({ id: firstReply.id, kind: 'ai', model: 'glm-5.3' });
             expect(chat.messages[2].parts).toEqual([
                 { kind: 'narration', text: 'Mira sets the pen down.' },
-                { kind: 'speech', characterId: story.characters[0].id, speakerName: 'Mira', text: 'Boots off.\nThen we talk.' },
-                { kind: 'speech', characterId: story.characters[1].id, speakerName: "Kai O'Rourke", text: 'Easy, friend.' },
-                { kind: 'speech', characterId: null, speakerName: 'Ghost', text: 'Boo.' },
+                { kind: 'speech', characterId: story.characters[0].id, speakerName: 'Mira', text: 'Boots off.\nThen we talk.', emotion: null },
+                { kind: 'speech', characterId: story.characters[1].id, speakerName: "Kai O'Rourke", text: 'Easy, friend.', emotion: null },
+                { kind: 'speech', characterId: null, speakerName: 'Ghost', text: 'Boo.', emotion: null },
             ]);
             expect(t.gateway.textCalls('turn')).toHaveLength(0);
             expect(chat.drift).toBeNull();
@@ -776,7 +779,7 @@ A Character knows only the Memories it is tagged on and acts as if the rest neve
             // A line written as the Role is kept: the user wrote it, so the guard is off.
             const kept = await edit(story.id, played.id, firstReply.id, '@Mira: Well?\n\nAsh: I say nothing.').expect(200);
             expect((kept.body as Chat).messages[2].parts).toEqual([
-                { kind: 'speech', characterId: story.characters[0].id, speakerName: 'Mira', text: 'Well?' },
+                { kind: 'speech', characterId: story.characters[0].id, speakerName: 'Mira', text: 'Well?', emotion: null },
                 { kind: 'narration', text: 'Ash: I say nothing.' },
             ]);
             expect(t.gateway.textCalls('turn')).toHaveLength(0);
@@ -792,7 +795,7 @@ A Character knows only the Memories it is tagged on and acts as if the rest neve
             expect(body.messages).toHaveLength(1);
             expect(body.messages[0]).toMatchObject({ id: played.messages[0].id, kind: 'ai', model: 'author' });
             expect(body.messages[0].parts).toEqual([
-                { kind: 'speech', characterId: story.characters[0].id, speakerName: 'Mira', text: 'Boots off.' },
+                { kind: 'speech', characterId: story.characters[0].id, speakerName: 'Mira', text: 'Boots off.', emotion: null },
             ]);
         });
 
@@ -855,7 +858,7 @@ A Character knows only the Memories it is tagged on and acts as if the rest neve
             expect(played.messages.map((message) => message.kind)).toEqual(['ai', 'ai']);
             expect(lastAi(played)).toMatchObject({ model: FAKE_TEXT_MODEL });
             expect(lastAi(played).parts).toEqual([
-                { kind: 'speech', characterId: story.characters[0].id, speakerName: 'Mira', text: 'Well? Are you staying or not?' },
+                { kind: 'speech', characterId: story.characters[0].id, speakerName: 'Mira', text: 'Well? Are you staying or not?', emotion: null },
             ]);
             expect(played.awaitingReply).toBe(false);
             expect(Date.parse(played.lastPlayedAt)).toBeGreaterThan(Date.parse(chat.lastPlayedAt));
@@ -1049,7 +1052,7 @@ A Character knows only the Memories it is tagged on and acts as if the rest neve
             expect(chat.messages).toHaveLength(1);
             expect(chat.messages[0]).toMatchObject({ kind: 'ai', model: 'author' });
             expect(chat.messages[0].parts).toEqual([
-                { kind: 'speech', characterId: story.characters[0].id, speakerName: 'Mira', text: 'Boots off, keeper.' },
+                { kind: 'speech', characterId: story.characters[0].id, speakerName: 'Mira', text: 'Boots off, keeper.', emotion: null },
             ]);
             expect(await countRows(countSql('message', 'chat_id = $1'), [chat.id])).toBe(1);
             expect(t.gateway.textCalls('turn')).toHaveLength(1);

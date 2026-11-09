@@ -2,7 +2,7 @@ import type { Request, Response } from 'express';
 
 import { errorResponse } from '../../filter/app-error.filter.js';
 import { TurnStream } from '../../manager/chat/turn/turn-stream.js';
-import { ReplyPart } from '../../manager/chat/turn/reply-parser.js';
+import { MessagePartResponse, untaggedPartResponse } from '../../model/chat/entities/message-part.entity.js';
 
 /** The least time between two `parts` events; the last one before `done` is never held. */
 const PARTS_INTERVAL_MS = 100;
@@ -41,7 +41,8 @@ export async function answerTurn<T>(
         const body = await run({
             signal: stop.signal,
             onStart: () => events.open(),
-            onParts: (parts) => events.parts(parts),
+            // Shaped as the stored parts are answered, so the last `parts` equals the stored Message.
+            onParts: (parts) => events.parts(parts.map(untaggedPartResponse)),
         });
         if (stop.signal.aborted) return;
         if (events.opened) events.end('done', body);
@@ -82,7 +83,7 @@ class EventWriter {
         this.response.write(': stream\n\n');
     }
 
-    parts(parts: ReplyPart[]): void {
+    parts(parts: MessagePartResponse[]): void {
         this.open();
         const data = JSON.stringify({ parts });
         if (data === this.lastSent) {

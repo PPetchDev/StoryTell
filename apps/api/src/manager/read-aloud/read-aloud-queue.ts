@@ -1,4 +1,4 @@
-import type { MessagePartResponse } from '../../model/chat/entities/message-part.entity.js';
+import type { StoredMessagePart } from '../../model/chat/entities/message-part.entity.js';
 
 /** The longest item sent in one request: under Venice's 4,096 so a request never runs over. */
 export const MAX_ITEM_CHARACTERS = 4000;
@@ -39,7 +39,7 @@ const SENTENCE_END = /[.!?…]["'”’)\]]*\s/g;
  * or the Character is gone). Items with no letter or digit are dropped, and any item over
  * MAX_ITEM_CHARACTERS is split at the last sentence end before it, else the last space.
  */
-export function readAloudQueue(parts: readonly MessagePartResponse[], voices: ReadAloudVoices): ReadAloudItem[] {
+export function readAloudQueue(parts: readonly StoredMessagePart[], voices: ReadAloudVoices): ReadAloudItem[] {
     const queue: ReadAloudItem[] = [];
     const add = (partIndex: number, paragraph: number | null, voice: string, text: string) => {
         for (const piece of fitted(text.trim())) {

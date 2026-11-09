@@ -70,7 +70,7 @@ The API reads its environment only through `apps/api/src/config/app-config.ts`:
 | `SPEECH_DIR` | no | Read aloud's audio and voice samples. Default: a folder named `speech` beside the image folder. It must not be inside the image folder: backups copy that folder, and audio is never backed up (it is made again on the next reading). |
 | `MODEL_GATEWAY` | no | `real` (default) or `fake`. `fake` is for tests only. |
 | `OPENROUTER_API_KEY` | for `real` | OpenRouter key: every text call, and the text credit balance |
-| `VENICE_API_KEY` (or `VENICE_INFERENCE_KEY`) | for `real` | Venice inference key: Snapshots, Reference images, Dictation and Read aloud |
+| `VENICE_API_KEY` (or `VENICE_INFERENCE_KEY`) | for `real` | Venice inference key: Snapshots, Reference images, Expressions, Dictation and Read aloud |
 | `VENICE_ADMIN_KEY` | no | Venice Admin key, only to read the image credit balance. Without it the Usage view shows image spend but no remaining credit. |
 | `ENV_FILE` | no | Load the variables above from this file at startup |
 

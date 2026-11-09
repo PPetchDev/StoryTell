@@ -149,3 +149,17 @@ export class UnknownVoiceError extends AppError {
         super('422.003.021', `"${voice}" is not one of the voices this app can read aloud in.`);
     }
 }
+
+/** Drawing an Expression for a Character with no Reference image to draw it from (.scratch/expressions/spec.md). */
+export class NoReferenceImageToDrawError extends AppError {
+    constructor() {
+        super('409.003.023', 'Add a Reference image first: Expressions are drawn from it.');
+    }
+}
+
+/** No Expression for that emotion on that Character (.scratch/expressions/spec.md, "Authoring API"). */
+export class ExpressionNotFoundError extends AppError {
+    constructor() {
+        super('404.003.022', 'That Character has no Expression for that emotion.');
+    }
+}

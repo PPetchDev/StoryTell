@@ -1,6 +1,6 @@
 # 02 — Draw an Expression from the Reference image
 
-**Status:** ready-for-agent
+**Status:** done
 
 **What to build:** On each Expression row, "Draw · $price" makes that emotion's picture from the Character's Reference image in one tap, with a confirm before drawing over an existing one. It is logged as an image call of its own kind, and drawn Expressions show "Drawn from an earlier Reference image" once the Reference image changes. Per the spec's "Authoring API" (Draw, the drawing prompt, Reference image changes) and "In the Story editor" (Draw):
 
@@ -16,8 +16,8 @@
 
 **Blocked by:** [01 — Expressions on a Character](01-expressions-on-a-character.md)
 
-- [ ] Pure test: each emotion's prompt holds its description and the Character's name, and says to keep the person, outfit, framing and style.
-- [ ] API tests:
+- [x] Pure test: each emotion's prompt holds its description and the Character's name, and says to keep the person, outfit, framing and style.
+- [x] API tests:
   - Draw sends one `expression_image` call carrying the Reference image and stores the result;
   - drawing again keeps the crop and replaces the file;
   - no Reference image is refused with `NoReferenceImageToDrawError` and no call;
@@ -25,7 +25,7 @@
   - replacing the Reference image marks the drawn one `outdated`, and not an uploaded one;
   - a gateway failure leaves the old Expression as it was;
   - the Usage summary counts `expression_image` in the image pool.
-- [ ] The real gateway contract test: `expression_image` with one reference goes to the Settings Snapshot model on the multi-edit endpoint and records its 1K list price.
-- [ ] e2e at 390px: Draw shows the price, then fills the thumbnail; Draw again asks first; the Usage page lists "Expression pictures".
-- [ ] `docs/error-codes.md` lists `NoReferenceImageToDrawError`, with the next free code at implementation time.
-- [ ] Typecheck and the whole suites stay green.
+- [x] The real gateway contract test: `expression_image` with one reference goes to the Settings Snapshot model on the multi-edit endpoint and records its 1K list price.
+- [x] e2e at 390px: Draw shows the price, then fills the thumbnail; Draw again asks first; the Usage page lists "Expression pictures".
+- [x] `docs/error-codes.md` lists `NoReferenceImageToDrawError`, with the next free code at implementation time.
+- [x] Typecheck and the whole suites stay green.

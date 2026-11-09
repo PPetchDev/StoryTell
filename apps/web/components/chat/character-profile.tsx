@@ -2,8 +2,10 @@
 
 import { CSSProperties, createContext, ReactNode, useCallback, useContext, useMemo, useState } from 'react';
 
+import { PortraitImage } from '@/components/portrait/portrait-image';
 import { Sheet } from '@/components/sheet/sheet';
 import { characterColour } from '@/lib/character-colour';
+import { EMOTION_LABEL } from '@/lib/expressions';
 import { Character, referenceImageUrl } from '@/lib/story';
 
 import styles from './character-profile.module.css';
@@ -11,7 +13,9 @@ import styles from './character-profile.module.css';
 /** Opens the profile of a Character in the cast; null where no profiles are on offer. */
 type OpenProfile = (characterId: number) => void;
 
-const ProfileContext = createContext<{ open: OpenProfile; has(characterId: number): boolean } | null>(null);
+const ProfileContext = createContext<{ open: OpenProfile; has(characterId: number): boolean; character(characterId: number): Character | undefined } | null>(
+    null,
+);
 
 /**
  * The opener of a Character's profile, for a tap on their Portrait in a Chat; null outside a
@@ -24,14 +28,24 @@ export function useCharacterProfile(characterId: number | null): (() => void) | 
 }
 
 /**
+ * A Character of the cast, for the picture beside their lines (lib/expressions.ts, `linePicture`);
+ * undefined outside a Chat and for a speaker with no Character in the cast.
+ */
+export function useCastCharacter(characterId: number | null): Character | undefined {
+    const profiles = useContext(ProfileContext);
+    return profiles && characterId !== null ? profiles.character(characterId) : undefined;
+}
+
+/**
  * Lets a tap on a Character's Portrait open their profile over the Chat: their Reference image
- * in full, name, Appearance, Personality, Voice and Background. Secrets and Arc directions stay
+ * in full, their Expressions under it, name, Appearance, Personality, Voice and Background. Secrets and Arc directions stay
  * hidden, since they would give the story away.
  */
 export function CharacterProfiles({ characters, children }: { characters: readonly Character[]; children: ReactNode }) {
     const [openId, setOpenId] = useState<number | null>(null);
     const has = useCallback((characterId: number) => characters.some((character) => character.id === characterId), [characters]);
-    const value = useMemo(() => ({ open: setOpenId, has }), [has]);
+    const find = useCallback((characterId: number) => characters.find((character) => character.id === characterId), [characters]);
+    const value = useMemo(() => ({ open: setOpenId, has, character: find }), [has, find]);
     const character = characters.find((candidate) => candidate.id === openId);
     const close = useCallback(() => setOpenId(null), []);
 
@@ -74,6 +88,19 @@ function CharacterProfileSheet({ character, colour, onClose }: { character: Char
                     <span className={styles.initial} aria-hidden="true">
                         {name.charAt(0).toUpperCase()}
                     </span>
+                )}
+                {character.expressions.length > 0 && (
+                    <ul className={styles.expressions} aria-label="Expressions">
+                        {character.expressions.map((expression) => (
+                            <li key={expression.emotion} className={styles.expression}>
+                                <PortraitImage
+                                    portrait={{ src: referenceImageUrl(expression.imagePath), crop: expression.crop ?? character.portraitCrop }}
+                                    className={styles.expressionPicture}
+                                />
+                                <span>{EMOTION_LABEL[expression.emotion]}</span>
+                            </li>
+                        ))}
+                    </ul>
                 )}
                 <h2 className={styles.name}>{name}</h2>
                 {sections.map(([label, field]) => (

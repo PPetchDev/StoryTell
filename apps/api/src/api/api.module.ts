@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { BackupApiModule } from './backup/backup.module.js';
 import { CharacterCardApiModule } from './character-card/character-card.module.js';
 import { DocumentApiModule } from './document/document.module.js';
+import { ExpressionApiModule } from './expression/expression.module.js';
 import { ChatApiModule } from './chat/chat.module.js';
 import { HealthApiController } from './health/health.controller.js';
 import { ImageApiModule } from './image/image.module.js';
@@ -35,6 +36,7 @@ import { VoiceApiModule } from './voice/voice.module.js';
         UsageApiModule,
         VoiceApiModule,
         ReferenceImageApiModule,
+        ExpressionApiModule,
         PersonaApiModule,
         SavedReplyApiModule,
         ReplaceRuleApiModule,

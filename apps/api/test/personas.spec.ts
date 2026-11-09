@@ -236,7 +236,7 @@ describe('Personas and swapping the worn identity', () => {
 
             expect(played.messages[played.messages.length - 1].parts).toEqual([
                 { kind: 'narration', text: 'Mira stands.' },
-                { kind: 'speech', characterId: story.characters[0].id, speakerName: 'Mira', text: 'Well?' },
+                { kind: 'speech', characterId: story.characters[0].id, speakerName: 'Mira', text: 'Well?', emotion: null },
             ]);
         });
 

@@ -498,8 +498,9 @@ describe('Story authoring', () => {
                         characterId: mira,
                         speakerName: 'Mira',
                         text: 'Who let you up here?\nShe does not wait for an answer.',
+                        emotion: null,
                     },
-                    { kind: 'speech', characterId: null, speakerName: 'The Harbourmaster', text: 'Leave the keeper be.' },
+                    { kind: 'speech', characterId: null, speakerName: 'The Harbourmaster', text: 'Leave the keeper be.', emotion: null },
                     { kind: 'narration', text: 'Rain finds the broken pane.' },
                 ],
             });
@@ -513,7 +514,7 @@ describe('Story authoring', () => {
 
             expect(response.body.parts).toEqual([
                 { kind: 'narration', text: 'The door opens.' },
-                { kind: 'speech', characterId: null, speakerName: 'The new keeper', text: 'Hello?' },
+                { kind: 'speech', characterId: null, speakerName: 'The new keeper', text: 'Hello?', emotion: null },
             ]);
         });
 

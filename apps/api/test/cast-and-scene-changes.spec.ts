@@ -295,7 +295,7 @@ describe('Cast and Scene changes reaching existing Chats', () => {
             expect(prompt).toContain('Dockside slang.');
             expect(prompt).toMatch(/- Lena: Arc so far: .*Possible direction \(author's intent, not yet happened\): She may come to trust the keeper\./);
             const reply = (await getChat(story.id, second.id)).messages.at(-1)!;
-            expect(reply.parts).toEqual([{ kind: 'speech', characterId: lena.id, speakerName: 'Lena', text: 'Who are you?' }]);
+            expect(reply.parts).toEqual([{ kind: 'speech', characterId: lena.id, speakerName: 'Lena', text: 'Who are you?', emotion: null }]);
         });
 
         it('copies nothing for a Character added without Arc directions, and a StartingBond added later stays out of existing Chats', async () => {
@@ -404,8 +404,8 @@ describe('Cast and Scene changes reaching existing Chats', () => {
                 // Old speech keeps the stamped name, with the Character link cleared.
                 const chat = await getChat(storyId, chatId);
                 expect(chat.messages.at(-1)!.parts).toEqual([
-                    { kind: 'speech', characterId: null, speakerName: 'Kai', text: 'Welcome, keeper!' },
-                    { kind: 'speech', characterId: mira.id, speakerName: 'Mira', text: 'Hush.' },
+                    { kind: 'speech', characterId: null, speakerName: 'Kai', text: 'Welcome, keeper!', emotion: null },
+                    { kind: 'speech', characterId: mira.id, speakerName: 'Mira', text: 'Hush.', emotion: null },
                 ]);
                 expect(chat.playable).toBe(true);
 

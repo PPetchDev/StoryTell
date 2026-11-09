@@ -4,10 +4,13 @@ import {
     Index,
     JoinColumn,
     ManyToOne,
+    OneToMany,
     PrimaryGeneratedColumn,
 } from 'typeorm';
 import type { Relation } from 'typeorm';
 
+import { EXPRESSION_EMOTIONS } from '../emotion.js';
+import type { CharacterExpressionEntity, ExpressionResponse } from './character-expression.entity.js';
 import type { StoryEntity } from './story.entity.js';
 
 /** A square of the Reference image, in fractions of the image's width: left edge, top edge, side. */
@@ -33,6 +36,8 @@ export interface CharacterResponse {
     portraitCrop: PortraitCrop | null;
     /** The Kokoro voice their lines are read aloud in; null reads them in the Narration voice. Apart from `voice`, how they talk on the page. */
     speakingVoice: string | null;
+    /** Their pictures per emotion, in the fixed order of the emotions (.scratch/expressions/spec.md). */
+    expressions: ExpressionResponse[];
 }
 
 /** An AI-played figure in one Story's cast. Ordered by `position` within the Story. */
@@ -89,6 +94,11 @@ export class CharacterEntity {
     @Column({ name: 'speaking_voice', type: 'text', nullable: true })
     speakingVoice: string | null;
 
+    // Loaded only through StoryModelService.findFull(). A save of the Character never touches them
+    // (orphanedRowAction 'disable' on the other side), so an autosave holding an older read is safe.
+    @OneToMany('CharacterExpressionEntity', 'character')
+    expressions: Relation<CharacterExpressionEntity[]>;
+
     toResponse(): CharacterResponse {
         return {
             id: this.id,
@@ -103,6 +113,9 @@ export class CharacterEntity {
             referenceImagePath: this.referenceImagePath,
             portraitCrop: this.portraitCrop ? { ...this.portraitCrop } : null,
             speakingVoice: this.speakingVoice,
+            expressions: [...(this.expressions ?? [])]
+                .sort((a, b) => EXPRESSION_EMOTIONS.indexOf(a.emotion) - EXPRESSION_EMOTIONS.indexOf(b.emotion))
+                .map((expression) => expression.toResponse(this.referenceImagePath)),
         };
     }
 }

@@ -10,6 +10,8 @@ import {
     EditResult,
 } from '../../../manager/chat/chat.service.js';
 import { ChatSummary, TimeOfDay, TIMES_OF_DAY } from '../../../model/chat/entities/chat.entity.js';
+import { EMOTIONS } from '../../../model/story/emotion.js';
+import type { Emotion } from '../../../model/story/emotion.js';
 import { BackgroundCallResponse, BackgroundStatus, ReplyVersionsResponse } from '../../../model/chat/entities/message.entity.js';
 import { ArcStepResponse } from '../../../model/ledger/entities/arc-step.entity.js';
 import { BondChangeResponse } from '../../../model/ledger/entities/bond-change.entity.js';
@@ -91,6 +93,15 @@ export class MessagePartDTO {
 
     @ApiProperty()
     text: string;
+
+    @ApiPropertyOptional({
+        enum: EMOTIONS,
+        nullable: true,
+        description:
+            'Speech only, always given: the emotion the Judge tagged the line with, written in the call that marks its judge done. ' +
+            'Null until then, on the Opening, and while the Story has no Expressions. Narration has none.',
+    })
+    emotion?: Emotion | null;
 }
 
 export class ReplyVersionsDTO implements ReplyVersionsResponse {

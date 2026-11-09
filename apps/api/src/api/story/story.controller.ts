@@ -13,6 +13,7 @@ import {
 import { ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 
 import { StoryManagerService } from '../../manager/story/story.service.js';
+import { untaggedPartResponse } from '../../model/chat/entities/message-part.entity.js';
 import {
     CharacterOrderRequestBodyDTO,
     CharacterRequestBodyDTO,
@@ -59,7 +60,7 @@ export class StoryApiController {
     @Get(':storyId/opening')
     @ApiOkResponse({ type: OpeningPreviewResponseBodyDTO })
     async openingPreview(@Id('storyId') storyId: number): Promise<OpeningPreviewResponseBodyDTO> {
-        return { parts: await this.storyManager.openingParts(storyId) };
+        return { parts: (await this.storyManager.openingParts(storyId)).map(untaggedPartResponse) };
     }
 
     @Patch(':storyId')

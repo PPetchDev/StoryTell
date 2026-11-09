@@ -24,7 +24,7 @@ describe('Thai reading: the source text (pure)', () => {
         const source = thaiReadingSource(
             ai([
                 { kind: 'narration', text: 'Rain hammers the glass. ' },
-                { kind: 'speech', characterId: 4, speakerName: 'Mira', text: ' Boots off, keeper.' },
+                { kind: 'speech', characterId: 4, speakerName: 'Mira', text: ' Boots off, keeper.', emotion: null },
                 { kind: 'narration', text: '*She turns away.*' },
             ]),
         );
@@ -32,7 +32,7 @@ describe('Thai reading: the source text (pure)', () => {
     });
 
     it('reads the Opening the same way, speech kept under its stamped name', () => {
-        expect(thaiReadingSource({ ...ai([{ kind: 'speech', characterId: null, speakerName: 'Old Tom', text: 'Lamp is out.' }]), model: 'author' })).toBe(
+        expect(thaiReadingSource({ ...ai([{ kind: 'speech', characterId: null, speakerName: 'Old Tom', text: 'Lamp is out.', emotion: null }]), model: 'author' })).toBe(
             'Old Tom: Lamp is out.',
         );
     });
@@ -220,6 +220,8 @@ describe('Thai reading: the API', () => {
 
         await t.http.put(`/api/stories/${storyId}/chats/${chat.id}/messages/${reply.id}/version`).send({ version: 1 }).expect(200);
         expect(await readingOf(storyId, chat.id, reply.id)).toBe('Mira: เทคแรก');
+        // Choosing runs both background calls on the shown version; the next choice waits for them only so long.
+        await settled(storyId, chat.id);
         await t.http.put(`/api/stories/${storyId}/chats/${chat.id}/messages/${reply.id}/version`).send({ version: 2 }).expect(200);
         expect(await readingOf(storyId, chat.id, reply.id)).toBe('Mira: เทคที่สอง');
         expect(t.gateway.textCalls('thai_reading')).toHaveLength(0);

@@ -1,7 +1,7 @@
 import { Column, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 import type { Relation } from 'typeorm';
 
-import type { MessagePartResponse } from './message-part.entity.js';
+import type { StoredMessagePart } from './message-part.entity.js';
 import type { MessageEntity } from './message.entity.js';
 
 /**
@@ -31,7 +31,7 @@ export class ReplyVersionEntity {
 
     /** The parts as they were stored on the Message, in order. */
     @Column({ type: 'jsonb' })
-    parts: MessagePartResponse[];
+    parts: StoredMessagePart[];
 
     @Column({ name: 'written_at', type: 'timestamptz' })
     writtenAt: Date;

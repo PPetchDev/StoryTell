@@ -60,3 +60,28 @@
     white-space: pre-wrap;
     overflow-wrap: anywhere;
 }
+
+/* The Character's Expressions under the Reference image: small round pictures with their labels. */
+.expressions {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.6rem 0.9rem;
+}
+
+.expression {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.8125rem;
+    color: var(--muted);
+}
+
+.expressionPicture {
+    width: 3rem;
+    height: 3rem;
+}

@@ -1,5 +1,6 @@
 import { apiFetch, apiSend } from './api';
 import type { MessagePart } from './chat';
+import type { Expression, ExpressionEmotion } from './expressions';
 import type { SavedReply } from './saved-replies';
 import type { ReplaceRule } from './replace-rules';
 
@@ -72,6 +73,8 @@ export interface Character {
     portraitCrop: PortraitCrop | null;
     /** The voice their lines are read aloud in; null reads them in the Narration voice. Apart from `voice`. */
     speakingVoice: string | null;
+    /** Their pictures per emotion, in the fixed order of the emotions (.scratch/expressions/spec.md). */
+    expressions: Expression[];
 }
 
 export interface StartingBond {
@@ -204,7 +207,7 @@ export interface Story {
 }
 
 export type StoryFields = Partial<Pick<Story, 'title' | 'setting' | 'opening' | 'narrationVoice'> & Style>;
-export type CharacterFields = Partial<Omit<Character, 'id' | 'referenceImagePath' | 'portraitCrop'>>;
+export type CharacterFields = Partial<Omit<Character, 'id' | 'referenceImagePath' | 'portraitCrop' | 'expressions'>>;
 export type SceneFields = Partial<Omit<Scene, 'id'>>;
 export type StartingBondFields = Partial<Pick<StartingBond, 'label' | 'description'>>;
 export type LoreEntryFields = Partial<Omit<LoreEntry, 'id'>>;
@@ -349,6 +352,23 @@ export const storyApi = {
         apiSend<Story>('PUT', `/stories/${storyId}/characters/${characterId}/reference-image/portrait`, crop),
     clearPortraitCrop: (storyId: number, characterId: number) =>
         apiSend<Story>('DELETE', `/stories/${storyId}/characters/${characterId}/reference-image/portrait`),
+
+    /** Draws the emotion's Expression from the Reference image, at the Settings Snapshot model's 1K price; replaces any there, keeping its square. */
+    drawExpression: (storyId: number, characterId: number, emotion: ExpressionEmotion) =>
+        apiSend<Story>('POST', `/stories/${storyId}/characters/${characterId}/expressions/${emotion}/draw`),
+    /** Stores a picture from the phone as the emotion's Expression, replacing any there (.scratch/expressions/spec.md). */
+    uploadExpression: (storyId: number, characterId: number, emotion: ExpressionEmotion, picture: Blob, filename: string) => {
+        const form = new FormData();
+        form.append('image', picture, filename);
+        return apiFetch<Story>(`/stories/${storyId}/characters/${characterId}/expressions/${emotion}`, { method: 'PUT', body: form });
+    },
+    setExpressionCrop: (storyId: number, characterId: number, emotion: ExpressionEmotion, crop: PortraitCrop) =>
+        apiSend<Story>('PUT', `/stories/${storyId}/characters/${characterId}/expressions/${emotion}/crop`, crop),
+    /** Back to the Portrait's square. */
+    clearExpressionCrop: (storyId: number, characterId: number, emotion: ExpressionEmotion) =>
+        apiSend<Story>('DELETE', `/stories/${storyId}/characters/${characterId}/expressions/${emotion}/crop`),
+    removeExpression: (storyId: number, characterId: number, emotion: ExpressionEmotion) =>
+        apiSend<Story>('DELETE', `/stories/${storyId}/characters/${characterId}/expressions/${emotion}`),
 
     /** Makes a Snapshot of the Gallery, or a Character's Reference image, the Cover; the Cover only points at it. */
     chooseCover: (storyId: number, choice: { snapshotId: number } | { characterId: number }) =>

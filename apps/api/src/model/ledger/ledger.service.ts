@@ -7,6 +7,7 @@ import { BackgroundStatus, MessageEntity } from '../chat/entities/message.entity
 import { MemoryKnownByEntity } from '../memory/entities/memory-known-by.entity.js';
 import { MemoryAuthor, MemoryEntity, MemorySnapshot } from '../memory/entities/memory.entity.js';
 import { createMemory, setKnownBy } from '../memory/memory.service.js';
+import type { Emotion } from '../story/emotion.js';
 import { ArcStepEntity } from './entities/arc-step.entity.js';
 import { BondChangeEntity } from './entities/bond-change.entity.js';
 import { ChatArcDirectionEntity } from './entities/chat-arc-direction.entity.js';
@@ -55,6 +56,12 @@ export interface NewTimeChange {
     toTime: TimeOfDay;
 }
 
+/** The emotion the judge tagged one speech part of the judged Message with (.scratch/expressions/spec.md). */
+export interface PartEmotion {
+    partId: number;
+    emotion: Emotion;
+}
+
 /** What one judgement changed, recorded together against the AI Message that caused it. */
 export interface MessageChanges {
     bonds: NewBondChange[];
@@ -62,6 +69,12 @@ export interface MessageChanges {
     scene: NewSceneAdvance | null;
     /** The Time of day moving on; null or left out when it stayed. */
     time?: NewTimeChange | null;
+    /**
+     * The emotion of each tagged speech part of the Message; every other part of it is cleared. Not
+     * ledger rows: nothing rolls them back, since whatever undoes a judgement replaces the parts.
+     * Left out, the parts are not touched.
+     */
+    emotions?: PartEmotion[];
 }
 
 /**
@@ -175,7 +188,9 @@ export class LedgerModelService {
 
     /**
      * Records what a judgement changed against the AI Message that caused it, moves the Chat
-     * to the advanced Scene, and marks the Message's judge done, all in one transaction.
+     * to the advanced Scene, writes its parts' emotions, and marks the Message's judge done, all in
+     * one transaction: the judge is done exactly when its tags are there, and a failure writes
+     * nothing, so a retry records each change once.
      */
     record(chatId: number, messageId: number, changes: MessageChanges): Promise<void> {
         return this.dataSource.transaction(async (manager) => {
@@ -206,6 +221,15 @@ export class LedgerModelService {
             if (changes.time) {
                 await manager.save(manager.create(TimeChangeEntity, { chatId, messageId, ...changes.time }));
                 await manager.update(ChatEntity, { id: chatId }, { timeOfDay: changes.time.toTime });
+            }
+            if (changes.emotions) {
+                // One statement: each tagged part gets its emotion, every other part of the Message none.
+                await manager.query(
+                    `UPDATE "message_part" p SET "emotion" = t."emotion"
+                     FROM "message_part" q LEFT JOIN unnest($2::int[], $3::text[]) AS t("id", "emotion") ON t."id" = q."id"
+                     WHERE p."id" = q."id" AND p."message_id" = $1`,
+                    [messageId, changes.emotions.map((tag) => tag.partId), changes.emotions.map((tag) => tag.emotion)],
+                );
             }
             await manager.update(
                 MessageEntity,

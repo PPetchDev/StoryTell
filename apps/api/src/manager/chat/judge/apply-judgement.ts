@@ -1,6 +1,6 @@
 import { TimeOfDay } from '../../../model/chat/entities/chat.entity.js';
-import { MessageChanges, NewBondChange } from '../../../model/ledger/ledger.service.js';
-import { Judgement } from './judge-prompt.js';
+import { MessageChanges, NewBondChange, PartEmotion } from '../../../model/ledger/ledger.service.js';
+import { Judgement, JudgedExpression } from './judge-prompt.js';
 
 /**
  * The backend rules for applying a judgement (spec: "Backend rules when applying a
@@ -141,4 +141,20 @@ export function applyJudgement(input: ApplyInput, judgement: Judgement): Applied
     }
 
     return { bonds, arcs, scene, time, rejected };
+}
+
+/**
+ * The judge's line tags on the reply's parts (.scratch/expressions/spec.md, "Applying"): line n is
+ * the n-th speech part, in order. A number outside 1 to the count of speech parts is dropped, and a
+ * repeated number keeps its first tag. Untagged parts are left out, so they stay null. Pure logic.
+ */
+export function emotionsOfParts(parts: ReadonlyArray<{ id: number; kind: string }>, tags: readonly JudgedExpression[]): PartEmotion[] {
+    const speech = parts.filter((part) => part.kind === 'speech');
+    const tagged = new Set<number>();
+    return tags.flatMap((tag) => {
+        const part = speech[tag.line - 1];
+        if (tag.line < 1 || !part || tagged.has(tag.line)) return [];
+        tagged.add(tag.line);
+        return [{ partId: part.id, emotion: tag.emotion }];
+    });
 }

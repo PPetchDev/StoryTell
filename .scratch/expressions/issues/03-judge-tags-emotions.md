@@ -1,6 +1,6 @@
 # 03 — The Judge tags each line, and the line's picture shows its Expression
 
-**Status:** ready-for-agent
+**Status:** done
 
 **What to build:** After a reply, the Judge's existing call also tags the emotion of each line a Character speaks. The tags are stored in the same transaction that records the judgement and marks the judge done, so they show the moment the judge is done and a failed write never records the judgement twice. Once the tags arrive, the round picture beside a line shows that Character's Expression for it, falling back to the Portrait. The Character profile shows the set. A Branch keeps the tags of the Messages it copies. Per the spec's "Storage" (on a message part, Branch), "The Judge tags each line" and "In the Chat":
 
@@ -17,13 +17,13 @@
 
 **Blocked by:** [01 — Expressions on a Character](01-expressions-on-a-character.md), [Branch's copy ticket](../../branch/issues/02-branch-a-chat.md)
 
-- [ ] Pure tests:
+- [x] Pure tests:
   - the judge prompt with Expressions numbers the latest exchange's speech lines and carries the rule and field;
   - without them, it is byte-for-byte unchanged;
   - parsing drops unknown emotions and bad numbers, in any case;
   - the mapping handles out-of-range and repeated numbers.
-- [ ] A Playwright test with no page (the web has no unit-test runner) checks the line-picture helper's two outputs: the round picture (Expression with its crop or the Portrait's, else the Portrait, else the initial) and the whole picture (the Expression's full image, else the whole Reference image, else none), for a tagged, a `neutral`, an untagged and a picture-less Character's part.
-- [ ] API tests:
+- [x] A Playwright test with no page (the web has no unit-test runner) checks the line-picture helper's two outputs: the round picture (Expression with its crop or the Portrait's, else the Portrait, else the initial) and the whole picture (the Expression's full image, else the whole Reference image, else none), for a tagged, a `neutral`, an untagged and a picture-less Character's part.
+- [x] API tests:
   - a judged reply's speech parts carry the scripted emotions, and narration none;
   - the first Chat read that shows the judge done already holds the tags;
   - in a model-level test, a record whose emotion write fails commits nothing (no Bond change, Arc step, Scene advance or Time change, and the judge not done), so the automatic retry records each change once;
@@ -32,8 +32,8 @@
   - a failed judge leaves them null, and its Retry fills them;
   - a Story without Expressions sends today's judge prompt;
   - a Branch of a judged reply carries its parts' emotions.
-- [ ] e2e at 390px:
+- [x] e2e at 390px:
   - after a turn whose scripted judge tags a line `joy`, that line's picture is the Happy Expression;
   - a `neutral` or untagged line shows the Portrait;
   - the Character profile lists the Expressions.
-- [ ] Typecheck and the whole suites stay green.
+- [x] Typecheck and the whole suites stay green.

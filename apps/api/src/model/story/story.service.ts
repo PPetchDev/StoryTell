@@ -5,6 +5,8 @@ import { DataSource, Repository } from 'typeorm';
 import { copyDocuments } from '../document/document.service.js';
 import { ReplaceRuleEntity } from '../replace-rule/entities/replace-rule.entity.js';
 import { SavedReplyEntity } from '../saved-reply/entities/saved-reply.entity.js';
+import { ExpressionEmotion } from './emotion.js';
+import { CharacterExpressionEntity } from './entities/character-expression.entity.js';
 import { CharacterEntity, PortraitCrop } from './entities/character.entity.js';
 import { LoreEntryEntity } from './entities/lore-entry.entity.js';
 import { RoleEntity } from './entities/role.entity.js';
@@ -15,7 +17,7 @@ import { CoverFocus, StoryEntity } from './entities/story.entity.js';
 // Relations are opted into here only; nothing on the entities auto-loads.
 const FULL_RELATIONS = {
     role: true,
-    characters: true,
+    characters: { expressions: true },
     startingBonds: true,
     scenes: true,
     lore: true,
@@ -24,6 +26,15 @@ const FULL_RELATIONS = {
     replaceRules: true,
     coverSnapshot: true,
 };
+
+/** What one Expression row holds besides its id (.scratch/expressions/spec.md, "Storage"). */
+export interface ExpressionColumns {
+    characterId: number;
+    emotion: ExpressionEmotion;
+    imagePath: string;
+    crop: PortraitCrop | null;
+    drawnFrom: string | null;
+}
 
 /** A Story's Cover columns: at most one of the three pointers set, and where to look. */
 export interface CoverColumns {
@@ -60,6 +71,7 @@ export class StoryModelService {
         @InjectRepository(StartingBondEntity) private readonly bonds: Repository<StartingBondEntity>,
         @InjectRepository(SceneEntity) private readonly scenes: Repository<SceneEntity>,
         @InjectRepository(LoreEntryEntity) private readonly lore: Repository<LoreEntryEntity>,
+        @InjectRepository(CharacterExpressionEntity) private readonly expressions: Repository<CharacterExpressionEntity>,
     ) {}
 
     /** Every Story with its relations, most recently saved first. */
@@ -233,6 +245,45 @@ export class StoryModelService {
                 await manager.update(CharacterEntity, { id }, { position });
             }
         });
+    }
+
+    /**
+     * Inserts the Character's Expression for that emotion, or replaces the one there (a new row id
+     * either way). `crop: 'keep'` keeps the replaced row's square (a drawing again). Answers the
+     * replaced row's columns, so the caller can delete its file; null when there was none.
+     */
+    async putExpression(columns: Omit<ExpressionColumns, 'crop'> & { crop: PortraitCrop | null | 'keep' }): Promise<ExpressionColumns | null> {
+        return this.dataSource.transaction(async (manager) => {
+            const previous = await manager.findOne(CharacterExpressionEntity, {
+                where: { characterId: columns.characterId, emotion: columns.emotion },
+                lock: { mode: 'pessimistic_write' },
+            });
+            if (previous) await manager.delete(CharacterExpressionEntity, { id: previous.id });
+            const crop = columns.crop === 'keep' ? (previous?.crop ?? null) : columns.crop;
+            await manager.insert(CharacterExpressionEntity, { ...columns, crop });
+            return previous
+                ? { characterId: previous.characterId, emotion: previous.emotion, imagePath: previous.imagePath, crop: previous.crop, drawnFrom: previous.drawnFrom }
+                : null;
+        });
+    }
+
+    /** Copies Expressions onto other Characters (Duplicate Story), each with its file already written. */
+    async insertExpressions(rows: ExpressionColumns[]): Promise<void> {
+        if (rows.length > 0) await this.expressions.insert(rows.map((row) => ({ ...row })));
+    }
+
+    /** Sets or clears its own square; answers whether the Expression was there. */
+    async setExpressionCrop(characterId: number, emotion: ExpressionEmotion, crop: PortraitCrop | null): Promise<boolean> {
+        const result = await this.expressions.update({ characterId, emotion }, { crop });
+        return (result.affected ?? 0) > 0;
+    }
+
+    /** Deletes the row; answers its image path, or null when there was none. */
+    async removeExpression(characterId: number, emotion: ExpressionEmotion): Promise<string | null> {
+        const expression = await this.expressions.findOneBy({ characterId, emotion });
+        if (!expression) return null;
+        await this.expressions.delete({ id: expression.id });
+        return expression.imagePath;
     }
 
     createStartingBond(fields: Partial<StartingBondEntity>): StartingBondEntity {
