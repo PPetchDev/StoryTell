@@ -1,10 +1,12 @@
-import { StoryResponse } from '../../model/story/entities/story.entity.js';
+import { Backdrop, StoryResponse } from '../../model/story/entities/story.entity.js';
+import { SELECTIVE_LOGIC } from './card-mapping.js';
 
 /**
  * The card writer (spec: "Exporting a card"): a Story and one of its Characters to the V2 and
  * V3 card JSON. Pure. Every text has the Role's name, as a whole word, written as `{{user}}`,
  * so another app's user sees their own name. Never written: ids, Chats, Memories, Bonds,
- * Scenes, Starting Bonds, Snapshots, Documents, Expressions, Saved replies, Replace rules.
+ * Scenes, Starting Bonds, Snapshots, Documents, Expressions, Saved replies, Replace rules. Storytell's
+ * own block carries the voices and the Backdrop choice, each only when it isn't the default.
  */
 
 type Character = StoryResponse['characters'][number];
@@ -75,14 +77,29 @@ export function writeCard(story: StoryResponse, character: Character): CardDefin
     const role = story.role.name;
     const u = (text: string) => userMacro(text.trim(), role);
     const lore = story.lore.filter((entry) => entry.text.trim() !== '');
+    // The Lore trigger settings go where SillyTavern reads them (card-mapping.ts reads them back):
+    // Patterns as `/source/i` keys, second keywords as selective second keys, the rest in extensions.
     const entries = lore.map((entry, index) => ({
-        keys: [entry.name, ...entry.keywords].map((key) => key.trim()).filter((key) => key !== '').map(u),
+        keys: [
+            ...[entry.name, ...entry.keywords].map((key) => key.trim()).filter((key) => key !== '').map(u),
+            ...entry.patterns.map((source) => `/${source}/i`),
+        ],
+        secondary_keys: entry.secondaryKeywords.map(u),
         content: u(entry.text),
-        extensions: {},
+        extensions: {
+            selectiveLogic: entry.secondaryMode === 'unless' ? SELECTIVE_LOGIC.notAny : SELECTIVE_LOGIC.andAny,
+            sticky: entry.sticky,
+            cooldown: entry.cooldown,
+            delay: entry.delay,
+            probability: entry.chance,
+            useProbability: true,
+            group: entry.group,
+            exclude_recursion: !entry.recursable,
+        },
         enabled: true,
         insertion_order: index,
         constant: entry.alwaysOn,
-        selective: false,
+        selective: entry.secondaryKeywords.length > 0,
         name: u(entry.name),
         comment: u(entry.name),
     }));
@@ -113,6 +130,8 @@ export function writeCard(story: StoryResponse, character: Character): CardDefin
                     background: u(character.background),
                     secrets: u(character.secrets),
                     arcDirections: u(character.arcDirections),
+                    // Ticket 06: written only when set, so another app's block stays as before.
+                    ...(character.speakingVoice !== null && { speakingVoice: character.speakingVoice }),
                 },
                 role: { name: role, description: u(story.role.description) },
                 style: {
@@ -120,6 +139,8 @@ export function writeCard(story: StoryResponse, character: Character): CardDefin
                     tense: story.style.tense,
                     replyLength: story.style.replyLength,
                     imageStyle: u(story.style.imageStyle),
+                    ...(story.narrationVoice !== null && { narrationVoice: story.narrationVoice }),
+                    ...(story.backdrop !== Backdrop.None && { backdrop: story.backdrop }),
                 },
             },
         },

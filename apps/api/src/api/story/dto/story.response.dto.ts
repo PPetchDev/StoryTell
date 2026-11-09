@@ -16,6 +16,7 @@ import type { LoreSecondaryMode } from '../../../model/story/entities/lore-entry
 import { SceneResponse } from '../../../model/story/entities/scene.entity.js';
 import { StartingBondResponse } from '../../../model/story/entities/starting-bond.entity.js';
 import {
+    Backdrop,
     CoverFocus,
     CoverSource,
     Pov,
@@ -375,6 +376,9 @@ export class StoryResponseBodyDTO implements StoryDetail {
 
     @ApiProperty({ type: String, nullable: true, description: 'The voice narration is read aloud in; null for the default (GET /api/voices).' })
     narrationVoice: string | null;
+
+    @ApiProperty({ enum: Backdrop, description: "What sits behind the Story's Chats: nothing, the Cover, or the Chat's newest Snapshot." })
+    backdrop: Backdrop;
 
     @ApiProperty({ description: 'True when `missing` is empty.' })
     playable: boolean;

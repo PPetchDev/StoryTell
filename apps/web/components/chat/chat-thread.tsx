@@ -204,7 +204,7 @@ interface VersionSwitchProps {
 }
 
 /** ‹ n/m › (.scratch/swipe/spec.md): steps through the newest reply's Reply versions. */
-function VersionSwitch({ versions, onVersion }: VersionSwitchProps) {
+export function VersionSwitch({ versions, onVersion }: VersionSwitchProps) {
     const { current, count } = versions;
     return (
         <span className={styles.versions} role="group" aria-label="Reply versions">
@@ -395,13 +395,15 @@ const AT_END_SLACK = 48;
  * finishes while the user reads further up leaves them where they are (spec: streaming
  * replies, story 4).
  */
-function useFollowEnd(followKey: string, streaming: boolean, writing: boolean) {
+function useFollowEnd(followKey: string, streaming: boolean, writing: boolean, openAt: OpenAt | null) {
     const threadRef = useRef<HTMLElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
     const atEndRef = useRef(true);
     const openedRef = useRef(false);
     /** The turn being written has shown words, even if they are gone again (a Stop, a failure). */
     const streamedRef = useRef(false);
+    /** The key the thread opened at a Message under: a second run for it (React's dev double run) keeps that place. */
+    const openedAtRef = useRef<string | null>(null);
 
     useLayoutEffect(() => {
         if (streaming) streamedRef.current = true;
@@ -410,18 +412,23 @@ function useFollowEnd(followKey: string, streaming: boolean, writing: boolean) {
     useLayoutEffect(() => {
         const thread = threadRef.current;
         if (!thread) return;
+        if (openedAtRef.current === followKey) return;
+        openedAtRef.current = null;
         const streamed = streamedRef.current;
         if (!writing) streamedRef.current = false;
         // A turn whose reply streamed is over: following it was the user's to stop.
         if (streamed && !atEndRef.current) return;
         if (!openedRef.current) {
             openedRef.current = true;
+            // At the Message the Visual novel view showed (its top), else the one the URL's hash names.
+            const shown = openAt ? document.getElementById(messageAnchor(openAt.messageId)) : null;
             const hash = window.location.hash.slice(1);
-            const target = hash ? document.getElementById(hash) : null;
+            const target = shown ?? (hash ? document.getElementById(hash) : null);
             if (target) {
-                target.scrollIntoView({ block: 'center' });
-                target.classList.add('message-target');
+                target.scrollIntoView({ block: shown && !openAt?.mark ? 'start' : 'center' });
+                if (!shown || openAt?.mark) target.classList.add('message-target');
                 atEndRef.current = false;
+                openedAtRef.current = followKey;
                 return;
             }
         }
@@ -450,6 +457,12 @@ function useFollowEnd(followKey: string, streaming: boolean, writing: boolean) {
     }, []);
 
     return { threadRef, contentRef };
+}
+
+/** Where the thread opens instead of its end: a Message, outlined when a link led there. */
+export interface OpenAt {
+    messageId: number;
+    mark: boolean;
 }
 
 /** A line the user just sent, shown before the API has answered (spec: "Send feedback"). */
@@ -492,6 +505,8 @@ interface ChatThreadProps {
     onDismissSnapshot(job: SnapshotJob): void;
     /** ไทย on each Message, and which readings show. */
     thaiReadings: ThaiReadings;
+    /** Opens at this Message rather than the end (coming from the Visual novel view); read once, on opening. */
+    openAt?: OpenAt | null;
 }
 
 /** The Chat's Messages in order, as their own scroll area between the top bar and the composer. */
@@ -517,6 +532,7 @@ export function ChatThread({
     onOpenSnapshot,
     onDismissSnapshot,
     thaiReadings,
+    openAt = null,
 }: ChatThreadProps) {
     // ↺ Again replaces the reply in place: it leaves the thread while the writing indicator shows.
     const shown = replacing === null ? messages : messages.filter((message) => message.id !== replacing);
@@ -525,7 +541,7 @@ export function ChatThread({
     const newest = last ? `${last.id}:${messageText(last)}` : '';
     // A growing reply is followed by the size observer, and only while the user is at the end.
     const streaming = writing && replySoFar !== null && replySoFar.length > 0;
-    const { threadRef, contentRef } = useFollowEnd(`${shown.length}:${newest}:${pending !== null}:${writing}`, streaming, writing);
+    const { threadRef, contentRef } = useFollowEnd(`${shown.length}:${newest}:${pending !== null}:${writing}`, streaming, writing, openAt);
     const storySize = { '--story-size': STORY_TEXT_SIZE[useTextSize()] } as CSSProperties;
     const [tapped, setTapped] = useTappedMessage(canEdit);
     const player = useReadAloud();

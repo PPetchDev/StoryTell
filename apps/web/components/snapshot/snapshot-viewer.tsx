@@ -127,6 +127,7 @@ export function SnapshotViewer<T extends Snapshot>({ snapshots, openId, onClose,
             role="dialog"
             aria-modal="true"
             aria-label="Snapshot"
+            /* The viewer's black stage, fading as it is dragged away: literal, the same in both themes. */
             style={{ backgroundColor: `rgba(0, 0, 0, ${fade})` }}
         >
             <div className={styles.top}>

@@ -1,6 +1,9 @@
 import { CoverFocus, LatestChat, StorySummary } from './story';
 
-/** Hue pairs that sit well on the dark purple theme; a Story's id picks one, so it never changes. */
+/**
+ * Hue pairs that sit well on the dark purple theme; a Story's id picks one, so it never changes.
+ * Literal in both themes: a placeholder Cover stands in for a picture, and pictures keep their colours.
+ */
 const GRADIENTS: Array<[string, string]> = [
     ['#1d2b57', '#5b3b8c'],
     ['#3b1d4f', '#8c3b6e'],

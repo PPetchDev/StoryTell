@@ -28,6 +28,7 @@ import { LoreEntryEntity, LoreTriggers } from '../../model/story/entities/lore-e
 import { SceneEntity } from '../../model/story/entities/scene.entity.js';
 import { StartingBondEntity } from '../../model/story/entities/starting-bond.entity.js';
 import {
+    Backdrop,
     CoverFocus,
     CoverSource,
     Pov,
@@ -88,6 +89,7 @@ export interface StoryFields {
     imageStyle?: string;
     /** A voice id from the voice list, or null for the default. */
     narrationVoice?: string | null;
+    backdrop?: Backdrop;
 }
 
 export interface RoleFields {
@@ -128,9 +130,9 @@ export interface LoreEntryFields {
 }
 
 /**
- * A Lore entry's trigger settings (.scratch/lore-triggers/spec.md), set only in the editor: the
- * Story assistant, drafting and Character cards write `LoreEntryFields`, so their entries keep
- * the defaults.
+ * A Lore entry's trigger settings (.scratch/lore-triggers/spec.md), set in the editor and brought
+ * in by a Character card's lorebook (.scratch/character-cards ticket 05): the Story assistant and
+ * drafting write `LoreEntryFields`, so their entries keep the defaults.
  */
 export type LoreTriggerFields = Partial<LoreTriggers>;
 
@@ -263,6 +265,7 @@ export class StoryManagerService {
             'replyLength',
             'imageStyle',
             'narrationVoice',
+            'backdrop',
         ]);
         await this.storyModel.saveStory(story);
         return this.reload(storyId);

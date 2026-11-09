@@ -21,8 +21,11 @@ export interface PlayerView {
 }
 
 export interface ReadAloudPlayer extends PlayerView {
-    /** Reads a Message from its first item (or `from`), stopping any other first. */
-    play(messageId: number, from?: number): void;
+    /**
+     * Reads a Message from its first item (or `from`: an item index, or a pick from the queue once it is
+     * read, as the Visual novel view's ▶ does for the step on show), stopping any other first.
+     */
+    play(messageId: number, from?: number | ((items: SpeechItem[]) => number)): void;
     pause(): void;
     /** Carries on: from the paused place, or from the item that failed. */
     resume(): void;
@@ -141,17 +144,18 @@ export function useReadAloudPlayer(storyId: number, chatId: number): ReadAloudPl
     );
 
     const play = useCallback(
-        (messageId: number, from = 0) => {
+        (messageId: number, from: number | ((items: SpeechItem[]) => number) = 0) => {
             if (!aliveRef.current) return;
             stop();
-            const run: Run = { messageId, items: [], index: from, abort: new AbortController(), audio: new Map() };
+            const run: Run = { messageId, items: [], index: typeof from === 'number' ? from : 0, abort: new AbortController(), audio: new Map() };
             runRef.current = run;
             setView({ messageId, state: 'loading', item: null, error: null, needsTap: false });
             readAloudApi.queue(storyId, chatId, messageId).then(
                 (items) => {
                     if (runRef.current !== run) return;
                     run.items = items;
-                    void playItem(run, Math.min(from, items.length));
+                    const start = typeof from === 'number' ? from : Math.max(0, from(items));
+                    void playItem(run, Math.min(start, items.length));
                 },
                 (caught: unknown) => fail(run, caught),
             );

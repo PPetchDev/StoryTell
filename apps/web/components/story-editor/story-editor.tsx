@@ -14,6 +14,7 @@ import { isFolded, setFolded } from '@/lib/folds';
 import { AppliedChange } from '@/lib/story-assistant';
 import { DEFAULT_NARRATION_VOICE, useVoices, voiceName } from '@/lib/voices';
 import {
+    BACKDROP_LABELS,
     LoreEntry,
     LoreEntryFields,
     MAX_CHARACTERS,
@@ -272,6 +273,10 @@ export function StoryEditor({ initial }: { initial: Story }) {
     const setStyle = <K extends StyleKey>(field: K, value: Story['style'][K]) => {
         setStory((current) => ({ ...current, style: { ...current.style, [field]: value } }));
         queue(`style.${field}`, () => storyApi.update(storyId, { [field]: value }), applyStatus);
+    };
+    const setBackdrop = (backdrop: Story['backdrop']) => {
+        setStory((current) => ({ ...current, backdrop }));
+        queue('story.backdrop', () => storyApi.update(storyId, { backdrop }), applyStatus);
     };
     const setNarrationVoice = (voice: string | null) => {
         setStory((current) => ({ ...current, narrationVoice: voice }));
@@ -550,6 +555,13 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                     sampleVoice={narrationVoice}
                                     onChange={setNarrationVoice}
                                     hint={SAMPLE_COST_HINT}
+                                />
+                                <SegmentedField
+                                    label="Chat backdrop"
+                                    value={story.backdrop}
+                                    options={BACKDROP_LABELS}
+                                    hint="Dimmed behind the Messages. Without a Snapshot yet, the Cover shows."
+                                    onChange={setBackdrop}
                                 />
                             </section>
                             <FoldingCard foldKey={`saved-replies:${storyId}`} label="Saved replies" title="Saved replies" fieldPrefixes={[]}>

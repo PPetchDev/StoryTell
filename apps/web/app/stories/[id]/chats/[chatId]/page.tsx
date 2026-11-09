@@ -49,6 +49,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string; cha
                 characters={characters}
                 portraits={portraits}
                 scenes={scenes}
+                looks={story.status === 'ready' ? story.data : null}
             />
         </CharacterProfiles>
     );

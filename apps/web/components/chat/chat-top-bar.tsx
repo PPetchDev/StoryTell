@@ -297,6 +297,9 @@ interface ChatTopBarProps {
     onReset(): void;
     /** Counts the asks for "Who's in this Chat" from outside the menu; each new one opens it. */
     whoRequest?: number;
+    /** The Visual novel view is on (.scratch/chat-looks/spec.md); the toggle sits between the title and ⋯. */
+    novel?: boolean;
+    onToggleNovel?(): void;
 }
 
 /**
@@ -321,6 +324,8 @@ export function ChatTopBar({
     onSetAutoRead,
     onReset,
     whoRequest = 0,
+    novel = false,
+    onToggleNovel,
 }: ChatTopBarProps) {
     const [menu, setMenu] = useState<'closed' | 'menu' | 'rename' | 'note' | 'who'>('closed');
     const sittingOutNames = chat.sittingOut.flatMap((id) => characters.find((character) => character.id === id)?.name ?? []);
@@ -362,6 +367,26 @@ export function ChatTopBar({
                     <h1 className={styles.name}>{chat.title}</h1>
                     <span className={styles.identity}>as {chat.identityName}</span>
                 </div>
+                {onToggleNovel && (
+                    <button type="button" className={styles.icon} aria-label="Visual novel view" aria-pressed={novel} onClick={onToggleNovel}>
+                        {/* A figure over a text box: the speaker large, their words below. */}
+                        <svg
+                            viewBox="0 0 24 24"
+                            width="22"
+                            height="22"
+                            aria-hidden="true"
+                            fill={novel ? 'currentColor' : 'none'}
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                        >
+                            <circle cx="12" cy="6.5" r="2.5" />
+                            <path d="M7.5 14c.6-2.4 2.3-3.8 4.5-3.8s3.9 1.4 4.5 3.8" fill="none" />
+                            <rect x="3" y="15" width="18" height="6" rx="1.5" />
+                        </svg>
+                    </button>
+                )}
                 <button
                     type="button"
                     className={styles.icon}

@@ -11,6 +11,7 @@ export default function manifest(): MetadataRoute.Manifest {
         start_url: '/',
         scope: '/',
         display: 'standalone',
+        // PWA metadata stays literal and dark in both themes: it only colours the splash screen.
         background_color: '#16131f',
         theme_color: '#16131f',
         icons: [

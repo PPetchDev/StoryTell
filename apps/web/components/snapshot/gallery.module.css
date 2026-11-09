@@ -78,6 +78,7 @@
     padding: 0;
     border: 1px solid var(--line);
     border-radius: 0.5rem;
+    /* A picture's dark stage, the same in both themes. */
     background: #000;
     overflow: hidden;
     cursor: pointer;

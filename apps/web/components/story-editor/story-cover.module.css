@@ -31,7 +31,7 @@
     border-radius: 999px;
     font-size: 0.8125rem;
     font-weight: 600;
-    background: rgba(22, 19, 31, 0.78);
+    background: var(--picture-chip);
     border: 1px solid var(--line);
 }
 
@@ -84,6 +84,7 @@
     line-height: 0;
     border-radius: 0.75rem;
     overflow: hidden;
+    /* A picture's dark stage, the same in both themes. */
     background: #000;
     touch-action: none;
     cursor: crosshair;
@@ -114,6 +115,7 @@
     border: 3px solid var(--accent-text);
     box-shadow:
         0 0 0 2px var(--accent-fill),
+        /* A shadow over the picture, the same in both themes. */
         0 2px 8px rgba(0, 0, 0, 0.6);
     pointer-events: none;
 }
@@ -154,6 +156,7 @@
     padding: 0;
     border: 2px solid transparent;
     border-radius: 0.75rem;
+    /* A picture's dark stage, the same in both themes. */
     background: #000;
     overflow: hidden;
     cursor: pointer;
@@ -200,8 +203,9 @@
     bottom: 0;
     padding: 1rem 0.4rem 0.3rem;
     font-size: 0.8125rem;
-    color: var(--text);
+    color: var(--on-picture-text);
     text-align: left;
+    /* A scrim over the picture, the same in both themes, so the caption keeps its own colour. */
     background: linear-gradient(transparent, rgba(5, 3, 12, 0.85));
     white-space: nowrap;
     overflow: hidden;

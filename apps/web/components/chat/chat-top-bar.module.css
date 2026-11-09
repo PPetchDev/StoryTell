@@ -9,6 +9,8 @@
     margin: 0 -0.5rem;
     padding: 0.25rem 0;
     border-bottom: 1px solid var(--line);
+    /* Its own surface, the page colour, so a Backdrop shows behind the Messages only. */
+    background: var(--bg);
 }
 
 .icon {
@@ -292,4 +294,9 @@
     border-color: var(--accent);
     background: var(--accent);
     color: var(--accent-text);
+}
+
+/* The Visual novel view toggle while it is on. */
+.icon[aria-pressed='true'] {
+    color: var(--accent);
 }

@@ -178,6 +178,11 @@ export interface StoryCover {
     characterId: number | null;
 }
 
+/** What sits behind a Story's Chats: nothing, its Cover, or the Chat's newest Snapshot (mirrors the API). */
+export type Backdrop = 'none' | 'cover' | 'snapshot';
+
+export const BACKDROP_LABELS: Record<Backdrop, string> = { none: 'None', cover: 'Cover', snapshot: 'Newest Snapshot' };
+
 export interface Story {
     id: number;
     title: string;
@@ -200,13 +205,15 @@ export interface Story {
     cover: StoryCover | null;
     /** The voice narration is read aloud in; null for the default (.scratch/read-aloud/spec.md). */
     narrationVoice: string | null;
+    /** What sits behind its Chats' Messages (.scratch/chat-looks/spec.md, "Backdrop"). */
+    backdrop: Backdrop;
     playable: boolean;
     missing: MissingField[];
     createdAt: string;
     updatedAt: string;
 }
 
-export type StoryFields = Partial<Pick<Story, 'title' | 'setting' | 'opening' | 'narrationVoice'> & Style>;
+export type StoryFields = Partial<Pick<Story, 'title' | 'setting' | 'opening' | 'narrationVoice' | 'backdrop'> & Style>;
 export type CharacterFields = Partial<Omit<Character, 'id' | 'referenceImagePath' | 'portraitCrop' | 'expressions'>>;
 export type SceneFields = Partial<Omit<Scene, 'id'>>;
 export type StartingBondFields = Partial<Pick<StartingBond, 'label' | 'description'>>;

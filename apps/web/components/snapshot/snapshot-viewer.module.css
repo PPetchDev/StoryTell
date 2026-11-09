@@ -1,4 +1,7 @@
-/* The full-screen Snapshot viewer (spec: "Snapshot viewer"): the image whole on black. */
+/*
+ * The full-screen Snapshot viewer (spec: "Snapshot viewer"): the image whole on black. Its stage and
+ * the colours on it are literal: the viewer stays dark in both themes (spec: Chat looks, "Light theme").
+ */
 .viewer {
     position: fixed;
     inset: 0;

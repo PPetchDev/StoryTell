@@ -1,6 +1,6 @@
 # 05 — Cards carry Lore trigger settings both ways
 
-**Status:** ready-for-agent
+**Status:** done
 
 **What to build:** Once Lore entries have their trigger settings ([Spec: Lore triggers](../../lore-triggers/spec.md)), import and export map them to and from the card's lorebook entries, so a lorebook keeps working as its author tuned it. Import:
 
@@ -15,6 +15,8 @@ Export writes the same fields back: `secondary_keys` with `selective` and `selec
 
 **Blocked by:** [04 — Export a Character as a card PNG](04-export-a-character-as-a-card.md), [03 — Preview a card and choose its greeting](03-preview-and-choose-the-greeting.md), [Lore triggers 07 — Groups](../../lore-triggers/issues/07-groups.md) and [Lore triggers 06 — Chance](../../lore-triggers/issues/06-chance.md) (every setting exists by then)
 
-- [ ] Before starting, confirm SillyTavern's `selectiveLogic` numbers and the `extensions` key names against its source (the research file paraphrases them).
-- [ ] Pure tests: each mapping both ways; clamping; a broken regex key left out and counted; the approximated modes listed; export then import keeps every trigger setting.
-- [ ] API tests: a card with a sticky, grouped, 50% entry with second keys and a regex key imports with those settings; exporting it writes them back.
+- [x] Before starting, confirm SillyTavern's `selectiveLogic` numbers and the `extensions` key names against its source (the research file paraphrases them).
+- [x] Pure tests: each mapping both ways; clamping; a broken regex key left out and counted; the approximated modes listed; export then import keeps every trigger setting.
+- [x] API tests: a card with a sticky, grouped, 50% entry with second keys and a regex key imports with those settings; exporting it writes them back.
+
+**Notes:** Checked against SillyTavern's `public/scripts/world-info.js` (release branch). It has `world_info_logic = { AND_ANY: 0, NOT_ALL: 1, NOT_ANY: 2, AND_ALL: 3 }`. `convertCharacterBook` reads `entry.selective`, `secondary_keys`, and from `extensions`: `sticky`, `cooldown`, `delay`, `probability` (default 100), `useProbability` (default **true**), `group`, `exclude_recursion` and `selectiveLogic`. So Chance comes from `probability` unless `useProbability` is `false`. Second keys count only on a `selective` entry, as in SillyTavern. A non-selective entry's second keys are dropped and not listed, because SillyTavern ignores them too. Export writes every setting on every entry: `useProbability: true`, and 0 for the timed effects that are off. Tests: `apps/api/test/card-lore-triggers.spec.ts`. The pre-ticket expectations in `character-cards.spec.ts` (regex keys left out) are updated.

@@ -8,7 +8,8 @@
     <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="theme-color" content="#16131f" />
+        <meta name="theme-color" content="#16131f" media="(prefers-color-scheme: dark)" />
+        <meta name="theme-color" content="#f6f4fa" media="(prefers-color-scheme: light)" />
         <title>Can't connect · Storytell AI</title>
         <style>
             :root {
@@ -22,6 +23,22 @@
                 --line: #3a3150;
                 --warning: #ffc46b;
                 color-scheme: dark;
+            }
+            /* The app's light theme (globals.css, :root[data-theme='light']): this page can't run the app's
+               theme script, so it follows the phone's own setting. */
+            @media (prefers-color-scheme: light) {
+                :root {
+                    --bg: #f6f4fa;
+                    --surface: #ffffff;
+                    --text: #15111e;
+                    --muted: #4a4360;
+                    --accent: #5b3fd9;
+                    --accent-text: #ffffff;
+                    --accent-fill: #6a4ff0;
+                    --line: #d9d2e6;
+                    --warning: #8a5a00;
+                    color-scheme: light;
+                }
             }
             * {
                 box-sizing: border-box;

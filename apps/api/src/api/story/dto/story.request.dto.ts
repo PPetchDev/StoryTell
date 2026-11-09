@@ -26,7 +26,7 @@ import {
 } from '../../../manager/story/story.service.js';
 import { LORE_GROUP_MAX, LORE_SECONDARY_MODES, LORE_TIMED_MAX } from '../../../model/story/entities/lore-entry.entity.js';
 import type { LoreSecondaryMode } from '../../../model/story/entities/lore-entry.entity.js';
-import { Pov, ReplyLength, Tense } from '../../../model/story/entities/story.entity.js';
+import { Backdrop, Pov, ReplyLength, Tense } from '../../../model/story/entities/story.entity.js';
 
 // Long enough for any passage an author writes, short enough to refuse a runaway client.
 const TEXT_MAX = 20_000;
@@ -83,6 +83,12 @@ export class StoryRequestBodyDTO implements StoryFields {
     @IsString()
     @MaxLength(VOICE_ID_MAX)
     narrationVoice?: string | null;
+
+    @ApiPropertyOptional({ enum: Backdrop, description: "What sits behind the Story's Chats: nothing, the Cover, or the Chat's newest Snapshot." })
+    // Optional, but never null: null is not one of the three.
+    @ValidateIf((_body, value) => value !== undefined)
+    @IsEnum(Backdrop)
+    backdrop?: Backdrop;
 }
 
 export class RoleRequestBodyDTO implements RoleFields {

@@ -19,6 +19,7 @@
 .square {
     position: absolute;
     box-sizing: border-box;
+    /* A frame and scrim over the picture: literal, the same in both themes. */
     border: 2px solid #fff;
     border-radius: 999px;
     /* Dims everything outside the circle. */

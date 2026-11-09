@@ -13,6 +13,8 @@ export type CardFormat = 'v1' | 'v2' | 'v3';
 export interface CardBookEntry {
     keys: string[];
     secondary_keys: string[];
+    /** Its second keys are used (SillyTavern reads them only then). */
+    selective: boolean;
     content: string;
     enabled: boolean;
     constant: boolean;
@@ -22,6 +24,8 @@ export interface CardBookEntry {
     use_regex: boolean;
     /** Which of ENTRY_SETTINGS the entry sets, for the left-out list. */
     settings: string[];
+    /** SillyTavern's per-entry settings (selectiveLogic, sticky, probability, group…), as written. */
+    extensions: Record<string, unknown>;
 }
 
 export interface CardBook {
@@ -186,6 +190,7 @@ function normaliseEntry(entry: Record<string, unknown>): CardBookEntry {
     return {
         keys: texts(entry.keys ?? entry.key),
         secondary_keys: texts(entry.secondary_keys ?? entry.keysecondary),
+        selective: entry.selective === true,
         content: text(entry.content),
         enabled,
         constant: entry.constant === true,
@@ -193,6 +198,7 @@ function normaliseEntry(entry: Record<string, unknown>): CardBookEntry {
         comment: text(entry.comment),
         use_regex: entry.use_regex === true,
         settings: ENTRY_SETTINGS.filter((key) => entry[key] !== undefined && entry[key] !== null),
+        extensions: isObject(entry.extensions) ? entry.extensions : {},
     };
 }
 

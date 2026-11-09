@@ -82,6 +82,9 @@ describe('Character cards: the mapping (pure)', () => {
             title: 'Mira',
             setting: 'Ash arrives on the supply boat as the new assistant keeper.',
             opening: 'Rain hammers the gallery windows. "You\'re Ash? You\'re late."',
+            // Only a Storytell card's own block carries these (ticket 06).
+            narrationVoice: null,
+            backdrop: 'none',
         });
         expect(result.role).toEqual({ name: 'Ash', description: '' });
         expect(result.character).toEqual({
@@ -93,6 +96,7 @@ describe('Character cards: the mapping (pure)', () => {
             background: 'Mira keeps the lighthouse on a storm-cut island. She is thirty-four.',
             secrets: '',
             arcDirections: '',
+            speakingVoice: null,
         });
     });
 
@@ -160,22 +164,21 @@ describe('Character cards: the mapping (pure)', () => {
         expect(result.leftOut).toContain('3 example messages past the 50 Example lines.');
     });
 
-    it('maps the lorebook: disabled, blank and decorator handling, constant to Always include, regex keys left out', () => {
+    it('maps the lorebook: disabled, blank and decorator handling, constant to Always include, a regex key to a Pattern', () => {
         const result = plan(cardFixtureJson('v2-lighthouse.json'), 'Ash');
-        expect(result.lore).toEqual([
+        expect(result.lore.map(({ name, keywords, text, alwaysOn }) => ({ name, keywords, text, alwaysOn }))).toEqual([
             // The comment names it; the key that is the name is dropped as redundant.
             { name: 'Lamp room', keywords: ['lamp'], text: 'The lamp room sits at the top of 112 steps.', alwaysOn: false },
             // No name or comment: the first key names it; the @@ decorator line is gone.
             { name: 'Gull Rock', keywords: [], text: "Gull Rock is where Mira's brother drowned.", alwaysOn: true },
-            // The /…/ key is left out until Lore triggers.
+            // The /…/ key is a Pattern (card-lore-triggers.spec.ts has the rest of the trigger settings).
             { name: 'Storms', keywords: ['weather'], text: 'Storms come from the west.', alwaysOn: false },
         ]);
-        expect(result.leftOut).toEqual(
-            expect.arrayContaining(['1 disabled Lore entry.', '1 empty Lore entry.', "1 regex keyword (patterns aren't supported yet)."]),
-        );
+        expect(result.lore[2].patterns).toEqual(['storm(s)?']);
+        expect(result.leftOut).toEqual(expect.arrayContaining(['1 disabled Lore entry.', '1 empty Lore entry.']));
     });
 
-    it('leaves every key of a V3 use_regex entry out, and names an entry with no name, comment or plain key "Lore n"', () => {
+    it('makes every key of a V3 use_regex entry a Pattern, and names an entry with no name, comment or plain key "Lore n"', () => {
         const result = plan(
             v3Card({
                 character_book: {
@@ -192,7 +195,7 @@ describe('Character cards: the mapping (pure)', () => {
             ['Lore 2', []],
             ['Lore 3', []],
         ]);
-        expect(result.leftOut).toContain("2 regex keywords (patterns aren't supported yet).");
+        expect(result.lore[1].patterns).toEqual(['moon', 'tides?']);
     });
 
     it('cleans keywords as the editor does and keeps at most 20 of at most 100 characters', () => {
@@ -271,6 +274,7 @@ describe('Character cards: the mapping (pure)', () => {
             background: 'Born on the island.',
             secrets: 'She put the lamp out.',
             arcDirections: 'Learns to trust.',
+            speakingVoice: null,
         });
         expect(result.role).toEqual({ name: 'Bea', description: 'Bea is the new keeper.' });
         expect(result.story).toMatchObject({ setting: 'The island, where Bea arrives.', pov: 'first', tense: 'present', replyLength: 'long', imageStyle: 'ink wash' });
@@ -636,7 +640,6 @@ describe('Character cards: what won\'t come along (pure)', () => {
             "The greetings you don't choose (2 of 3).",
             '1 disabled Lore entry.',
             '2 Lore entries past the 200 limit.',
-            "1 regex keyword (patterns aren't supported yet).",
             'Lorebook settings: scan depth.',
             'Lore entry settings: insertion order.',
             'The Setting was cut to 20,000 characters.',
@@ -756,6 +759,22 @@ describe('Character cards: preview and greeting through the API', () => {
 
 type StoryForCard = Parameters<typeof writeCard>[0];
 
+/** What an entry with default trigger settings writes in its extensions (SillyTavern's keys). */
+const PLAIN_ENTRY_EXTENSIONS = { selectiveLogic: 0, sticky: 0, cooldown: 0, delay: 0, probability: 100, useProbability: true, group: '', exclude_recursion: false };
+
+/** A Lore entry's trigger settings at their defaults. */
+const NO_TRIGGERS = {
+    secondaryKeywords: [],
+    secondaryMode: 'alsoNeeds',
+    patterns: [],
+    recursable: true,
+    sticky: 0,
+    cooldown: 0,
+    delay: 0,
+    chance: 100,
+    group: '',
+};
+
 function storyForCard(overrides: Partial<StoryForCard> = {}): StoryForCard {
     const mira = {
         id: 11,
@@ -783,9 +802,9 @@ function storyForCard(overrides: Partial<StoryForCard> = {}): StoryForCard {
         startingBonds: [],
         scenes: [],
         lore: [
-            { id: 21, name: 'Lamp room', keywords: ['lamp', 'lens'], text: 'At the top of 112 steps.', alwaysOn: false },
-            { id: 22, name: 'Empty', keywords: [], text: '   ', alwaysOn: true },
-            { id: 23, name: 'Gull Rock', keywords: [], text: 'Where Ash first landed.', alwaysOn: true },
+            { id: 21, name: 'Lamp room', keywords: ['lamp', 'lens'], text: 'At the top of 112 steps.', alwaysOn: false, ...NO_TRIGGERS },
+            { id: 22, name: 'Empty', keywords: [], text: '   ', alwaysOn: true, ...NO_TRIGGERS },
+            { id: 23, name: 'Gull Rock', keywords: [], text: 'Where Ash first landed.', alwaysOn: true, ...NO_TRIGGERS },
         ],
         cover: null,
         ...overrides,
@@ -818,8 +837,8 @@ describe('Character cards: the writer (pure)', () => {
             name: 'The Lighthouse',
             extensions: {},
             entries: [
-                { keys: ['Lamp room', 'lamp', 'lens'], content: 'At the top of 112 steps.', extensions: {}, enabled: true, insertion_order: 0, constant: false, selective: false, name: 'Lamp room', comment: 'Lamp room' },
-                { keys: ['Gull Rock'], content: 'Where {{user}} first landed.', extensions: {}, enabled: true, insertion_order: 1, constant: true, selective: false, name: 'Gull Rock', comment: 'Gull Rock' },
+                { keys: ['Lamp room', 'lamp', 'lens'], secondary_keys: [], content: 'At the top of 112 steps.', extensions: PLAIN_ENTRY_EXTENSIONS, enabled: true, insertion_order: 0, constant: false, selective: false, name: 'Lamp room', comment: 'Lamp room' },
+                { keys: ['Gull Rock'], secondary_keys: [], content: 'Where {{user}} first landed.', extensions: PLAIN_ENTRY_EXTENSIONS, enabled: true, insertion_order: 1, constant: true, selective: false, name: 'Gull Rock', comment: 'Gull Rock' },
             ],
         });
         expect((data.extensions as { storytell: unknown }).storytell).toEqual({
@@ -893,11 +912,12 @@ describe('Character cards: the writer (pure)', () => {
                 background: mira.background,
                 secrets: mira.secrets,
                 arcDirections: mira.arcDirections,
+                speakingVoice: null,
             });
             expect(back.role).toEqual({ name: 'Ash', description: story.role.description });
-            expect(back.story).toEqual({ title: 'Mira', setting: story.setting, opening: story.opening, ...story.style });
+            expect(back.story).toEqual({ title: 'Mira', setting: story.setting, opening: story.opening, ...story.style, narrationVoice: null, backdrop: 'none' });
             expect(back.lore).toEqual(
-                story.lore.filter((entry) => entry.text.trim() !== '').map(({ name, keywords, text, alwaysOn }) => ({ name, keywords, text, alwaysOn })),
+                story.lore.filter((entry) => entry.text.trim() !== '').map(({ id: _id, ...fields }) => fields),
             );
         }
     });

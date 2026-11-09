@@ -1,26 +1,30 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { ChatBackdrop } from '@/components/chat/backdrop';
 import { CharacterRow } from '@/components/chat/character-row';
 import { ChatComposer } from '@/components/chat/chat-composer';
-import { ChatThread, PendingLine } from '@/components/chat/chat-thread';
+import { ChatThread, OpenAt, PendingLine } from '@/components/chat/chat-thread';
 import { ChatTopBar } from '@/components/chat/chat-top-bar';
 import { MemoryDrawer } from '@/components/chat/memory-drawer';
+import { NovelRequest, NovelView } from '@/components/chat/novel-view';
 import { SceneStrip } from '@/components/chat/scene-strip';
 import { SnapshotSheet } from '@/components/chat/snapshot-sheet';
 import { SnapshotViewer, useChatSnapshots } from '@/components/chat/snapshots';
 import { useThaiReadings } from '@/components/chat/thai-reading';
 import { useConnection } from '@/components/connection';
 import { ApiError, apiFetch, ApiUnreachableError, StreamBrokenError, StreamStoppedError } from '@/lib/api';
+import { backdropOf } from '@/lib/backdrop';
 import { handOffBranch, takeBranchHandoff } from '@/lib/branch';
 import { Cast, Portraits } from '@/lib/character-colour';
+import { setChatView, useChatView } from '@/lib/chat-view';
 import { backgroundPending, Chat, chatApi, EditedChat, latestReply, Message, MessagePart, rollbackNotice, TurnStream } from '@/lib/chat';
 import { Memory, memoryApi, renderUser } from '@/lib/memory';
 import { setSceneStripHidden, useSceneStripHidden } from '@/lib/scene-strip';
 import { inThreadOrder, Snapshot, snapshotApi } from '@/lib/snapshot';
-import { Scene } from '@/lib/story';
+import { Scene, Story } from '@/lib/story';
 
 import { applyReplaceRules, onMineRules } from '@/lib/replace-rules';
 import { ReadAloudProvider, useReadAloudPlayer } from './read-aloud';
@@ -60,9 +64,11 @@ interface ChatScreenProps {
     characters: readonly { id: number; name: string }[];
     /** The Story's Scenes, for the goals in the Scene strip; empty if the Story can't be read. */
     scenes: Scene[];
+    /** The Story's Backdrop choice and Cover; null if the Story can't be read, which shows no Backdrop. */
+    looks: Pick<Story, 'backdrop' | 'cover'> | null;
 }
 
-export function ChatScreen({ initial, cast, characters, portraits, scenes }: ChatScreenProps) {
+export function ChatScreen({ initial, cast, characters, portraits, scenes, looks }: ChatScreenProps) {
     const { reportUnreachable } = useConnection();
     const router = useRouter();
     const [chat, setChat] = useState(initial);
@@ -104,6 +110,20 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes }: Cha
     /** Read aloud's one player: the screen owns it, so it outlives whatever shows the Messages. Leaving stops it. */
     const player = useReadAloudPlayer(initial.storyId, initial.id);
     /** Stops the reading when it is this Message's: ↺ Again, an edit or another version changes its words. */
+    /** The Visual novel view (.scratch/chat-looks/spec.md): this device's choice, the moves the screen asks of it, and where it is. */
+    const novel = useChatView() === 'novel';
+    const [novelRequest, setNovelRequest] = useState<NovelRequest | null>(null);
+    const askNovel = (kind: NovelRequest['kind']) => setNovelRequest((current) => ({ kind, nonce: (current?.nonce ?? 0) + 1 }));
+    const novelAtRef = useRef<number | null>(null);
+    const onNovelPosition = useCallback((messageId: number | null) => {
+        novelAtRef.current = messageId;
+    }, []);
+    /** To the thread, opening at a Message: the one on show in the view, or a Memory's jump link's (outlined). */
+    const [threadAt, setThreadAt] = useState<OpenAt | null>(null);
+    const showThreadAt = (messageId: number | null, mark = false) => {
+        setThreadAt(messageId === null ? null : { messageId, mark });
+        setChatView('thread');
+    };
     const stopReading = (messageId: number) => {
         if (player.messageId === messageId) player.stop();
     };
@@ -172,6 +192,10 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes }: Cha
 
     /** Scrolls to a Message and outlines it, from a Memory's jump link. */
     const jumpTo = (messageId: number) => {
+        if (novel) {
+            showThreadAt(messageId, true);
+            return;
+        }
         const target = document.getElementById(`message-${messageId}`);
         if (!target) return;
         window.history.replaceState(null, '', `#message-${messageId}`);
@@ -319,6 +343,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes }: Cha
         stopReading(messageId);
         player.unlock();
         setReplacing(messageId);
+        askNovel('newest-reply');
         // Shown again only once the turn has settled, so the old reply never flashes back first.
         void runTurn(async (stream) => {
             try {
@@ -334,6 +359,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes }: Cha
     const chooseVersion = (messageId: number, version: number) => {
         if (writing || busy) return;
         stopReading(messageId);
+        askNovel('newest-reply');
         void runWrite(async () => refreshMemory(noteRollback(await chatApi.chooseVersion(chat.storyId, chat.id, messageId, version))));
     };
 
@@ -387,6 +413,9 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes }: Cha
             return swapped;
         });
 
+    // The Backdrop follows the thread: a new Snapshot, or one an edit or Reset took away, changes it.
+    const backdrop = looks ? backdropOf(looks, snaps.state.snapshots, chat.messages) : null;
+
     const failedJobs = snaps.state.jobs.filter((job) => job.status === 'failed');
 
     /**
@@ -412,6 +441,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes }: Cha
 
     return (
         <main className={`chat ${styles.screen}`}>
+            <ChatBackdrop picture={backdrop} />
             <ChatTopBar
                 chat={chat}
                 cast={cast}
@@ -435,9 +465,12 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes }: Cha
                 }
                 onReset={() => {
                     player.stop();
+                    askNovel('opening');
                     void runWrite(async () => refreshMemory(await chatApi.reset(chat.storyId, chat.id)));
                 }}
                 whoRequest={whoRequest}
+                novel={novel}
+                onToggleNovel={() => (novel ? showThreadAt(novelAtRef.current) : setChatView('novel'))}
             />
             {!stripHidden && (
                 <SceneStrip
@@ -473,6 +506,30 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes }: Cha
 
             <ShownTextProvider rules={chat.replaceRules}>
             <ReadAloudProvider player={player}>
+            {novel ? (
+                <NovelView
+                    messages={chat.messages}
+                    cast={cast}
+                    pending={pending}
+                    writing={writing}
+                    replySoFar={replySoFar}
+                    replacing={replacing}
+                    snapshots={snaps.state}
+                    busy={busy}
+                    canAct={!writing && !busy && editing === null}
+                    blocked={blocked}
+                    request={novelRequest}
+                    onAgain={again}
+                    onVersion={chooseVersion}
+                    onSnapshot={() => setSnapshotSheet(true)}
+                    onEditInThread={(messageId) => {
+                        showThreadAt(messageId);
+                        startEdit(messageId);
+                    }}
+                    onOpenSnapshot={setViewing}
+                    onPosition={onNovelPosition}
+                />
+            ) : (
             <ChatThread
                 messages={chat.messages}
                 cast={cast}
@@ -495,7 +552,9 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes }: Cha
                 onOpenSnapshot={setViewing}
                 onDismissSnapshot={(job) => void snaps.dismiss(job)}
                 thaiReadings={thaiReadings}
+                openAt={threadAt}
             />
+            )}
             </ReadAloudProvider>
             </ShownTextProvider>
 

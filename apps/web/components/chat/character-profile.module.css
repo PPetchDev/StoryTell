@@ -27,7 +27,7 @@
     height: 6rem;
     border-radius: 999px;
     background: var(--speaker-colour);
-    color: var(--bg);
+    color: var(--on-character);
     font-size: 2.5rem;
     font-weight: 700;
     line-height: 1;

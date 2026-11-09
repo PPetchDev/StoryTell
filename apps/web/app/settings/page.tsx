@@ -10,6 +10,7 @@ import { AppSavedRepliesCard } from '@/components/saved-replies/app-saved-replie
 import { AppReplaceRulesCard } from '@/components/replace-rules/app-replace-rules-card';
 import { SaveStatus } from '@/components/story-editor/save-status';
 import { TextSizeSetting } from '@/components/text-size-setting';
+import { ThemeSetting } from '@/components/theme-setting';
 import { apiSend } from '@/lib/api';
 import { ImageModelOption, ModelOption, PlayModelOption, Settings, SettingsResponse, SnapshotSize } from '@/lib/types';
 
@@ -288,6 +289,7 @@ export default function SettingsPage() {
             {settings.status === 'loading' && <p className="muted">Loading…</p>}
             {settings.status === 'error' && <p role="alert">{settings.error.message}</p>}
             {settings.status === 'ready' && <SettingsForm initial={settings.data} autosave={autosave} />}
+            <ThemeSetting />
             <TextSizeSetting />
         </main>
     );

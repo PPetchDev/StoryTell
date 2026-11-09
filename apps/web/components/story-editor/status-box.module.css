@@ -6,9 +6,9 @@
 }
 
 .ok {
-    background: #15301f;
-    border-color: #2f6b45;
-    color: #bfeccc;
+    background: var(--status-ok-surface);
+    border-color: var(--status-ok-line);
+    color: var(--status-ok-text);
 }
 
 .ok p {
@@ -30,7 +30,7 @@
     font: inherit;
     font-size: 0.875rem;
     text-align: left;
-    color: #ffe2b8;
+    color: var(--status-toggle-text);
     cursor: pointer;
 }
 
@@ -57,7 +57,7 @@
     min-height: 2.75rem;
     margin-top: 0.3rem;
     padding: 0.5rem 0.6rem;
-    background: rgba(0, 0, 0, 0.2);
+    background: var(--status-item-tint);
     border: 0;
     border-radius: 0.6rem;
     font: inherit;

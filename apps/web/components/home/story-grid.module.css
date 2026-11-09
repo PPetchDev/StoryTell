@@ -41,8 +41,9 @@
     left: 0.4rem;
     padding: 0.1rem 0.5rem;
     border-radius: 999px;
+    /* A scrim over the picture, the same in both themes, so the badge has its own colour too. */
     background: rgba(0, 0, 0, 0.78);
-    color: var(--warning);
+    color: var(--on-picture-warning);
     font-size: 0.75rem;
     font-weight: 700;
 }

@@ -1,6 +1,6 @@
 # 04 — Visual novel view: stepping through a Chat
 
-**Status:** ready-for-agent
+**Status:** done
 
 **What to build:** A button in the Chat top bar switches this device to the Visual novel view, remembered for every Chat. It shows the Chat's stored Messages one step at a time over the Backdrop, in their shown text (the Chat's `onAi` Replace rules applied to each AI part before it is split into steps, as the thread applies them before splitting paragraphs):
 
@@ -14,7 +14,7 @@ A tap, Space, Enter or → goes on; Back or ← goes back. It opens on the newes
 
 **Blocked by:** [03 — A Backdrop](03-backdrop.md), [Expressions 03 — The Judge tags each line](../../expressions/issues/03-judge-tags-emotions.md), [Replace rules on AI Messages as shown](../../saved-replies-and-replace-rules/issues/04-replace-rules-on-ai-messages.md)
 
-- [ ] e2e at 390px:
+- [x] e2e at 390px:
   - the toggle persists across a reload;
   - a reply with narration and two speakers steps through narration (no picture), speaker A (Reference image) and speaker B (initial);
   - Back returns;
@@ -24,6 +24,8 @@ A tap, Space, Enter or → goes on; Back or ← goes back. It opens on the newes
   - with a tagged line and an Expression, the large picture is that Expression;
   - switching to the thread scrolls to the Message shown;
   - Space and the arrow keys step.
-- [ ] e2e at 1440px: the stage sits in the reading column over the Backdrop, and the docked Memory drawer leaves it usable.
-- [ ] The box is `aria-live`, and Next and Back are labelled buttons.
-- [ ] The thread view is unchanged with the toggle off. Typecheck and the whole e2e suite pass.
+- [x] e2e at 1440px: the stage sits in the reading column over the Backdrop, and the docked Memory drawer leaves it usable.
+- [x] The box is `aria-live`, and Next and Back are labelled buttons.
+- [x] The thread view is unchanged with the toggle off. Typecheck and the whole e2e suite pass.
+
+**Notes:** `lib/novel-steps.ts` (`novelSteps` and the step lookups) and `lib/backdrop.ts` are pure. `e2e/novel-steps.spec.ts` tests them with no page, as `line-picture.spec` does. The view is `components/chat/novel-view.tsx`, and the preference is `lib/chat-view.ts` (`storytell.chatView`). The stage takes taps and keys (Space, Enter, →, ←) and holds focus. Next and Back are real buttons. The words sit in a `Shown line` region with `aria-live=polite`. A Snapshot step has Back and Next under the picture, since it has no box. The thread now takes `openAt` (a Message to open at) to scroll back to where the view was. Its opening scroll skips React's dev-mode second run for the same key. Before this, the dev double run sent a `#message-N` link back to the end of the thread.

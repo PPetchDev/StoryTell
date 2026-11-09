@@ -38,6 +38,13 @@ export enum ReplyLength {
     Long = 'long',
 }
 
+/** What sits behind a Story's Chats (.scratch/chat-looks/spec.md, "Backdrop"). */
+export enum Backdrop {
+    None = 'none',
+    Cover = 'cover',
+    Snapshot = 'snapshot',
+}
+
 /** The point of a Cover kept in view when it is cropped, in fractions of the picture's width and height. */
 export interface CoverFocus {
     x: number;
@@ -92,6 +99,8 @@ export interface StoryResponse extends StorySummary {
     cover: StoryCover | null;
     /** The Kokoro voice narration is read aloud in; null for the default (.scratch/read-aloud/spec.md). */
     narrationVoice: string | null;
+    /** What sits behind its Chats' Messages (.scratch/chat-looks/spec.md, "Backdrop"). */
+    backdrop: Backdrop;
 }
 
 @Entity('story')
@@ -129,6 +138,9 @@ export class StoryEntity {
     /** A Kokoro voice id; null means DEFAULT_NARRATION_VOICE. */
     @Column({ name: 'narration_voice', type: 'text', nullable: true })
     narrationVoice: string | null;
+
+    @Column({ type: 'enum', enum: Backdrop, enumName: 'story_backdrop_enum', default: Backdrop.None })
+    backdrop: Backdrop;
 
     // The Cover is at most one of the next three (CHECK chk_story_one_cover); see cover().
     // Written only by StoryModelService.setCover(); saveStory() writes the authored fields alone,
@@ -217,6 +229,7 @@ export class StoryEntity {
             replaceRules: this.replaceRules.map((rule) => rule.toResponse()),
             cover: this.cover(),
             narrationVoice: this.narrationVoice,
+            backdrop: this.backdrop,
         };
     }
 

@@ -17,7 +17,8 @@ export async function preparedForUpload(file: File): Promise<{ picture: Blob; fi
         canvas.height = Math.max(1, Math.round(bitmap.height * scale));
         const context = canvas.getContext('2d');
         if (!context) throw new Error('No 2D canvas');
-        // JPEG has no transparency: a see-through PNG gets the dark theme's background behind it.
+        // JPEG has no transparency: a see-through PNG gets the dark theme's background behind it. A
+        // literal, not a token: it is baked into the stored JPEG, whatever the uploading device's theme.
         context.fillStyle = '#16131f';
         context.fillRect(0, 0, canvas.width, canvas.height);
         context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);

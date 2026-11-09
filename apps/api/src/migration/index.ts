@@ -34,6 +34,7 @@ import { Voices1764040000000 } from './1764040000000-Voices.js';
 import { AutoRead1764050000000 } from './1764050000000-AutoRead.js';
 import { Expressions1764060000000 } from './1764060000000-Expressions.js';
 import { MessagePartEmotion1764070000000 } from './1764070000000-MessagePartEmotion.js';
+import { StoryBackdrop1764080000000 } from './1764080000000-StoryBackdrop.js';
 
 // Listed by hand, oldest first, so migrations load the same way from compiled JS, the
 // TypeORM CLI and Vitest. Add every new migration here.
@@ -74,4 +75,5 @@ export const migrations = [
     AutoRead1764050000000,
     Expressions1764060000000,
     MessagePartEmotion1764070000000,
+    StoryBackdrop1764080000000,
 ];

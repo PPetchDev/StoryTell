@@ -1,6 +1,7 @@
 import { initialOf } from '@/components/portrait/character-portrait';
 
 import { apiFetch, ApiError, ApiUnreachableError } from './api';
+import { ON_CHARACTER_COLOUR, resolvedColour } from './character-colour';
 import { Character, referenceImageUrl, Story } from './story';
 
 /** What Home's file picker offers: card sites give PNGs and JSON files. */
@@ -86,9 +87,10 @@ export async function drawCardPicture(character: Pick<Character, 'name' | 'refer
     } else {
         canvas.width = STAND_IN_SIZE.width;
         canvas.height = STAND_IN_SIZE.height;
-        context.fillStyle = colour;
+        // The colours are theme tokens: the canvas takes their values as the page shows them now.
+        context.fillStyle = resolvedColour(colour);
         context.fillRect(0, 0, canvas.width, canvas.height);
-        context.fillStyle = '#16131f';
+        context.fillStyle = resolvedColour(ON_CHARACTER_COLOUR);
         context.font = `700 ${Math.round(canvas.width * 0.55)}px system-ui, sans-serif`;
         context.textAlign = 'center';
         context.textBaseline = 'middle';

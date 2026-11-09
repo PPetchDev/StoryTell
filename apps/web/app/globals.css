@@ -26,11 +26,133 @@
     --warning-surface: #3a2a12;
     --warning-line: #8a6326;
     --warning-soft: rgba(255, 180, 84, 0.14);
+    /*
+     * Chat looks ticket 01: every other colour of the app, named by its role. apps/web/scripts/contrast-check.mjs
+     * keeps a copy of these values for both themes and checks every text pair; keep the two in step.
+     */
+    --quiet-fill: #3a3150;
+    --ok-surface: #1f4d3a;
+    --ok-text: #9be7c4;
+    --banner-surface: #4a2a12;
+    --banner-line: #b8742a;
+    --caution-text: #f3b26b;
+    --error-text: #f3b26b;
+    --notice-surface: #2d2742;
+    --notice-line: #4a4068;
+    --rollback-surface: #23313a;
+    --rollback-line: #3d5a68;
+    --toast-surface: #2b3a2e;
+    --toast-line: #4a7a52;
+    --event: #d9c48a;
+    --confirm-warning-text: #f0c9a0;
+    --earlier-text: #e0b36a;
+    --rewrite-text: #c7b6ff;
+    --snapshot-failed-surface: #3a2b2e;
+    --snapshot-failed-line: #7a4a52;
+    --status-ok-surface: #15301f;
+    --status-ok-line: #2f6b45;
+    --status-ok-text: #bfeccc;
+    --status-toggle-text: #ffe2b8;
+    --status-item-tint: rgba(0, 0, 0, 0.2);
+    /* A chip on the Cover banner, over the picture. */
+    --picture-chip: rgba(22, 19, 31, 0.78);
+    /* Text on a picture's dark scrim: the scrim is the same in both themes, so these are too. */
+    --on-picture-text: #ece8f6;
+    --on-picture-warning: #ffc46b;
+    /* Behind a sheet or a dialog. */
+    --scrim: rgba(5, 3, 12, 0.6);
+    --shadow-soft: rgb(0 0 0 / 0.18);
+    --shadow: rgba(0, 0, 0, 0.4);
+    --shadow-strong: rgba(0, 0, 0, 0.55);
+    /*
+     * Character colours (spec: "Character colour"), picked by a Character's place in the cast, and
+     * the colour of an initial drawn on one. lib/character-colour.ts answers these as var(...).
+     */
+    --character-1: #f2b766;
+    --character-2: #5fd0c5;
+    --character-3: #f08aa8;
+    --character-4: #8fc7ff;
+    --character-5: #b5e07a;
+    --character-6: #d6a8ff;
+    --character-7: #ffa07a;
+    --character-8: #7fe0a0;
+    --character-neutral: #c4bdd6;
+    --on-character: #16131f;
+    /* Chat looks ticket 03: the page colour laid over a Backdrop picture, so lines on it stay readable. */
+    --backdrop-dim: rgba(22, 19, 31, 0.94);
     /* Friendly UI ticket 10: a modeless sheet's height, and the room a page leaves under it. */
     --sheet-half: 50dvh;
     /* The side rail's width on a wide screen; nothing on a phone, where the nav is a bottom bar. */
     --rail-width: 0px;
     color-scheme: dark;
+}
+
+/*
+ * Chat looks ticket 02: the light theme. The root layout's inline script sets data-theme on <html>
+ * from the Theme setting before the first paint. Every colour token is overridden here; the contrast
+ * check (apps/web/scripts/contrast-check.mjs light --fail) holds the same values and gates them.
+ */
+:root[data-theme='light'] {
+    --bg: #f6f4fa;
+    --surface: #ffffff;
+    --text: #15111e;
+    --muted: #4a4360;
+    --faint: #6c6486;
+    --accent: #5b3fd9;
+    --accent-text: #ffffff;
+    --accent-fill: #6a4ff0;
+    --surface-raised: #ece8f4;
+    --line: #d9d2e6;
+    --accent-soft: rgba(106, 79, 240, 0.12);
+    --accent-line: rgba(106, 79, 240, 0.4);
+    --danger: #b3243a;
+    --danger-soft: #fbe1e5;
+    --danger-text: #8a1428;
+    --warning: #8a5a00;
+    --warning-surface: #fdf1db;
+    --warning-line: #d9a548;
+    --warning-soft: rgba(217, 150, 40, 0.14);
+    --quiet-fill: #e6e1f0;
+    --ok-surface: #dcf2e5;
+    --ok-text: #1b5e3b;
+    --banner-surface: #fdeedb;
+    --banner-line: #d9a05c;
+    --caution-text: #8a4b00;
+    --error-text: #a33a0c;
+    --notice-surface: #ebe7f7;
+    --notice-line: #cbc2e8;
+    --rollback-surface: #e2eef3;
+    --rollback-line: #a7c5d2;
+    --toast-surface: #e3f2e5;
+    --toast-line: #9ac8a2;
+    --event: #735400;
+    --confirm-warning-text: #8a4510;
+    --earlier-text: #8a5a00;
+    --rewrite-text: #5b3fd9;
+    --snapshot-failed-surface: #fbe7ea;
+    --snapshot-failed-line: #dfa4ae;
+    --status-ok-surface: #e1f4e7;
+    --status-ok-line: #9dd0ae;
+    --status-ok-text: #1b5631;
+    --status-toggle-text: #6b4500;
+    --status-item-tint: rgba(0, 0, 0, 0.05);
+    --picture-chip: rgba(255, 255, 255, 0.88);
+    --scrim: rgba(20, 14, 40, 0.4);
+    --shadow-soft: rgb(30 20 60 / 0.12);
+    --shadow: rgba(30, 20, 60, 0.18);
+    --shadow-strong: rgba(30, 20, 60, 0.25);
+    --character-1: #7a5000;
+    --character-2: #0b645e;
+    --character-3: #b02c58;
+    --character-4: #1f5fa6;
+    --character-5: #41610e;
+    --character-6: #7a3dc2;
+    --character-7: #9c3a14;
+    --character-8: #126a38;
+    --character-neutral: #5c5670;
+    --on-character: #ffffff;
+    --backdrop-dim: rgba(246, 244, 250, 0.9);
+    color-scheme: light;
 }
 
 @media (min-width: 1024px) {
@@ -131,8 +253,8 @@ h1 {
 }
 
 .banner {
-    background: #4a2a12;
-    border: 1px solid #b8742a;
+    background: var(--banner-surface);
+    border: 1px solid var(--banner-line);
     border-radius: 0.75rem;
     padding: 0.75rem 1rem;
     margin: 0 0 1.25rem;
@@ -205,13 +327,13 @@ a {
     padding: 0.125rem 0.75rem;
     border-radius: 999px;
     font-size: 0.875rem;
-    background: #3a3150;
+    background: var(--quiet-fill);
     color: var(--muted);
 }
 
 .pill-ok {
-    background: #1f4d3a;
-    color: #9be7c4;
+    background: var(--ok-surface);
+    color: var(--ok-text);
 }
 
 .save-state {
@@ -249,15 +371,15 @@ a {
 }
 
 .warning {
-    background: #4a2a12;
-    border: 1px solid #b8742a;
+    background: var(--banner-surface);
+    border: 1px solid var(--banner-line);
     border-radius: 0.5rem;
     padding: 0.625rem 0.75rem;
     margin: 0 0 1rem;
 }
 
 .warning-text {
-    color: #f3b26b;
+    color: var(--caution-text);
 }
 
 .card h3 {
@@ -298,7 +420,7 @@ a {
     width: 100%;
     background: var(--bg);
     color: var(--text);
-    border: 1px solid #3a3150;
+    border: 1px solid var(--line);
     border-radius: 0.5rem;
     padding: 0.5rem 0.625rem;
     min-width: 0;
@@ -327,7 +449,7 @@ a {
 }
 
 .subsection {
-    border: 1px solid #3a3150;
+    border: 1px solid var(--line);
     border-radius: 0.5rem;
     padding: 0.5rem 0.75rem 0.75rem;
     margin: 0.75rem 0;
@@ -351,7 +473,7 @@ a {
 }
 
 .bond {
-    border-top: 1px solid #3a3150;
+    border-top: 1px solid var(--line);
     padding-top: 0.5rem;
     margin-top: 0.5rem;
 }
@@ -379,7 +501,7 @@ a {
 }
 
 .button-quiet {
-    background: #3a3150;
+    background: var(--quiet-fill);
     color: var(--text);
     padding: 0.375rem 0.875rem;
     font-weight: 500;
@@ -436,15 +558,15 @@ a {
     flex: 1 1 10rem;
     background: var(--bg);
     color: var(--text);
-    border: 1px solid #3a3150;
+    border: 1px solid var(--line);
     border-radius: 0.5rem;
     padding: 0.5rem 0.625rem;
     min-width: 0;
 }
 
 .notice {
-    background: #2d2742;
-    border: 1px solid #4a4068;
+    background: var(--notice-surface);
+    border: 1px solid var(--notice-line);
     border-radius: 0.5rem;
     padding: 0.625rem 0.75rem;
     margin: 0 0 0.75rem;
@@ -479,7 +601,7 @@ a {
 }
 
 .turn-error {
-    color: #f3b26b;
+    color: var(--error-text);
 }
 
 /* Edit a Message in place and reset the Chat (ticket 25) */
@@ -506,7 +628,7 @@ a {
     width: 100%;
     background: var(--bg);
     color: var(--text);
-    border: 1px solid #3a3150;
+    border: 1px solid var(--line);
     border-radius: 0.5rem;
     padding: 0.5rem 0.625rem;
     resize: vertical;
@@ -544,7 +666,7 @@ a {
 .field-error {
     margin: 0.25rem 0 0;
     font-size: 0.875rem;
-    color: #f3b26b;
+    color: var(--error-text);
 }
 
 /* --- Reference images (ticket 30): the current image, the offer and the candidate grid --- */
@@ -593,7 +715,7 @@ a {
 .field-changed textarea,
 .field-changed select {
     border-color: var(--accent);
-    box-shadow: 0 0 0 2px rgba(143, 115, 255, 0.35);
+    box-shadow: 0 0 0 2px var(--accent-line);
 }
 
 .changed-mark {
@@ -611,8 +733,8 @@ a {
 }
 
 .rollback-notice {
-    background: #23313a;
-    border-color: #3d5a68;
+    background: var(--rollback-surface);
+    border-color: var(--rollback-line);
 }
 
 .dashboard h2 {
@@ -717,11 +839,11 @@ a {
 .event {
     margin: 0 0 0.25rem;
     font-size: 0.9375rem;
-    color: #d9c48a;
+    color: var(--event);
 }
 
 .bond {
-    border-top: 1px solid #3a3150;
+    border-top: 1px solid var(--line);
     padding: 0.75rem 0;
 }
 
@@ -766,8 +888,8 @@ a {
     display: grid;
     gap: 0.125rem;
     text-align: left;
-    background: #2b3a2e;
-    border: 1px solid #4a7a52;
+    background: var(--toast-surface);
+    border: 1px solid var(--toast-line);
     border-radius: 0.75rem;
     padding: 0.625rem 0.875rem;
     color: var(--text);
@@ -808,7 +930,7 @@ a {
     inset: 0;
     z-index: 20;
     overflow-y: auto;
-    background: var(--bg, #15121f);
+    background: var(--bg);
     padding: 1rem;
 }
 
@@ -817,8 +939,8 @@ a {
         left: auto;
         width: 26rem;
         padding: 1.25rem 1.25rem 2rem;
-        border-left: 1px solid #3a3150;
-        box-shadow: -0.5rem 0 1.5rem rgba(0, 0, 0, 0.4);
+        border-left: 1px solid var(--line);
+        box-shadow: -0.5rem 0 1.5rem var(--shadow);
     }
 }
 
@@ -882,7 +1004,7 @@ a {
 
 .chip {
     display: inline-block;
-    background: #3a3150;
+    background: var(--quiet-fill);
     border-radius: 999px;
     padding: 0.125rem 0.625rem;
     font-size: 0.8125rem;
@@ -903,7 +1025,7 @@ a {
 }
 
 .memory-lock {
-    color: #d9c48a;
+    color: var(--event);
 }
 
 .memory-form {
@@ -1117,7 +1239,7 @@ a {
     max-width: 14rem;
     background: var(--bg);
     color: var(--text);
-    border: 1px solid #3a3150;
+    border: 1px solid var(--line);
     border-radius: 0.5rem;
     padding: 0.375rem 0.5rem;
 }
@@ -1125,7 +1247,7 @@ a {
 .confirm-warning {
     flex-basis: 100%;
     order: 1;
-    color: #f0c9a0;
+    color: var(--confirm-warning-text);
     font-size: 0.875rem;
 }
 
@@ -1133,7 +1255,7 @@ a {
 .snapshot-thumb {
     display: block;
     padding: 0;
-    border: 1px solid #3a3150;
+    border: 1px solid var(--line);
     border-radius: 0.5rem;
     background: var(--surface);
     overflow: hidden;
@@ -1190,7 +1312,7 @@ a {
     font: inherit;
     background: var(--bg);
     color: var(--text);
-    border: 1px solid #3a3150;
+    border: 1px solid var(--line);
     border-radius: 0.5rem;
     padding: 0.375rem 0.5rem;
 }
@@ -1214,7 +1336,7 @@ a {
 }
 
 .gallery-earlier {
-    color: #e0b36a;
+    color: var(--earlier-text);
 }
 
 /* --- Character cards: a picked PNG card's picture in the New Story panel --- */
@@ -1284,7 +1406,7 @@ a {
     align-items: flex-start;
     padding: 0.5rem 0.625rem;
     border-radius: 0.75rem;
-    background: var(--surface-raised, rgba(255, 255, 255, 0.04));
+    background: var(--surface-raised);
 }
 
 .card-import-greeting input {

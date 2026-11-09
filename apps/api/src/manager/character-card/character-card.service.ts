@@ -3,9 +3,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { NotAPngError } from '../../errors/character-card.errors.js';
 import { CharacterNotFoundError } from '../../errors/story.errors.js';
 import { StoryDetail, StoryManagerService } from '../story/story.service.js';
+import { VoiceManagerService } from '../voice/voice.service.js';
 import { characterNameOf, greetingsOf, mapCard, storytellBlock, titleOf } from './card-mapping.js';
 import { isPng, PngFormatError, replaceText } from './card-png.js';
-import { CardFormat, readCard, ReadCard } from './card-reader.js';
+import { CardData, CardFormat, readCard, ReadCard } from './card-reader.js';
 import { writeCard } from './card-writer.js';
 
 /** What the user sees before anything is made (spec: "API"). */
@@ -83,7 +84,25 @@ export interface CardImportRequest {
 export class CharacterCardManagerService {
     private readonly logger = new Logger(CharacterCardManagerService.name);
 
-    constructor(private readonly storyManager: StoryManagerService) {}
+    constructor(
+        private readonly storyManager: StoryManagerService,
+        private readonly voices: VoiceManagerService,
+    ) {}
+
+    /**
+     * Whether a voice id is in the voice list, for a Storytell card's voices. The list is read only
+     * when the card names a voice; when it can't be read, no voice is known and each is listed.
+     */
+    private async knownVoices(card: CardData): Promise<(voiceId: string) => boolean> {
+        const block = storytellBlock(card);
+        if (block?.style.narrationVoice == null && block?.character.speakingVoice == null) return () => false;
+        try {
+            const ids = new Set((await this.voices.list()).voices.map((voice) => voice.id));
+            return (voiceId) => ids.has(voiceId);
+        } catch {
+            return () => false;
+        }
+    }
 
     /** Reads the card; refuses a file that isn't one before anything is made. */
     read(bytes: Buffer): ReadCard {
@@ -91,11 +110,11 @@ export class CharacterCardManagerService {
     }
 
     /** Reads the card and says what an import would make. Writes nothing and makes no call. */
-    preview(bytes: Buffer): CardPreview {
+    async preview(bytes: Buffer): Promise<CardPreview> {
         const { format, card, picture } = this.read(bytes);
         const roleName = storytellBlock(card)?.role.name.trim() || null;
         // The name only changes what `{{user}}` reads as, not what comes along.
-        const plan = mapCard(card, { roleName: roleName ?? 'You', greeting: 0 });
+        const plan = mapCard(card, { roleName: roleName ?? 'You', greeting: 0 }, await this.knownVoices(card));
         return {
             format,
             title: titleOf(card),
@@ -112,7 +131,7 @@ export class CharacterCardManagerService {
 
     async importCard(bytes: Buffer, request: CardImportRequest): Promise<StoryDetail> {
         const { card, picture } = this.read(bytes);
-        const plan = mapCard(card, request);
+        const plan = mapCard(card, request, await this.knownVoices(card));
 
         let storyId: number | null = null;
         try {

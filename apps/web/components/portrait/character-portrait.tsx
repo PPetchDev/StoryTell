@@ -33,7 +33,7 @@ export function CharacterPortrait({ name, colour, portrait, light = false, class
                     fontWeight: 700,
                     lineHeight: 1,
                     background: colour,
-                    color: light ? 'var(--accent-text)' : 'var(--bg)',
+                    color: light ? 'var(--accent-text)' : 'var(--on-character)',
                 } as CSSProperties
             }
             aria-hidden="true"

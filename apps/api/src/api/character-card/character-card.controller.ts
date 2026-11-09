@@ -73,7 +73,7 @@ export class CharacterCardApiController {
     @ApiConsumes('multipart/form-data')
     @ApiBody({ type: CardFileRequestBodyDTO })
     @ApiOkResponse({ type: CardPreviewResponseBodyDTO, description: 'What an import of this card would make. Nothing is written.' })
-    preview(@UploadedFile() file: UploadedCard | undefined): CardPreviewResponseBodyDTO {
+    preview(@UploadedFile() file: UploadedCard | undefined): Promise<CardPreviewResponseBodyDTO> {
         if (!file) throw new NoCardFileError();
         return this.cards.preview(file.buffer);
     }

@@ -42,3 +42,8 @@
     font-size: var(--story-size);
     line-height: 1.5;
 }
+
+/* A segment with a word in it (the Theme setting), rather than one letter. */
+.wide {
+    padding: 0 0.875rem;
+}
