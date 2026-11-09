@@ -9,6 +9,7 @@ import {
     UnparseableOutputError,
 } from '../errors/model-gateway.errors.js';
 import {
+    FakeEmbeddingReply,
     FakeGatewayCall,
     FakeImageReply,
     FakeModelGateway,
@@ -17,12 +18,14 @@ import {
 } from '../service/model-gateway/fake-model-gateway.js';
 import {
     CreditPool,
+    EmbeddingCallKind,
     ImageCallKind,
     ModelGateway,
     RemainingCredit,
     TextCallKind,
     TextCompletionResult,
 } from '../service/model-gateway/model-gateway.js';
+import { FakePage, FakePageFetcher } from '../service/page-fetch/fake-page-fetcher.js';
 
 /** A scripted error, as JSON. `pool` applies to `out_of_credit` only. */
 export interface ScriptedErrorJson {
@@ -44,6 +47,16 @@ export interface ScriptImageBody {
     replies: Array<
         { imageBase64?: string; mimeType?: string; model?: string; costUsd?: number; delayMs?: number } | ScriptedErrorJson
     >;
+}
+
+/** A page the fake page fetcher answers for `url`. */
+export interface ScriptPageBody extends FakePage {
+    url: string;
+}
+
+export interface ScriptEmbeddingBody {
+    kind: EmbeddingCallKind;
+    replies: Array<'answer' | ScriptedErrorJson>;
 }
 
 function toError(json: ScriptedErrorJson): ModelGatewayError {
@@ -72,8 +85,19 @@ function isScriptedError(reply: unknown): reply is ScriptedErrorJson {
 export class FakeGatewayControlController {
     private readonly fake: FakeModelGateway;
 
-    constructor(gateway: ModelGateway) {
+    constructor(
+        gateway: ModelGateway,
+        private readonly pages: FakePageFetcher,
+    ) {
         this.fake = gateway as FakeModelGateway;
+    }
+
+    /** Scripts what the fake page fetcher answers for one address (Documents from a web page). */
+    @Post('page')
+    @HttpCode(204)
+    scriptPage(@Body() body: ScriptPageBody): void {
+        const { url, ...page } = body;
+        this.pages.script(url, page);
     }
 
     @Post('text')
@@ -104,6 +128,16 @@ export class FakeGatewayControlController {
                 : rest;
         });
         this.fake.scriptImage(body.kind, ...replies);
+    }
+
+    /** Embeddings answer unscripted; this queues failures (or `'answer'`) for the next calls of a kind. */
+    @Post('embedding')
+    @HttpCode(204)
+    scriptEmbedding(@Body() body: ScriptEmbeddingBody): void {
+        this.fake.scriptEmbedding(
+            body.kind,
+            ...body.replies.map((reply): FakeEmbeddingReply => (isScriptedError(reply) ? toError(reply) : 'answer')),
+        );
     }
 
     @Put('credit')
@@ -138,5 +172,6 @@ export class FakeGatewayControlController {
     @HttpCode(204)
     reset(): void {
         this.fake.reset();
+        this.pages.reset();
     }
 }

@@ -20,6 +20,12 @@ export enum MessageKind {
     Ai = 'ai',
 }
 
+/** A turn's Document search: the passages it sent, in the order sent, or that it failed. */
+export interface DocumentPassagesUsed {
+    status: 'found' | 'failed';
+    passageIds: number[];
+}
+
 /** The model recorded on the Opening, which no model wrote. */
 export const AUTHOR_MODEL = 'author';
 
@@ -137,6 +143,14 @@ export class MessageEntity {
 
     @Column({ name: 'memory_error', type: 'text', nullable: true })
     memoryError: string | null;
+
+    /**
+     * What the turn that wrote this AI Message found in the Story's Documents
+     * (.scratch/documents/spec.md: "What a turn used"); NULL when the Story had none. Regenerate
+     * and a User Message edit overwrite it; choosing an older Reply version keeps it.
+     */
+    @Column({ name: 'document_passages', type: 'jsonb', nullable: true })
+    documentPassages: DocumentPassagesUsed | null;
 
     // The shown Reply version's place among the Message's versions; NULL while it has no others.
     @Column({ name: 'version_ordinal', type: 'integer', nullable: true })

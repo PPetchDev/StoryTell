@@ -20,6 +20,7 @@ import {
     ListChatsResponseBodyDTO,
 } from './dto/chat.response.dto.js';
 import { LoreInPlayResponseBodyDTO } from './dto/lore-in-play.response.dto.js';
+import { DocumentsInPlayResponseBodyDTO } from './dto/documents-in-play.response.dto.js';
 import { SuggestionsResponseBodyDTO } from './dto/suggestions.response.dto.js';
 import { answerTurn } from './turn-response.js';
 
@@ -228,6 +229,16 @@ export class ChatApiController {
         @Id('messageId') messageId: number,
     ): Promise<BranchResponseBodyDTO> {
         return this.chatManager.branchChat(storyId, chatId, messageId);
+    }
+
+    /**
+     * Spec: .scratch/documents/spec.md, "Documents in play": the Document passages the last turn
+     * used, or that its search failed. No model call.
+     */
+    @Get(':chatId/documents')
+    @ApiOkResponse({ type: DocumentsInPlayResponseBodyDTO })
+    documentsInPlay(@Id('storyId') storyId: number, @Id('chatId') chatId: number): Promise<DocumentsInPlayResponseBodyDTO> {
+        return this.chatManager.documentsInPlay(storyId, chatId);
     }
 
     /** Spec: "Lore in play": the Lore entries a turn would send now, for the Memory drawer. */

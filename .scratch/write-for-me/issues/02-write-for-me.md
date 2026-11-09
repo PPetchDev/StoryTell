@@ -20,3 +20,10 @@ Part of: [Spec: Write for me and Thai reading](../spec.md)
 - [ ] Web: ✍️ ("Write for me") is disabled while a turn is written, a write is in flight, sending is blocked, or (once Dictation's mic exists) a recording or transcription runs — its own rule, not a copy of ⚡'s; while waiting the box is read-only and "Writing for you…" shows; a second tap cancels and the late answer is dropped.
 - [ ] Web: the result replaces the draft; "↶ Undo" shows while the box holds exactly the result and restores the earlier draft (empty included); any change to the box hides it; a failure shows "Couldn't write it, try again" and leaves the draft.
 - [ ] Pure tests for the prompt and the answer reading, API tests and e2e as listed in the spec's Testing Decisions pass; the existing suites stay green.
+
+## Comments
+
+**2026-11-09, from Documents ticket 06.** [Documents 06](../../documents/issues/06-suggested-replies-and-write-for-me-use-the-passages.md) landed before Write for me existed, so it wired the passages into Suggested replies only. Per [integration](../../sillytavern-gaps/integration.md) "Write for me's inputs", **this ticket owes the Documents block**, with a test. How Suggested replies do it, to copy:
+- `ChatManagerService.suggestReplies` reads the passages the newest AI Message recorded, still existing ones only, with no search call: `await this.documentSearch.recorded(story.id, newestAiMessage(chat)?.documentPassages ?? null)`, and hands them in as `documentPassages` (a `PromptLayersInput` field).
+- `buildSuggestionsPrompt` puts `documentsBlock(input.documentPassages ?? [])` after the Lore block and before the Author's note, and the history budget is what is left after the whole last message, so the block is reserved there.
+- The API checks to mirror are in `apps/api/test/documents-in-turns.spec.ts` ("Suggested replies"): the newest AI Message's passages are carried with no `document_search` call; a removed Document's passages drop out; a `failed` or null record gives no block; a Story without Documents sends the same prompt as before. The pure budget check is in `apps/api/test/document-search.spec.ts` ("the Suggested replies prompt").

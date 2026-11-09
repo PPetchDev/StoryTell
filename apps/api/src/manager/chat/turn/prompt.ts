@@ -4,6 +4,7 @@ import { PromptMessage } from '../../../service/model-gateway/model-gateway.js';
 import { MEMORY_CAP_TOKENS, memoryLine } from '../memory/memory-prompt.js';
 import { memoryIsAbout } from '../memory/present.js';
 import { renderUser } from '../memory/render-user.js';
+import { documentsBlock, PromptPassage } from '../../document/document-search.js';
 import { loreBlock, PromptLoreEntry } from '../lore/lore-select.js';
 import { estimateTokens } from './prompt-tokens.js';
 
@@ -18,7 +19,8 @@ import { estimateTokens } from './prompt-tokens.js';
  *  4. Style               8. Arcs                   12. the final instruction
  *
  * The final instruction opens with the Lore the latest exchange brings up (spec: "Lore"), then
- * the Chat's Author's note (.scratch/authors-note/spec.md), so the system message, and with it
+ * the Document passages the turn's search found (.scratch/documents/spec.md), then the Chat's
+ * Author's note (.scratch/authors-note/spec.md), so the system message, and with it
  * the cached prefix, stays the same from turn to turn. "Where things stand" names the Characters
  * sitting out (.scratch/speaker-controls/spec.md) for the same reason.
  *
@@ -130,6 +132,13 @@ export interface TurnPromptInput {
      * builder chooses Lore itself.
      */
     chosenLore?: PromptLoreEntry[];
+    /**
+     * The Document passages this turn's search selected (.scratch/documents/spec.md), highest
+     * score first; empty or left out sends no Documents block.
+     */
+    documentPassages?: PromptPassage[];
+    /** Whether the Story has any Document passage: the Story so far then reserves room for the block. */
+    hasDocuments?: boolean;
     /** The Memory layer's cap in tokens (spec: "about 2k tokens"); past it, Memories are left out in `memoryLeaveOutOrder`. */
     memoryCapTokens?: number;
     /**
@@ -467,8 +476,13 @@ export function buildTurnPrompt(input: TurnPromptInput): TurnPrompt {
     const userText = input.userText ?? continueInstruction(identity);
     const system = systemPrompt(input);
     const lore = loreBlock(input.chosenLore ?? []);
-    // One order (.scratch/sillytavern-gaps/integration.md): Lore, Author's note, Where things stand, the final instruction.
-    const finalInstruction = joinBlocks([lore, authorsNoteBlock(input.authorsNote, identity), `${stateReminder(input)}\n${turnFinalInstruction(identity)}`]);
+    // One order (.scratch/sillytavern-gaps/integration.md): Lore, Documents, Author's note, Where things stand, the final instruction.
+    const finalInstruction = joinBlocks([
+        lore,
+        documentsBlock(input.documentPassages ?? []),
+        authorsNoteBlock(input.authorsNote, identity),
+        `${stateReminder(input)}\n${turnFinalInstruction(identity)}`,
+    ]);
 
     const budget = input.tokenBudget ?? TURN_PROMPT_TOKEN_BUDGET;
     const fixed = estimateTokens(system.text) + estimateTokens(userText) + estimateTokens(finalInstruction);

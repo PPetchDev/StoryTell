@@ -92,3 +92,51 @@ export class InvalidLorePatternError extends AppError {
         super('422.003.014', `The pattern "${pattern}" is not a valid regular expression: ${reason}`);
     }
 }
+
+/** A Document whose text is nothing but whitespace (.scratch/documents/spec.md: "Limits"). No call is made. */
+export class EmptyDocumentError extends AppError {
+    constructor() {
+        super('422.003.015', 'The Document has no text. Paste or load some first.');
+    }
+}
+
+/** A Document over the size limit, refused before any call. */
+export class DocumentTooLargeError extends AppError {
+    constructor(characters: number, max: number) {
+        super(
+            '413.003.016',
+            `The Document is ${characters.toLocaleString('en-US')} characters; a Document holds at most ${max.toLocaleString('en-US')}. Split or trim it.`,
+        );
+    }
+}
+
+/** A 21st Document, or one that takes the Story past its passage limit, refused before any call. */
+export class DocumentLimitError extends AppError {
+    constructor(message: string) {
+        super('422.003.017', message);
+    }
+}
+
+/** No Document with that id in this Story: removed, or another Story's. */
+export class DocumentNotFoundError extends AppError {
+    constructor() {
+        super('404.003.018', 'Document not found in this Story.');
+    }
+}
+
+/**
+ * A web page address the API won't fetch (.scratch/documents/spec.md: "Files and web pages"):
+ * not http or https, carrying credentials, or naming this PC itself, given or redirected to.
+ */
+export class InvalidPageAddressError extends AppError {
+    constructor(reason: string) {
+        super('422.003.019', `${reason} Paste the page's text instead.`);
+    }
+}
+
+/** A page that couldn't be fetched or read; the message says why. Nothing is stored or spent. */
+export class PageFetchError extends AppError {
+    constructor(reason: string) {
+        super('502.003.020', `${reason} Paste the page's text instead.`);
+    }
+}

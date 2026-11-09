@@ -2,6 +2,8 @@ import { ApiProperty } from '@nestjs/swagger';
 
 import { MissingField } from '../../../manager/story/playable.js';
 import { LatestChat, StoryDetail, StoryListItem } from '../../../manager/story/story.service.js';
+import { DOCUMENT_SOURCES, DocumentSummary } from '../../../model/document/entities/document.entity.js';
+import type { DocumentSource } from '../../../model/document/entities/document.entity.js';
 import { CharacterResponse, PortraitCrop } from '../../../model/story/entities/character.entity.js';
 import { RoleResponse } from '../../../model/story/entities/role.entity.js';
 import { LORE_SECONDARY_MODES, LoreEntryResponse } from '../../../model/story/entities/lore-entry.entity.js';
@@ -267,6 +269,29 @@ export class LoreEntryDTO implements LoreEntryResponse {
     group: string;
 }
 
+export class DocumentSummaryDTO implements DocumentSummary {
+    @ApiProperty()
+    id: number;
+
+    @ApiProperty()
+    title: string;
+
+    @ApiProperty({ enum: DOCUMENT_SOURCES })
+    source: DocumentSource;
+
+    @ApiProperty({ type: String, nullable: true, description: 'The file name or the page URL; null for pasted text.' })
+    sourceName: string | null;
+
+    @ApiProperty({ description: "How many characters the Document's text has." })
+    characters: number;
+
+    @ApiProperty({ description: 'How many passages it was split into.' })
+    passages: number;
+
+    @ApiProperty()
+    createdAt: string;
+}
+
 export class MissingFieldDTO implements MissingField {
     @ApiProperty({ description: 'Stable field path, e.g. `role.name` or `characters.0.voice`.' })
     field: string;
@@ -306,6 +331,9 @@ export class StoryResponseBodyDTO implements StoryDetail {
 
     @ApiProperty({ type: [LoreEntryDTO], description: 'In add order.' })
     lore: LoreEntryDTO[];
+
+    @ApiProperty({ type: [DocumentSummaryDTO], description: 'In add order, without text or vectors.' })
+    documents: DocumentSummaryDTO[];
 
     @ApiProperty({ type: StoryCoverDTO, nullable: true, description: 'The picture the author chose; null while there is none.' })
     cover: StoryCoverDTO | null;

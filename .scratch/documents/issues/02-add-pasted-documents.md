@@ -1,6 +1,6 @@
 # 02 — Add a pasted Document to a Story
 
-**Status:** ready-for-agent
+**Status:** done
 
 Part of: [Spec: Documents](../spec.md)
 
@@ -17,16 +17,16 @@ Covers:
 
 **Blocked by:** [01 — Embeddings in the Model Gateway](01-gateway-embeddings.md)
 
-- [ ] Pure tests for the splitter:
-  - [ ] about 400 and at most 500 estimated tokens per passage;
-  - [ ] paragraph packing, then sentence splits, then hard splits;
-  - [ ] the ~60-token overlap;
-  - [ ] Thai text.
-- [ ] API tests through the fake gateway:
-  - [ ] Add stores the passages, records the gateway's model, and answers the Story with `documents` (no text, no vectors);
-  - [ ] empty text, over 200,000 characters, a 21st Document and past 1,000 passages are refused before any call;
-  - [ ] a batch that fails stores nothing.
-- [ ] The new errors take the next free codes in domain 003 and are listed in `docs/error-codes.md`.
-- [ ] The Lore tab's Documents section: the explanation line; the "+ Add Document" sheet with title, text, the live "About N passages · less than $0.01" estimate, and Add with "Adding…" and disabled buttons; errors shown in the sheet with the text kept; a card per Document with title, "Pasted" and its size.
-- [ ] e2e at 390px: paste and add a Document, see its passage count, reload and still see it.
-- [ ] The schema test passes with the new tables, and the existing suites stay green.
+- [x] Pure tests for the splitter:
+  - [x] about 400 and at most 500 estimated tokens per passage;
+  - [x] paragraph packing, then sentence splits, then hard splits;
+  - [x] the ~60-token overlap;
+  - [x] Thai text.
+- [x] API tests through the fake gateway:
+  - [x] Add stores the passages, records the gateway's model, and answers the Story with `documents` (no text, no vectors);
+  - [x] empty text, over 200,000 characters, a 21st Document and past 1,000 passages are refused before any call;
+  - [x] a batch that fails stores nothing.
+- [x] The new errors take the next free codes in domain 003 and are listed in `docs/error-codes.md`.
+- [x] The Lore tab's Documents section: the explanation line; the "+ Add Document" sheet with title, text, the live "About N passages · less than $0.01" estimate, and Add with "Adding…" and disabled buttons; errors shown in the sheet with the text kept; a card per Document with title, "Pasted" and its size.
+- [x] e2e at 390px: paste and add a Document, see its passage count, reload and still see it.
+- [x] The schema test passes with the new tables, and the existing suites stay green.

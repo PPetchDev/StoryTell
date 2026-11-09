@@ -50,3 +50,11 @@ export function latestLine(
             : message.parts.map((part) => (part.speakerName ? `${part.speakerName}: ${part.text}` : part.text)).join(' ');
     return clip(text, LATEST_LINE_LENGTH);
 }
+
+/** How long a Document passage's excerpt in Documents in play may get before it is cut. */
+const PASSAGE_EXCERPT_LENGTH = 160;
+
+/** A Document passage as Documents in play shows it: its first ~160 characters, whitespace collapsed. */
+export function passageExcerpt(text: string): string {
+    return clip(text, PASSAGE_EXCERPT_LENGTH);
+}

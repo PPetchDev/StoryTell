@@ -18,6 +18,8 @@ const CALL_KINDS = Object.keys({
     story_summary: true,
     snapshot_image: true,
     reference_image: true,
+    document_embedding: true,
+    document_search: true,
 } satisfies Record<CallKind, true>);
 
 export class KindSpendDTO implements KindSpend {

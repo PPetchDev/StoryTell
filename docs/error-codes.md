@@ -67,6 +67,12 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | `409.003.012` | `NoReferenceImageForCoverError` | A Cover picked from a Character with no Reference image. |
 | `404.003.013` | `LoreEntryNotFoundError` | No Lore entry with that id in this Story: edited or removed. |
 | `422.003.014` | `InvalidLorePatternError` | A Lore pattern that does not compile as a regular expression (case-insensitive, Unicode, multi-line). The message names the pattern and the reason; nothing of that write is saved. |
+| `422.003.015` | `EmptyDocumentError` | A Document added with nothing but whitespace. No embedding call is made. |
+| `413.003.016` | `DocumentTooLargeError` | A Document over 200,000 characters after trimming, refused before any embedding call. Split or trim it. |
+| `422.003.017` | `DocumentLimitError` | A 21st Document in a Story, or a Document that would take the Story past 1,000 passages in all, refused before any embedding call. |
+| `404.003.018` | `DocumentNotFoundError` | No Document with that id in this Story: removed, or another Story's. |
+| `422.003.019` | `InvalidPageAddressError` | A fetch-page address that isn't `http:` or `https:`, carries credentials, or names the PC itself (`localhost`, `*.localhost`, `127.0.0.0/8`, `::1`, `::ffff:127.x.x.x`), given or reached by a redirect. Refused before it is fetched. The message says which, and to paste the text instead. |
+| `502.003.020` | `PageFetchError` | A page that couldn't be fetched or read: unreachable, a timeout (15 s), a non-2xx answer, more than 5 redirects, a type other than `text/html` or `text/plain`, a body over 2 MB, or no text. The message says which, and to paste the text instead. |
 | `404.004.001` | `ChatNotFoundError` | No Chat with that id in this Story. |
 | `422.004.002` | `StoryNotPlayableError` | The Story has a required field empty. The message names the missing fields. Blocks starting a Chat, sending, Continue and Regenerate. |
 | `409.004.003` | `NoTurnToRetryError` | Retry when the Chat is not waiting for a reply to a User Message. |

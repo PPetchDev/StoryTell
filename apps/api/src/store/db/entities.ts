@@ -14,6 +14,8 @@ import { MemoryEntity } from '../../model/memory/entities/memory.entity.js';
 import { SettingsEntity } from '../../model/settings/entities/settings.entity.js';
 import { CharacterEntity } from '../../model/story/entities/character.entity.js';
 import { LoreEntryEntity } from '../../model/story/entities/lore-entry.entity.js';
+import { DocumentPassageEntity } from '../../model/document/entities/document-passage.entity.js';
+import { DocumentEntity } from '../../model/document/entities/document.entity.js';
 import { RoleEntity } from '../../model/story/entities/role.entity.js';
 import { SceneEntity } from '../../model/story/entities/scene.entity.js';
 import { StartingBondEntity } from '../../model/story/entities/starting-bond.entity.js';
@@ -31,6 +33,8 @@ export const entities = [
     StartingBondEntity,
     SceneEntity,
     LoreEntryEntity,
+    DocumentEntity,
+    DocumentPassageEntity,
     SettingsEntity,
     UsageRecordEntity,
     ChatEntity,

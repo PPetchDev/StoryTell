@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 
+import { copyDocuments } from '../document/document.service.js';
 import { CharacterEntity, PortraitCrop } from './entities/character.entity.js';
 import { LoreEntryEntity } from './entities/lore-entry.entity.js';
 import { RoleEntity } from './entities/role.entity.js';
@@ -10,7 +11,15 @@ import { StartingBondEntity } from './entities/starting-bond.entity.js';
 import { CoverFocus, StoryEntity } from './entities/story.entity.js';
 
 // Relations are opted into here only; nothing on the entities auto-loads.
-const FULL_RELATIONS = { role: true, characters: true, startingBonds: true, scenes: true, lore: true, coverSnapshot: true };
+const FULL_RELATIONS = {
+    role: true,
+    characters: true,
+    startingBonds: true,
+    scenes: true,
+    lore: true,
+    documents: true,
+    coverSnapshot: true,
+};
 
 /** A Story's Cover columns: at most one of the three pointers set, and where to look. */
 export interface CoverColumns {
@@ -29,6 +38,7 @@ function sorted(story: StoryEntity): StoryEntity {
     story.characters = byPosition(story.characters);
     story.scenes = byPosition(story.scenes);
     story.lore = byPosition(story.lore);
+    story.documents = byPosition(story.documents);
     story.startingBonds = [...story.startingBonds].sort((a, b) => a.id - b.id);
     return story;
 }
@@ -123,6 +133,8 @@ export class StoryModelService {
                 const { id: _id, ...fields } = entry.toResponse();
                 await manager.save(manager.create(LoreEntryEntity, { ...fields, storyId: story.id, position: entry.position }));
             }
+            // With their passages and vectors, so the copy is complete and costs nothing (.scratch/documents/spec.md).
+            await copyDocuments(manager, source.id, story.id);
             return { storyId: story.id, characterIds };
         });
     }

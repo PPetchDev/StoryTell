@@ -54,6 +54,8 @@ import { SuggestedRepliesManagerService } from './suggestions/suggested-replies.
 import { SuggestedReply } from './suggestions/suggestions-prompt.js';
 import { buildTurnPrompt, PromptArc, PromptBond, PromptHistoryMessage, PromptLayersInput, PromptMemory } from './turn/prompt.js';
 import { chosenLore, LoreInPlay, loreInPlayOf, promptLore, selectLoreAt } from './lore/lore-select.js';
+import { documentQuery } from '../document/document-search.js';
+import { DocumentSearchManagerService, DocumentsInPlay, hasDocumentPassages } from './document-search.service.js';
 import { CastName, ParseOptions, parseReply, partsToText, releasedText, ReplyPart } from './turn/reply-parser.js';
 import { TurnStoppedError, TurnStream } from './turn/turn-stream.js';
 
@@ -187,6 +189,7 @@ export class ChatManagerService {
         private readonly extraction: MemoryExtractionManagerService,
         private readonly suggestedReplies: SuggestedRepliesManagerService,
         private readonly storySoFar: StorySoFarManagerService,
+        private readonly documentSearch: DocumentSearchManagerService,
         private readonly gateway: ModelGateway,
     ) {}
 
@@ -619,6 +622,15 @@ export class ChatManagerService {
     }
 
     /**
+     * Spec: "Documents in play": the passages the newest AI Message's search sent, or that it
+     * failed. No model call: opening the drawer never spends.
+     */
+    async documentsInPlay(storyId: number, chatId: number): Promise<DocumentsInPlay> {
+        const { story, chat } = await this.load(storyId, chatId);
+        return this.documentSearch.inPlay(story, newestAiMessage(chat)?.documentPassages ?? null);
+    }
+
+    /**
      * Spec: "Lore in play": the entries a turn would send now with no new user message, as a
      * Continue would, for the Memory drawer.
      */
@@ -702,7 +714,9 @@ export class ChatManagerService {
         const history = promptHistory(chat.messages);
         // The point after the newest Message, as Lore in play reads it.
         const chosen = chosenLore(selectLoreAt(layers.lore ?? [], history));
-        return this.suggestedReplies.suggest({ ...layers, chosenLore: chosen, history }, { storyId: story.id, chatId: chat.id });
+        // The passages the last turn found, still existing ones only, with no search call (.scratch/documents/spec.md).
+        const documentPassages = await this.documentSearch.recorded(story.id, newestAiMessage(chat)?.documentPassages ?? null);
+        return this.suggestedReplies.suggest({ ...layers, chosenLore: chosen, documentPassages, history }, { storyId: story.id, chatId: chat.id });
     }
 
     /**
@@ -727,6 +741,8 @@ export class ChatManagerService {
         const scene = story.scenes.find((candidate) => candidate.id === chat.currentSceneId) ?? null;
         const identity: WornIdentity = wornIdentity(story, chat);
         const sittingOut = sittingOutOf(story, chat);
+        // Before the prompt is built (.scratch/documents/spec.md): out of text credit fails the turn here, with nothing stored.
+        const documents = await this.documentSearch.forTurn(story, chat.id, documentQuery(history, userText));
         const [state, memories] = await Promise.all([this.ledger.state(chat.id), this.memoryModel.findByChat(chat.id)]);
         const prompt = buildTurnPrompt({
             story,
@@ -739,6 +755,8 @@ export class ChatManagerService {
             lore: promptLore(story),
             // The one selection, once per turn, at the reply's point: the user's new Message is before it.
             chosenLore: chosenLore(selectLoreAt(promptLore(story), promptHistory(chat.messages))),
+            documentPassages: documents.passages,
+            hasDocuments: documents.hasDocuments,
             authorsNote: chat.authorsNote,
             history,
             userText,
@@ -781,10 +799,12 @@ export class ChatManagerService {
         let aiMessageId: number;
         if (replacing) {
             // Regenerate: the new reply is the Message's last Reply version.
-            await this.chatModel.replaceReply(replacing, result.model, parts, MAX_REPLY_VERSIONS);
+            await this.chatModel.replaceReply(replacing, result.model, parts, MAX_REPLY_VERSIONS, documents.record);
             aiMessageId = replacing.id;
         } else {
-            aiMessageId = (await this.chatModel.addAiMessage(chat.id, chat.messages.length, result.model, parts, BackgroundStatus.Pending)).id;
+            aiMessageId = (
+                await this.chatModel.addAiMessage(chat.id, chat.messages.length, result.model, parts, BackgroundStatus.Pending, documents.record)
+            ).id;
             // A Message after the one with versions settles it on its shown version.
             await this.chatModel.dropReplyVersions(chat.id);
         }
@@ -846,6 +866,7 @@ export class ChatManagerService {
             storySoFar: promptStorySoFar(chat),
             timeOfDay: chat.timeOfDay,
             lore: promptLore(story),
+            hasDocuments: hasDocumentPassages(story),
             authorsNote: chat.authorsNote,
             present: inLatestExchange(story, chat, null),
             sittingOut: sittingOutOf(story, chat).map((character) => character.name),
@@ -1069,6 +1090,14 @@ function lastAiModel(chat: ChatEntity): string | null {
         if (message.kind === MessageKind.Ai && message.model && message.model !== AUTHOR_MODEL) {
             return message.model;
         }
+    }
+    return null;
+}
+
+/** The Chat's newest AI Message, the Opening included; null for a Chat with none. */
+function newestAiMessage(chat: ChatEntity): MessageEntity | null {
+    for (let i = chat.messages.length - 1; i >= 0; i--) {
+        if (chat.messages[i].kind === MessageKind.Ai) return chat.messages[i];
     }
     return null;
 }

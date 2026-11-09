@@ -20,9 +20,22 @@ import {
     sendRequest,
     SleepFn,
 } from './http.js';
-import { TextModelSpec } from './model-table.js';
+import { EmbeddingModelSpec, TextModelSpec } from './model-table.js';
 
 export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
+
+export interface OpenRouterEmbeddingRequest {
+    model: EmbeddingModelSpec;
+    inputs: string[];
+}
+
+export interface OpenRouterEmbeddingResult {
+    /** One per input, in input order. */
+    vectors: number[][];
+    promptTokens: number;
+    /** Undefined when OpenRouter reported no cost; the gateway then records the list price. */
+    costUsd: number | undefined;
+}
 
 export interface OpenRouterChatRequest {
     model: TextModelSpec;
@@ -161,6 +174,62 @@ export class OpenRouterClient {
             throw this.toError(response.status, json, OpenRouterClient.requiresParameters(body));
         }
         return this.readChat(json ?? {}, request.model);
+    }
+
+    /** The JSON body an embeddings request becomes. Exposed so contract tests can check it. */
+    static buildEmbeddingBody(request: OpenRouterEmbeddingRequest): Record<string, unknown> {
+        return {
+            model: request.model.id,
+            input: request.inputs,
+            encoding_format: 'float',
+            // Pinned host, and never another one: Document text is story text.
+            provider: { only: [request.model.host], allow_fallbacks: false },
+        };
+    }
+
+    /**
+     * Embeddings (https://openrouter.ai/docs/api/reference/embeddings): the OpenAI shape, one
+     * `data` item per input carrying its `index`. Errors map as for chat.
+     */
+    async embed(request: OpenRouterEmbeddingRequest): Promise<OpenRouterEmbeddingResult> {
+        const response = await this.send('/embeddings', {
+            method: 'POST',
+            headers: {
+                ...this.headers(),
+                'Content-Type': 'application/json',
+                'X-Title': 'Storytell AI',
+            },
+            body: JSON.stringify(OpenRouterClient.buildEmbeddingBody(request)),
+        });
+        const json = await readJson(response);
+        if (!response.ok || json?.error) throw this.toError(response.status, json);
+
+        const data: unknown = json?.data;
+        const { id, dimensions } = request.model;
+        if (!Array.isArray(data) || data.length !== request.inputs.length) {
+            throw new UnparseableOutputError(`${id} returned ${Array.isArray(data) ? data.length : 'no'} vectors for ${request.inputs.length} inputs.`);
+        }
+        const vectors: number[][] = new Array(request.inputs.length);
+        data.forEach((item: Record<string, any>, at) => {
+            const index = typeof item?.index === 'number' ? item.index : at;
+            const vector = item?.embedding;
+            if (
+                !Array.isArray(vector) ||
+                vector.length !== dimensions ||
+                !vector.every((value) => typeof value === 'number' && Number.isFinite(value)) ||
+                index < 0 ||
+                index >= vectors.length ||
+                vectors[index]
+            ) {
+                throw new UnparseableOutputError(`${id} returned a vector that could not be read.`);
+            }
+            vectors[index] = vector;
+        });
+
+        const usage = json?.usage ?? {};
+        const costUsd = typeof usage.cost === 'number' ? usage.cost : undefined;
+        if (costUsd === undefined) this.logger.warn(`OpenRouter reported no cost for ${id}; recording the list price.`);
+        return { vectors, promptTokens: typeof usage.prompt_tokens === 'number' ? usage.prompt_tokens : 0, costUsd };
     }
 
     /**

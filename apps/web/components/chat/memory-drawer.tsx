@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 
 import { GraphSelection, MemoryGraph, memoriesAbout, personName } from '@/components/chat/memory-graph';
+import { DocumentsInPlayCard } from '@/components/chat/documents-in-play-card';
 import { LoreInPlayCard } from '@/components/chat/lore-in-play-card';
 import { StorySoFarCard } from '@/components/chat/story-so-far-card';
 import { useConnection } from '@/components/connection';
@@ -509,6 +510,7 @@ export function MemoryDrawer({ storyId, chatId, focusMemoryId, version, onClose,
                     )}
                     <StorySoFarCard storyId={storyId} chatId={chatId} version={version} />
                     <LoreInPlayCard storyId={storyId} chatId={chatId} version={version} />
+                    <DocumentsInPlayCard storyId={storyId} chatId={chatId} version={version} />
                     <MemoryViewSwitch value={viewKind} onChange={memoryViewKind.set} />
                     {active.length === 0 ? (
                         <p className="muted">Nothing remembered yet.</p>

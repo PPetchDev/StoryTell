@@ -24,6 +24,8 @@ import { LoreTimedEffects1763940000000 } from './1763940000000-LoreTimedEffects.
 import { LoreChance1763950000000 } from './1763950000000-LoreChance.js';
 import { LoreGroup1763960000000 } from './1763960000000-LoreGroup.js';
 import { Samplers1763970000000 } from './1763970000000-Samplers.js';
+import { Documents1763980000000 } from './1763980000000-Documents.js';
+import { DocumentPassagesUsed1763990000000 } from './1763990000000-DocumentPassagesUsed.js';
 
 // Listed by hand, oldest first, so migrations load the same way from compiled JS, the
 // TypeORM CLI and Vitest. Add every new migration here.
@@ -54,4 +56,6 @@ export const migrations = [
     LoreChance1763950000000,
     LoreGroup1763960000000,
     Samplers1763970000000,
+    Documents1763980000000,
+    DocumentPassagesUsed1763990000000,
 ];

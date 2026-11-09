@@ -7,6 +7,9 @@ import {
     CallKind,
     CreditBalance,
     CreditPool,
+    EMBEDDING_MODEL,
+    EmbeddingRequest,
+    EmbeddingResult,
     ImageGenerationRequest,
     ImageGenerationResult,
     MAX_REFERENCE_IMAGES,
@@ -25,6 +28,7 @@ import {
 } from '../model-gateway.js';
 import {
     drawnSize,
+    EMBEDDING_MODELS,
     IMAGE_MODELS,
     imageModelForKind,
     ImageModelSpec,
@@ -196,6 +200,33 @@ export class RealModelGateway extends ModelGateway {
         }
         this.logger.warn(`OpenRouter never reported the stopped generation ${generationId}; its cost is not recorded.`);
         return undefined;
+    }
+
+    /**
+     * Vectors from the embedding model, pinned to its host. One text-pool UsageRecord per call,
+     * with the cost OpenRouter reports, or the list price times the prompt tokens when it
+     * reports none.
+     */
+    async embedTexts(request: EmbeddingRequest): Promise<EmbeddingResult> {
+        if (request.inputs.length === 0) throw new RangeError('embedTexts needs at least one input');
+        const modelName = EMBEDDING_MODEL;
+        const model = EMBEDDING_MODELS[modelName];
+        const result = await this.deps.openRouter.embed({ model, inputs: request.inputs });
+        // Whole billionths of a dollar: a search is about $0.000005.
+        const costUsd = result.costUsd ?? Math.round(result.promptTokens * model.priceUsdPerMillion * 1e3) / 1e9;
+        await this.deps.usage.record({
+            kind: request.kind,
+            pool: 'text',
+            model: modelName,
+            host: model.host,
+            promptTokens: result.promptTokens,
+            completionTokens: 0,
+            images: null,
+            costUsd,
+            storyId: request.servedFor?.storyId ?? null,
+            chatId: request.servedFor?.chatId ?? null,
+        });
+        return { vectors: result.vectors, model: modelName, usage: { promptTokens: result.promptTokens }, costUsd };
     }
 
     async generateImage(request: ImageGenerationRequest): Promise<ImageGenerationResult> {

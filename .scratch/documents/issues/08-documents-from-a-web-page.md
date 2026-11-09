@@ -1,6 +1,6 @@
 # 08 — A Document from a web page
 
-**Status:** ready-for-agent
+**Status:** done
 
 Part of: [Spec: Documents](../spec.md)
 
@@ -14,14 +14,14 @@ Part of: [Spec: Documents](../spec.md)
 
 **Blocked by:** [02 — Add a pasted Document to a Story](02-add-pasted-documents.md)
 
-- [ ] Pure tests for HTML to text: `<article>`, then `<main>`, then `<body>`; script, style, nav, header, footer, aside and form dropped; block breaks, headings as `#`, list items as `-`; named and numeric entities; the title trimmed; a Thai page.
-- [ ] Pure tests for the address rule: schemes, credentials, `localhost`, `*.localhost`, `127.0.0.0/8`, `::1` and `::ffff:127.0.0.1` refused; ordinary addresses allowed.
-- [ ] API tests through the scripted page fetcher (no socket, never the internet):
-  - [ ] a page answers title, text and URL; `windows-874` and UTF-8 Thai decode;
-  - [ ] each refusal maps to `InvalidPageAddressError` or `PageFetchError` with a message that says which: scheme, credentials, loopback, a redirect onto loopback, more than 5 redirects, wrong type, over 2 MB, non-2xx, timeout;
-  - [ ] an address refused up front, and a redirect target refused, never reach the fetcher;
-  - [ ] fetch-page makes no gateway call.
-- [ ] The two new errors take the next free codes in domain 003 and are listed in `docs/error-codes.md`.
-- [ ] The sheet: the address field with Fetch and a "Fetching…" state; errors shown in the sheet with the advice to paste the text instead.
-- [ ] e2e at 390px: script a page through the testing controls, fetch it, see title and text filled, add it, and see its card link to the address.
-- [ ] No new npm dependency, and the existing suites stay green.
+- [x] Pure tests for HTML to text: `<article>`, then `<main>`, then `<body>`; script, style, nav, header, footer, aside and form dropped; block breaks, headings as `#`, list items as `-`; named and numeric entities; the title trimmed; a Thai page.
+- [x] Pure tests for the address rule: schemes, credentials, `localhost`, `*.localhost`, `127.0.0.0/8`, `::1` and `::ffff:127.0.0.1` refused; ordinary addresses allowed.
+- [x] API tests through the scripted page fetcher (no socket, never the internet):
+  - [x] a page answers title, text and URL; `windows-874` and UTF-8 Thai decode;
+  - [x] each refusal maps to `InvalidPageAddressError` or `PageFetchError` with a message that says which: scheme, credentials, loopback, a redirect onto loopback, more than 5 redirects, wrong type, over 2 MB, non-2xx, timeout;
+  - [x] an address refused up front, and a redirect target refused, never reach the fetcher;
+  - [x] fetch-page makes no gateway call.
+- [x] The two new errors take the next free codes in domain 003 and are listed in `docs/error-codes.md`.
+- [x] The sheet: the address field with Fetch and a "Fetching…" state; errors shown in the sheet with the advice to paste the text instead.
+- [x] e2e at 390px: script a page through the testing controls, fetch it, see title and text filled, add it, and see its card link to the address.
+- [x] No new npm dependency, and the existing suites stay green.

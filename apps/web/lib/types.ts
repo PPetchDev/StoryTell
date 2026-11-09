@@ -69,7 +69,9 @@ export type CallKind =
     | 'suggested_replies'
     | 'story_summary'
     | 'snapshot_image'
-    | 'reference_image';
+    | 'reference_image'
+    | 'document_embedding'
+    | 'document_search';
 
 /** What each call kind is for, in the words the Usage page shows. */
 export const CALL_KIND_LABEL: Record<CallKind, string> = {
@@ -84,6 +86,8 @@ export const CALL_KIND_LABEL: Record<CallKind, string> = {
     story_summary: 'Story so far',
     snapshot_image: 'Snapshots',
     reference_image: 'Reference images',
+    document_embedding: 'Document adding',
+    document_search: 'Document search',
 };
 
 /** One call kind's share of a pool's spend this month. */
@@ -111,6 +115,8 @@ export interface UsageResponse {
 
 export const POOL_LABEL: Record<CreditPool, string> = { text: 'Text', image: 'Image' };
 
+/** Dollars to the cent; a non-zero amount under a cent shows as "<$0.01", so small spend is never "$0.00". */
 export function usd(amount: number): string {
+    if (amount > 0 && amount < 0.01) return '<$0.01';
     return `$${amount.toFixed(2)}`;
 }

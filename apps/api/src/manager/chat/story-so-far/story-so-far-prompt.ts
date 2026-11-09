@@ -9,6 +9,7 @@ import {
     TURN_PROMPT_TOKEN_BUDGET,
     turnFinalInstruction,
 } from '../turn/prompt.js';
+import { documentsReserveTokens } from '../../document/document-search.js';
 import { loreReserveTokens } from '../lore/lore-select.js';
 
 /**
@@ -43,6 +44,8 @@ export function storySoFarCoverage(layers: PromptLayersInput, history: PromptHis
         NEXT_USER_MESSAGE_TOKENS +
         // The Lore block varies by turn; the most it can take is reserved.
         loreReserveTokens(layers.lore ?? []) +
+        // So is the Documents block's cap, when the Story has passages (.scratch/documents/spec.md: "Budget").
+        documentsReserveTokens(layers.hasDocuments) +
         // The Author's note, as the Chat holds it when the check runs.
         estimateTokens(authorsNoteBlock(layers.authorsNote, layers.identity.name) ?? '') +
         estimateTokens(`${reminder}

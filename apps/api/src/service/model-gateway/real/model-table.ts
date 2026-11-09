@@ -1,4 +1,5 @@
 import {
+    EmbeddingModel,
     ImageCallKind,
     ImageModel,
     PlayModelFacts,
@@ -54,6 +55,33 @@ export const TEXT_MODELS: Record<TextModel, TextModelSpec> = {
         host: 'deepinfra',
         reasoning: { enabled: false },
         stopStrings: true,
+    },
+};
+
+/** An embedding model, pinned to one OpenRouter host like the text models. */
+export interface EmbeddingModelSpec {
+    /** The OpenRouter model id. */
+    id: string;
+    /** The OpenRouter provider slug sent in `provider.only`. */
+    host: string;
+    /** How many numbers each vector has. */
+    dimensions: number;
+    /** The host's list price, recorded when OpenRouter reports no cost (as image calls record list prices). */
+    priceUsdPerMillion: number;
+}
+
+/**
+ * Spec: Documents. OpenRouter's endpoints API for `baai/bge-m3`, read on 2026-11-09: DeepInfra
+ * serves it (fp32) at $0.01 per million prompt tokens, with an 8,192-token context. DeepInfra
+ * for the same reason as chat: no adult clause in its terms, and no storing or training on
+ * inference data.
+ */
+export const EMBEDDING_MODELS: Record<EmbeddingModel, EmbeddingModelSpec> = {
+    'bge-m3': {
+        id: 'baai/bge-m3',
+        host: 'deepinfra',
+        dimensions: 1024,
+        priceUsdPerMillion: 0.01,
     },
 };
 

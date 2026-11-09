@@ -1,5 +1,9 @@
 import { ModelGatewayError, ProviderOutageError } from '../../errors/model-gateway.errors.js';
+import { fakeEmbedding } from './fake-embedding.js';
 import {
+    EmbeddingCallKind,
+    EmbeddingRequest,
+    EmbeddingResult,
     ImageCallKind,
     ImageData,
     ImageGenerationRequest,
@@ -33,8 +37,15 @@ export type FakeTextReply = string | (Partial<TextCompletionResult> & FakeStream
 /** `delayMs` holds the reply back, so a browser test can see work in progress. */
 export type FakeImageReply = (Partial<ImageGenerationResult> & { delayMs?: number }) | ModelGatewayError;
 
+/**
+ * Embeddings answer without scripting. A scripted reply is consumed by the next call of its
+ * kind: `'answer'` answers as usual, an error rejects with it.
+ */
+export type FakeEmbeddingReply = 'answer' | ModelGatewayError;
+
 export type FakeGatewayCall =
     | { method: 'completeText'; request: TextCompletionRequest }
+    | { method: 'embedTexts'; request: EmbeddingRequest }
     /** `stopped` turns true when the caller's signal ended the stream. */
     | { method: 'streamText'; request: TextCompletionRequest; stopped: boolean }
     | { method: 'generateImage'; request: ImageGenerationRequest }
@@ -51,6 +62,7 @@ export const FAKE_PNG: ImageData = {
 
 export const FAKE_TEXT_MODEL = 'fake/text-model';
 export const FAKE_IMAGE_MODEL = 'fake/image-model';
+export const FAKE_EMBEDDING_MODEL = 'fake/embedding-model';
 
 const DEFAULT_CREDIT: RemainingCredit = {
     text: { remainingUsd: 22, limitUsd: 22 },
@@ -66,6 +78,7 @@ export class FakeModelGateway extends ModelGateway {
     readonly calls: FakeGatewayCall[] = [];
     private readonly textReplies = new Map<TextCallKind, FakeTextReply[]>();
     private readonly imageReplies = new Map<ImageCallKind, FakeImageReply[]>();
+    private readonly embeddingReplies = new Map<EmbeddingCallKind, FakeEmbeddingReply[]>();
     private credit: RemainingCredit = structuredClone(DEFAULT_CREDIT);
 
     scriptText(kind: TextCallKind, ...replies: FakeTextReply[]): this {
@@ -75,6 +88,12 @@ export class FakeModelGateway extends ModelGateway {
 
     scriptImage(kind: ImageCallKind, ...replies: FakeImageReply[]): this {
         this.imageReplies.set(kind, [...(this.imageReplies.get(kind) ?? []), ...replies]);
+        return this;
+    }
+
+    /** Queues what the next embedding calls of `kind` do, in order; unscripted calls answer. */
+    scriptEmbedding(kind: EmbeddingCallKind, ...replies: FakeEmbeddingReply[]): this {
+        this.embeddingReplies.set(kind, [...(this.embeddingReplies.get(kind) ?? []), ...replies]);
         return this;
     }
 
@@ -99,10 +118,16 @@ export class FakeModelGateway extends ModelGateway {
         );
     }
 
+    embeddingCalls(kind?: EmbeddingCallKind): EmbeddingRequest[] {
+        return this.calls.flatMap((call) =>
+            call.method === 'embedTexts' && (!kind || call.request.kind === kind) ? [call.request] : [],
+        );
+    }
+
     /** Scripted replies not yet consumed, by kind. Handy for asserting a flow made no call. */
     pendingReplies(): Record<string, number> {
         const pending: Record<string, number> = {};
-        for (const [kind, replies] of [...this.textReplies, ...this.imageReplies]) {
+        for (const [kind, replies] of [...this.textReplies, ...this.imageReplies, ...this.embeddingReplies]) {
             if (replies.length > 0) pending[kind] = replies.length;
         }
         return pending;
@@ -112,6 +137,7 @@ export class FakeModelGateway extends ModelGateway {
         this.calls.length = 0;
         this.textReplies.clear();
         this.imageReplies.clear();
+        this.embeddingReplies.clear();
         this.credit = structuredClone(DEFAULT_CREDIT);
     }
 
@@ -176,6 +202,20 @@ export class FakeModelGateway extends ModelGateway {
         const { delayMs, ...result } = reply;
         if (delayMs) await new Promise((resolve) => setTimeout(resolve, delayMs));
         return { image: FAKE_PNG, model: FAKE_IMAGE_MODEL, costUsd: 0, ...result };
+    }
+
+    /** Deterministic vectors from each input's words (see `fakeEmbedding`), unless scripted to fail. */
+    async embedTexts(request: EmbeddingRequest): Promise<EmbeddingResult> {
+        this.calls.push({ method: 'embedTexts', request });
+        if (request.inputs.length === 0) throw new RangeError('FakeModelGateway: embedTexts needs at least one input');
+        const reply = this.embeddingReplies.get(request.kind)?.shift();
+        if (reply instanceof ModelGatewayError) throw reply;
+        return {
+            vectors: request.inputs.map(fakeEmbedding),
+            model: FAKE_EMBEDDING_MODEL,
+            usage: { promptTokens: request.inputs.reduce((sum, input) => sum + Math.ceil(input.length / 4), 0) },
+            costUsd: 0,
+        };
     }
 
     async remainingCredit(): Promise<RemainingCredit> {

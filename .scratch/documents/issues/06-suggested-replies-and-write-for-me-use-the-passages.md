@@ -1,6 +1,6 @@
 # 06 — Suggested replies and Write for me use the last turn's passages
 
-**Status:** ready-for-agent
+**Status:** done
 
 Part of: [Spec: Documents](../spec.md)
 
@@ -11,7 +11,11 @@ Part of: [Spec: Documents](../spec.md)
 
 **Blocked by:** [04 — Documents reach the Narrator](04-documents-reach-the-narrator.md)
 
-- [ ] Pure tests: the Suggested replies prompt has the block after Lore and before the instruction; with a long history it keeps fewer Messages with the block than without, and never goes over the budget.
-- [ ] API tests through the fake gateway: Suggested replies carry the newest AI Message's passages with no `document_search` call; a removed Document's passages drop out; a `failed` or null record gives no block; a Story without Documents sends the same prompt as before.
-- [ ] If Write for me exists: the same three API checks for Write for me, and its history budget takes the block.
-- [ ] The existing Suggested replies tests stay green.
+- [x] Pure tests: the Suggested replies prompt has the block after Lore and before the instruction; with a long history it keeps fewer Messages with the block than without, and never goes over the budget.
+- [x] API tests through the fake gateway: Suggested replies carry the newest AI Message's passages with no `document_search` call; a removed Document's passages drop out; a `failed` or null record gives no block; a Story without Documents sends the same prompt as before.
+- [ ] (n/a: Write for me does not exist yet) If Write for me exists: the same three API checks for Write for me, and its history budget takes the block.
+- [x] The existing Suggested replies tests stay green.
+
+## Comments
+
+**2026-11-09.** Write for me is not built yet, so this ticket wired the passages into Suggested replies only, and the "If Write for me exists" item does not apply. Write for me's own ticket now owes the block, with a test: see the Comments of [Write for me 02](../../write-for-me/issues/02-write-for-me.md).

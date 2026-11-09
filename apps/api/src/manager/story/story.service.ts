@@ -20,6 +20,7 @@ import {
 import { cleanPatterns, compileLorePattern } from '../chat/lore/lore-pattern.js';
 import { ImageNotFoundError, SnapshotNotFoundError, UnsupportedImageError } from '../../errors/image.errors.js';
 import { ChatModelService } from '../../model/chat/chat.service.js';
+import { DocumentModelService } from '../../model/document/document.service.js';
 import { LedgerModelService } from '../../model/ledger/ledger.service.js';
 import { SnapshotModelService } from '../../model/snapshot/snapshot.service.js';
 import { CharacterEntity, PortraitCrop } from '../../model/story/entities/character.entity.js';
@@ -196,6 +197,7 @@ export class StoryManagerService {
         private readonly ledger: LedgerModelService,
         private readonly imageStore: ImageStoreService,
         private readonly snapshotModel: SnapshotModelService,
+        private readonly documentModel: DocumentModelService,
     ) {}
 
     async listStories(): Promise<StoryListItem[]> {
@@ -316,6 +318,8 @@ export class StoryManagerService {
         // Read before the delete: the Gallery's records go with the Story through CASCADE.
         const galleryFiles = await this.snapshotModel.imagePathsByStory(storyId);
         await this.storyModel.deleteStory(storyId);
+        // Its Documents went with it through CASCADE; their passages leave memory too.
+        this.documentModel.forget(storyId);
         for (const character of story.characters) await this.removeReferenceImageFile(character);
         for (const imagePath of galleryFiles) await this.removeFile(imagePath);
         if (story.coverImagePath) await this.removeFile(story.coverImagePath);

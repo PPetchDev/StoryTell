@@ -20,6 +20,12 @@ export abstract class ModelGateway {
 
     abstract generateImage(request: ImageGenerationRequest): Promise<ImageGenerationResult>;
 
+    /**
+     * Turns texts into vectors (Spec: Documents, "The Model Gateway learns embeddings"): one
+     * vector per input, in input order. Text pool; callers never name the model.
+     */
+    abstract embedTexts(request: EmbeddingRequest): Promise<EmbeddingResult>;
+
     abstract remainingCredit(): Promise<RemainingCredit>;
 }
 
@@ -38,7 +44,10 @@ export type TextCallKind =
 
 export type ImageCallKind = 'snapshot_image' | 'reference_image';
 
-export type CallKind = TextCallKind | ImageCallKind;
+/** A Document's passages turned into vectors on Add, and one query per turn. Both in the text pool. */
+export type EmbeddingCallKind = 'document_embedding' | 'document_search';
+
+export type CallKind = TextCallKind | ImageCallKind | EmbeddingCallKind;
 
 export const MAX_REFERENCE_IMAGES = 3;
 
@@ -56,6 +65,9 @@ export const BACKGROUND_MODEL = 'deepseek-v4-flash';
  */
 export const BACKGROUND_FALLBACK_MODEL: PlayModel = 'deepseek-v4-pro';
 export type TextModel = PlayModel | typeof BACKGROUND_MODEL;
+/** The one embedding model: BAAI's bge-m3, pinned to DeepInfra (Spec: Documents). */
+export const EMBEDDING_MODEL = 'bge-m3';
+export type EmbeddingModel = typeof EMBEDDING_MODEL;
 
 export const SNAPSHOT_MODELS = ['seedream-v4-edit', 'seedream-v5-pro-edit', 'qwen-edit-uncensored'] as const;
 export type SnapshotModel = (typeof SNAPSHOT_MODELS)[number];
@@ -226,6 +238,22 @@ export interface ImageGenerationRequest {
 export interface ImageGenerationResult {
     image: ImageData;
     model: string;
+    costUsd: number;
+}
+
+export interface EmbeddingRequest {
+    kind: EmbeddingCallKind;
+    /** At least one. Each becomes one vector. */
+    inputs: string[];
+    servedFor?: ServedFor;
+}
+
+export interface EmbeddingResult {
+    /** One per input, in input order. */
+    vectors: number[][];
+    /** The model that made them. Stored with a Document's passages, so another model's are never compared. */
+    model: string;
+    usage: { promptTokens: number };
     costUsd: number;
 }
 

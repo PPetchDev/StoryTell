@@ -108,10 +108,10 @@ const copyMessages: CopyStep = async ({ manager, sourceChatId, chatId, through, 
     const keepVersions = newest[0]?.position === through;
     await manager.query(
         `INSERT INTO "message" ("id", "chat_id", "position", "kind", "text", "identity_name", "persona_id", "model",
-                "judge_status", "judge_error", "memory_status", "memory_error", "version_ordinal", "created_at")
+                "judge_status", "judge_error", "memory_status", "memory_error", "version_ordinal", "document_passages", "created_at")
          SELECT m."new_id", $1, s."position", s."kind", s."text", s."identity_name", s."persona_id", s."model",
                 s."judge_status", s."judge_error", s."memory_status", s."memory_error",
-                s."version_ordinal", s."created_at"
+                s."version_ordinal", s."document_passages", s."created_at"
          FROM "message" s JOIN unnest($3::int[], $4::int[]) AS m("old_id", "new_id") ON m."old_id" = s."id"
          WHERE s."chat_id" = $2 ORDER BY s."id"`,
         [chatId, sourceChatId, olds, news],

@@ -1,6 +1,6 @@
 # 03 — Rename, read and remove Documents; Duplicate copies them
 
-**Status:** ready-for-agent
+**Status:** done
 
 Part of: [Spec: Documents](../spec.md)
 
@@ -12,11 +12,11 @@ Covers `PATCH`, `GET` and `DELETE /api/stories/:storyId/documents/:documentId`, 
 
 **Blocked by:** [02 — Add a pasted Document to a Story](02-add-pasted-documents.md)
 
-- [ ] API tests through the fake gateway:
-  - [ ] rename changes only the title and answers the Story; read answers `{ id, title, source, sourceName, text }`; remove answers the Story without it;
-  - [ ] an unknown id, or one of another Story, is `DocumentNotFoundError` (next free 404 in domain 003, listed in `docs/error-codes.md`);
-  - [ ] Duplicate copies Documents and passages, vectors included, with no `document_embedding` call;
-  - [ ] deleting the Story removes its Documents and passages.
-- [ ] The card: editable title (autosaved), Read sheet, Remove with confirmation.
-- [ ] e2e at 390px: rename a Document and see the name after a reload; read its text; remove it with confirmation.
-- [ ] The existing suites stay green, including the Duplicate Story tests.
+- [x] API tests through the fake gateway:
+  - [x] rename changes only the title and answers the Story; read answers `{ id, title, source, sourceName, text }`; remove answers the Story without it;
+  - [x] an unknown id, or one of another Story, is `DocumentNotFoundError` (next free 404 in domain 003, listed in `docs/error-codes.md`);
+  - [x] Duplicate copies Documents and passages, vectors included, with no `document_embedding` call;
+  - [x] deleting the Story removes its Documents and passages.
+- [x] The card: editable title (autosaved), Read sheet, Remove with confirmation.
+- [x] e2e at 390px: rename a Document and see the name after a reload; read its text; remove it with confirmation.
+- [x] The existing suites stay green, including the Duplicate Story tests.

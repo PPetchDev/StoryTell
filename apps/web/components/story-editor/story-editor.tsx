@@ -28,6 +28,7 @@ import {
 import { focusChoice, movedIndex } from './arrow-keys';
 import { useAutosave } from './autosave';
 import { CharacterCard } from './character-card';
+import { DocumentsSection } from './documents-section';
 import { EditorHeader } from './editor-header';
 import { CoverBanner, CoverSheet } from './story-cover';
 import {
@@ -281,6 +282,13 @@ export function StoryEditor({ initial }: { initial: Story }) {
             scenes: current.scenes.map((s) => (s.id === sceneId ? { ...s, [field]: value } : s)),
         }));
         queue(`scene.${sceneId}.${field}`, () => storyApi.updateScene(storyId, sceneId, { [field]: value }), applyStatus);
+    };
+    const setDocumentTitle = (documentId: number, title: string) => {
+        setStory((current) => ({
+            ...current,
+            documents: current.documents.map((document) => (document.id === documentId ? { ...document, title } : document)),
+        }));
+        queue(`document.${documentId}.title`, () => storyApi.renameDocument(storyId, documentId, title), applyStatus);
     };
     const setLore = <K extends keyof LoreEntryFields>(loreId: number, field: K, value: LoreEntry[K]) => {
         setStory((current) => ({
@@ -656,6 +664,13 @@ export function StoryEditor({ initial }: { initial: Story }) {
                             >
                                 + Add Lore entry
                             </button>
+                            <DocumentsSection
+                                storyId={storyId}
+                                documents={story.documents}
+                                commit={commit}
+                                applyWhole={applyWhole}
+                                onTitle={setDocumentTitle}
+                            />
                         </section>
                     )}
                 </div>

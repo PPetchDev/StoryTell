@@ -16,6 +16,7 @@ import { FakeModelGateway } from '../../src/service/model-gateway/fake-model-gat
 import { GATEWAY_FETCH } from '../../src/service/model-gateway/model-gateway.module.js';
 import { ModelGateway } from '../../src/service/model-gateway/model-gateway.js';
 import { FetchLike } from '../../src/service/model-gateway/real/http.js';
+import { PAGE_FETCH } from '../../src/service/page-fetch/page-fetch.module.js';
 
 export interface TestApp {
     app: INestApplication;
@@ -37,6 +38,8 @@ export interface TestAppOptions {
      */
     modelGateway?: 'fake' | 'real';
     fetch?: FetchLike;
+    /** What a web page fetch for a Document goes through. Default: a fetcher that fails every address, so no test opens a socket. */
+    pageFetch?: FetchLike;
     providerKeys?: Partial<ProviderKeys>;
     /** How long a send waits for a pending background call. Default 1.5 s. */
     backgroundWaitMs?: number;
@@ -92,6 +95,8 @@ export async function startTestApp(options: TestAppOptions = {}): Promise<TestAp
     })
         .overrideProvider(GATEWAY_FETCH)
         .useValue(options.fetch ?? noNetwork)
+        .overrideProvider(PAGE_FETCH)
+        .useValue(options.pageFetch ?? noNetwork)
         .compile();
     const app = configureApp(moduleRef.createNestApplication({ logger: false }));
     await app.init();

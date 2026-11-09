@@ -1,6 +1,6 @@
 # 07 — A Document from a .txt or .md file
 
-**Status:** ready-for-agent
+**Status:** done
 
 Part of: [Spec: Documents](../spec.md)
 
@@ -11,7 +11,7 @@ Part of: [Spec: Documents](../spec.md)
 
 **Blocked by:** [02 — Add a pasted Document to a Story](02-add-pasted-documents.md)
 
-- [ ] The picker accepts only .txt and .md; over 1 MB, another type and non-UTF-8 text each show their message in the sheet and fill nothing.
-- [ ] API test: a Document added with `source: 'file'` and a `sourceName` answers them on the Story response.
-- [ ] e2e at 390px: load a .txt file through the picker, see the title and text filled, add it, and see its card show the file name after a reload.
-- [ ] No new npm dependency, and the existing suites stay green.
+- [x] The picker accepts only .txt and .md; over 1 MB, another type and non-UTF-8 text each show their message in the sheet and fill nothing.
+- [x] API test: a Document added with `source: 'file'` and a `sourceName` answers them on the Story response.
+- [x] e2e at 390px: load a .txt file through the picker, see the title and text filled, add it, and see its card show the file name after a reload.
+- [x] No new npm dependency, and the existing suites stay green.

@@ -1,6 +1,6 @@
 # 01 — Embeddings in the Model Gateway
 
-**Status:** ready-for-agent
+**Status:** done
 
 Part of: [Spec: Documents](../spec.md)
 
@@ -14,17 +14,17 @@ No feature calls it yet, so nothing shows on the Usage page until ticket 02 adds
 
 **Blocked by:** None — can start immediately
 
-- [ ] `embedTexts({ kind, inputs, servedFor })` on the gateway interface, real and fake; `completeText` does not accept an embedding kind (typecheck).
-- [ ] `bge-m3` is in the model table: OpenRouter id `baai/bge-m3`, host `deepinfra`, 1,024 dimensions, list price $0.01 per million tokens (re-read from the endpoints API, with the date).
-- [ ] Contract tests with a synthetic recorded fixture:
-  - [ ] the body: model, inputs, `encoding_format: 'float'`, `provider: { only: ['deepinfra'], allow_fallbacks: false }`;
-  - [ ] vectors back in input order;
-  - [ ] one UsageRecord with the reported cost, or list price × prompt tokens when none is reported, and the Usage API counts it under its kind in the text pool;
-  - [ ] errors mapped as for chat, including a 402 as out of text credit.
-- [ ] The fake gateway:
-  - [ ] gives unit vectors under `fake/embedding-model`, the same for the same text;
-  - [ ] scores higher for texts sharing words, Thai included;
-  - [ ] records the calls with their kind and `servedFor`;
-  - [ ] can be scripted to fail for a kind, with an outage, a refusal or out of text credit, from tests and through the `/api/testing/fake-gateway` controls.
-- [ ] The web's call-kind label map covers both kinds (the typecheck enforces it), and the amount formatter returns "<$0.01" for a non-zero amount under one cent and "$0.00" for zero.
-- [ ] The existing suites stay green. No paid API is called.
+- [x] `embedTexts({ kind, inputs, servedFor })` on the gateway interface, real and fake; `completeText` does not accept an embedding kind (typecheck).
+- [x] `bge-m3` is in the model table: OpenRouter id `baai/bge-m3`, host `deepinfra`, 1,024 dimensions, list price $0.01 per million tokens (re-read from the endpoints API, with the date).
+- [x] Contract tests with a synthetic recorded fixture:
+  - [x] the body: model, inputs, `encoding_format: 'float'`, `provider: { only: ['deepinfra'], allow_fallbacks: false }`;
+  - [x] vectors back in input order;
+  - [x] one UsageRecord with the reported cost, or list price × prompt tokens when none is reported, and the Usage API counts it under its kind in the text pool;
+  - [x] errors mapped as for chat, including a 402 as out of text credit.
+- [x] The fake gateway:
+  - [x] gives unit vectors under `fake/embedding-model`, the same for the same text;
+  - [x] scores higher for texts sharing words, Thai included;
+  - [x] records the calls with their kind and `servedFor`;
+  - [x] can be scripted to fail for a kind, with an outage, a refusal or out of text credit, from tests and through the `/api/testing/fake-gateway` controls.
+- [x] The web's call-kind label map covers both kinds (the typecheck enforces it), and the amount formatter returns "<$0.01" for a non-zero amount under one cent and "$0.00" for zero.
+- [x] The existing suites stay green. No paid API is called.

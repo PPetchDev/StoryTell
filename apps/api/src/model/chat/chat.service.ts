@@ -5,7 +5,7 @@ import { DataSource, EntityManager, In, IsNull, MoreThan, Not, Repository } from
 import { ChatSittingOutEntity } from './entities/chat-sitting-out.entity.js';
 import { ChatEntity, StorySoFarAuthor } from './entities/chat.entity.js';
 import { MessagePartEntity, MessagePartKind } from './entities/message-part.entity.js';
-import { BackgroundStatus, MessageEntity, MessageKind } from './entities/message.entity.js';
+import { BackgroundStatus, DocumentPassagesUsed, MessageEntity, MessageKind } from './entities/message.entity.js';
 import { ReplyVersionEntity } from './entities/reply-version.entity.js';
 
 /** The worn identity as a User Message records it: the Persona (null for the Role) and the name. */
@@ -207,6 +207,7 @@ export class ChatModelService {
         model: string,
         parts: NewMessagePart[],
         background: BackgroundStatus | null,
+        documentPassages: DocumentPassagesUsed | null = null,
     ): Promise<MessageEntity> {
         return this.dataSource.transaction(async (manager) => {
             const message = await manager.save(
@@ -215,6 +216,7 @@ export class ChatModelService {
                     position,
                     kind: MessageKind.Ai,
                     model,
+                    documentPassages,
                     judgeStatus: background,
                     judgeError: null,
                     memoryStatus: background,
@@ -272,8 +274,16 @@ export class ChatModelService {
      * parts become the last version, with both background calls pending; and past `maxVersions`
      * in all, the oldest version rows go (their Snapshots stay in the Gallery, unlinked).
      */
-    replaceReply(message: MessageEntity, model: string, parts: NewMessagePart[], maxVersions: number): Promise<void> {
+    replaceReply(
+        message: MessageEntity,
+        model: string,
+        parts: NewMessagePart[],
+        maxVersions: number,
+        documentPassages: DocumentPassagesUsed | null = null,
+    ): Promise<void> {
         return this.dataSource.transaction(async (manager) => {
+            // The new turn's own search replaces the old one's record (.scratch/documents/spec.md).
+            await manager.update(MessageEntity, { id: message.id }, { documentPassages });
             const shown = message.versionOrdinal ?? 1;
             const kept = await manager.find(ReplyVersionEntity, { where: { messageId: message.id }, order: { ordinal: 'ASC' } });
             const putAway = await this.putAway(manager, message, shown);

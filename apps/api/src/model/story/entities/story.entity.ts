@@ -11,6 +11,7 @@ import {
 } from 'typeorm';
 import type { Relation } from 'typeorm';
 
+import type { DocumentEntity, DocumentSummary } from '../../document/entities/document.entity.js';
 import type { SnapshotEntity } from '../../snapshot/entities/snapshot.entity.js';
 import type { CharacterEntity, CharacterResponse } from './character.entity.js';
 import type { LoreEntryEntity, LoreEntryResponse } from './lore-entry.entity.js';
@@ -79,6 +80,8 @@ export interface StoryResponse extends StorySummary {
     scenes: SceneResponse[];
     /** In add order. */
     lore: LoreEntryResponse[];
+    /** In add order, without text or vectors (.scratch/documents/spec.md). */
+    documents: DocumentSummary[];
     /** Null while the author has chosen none. */
     cover: StoryCover | null;
 }
@@ -154,6 +157,10 @@ export class StoryEntity {
     @OneToMany('LoreEntryEntity', 'story')
     lore: Relation<LoreEntryEntity[]>;
 
+    /** Loaded without text; passages are never loaded with the Story. */
+    @OneToMany('DocumentEntity', 'story')
+    documents: Relation<DocumentEntity[]>;
+
     /** ON DELETE SET NULL: a deleted Snapshot leaves the Story without a Cover. */
     @ManyToOne('SnapshotEntity', { onDelete: 'SET NULL', nullable: true })
     @JoinColumn({ name: 'cover_snapshot_id' })
@@ -185,6 +192,7 @@ export class StoryEntity {
             startingBonds: this.startingBonds.map((bond) => bond.toResponse()),
             scenes: this.scenes.map((scene) => scene.toResponse()),
             lore: this.lore.map((entry) => entry.toResponse()),
+            documents: this.documents.map((document) => document.toSummary()),
             cover: this.cover(),
         };
     }

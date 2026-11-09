@@ -112,6 +112,37 @@ export interface LoreEntry {
     group: string;
 }
 
+/** Where a Document's text came from. */
+export type DocumentSource = 'pasted' | 'file' | 'web';
+
+/** A longer text the Narrator looks things up in by meaning (mirrors DocumentSummaryDTO): no text, no vectors. */
+export interface DocumentSummary {
+    id: number;
+    title: string;
+    source: DocumentSource;
+    /** The file name or the page URL; null for pasted text. */
+    sourceName: string | null;
+    characters: number;
+    passages: number;
+    createdAt: string;
+}
+
+/** A Document with its text, for reading. */
+export interface DocumentText {
+    id: number;
+    title: string;
+    source: DocumentSource;
+    sourceName: string | null;
+    text: string;
+}
+
+export interface NewDocument {
+    title: string;
+    text: string;
+    source: DocumentSource;
+    sourceName?: string | null;
+}
+
 /** "alsoNeeds": one of the second keywords must be there too; "unless": none of them may be. */
 export type LoreSecondaryMode = 'alsoNeeds' | 'unless';
 
@@ -152,6 +183,8 @@ export interface Story {
     scenes: Scene[];
     /** In add order. */
     lore: LoreEntry[];
+    /** In add order. */
+    documents: DocumentSummary[];
     /** Null while the author has chosen none. */
     cover: StoryCover | null;
     playable: boolean;
@@ -282,6 +315,17 @@ export const storyApi = {
     updateLoreEntry: (storyId: number, loreId: number, fields: LoreEntryFields) =>
         apiSend<Story>('PATCH', `/stories/${storyId}/lore/${loreId}`, fields),
     removeLoreEntry: (storyId: number, loreId: number) => apiSend<Story>('DELETE', `/stories/${storyId}/lore/${loreId}`),
+
+    /** Splits and embeds the text (a fraction of a cent), then stores it; the only Document write that spends. */
+    addDocument: (storyId: number, document: NewDocument) => apiSend<Story>('POST', `/stories/${storyId}/documents`, document),
+    /** A web page's title and plain text for the Add sheet; the API stores nothing and spends nothing. */
+    fetchPage: (storyId: number, url: string) =>
+        apiSend<{ title: string; text: string; url: string }>('POST', `/stories/${storyId}/documents/fetch-page`, { url }),
+    /** Only the title changes: the text stays as added. */
+    renameDocument: (storyId: number, documentId: number, title: string) =>
+        apiSend<Story>('PATCH', `/stories/${storyId}/documents/${documentId}`, { title }),
+    readDocument: (storyId: number, documentId: number) => apiFetch<DocumentText>(`/stories/${storyId}/documents/${documentId}`),
+    removeDocument: (storyId: number, documentId: number) => apiSend<Story>('DELETE', `/stories/${storyId}/documents/${documentId}`),
 
     /** Makes a round of 4 Reference image candidates; a new round discards the Character's old one (ticket 30). */
     generateReferenceCandidates: (storyId: number, characterId: number) =>
