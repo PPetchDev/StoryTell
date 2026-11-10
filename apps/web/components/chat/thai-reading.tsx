@@ -17,6 +17,8 @@ export interface ThaiReadings {
     failed(messageId: number): boolean;
     /** With no reading, asks for one; with one, hides or shows it with no call. */
     toggle(message: Message): void;
+    /** Asks again after a failure. */
+    retry(messageId: number): void;
 }
 
 const without = (set: Set<number>, id: number) => new Set([...set].filter((other) => other !== id));
@@ -56,6 +58,9 @@ export function useThaiReadings(storyId: number, chatId: number, onReading: (mes
             if (message.thaiReading === null) return void ask(message.id);
             setHidden((current) => (current.has(message.id) ? without(current, message.id) : new Set(current).add(message.id)));
         },
+        retry: (messageId) => {
+            if (!busy.has(messageId)) void ask(messageId);
+        },
     };
 }
 
@@ -78,14 +83,26 @@ export function ThaiReadingAction({ message, readings }: { message: Message; rea
 }
 
 /**
- * Under the Message's story text, above its Snapshots and actions: the reading, set apart, or the
- * failure. One block for all parts, so `*…*` spans read in italics everywhere, as speech shows them.
+ * Under the Message's story text, above its Snapshots and actions: the wait, the reading, set
+ * apart, or the failure with Retry. The wait and the failure show here, by the Message, because ไทย
+ * may be in the "⋯" menu, which closes on the tap. One block for all parts, so `*…*` spans read in
+ * italics everywhere, as speech shows them.
  */
 export function ThaiReadingBlock({ message, readings }: { message: Message; readings: ThaiReadings }) {
+    if (readings.busy(message.id) && message.thaiReading === null) {
+        return (
+            <p role="status" className={styles.thaiPending}>
+                Making a Thai reading…
+            </p>
+        );
+    }
     if (readings.failed(message.id) && message.thaiReading === null) {
         return (
             <p role="alert" className="turn-error">
-                Couldn&apos;t make a Thai reading, try again
+                Couldn&apos;t make a Thai reading, try again{' '}
+                <button type="button" className="button button-quiet" onClick={() => readings.retry(message.id)}>
+                    Retry
+                </button>
             </p>
         );
     }

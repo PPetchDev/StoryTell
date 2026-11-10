@@ -107,16 +107,51 @@ test('ไทย reads the newest reply and a User Message in Thai, toggles with 
     }
 });
 
-test('a failed Thai reading says so under that Message', async ({ page, request }) => {
+test('a failed Thai reading says so under that Message, and Retry there asks again', async ({ page, request }) => {
     const { storyId, chatId } = await playedChat(request);
-    await request.post('/api/testing/fake-gateway/text', { data: { kind: 'thai_reading', replies: ['   '] } });
+    await request.post('/api/testing/fake-gateway/text', { data: { kind: 'thai_reading', replies: ['   ', REPLY_THAI] } });
 
     try {
         await page.goto(`/stories/${storyId}/chats/${chatId}`);
         const reply = page.getByRole('article', { name: 'AI reply' });
         await (await thaiButton(reply)).tap();
-        await expect(reply.getByRole('alert')).toHaveText("Couldn't make a Thai reading, try again");
+        const failure = reply.getByRole('alert');
+        await expect(failure).toContainText("Couldn't make a Thai reading, try again");
         await expect(reply.getByRole('region', { name: 'Thai reading' })).toHaveCount(0);
+
+        // Retry sits on the failure itself, so ไทย needn't be found again (it may be in the ⋯ menu).
+        await failure.getByRole('button', { name: 'Retry' }).tap();
+        await expect(reply.getByRole('region', { name: 'Thai reading' })).toContainText('กุญแจอยู่ในกระเป๋าฉัน');
+        await expect(failure).toHaveCount(0);
+    } finally {
+        await request.delete(`/api/stories/${storyId}`);
+    }
+});
+
+test('while a Thai reading is made, the Message says so, even when ไทย was in the ⋯ menu', async ({ page, request }) => {
+    const { storyId, chatId } = await playedChat(request);
+    await request.post('/api/testing/fake-gateway/text', { data: { kind: 'thai_reading', replies: [LINE_THAI] } });
+    // Hold the answer, so the wait can be looked at.
+    let release: () => void = () => {};
+    const held = new Promise<void>((resolve) => (release = resolve));
+    await page.route('**/thai-reading', async (route) => {
+        await held;
+        await route.continue();
+    });
+
+    try {
+        await page.goto(`/stories/${storyId}/chats/${chatId}`);
+        // The User Message: its ไทย is in the ⋯ menu, which closes on the tap.
+        const line = page.getByRole('article', { name: 'Ash said' });
+        await line.tap();
+        await (await thaiButton(line)).tap();
+
+        const waiting = line.getByRole('status').filter({ hasText: 'Making a Thai reading…' });
+        await expect(waiting).toBeVisible();
+        release();
+
+        await expect(line.getByRole('region', { name: 'Thai reading' })).toContainText(LINE_THAI);
+        await expect(waiting).toHaveCount(0);
     } finally {
         await request.delete(`/api/stories/${storyId}`);
     }

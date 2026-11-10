@@ -248,6 +248,36 @@ div.overflowRow {
     margin-bottom: 0.2rem;
 }
 
+/* While a Thai reading is made: where it will appear, quiet and gently pulsing. */
+.thaiPending {
+    margin: 0.5rem 0 0;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.75rem;
+    border: 1px dashed var(--line);
+    color: var(--muted);
+    font-size: 0.875rem;
+    animation: thaiPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes thaiPulse {
+    50% {
+        opacity: 0.55;
+    }
+}
+
+/* ไทย itself while it waits, wherever it sits (the row or the "⋯" menu). */
+.action[aria-busy='true'] {
+    animation: thaiPulse 1.4s ease-in-out infinite;
+    cursor: progress;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .thaiPending,
+    .action[aria-busy='true'] {
+        animation: none;
+    }
+}
+
 .thaiText {
     margin: 0;
     white-space: pre-wrap;
