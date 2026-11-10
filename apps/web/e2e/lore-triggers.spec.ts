@@ -201,6 +201,39 @@ test('Stays for 4 autosaves and shows in the header; after a turn that mentions 
     }
 });
 
+test("the header words every setting as the Story assistant reads them: the spec's all-settings example, and Unless with patterns", async ({ page, request }) => {
+    const storyId = await createStory(request);
+    try {
+        // The same entries as the API's pure test of the summary (apps/api/test/lore-triggers.spec.ts).
+        await request.post(`/api/stories/${storyId}/lore`, {
+            data: {
+                name: 'Well',
+                text: 'The well is deep.',
+                secondaryKeywords: ['night'],
+                secondaryMode: 'alsoNeeds',
+                patterns: ['a'],
+                sticky: 4,
+                cooldown: 6,
+                delay: 10,
+                chance: 50,
+                group: 'weather',
+                recursable: false,
+            },
+        });
+        await request.post(`/api/stories/${storyId}/lore`, {
+            data: { name: 'Feast', text: 'A feast.', secondaryKeywords: ['last year', 'old'], secondaryMode: 'unless', patterns: ['a', 'b', 'c'] },
+        });
+        const panel = await openLoreTab(page, storyId);
+
+        await expect(moreTriggers(panel.getByRole('region', { name: 'Lore 1' }))).toHaveText(
+            'More triggersAlso needs: night · 1 pattern · Stays 4 · Rests 6 · Waits 10 · 50% · Group: weather · Not from other entries',
+        );
+        await expect(moreTriggers(panel.getByRole('region', { name: 'Lore 2' }))).toHaveText('More triggersUnless: last year, old · 3 patterns');
+    } finally {
+        await request.delete(`/api/stories/${storyId}`);
+    }
+});
+
 test('Chance 40 autosaves, survives a reload and shows "40%" in the header', async ({ page, request }) => {
     const storyId = await createStory(request);
     try {

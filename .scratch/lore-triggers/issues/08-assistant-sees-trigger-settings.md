@@ -6,6 +6,6 @@
 
 **Blocked by:** [06 — Chance](06-chance.md), [07 — Groups](07-groups.md) (every setting exists by then)
 
-- [ ] API tests through the fake gateway: the assistant's rendered Story carries the summary line, in the fold's exact words, for an entry with settings and none for a default entry; a field rewrite's prompt for the same Story has no summary line; a `set` of keywords keeps second keywords, patterns, Sticky, Chance and Group; a `set` of `sticky` is an invalid change set; an `add` and a draft's entries have every default.
-- [ ] A pure API test pins the summary for the spec's all-settings example, word for word; the web's header shows the same words (checked by the e2e of tickets 02–07).
-- [ ] No other prompt changes: the field rewrite and drafting prompts are byte-for-byte as before, and the existing assistant and drafting tests pass.
+- [x] API tests through the fake gateway: the assistant's rendered Story carries the summary line, in the fold's exact words, for an entry with settings and none for a default entry; a field rewrite's prompt for the same Story has no summary line; a `set` of keywords keeps second keywords, patterns, Sticky, Chance and Group; a `set` of `sticky` is an invalid change set; an `add` and a draft's entries have every default.
+- [x] A pure API test pins the summary for the spec's all-settings example, word for word; the web's header shows the same words (checked by the e2e of tickets 02–07).
+- [x] No other prompt changes: the field rewrite and drafting prompts are byte-for-byte as before, and the existing assistant and drafting tests pass.

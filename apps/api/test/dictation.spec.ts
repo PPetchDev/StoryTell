@@ -1,3 +1,7 @@
+import { Logger } from '@nestjs/common';
+import { mkdir, readdir, stat, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+
 import { ProviderOutageError } from '../src/errors/model-gateway.errors.js';
 import { FetchLike } from '../src/service/model-gateway/real/http.js';
 import { TEST_KEYS } from './harness/gateway-under-test.js';
@@ -12,6 +16,21 @@ const WAV = Buffer.concat([Buffer.from('RIFF'), Buffer.from([0x24, 0, 0, 0]), Bu
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);
 
 const MIRA = { name: 'Mira', appearance: 'Tall.', personality: 'Dry.', voice: 'Short.' };
+
+/** Every file under `dir`, at any depth, with its size and last change: what a write would alter. */
+async function filesUnder(dir: string): Promise<Array<{ file: string; size: number; changedMs: number }>> {
+    const entries = await readdir(dir, { recursive: true, withFileTypes: true });
+    const files = await Promise.all(
+        entries
+            .filter((entry) => !entry.isDirectory())
+            .map(async (entry) => {
+                const full = path.join(entry.parentPath, entry.name);
+                const info = await stat(full);
+                return { file: path.relative(dir, full), size: info.size, changedMs: info.mtimeMs };
+            }),
+    );
+    return files.sort((a, b) => a.file.localeCompare(b.file));
+}
 
 async function playableChat(t: TestApp): Promise<{ storyId: number; chatId: number }> {
     const created = await t.http.post('/api/stories').send({ title: 'The Lighthouse' }).expect(201);
@@ -91,6 +110,48 @@ describe('Dictation', () => {
 
         const after = (await t.http.get(`/api/stories/${storyId}/chats/${chatId}`).expect(200)).body;
         expect(after.messages).toEqual(before.messages);
+    });
+
+    it('never writes the recording to disk: the image and speech folders are left exactly as they were', async () => {
+        // Something already in each folder, so "unchanged" is more than "still empty".
+        await mkdir(path.join(t.imageDir, 'covers'), { recursive: true });
+        await writeFile(path.join(t.imageDir, 'covers', 'keep.png'), PNG);
+        await mkdir(path.join(t.speechDir, 'samples'), { recursive: true });
+        await writeFile(path.join(t.speechDir, 'samples', 'keep.mp3'), Buffer.from('ID3 synthetic'));
+        const before = { images: await filesUnder(t.imageDir), speech: await filesUnder(t.speechDir) };
+        t.gateway.scriptTranscription('Boots off.');
+
+        await dictate(WEBM).expect(200);
+
+        expect({ images: await filesUnder(t.imageDir), speech: await filesUnder(t.speechDir) }).toEqual(before);
+        expect(before.images).toHaveLength(1);
+        expect(before.speech).toHaveLength(1);
+    });
+
+    it('never logs the recording, when it is heard or when Venice fails', async () => {
+        const said: string[] = [];
+        const record = (...args: unknown[]) => {
+            said.push(args.map((arg) => (typeof arg === 'string' ? arg : JSON.stringify(arg) ?? String(arg))).join(' '));
+        };
+        const levels = ['log', 'error', 'warn', 'debug', 'verbose', 'fatal'] as const;
+        const spies = [
+            ...levels.map((level) => vi.spyOn(Logger.prototype, level).mockImplementation(record)),
+            ...levels.map((level) => vi.spyOn(Logger, level).mockImplementation(record)),
+            ...(['log', 'info', 'warn', 'error', 'debug'] as const).map((level) => vi.spyOn(console, level).mockImplementation(record)),
+        ];
+        try {
+            t.gateway.scriptTranscription('Boots off.', new ProviderOutageError('Venice: down'));
+            await dictate(WEBM).expect(200);
+            await dictate(WEBM).expect(502);
+        } finally {
+            spies.forEach((spy) => spy.mockRestore());
+        }
+
+        const logged = said.join('\n');
+        expect(logged).not.toContain('synthetic webm audio');
+        expect(logged).not.toContain(WEBM.toString('base64'));
+        expect(logged).not.toContain(WEBM.toString('hex'));
+        expect(logged).not.toContain(JSON.stringify([...WEBM]).slice(1, -1));
     });
 
     describe('refuses before any call', () => {

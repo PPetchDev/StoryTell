@@ -23,7 +23,8 @@ Per the spec's "Colour tokens (prefactor)".
 
 - [x] A search of the web app's `.css`, `.ts` and `.tsx` files (app, components and lib; hex, `rgb(a)` and `hsl(a)`) finds no colour literal outside `:root`, except the commented scrims, viewer stage, PWA metadata, placeholder Cover gradients and Cover canvas fill.
 - [x] The contrast check passes in `dark`, with the same ratios as the Friendly UI run for unchanged pairs.
-- [ ] Screenshots at 390px of Home (with a Story that has no Cover), a Chat, the Memory drawer, the Dashboard, the Story editor and Settings look the same as before (compared by eye against master).
+- [x] Screenshots at 390px of Home (with a Story that has no Cover), a Chat, the Memory drawer, the Dashboard, the Story editor and Settings look the same as before (compared by eye against master).
+  Compared by eye 2026-11-09 against the pre-token phone build: Chat list and Chat screen, dark, 375px; colours identical.
 - [x] Typecheck and the whole e2e suite pass. The Memory graph and Portrait initials still show Character colours.
 
 **Notes:** The contrast check now lives at `apps/web/scripts/contrast-check.mjs` (`node apps/web/scripts/contrast-check.mjs dark|light [--fail]`). It also fails when its token table and `app/globals.css` disagree. `.scratch/friendly-ui/contrast-check.mjs` is kept unchanged as a historical record. Its "after" pairs all give the same ratios here. The Character card stand-in picture (built after the spec) reads the Character colour and `--on-character` from the computed style, as the spec says for anything that needs a value. Borders that were `#3a3150` now use `--line`, which has that value. `e2e/theme.spec.ts` checks the dark palette on names, initials and the Memory graph.

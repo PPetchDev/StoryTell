@@ -455,5 +455,36 @@ ${LIGHTHOUSE}`);
             expect(await writeForMe(storyId, chatId)).not.toContain(DOCUMENTS_HEADING);
             expect(t.gateway.embeddingCalls('document_search')).toHaveLength(1);
         });
+
+        it('has no block after a failed search, and searches nothing itself', async () => {
+            const storyId = await playableStory();
+            await addDocument(storyId, 'Gull Point light', LIGHTHOUSE);
+            const chatId = await newChat(storyId);
+            t.gateway.scriptEmbedding('document_search', new ProviderOutageError('Down.'));
+            await send(storyId, chatId, QUESTION);
+            const searches = t.gateway.embeddingCalls('document_search').length;
+
+            expect(await writeForMe(storyId, chatId)).not.toContain(DOCUMENTS_HEADING);
+            expect(t.gateway.embeddingCalls('document_search')).toHaveLength(searches);
+        });
+
+        it('sends the same prompt as before for a Story without Documents', async () => {
+            const plain = await playableStory('Twin');
+            const withDocuments = await playableStory('Twin');
+            await addDocument(withDocuments, 'Valley bakers', BREAD);
+            const plainChat = await newChat(plain);
+            const documentsChat = await newChat(withDocuments);
+            await send(plain, plainChat, QUESTION);
+            await send(withDocuments, documentsChat, QUESTION);
+            t.gateway.reset();
+
+            await writeForMe(plain, plainChat);
+            await writeForMe(withDocuments, documentsChat);
+
+            const [first, second] = t.gateway.textCalls('write_for_me');
+            expect(second.messages).toEqual(first.messages);
+            expect(first.messages.at(-1)!.content).not.toContain(DOCUMENTS_HEADING);
+            expect(t.gateway.embeddingCalls()).toEqual([]);
+        });
     });
 });

@@ -6,6 +6,8 @@ test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true
 const OPENING = 'Dust rises over the market.\n\n@Nara: Welcome, traveller.';
 const NO_CHANGE = '{"bond_changes":[],"arc_steps":[],"scene":{"move_on":false}}';
 const NO_OPS = '{"operations":[]}';
+// What a new Lore entry stores for its triggers when none are given (mirrors TRIGGER_DEFAULTS in apps/api/test/lore.spec.ts).
+const TRIGGER_DEFAULTS = { secondaryKeywords: [], secondaryMode: 'alsoNeeds', patterns: [], recursable: true, sticky: 0, cooldown: 0, delay: 0, chance: 100, group: '' };
 
 async function createStory(request: APIRequestContext): Promise<number> {
     const created = await request.post('/api/stories', { data: { title: 'The Market' } });
@@ -38,7 +40,9 @@ test('an entry added in the Lore tab autosaves and survives a reload', async ({ 
         await expect(card.getByRole('textbox', { name: 'Keywords' })).toHaveValue('yurt, กระโจม, ');
 
         const stored = (await (await request.get(`/api/stories/${storyId}`)).json()) as { lore: unknown[] };
-        expect(stored.lore).toEqual([expect.objectContaining({ name: 'Tents', keywords: ['yurt', 'กระโจม'], text: 'Round felt tents with a smoke hole.', alwaysOn: true })]);
+        expect(stored.lore).toEqual([
+            { id: expect.any(Number), name: 'Tents', keywords: ['yurt', 'กระโจม'], text: 'Round felt tents with a smoke hole.', alwaysOn: true, ...TRIGGER_DEFAULTS },
+        ]);
 
         await page.reload();
         await page.getByRole('tab', { name: 'Lore', exact: true }).tap();
@@ -63,6 +67,23 @@ async function scriptTurn(request: APIRequestContext, reply: string) {
     await request.post('/api/testing/fake-gateway/text', { data: { kind: 'judge', replies: [NO_CHANGE] } });
     await request.post('/api/testing/fake-gateway/text', { data: { kind: 'memory_extraction', replies: [NO_OPS] } });
 }
+
+test('with no entry in play, the Memory drawer says none right now', async ({ page, request }) => {
+    const storyId = await createStory(request);
+    try {
+        // Neither entry is Always on, and no Message names them yet.
+        await request.post(`/api/stories/${storyId}/lore`, { data: { name: 'Tents', keywords: ['yurt'], text: 'Round felt tents.' } });
+        await request.post(`/api/stories/${storyId}/lore`, { data: { name: 'Salt', text: 'Salt is money here.' } });
+        const chatId = (await (await request.post(`/api/stories/${storyId}/chats`)).json()).id as number;
+
+        await page.goto(`/stories/${storyId}/chats/${chatId}`);
+        const card = await openLoreInPlay(page);
+        await expect(card.getByText(/None right now/)).toBeVisible();
+        await expect(card.getByRole('list', { name: 'Lore entries in play' })).toHaveCount(0);
+    } finally {
+        await request.delete(`/api/stories/${storyId}`);
+    }
+});
 
 test('after a turn that mentions an entry, the Memory drawer says it came up with the keyword', async ({ page, request }) => {
     await request.delete('/api/testing/fake-gateway');

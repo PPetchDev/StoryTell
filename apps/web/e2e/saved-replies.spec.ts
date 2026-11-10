@@ -219,6 +219,32 @@ test.describe('the Saved replies tray', () => {
         }
     });
 
+    test("{user} becomes the Persona's name when the Chat wears one, not the Role's", async ({ page, request }) => {
+        const storyId = await createStory(request);
+        const persona = await request.post('/api/personas', { data: { name: 'Rin', description: 'A drifter.' } });
+        expect(persona.ok()).toBe(true);
+        const personaId = (await persona.json()).id as number;
+        await request.post('/api/saved-replies', { data: { text: 'I nod at {user} and smile.' } });
+        try {
+            await request.delete('/api/testing/fake-gateway');
+            const chatId = (await (await request.post(`/api/stories/${storyId}/chats`)).json()).id as number;
+            const worn = await request.put(`/api/stories/${storyId}/chats/${chatId}/identity`, { data: { personaId } });
+            expect(worn.ok()).toBe(true);
+
+            await page.goto(`/stories/${storyId}/chats/${chatId}`);
+            const composer = page.getByRole('form', { name: 'Composer' });
+            const text = composer.getByRole('textbox', { name: 'Write as Rin' });
+            await expect(text).toBeVisible();
+            await composer.getByRole('toolbar', { name: 'Composer tools' }).getByRole('button', { name: 'Saved replies' }).tap();
+            await composer.getByRole('region', { name: 'Saved replies' }).getByRole('button', { name: 'I nod at {user} and smile.' }).tap();
+
+            await expect(text).toHaveValue('I nod at Rin and smile.');
+        } finally {
+            await request.delete(`/api/stories/${storyId}`);
+            await request.delete(`/api/personas/${personaId}`);
+        }
+    });
+
     test("a Saved reply put in the box ends Write for me's Undo", async ({ page, request }) => {
         const storyId = await createStory(request);
         await request.post(`/api/stories/${storyId}/saved-replies`, { data: { text: 'I wave.' } });

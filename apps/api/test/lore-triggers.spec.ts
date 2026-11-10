@@ -687,6 +687,45 @@ describe('Lore triggers: the API', () => {
         expect(inPlayAfter).toEqual(inPlayBefore);
     });
 
+    it("gives Regenerate the replaced reply's Lore block whichever Reply version is shown, even one that names another entry", async () => {
+        const storyId = await playableStory();
+        await t.http.post(`/api/stories/${storyId}/lore`).send({ name: 'Well', text: 'The well is deep.', sticky: 2 }).expect(201);
+        await t.http.post(`/api/stories/${storyId}/lore`).send({ name: 'Salt', text: 'Salt is money.' }).expect(201);
+        const chatId = await newChat(storyId);
+        await turn(storyId, chatId, 'To the well.', '@Nara: Here.');
+        // The reply names salt; the point it was written at did not, so Salt is not in its block.
+        const original = lorePart(await turn(storyId, chatId, 'I wait.', '@Nara: The salt is gone.'));
+        expect(original).toContain('## Well');
+        expect(original).not.toContain('Salt is money.');
+        const reply = (await chatBody(storyId, chatId)).messages.at(-1)!;
+
+        const regenerate = async (text: string): Promise<string> => {
+            t.gateway.scriptText('turn', text);
+            t.gateway.scriptText('judge', NO_CHANGE);
+            t.gateway.scriptText('memory_extraction', NO_OPS);
+            await t.http.post(`/api/stories/${storyId}/chats/${chatId}/messages/${reply.id}/regenerate`).expect(200);
+            await settle(storyId, chatId);
+            return lorePart(t.gateway.textCalls('turn').at(-1)!.messages.at(-1)!.content);
+        };
+        expect(await regenerate('@Nara: Nothing.')).toBe(original);
+
+        // Back to the first version, the one naming salt: the next Regenerate still gets the same block.
+        t.gateway.scriptText('judge', NO_CHANGE);
+        t.gateway.scriptText('memory_extraction', NO_OPS);
+        await t.http.put(`/api/stories/${storyId}/chats/${chatId}/messages/${reply.id}/version`).send({ version: 1 }).expect(200);
+        await settle(storyId, chatId);
+        expect(await regenerate('@Nara: Quiet now.')).toBe(original);
+    });
+
+    it('copies Stays for, Rests for and Waits until on Duplicate', async () => {
+        const storyId = await playableStory();
+        await t.http.post(`/api/stories/${storyId}/lore`).send({ name: 'Well', text: 'The well is deep.', sticky: 2, cooldown: 3, delay: 4 }).expect(201);
+
+        const copy = (await t.http.post(`/api/stories/${storyId}/duplicate`).expect(201)).body as Story;
+
+        expect(copy.lore[0]).toMatchObject({ name: 'Well', sticky: 2, cooldown: 3, delay: 4 });
+    });
+
     it('gives Regenerate the same Lore block for Chance entries; Lore in play shows the chance and the chance reason', async () => {
         const storyId = await playableStory();
         for (let i = 0; i < 8; i++) {

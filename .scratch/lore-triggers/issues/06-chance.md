@@ -6,6 +6,6 @@
 
 **Blocked by:** [05 — Stays for, Rests for, Waits until](05-stays-rests-waits.md)
 
-- [ ] Pure tests: the same Messages give the same answer on every call; a different text before the point can change it; 0 never goes in and 100 always does; a staying entry is not rolled again; over many points a 50% entry goes in roughly half the time (a loose bound, deterministic inputs).
-- [ ] API tests: Regenerate gives the same Lore block for a Chance entry; Lore in play shows the chance and the `chance` left-out reason; Duplicate copies it.
-- [ ] e2e (390px): setting Chance to 40 autosaves, survives a reload and shows "40%" in the header.
+- [x] Pure tests: the same Messages give the same answer on every call; a different text before the point can change it; 0 never goes in and 100 always does; a staying entry is not rolled again; over many points a 50% entry goes in roughly half the time (a loose bound, deterministic inputs).
+- [x] API tests: Regenerate gives the same Lore block for a Chance entry; Lore in play shows the chance and the `chance` left-out reason; Duplicate copies it.
+- [x] e2e (390px): setting Chance to 40 autosaves, survives a reload and shows "40%" in the header.

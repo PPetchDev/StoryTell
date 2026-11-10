@@ -90,6 +90,9 @@ describe('Read aloud', () => {
         return t.http.post(`${base(storyId, chatId, messageId)}/${index}`).buffer(true).parse(binary);
     }
 
+    /** Whether a Message still has its audio folder, empty or not. */
+    const hasFolder = (messageId: number): boolean => existsSync(path.join(t.speechDir, 'messages', String(messageId)));
+
     /** The audio files kept for a Message. */
     async function files(messageId: number): Promise<string[]> {
         const folder = path.join(t.speechDir, 'messages', String(messageId));
@@ -359,6 +362,7 @@ describe('Read aloud', () => {
 
             expect(await files(opening)).toEqual([]);
             expect(await files(reply)).toEqual([]);
+            expect([hasFolder(opening), hasFolder(reply)]).toEqual([false, false]);
         });
 
         it('Delete Chat takes its audio', async () => {
@@ -368,6 +372,7 @@ describe('Read aloud', () => {
 
             expect(await files(opening)).toEqual([]);
             expect(await files(reply)).toEqual([]);
+            expect([hasFolder(opening), hasFolder(reply)]).toEqual([false, false]);
         });
 
         it('Delete Story takes its audio, and leaves other Stories\' and the samples', async () => {
@@ -382,6 +387,7 @@ describe('Read aloud', () => {
 
             expect(await files(opening)).toEqual([]);
             expect(await files(reply)).toEqual([]);
+            expect([hasFolder(opening), hasFolder(reply)]).toEqual([false, false]);
             expect(await files(other.chat.messages[0].id)).toHaveLength(1);
             expect(existsSync(path.join(t.speechDir, 'samples', 'af_sky.mp3'))).toBe(true);
         });

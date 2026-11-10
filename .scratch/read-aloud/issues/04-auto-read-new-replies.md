@@ -16,11 +16,12 @@
 
 **Blocked by:** [03 — Read a Message aloud](03-read-a-message-aloud.md), [Branch's copy ticket](../../branch/issues/02-branch-a-chat.md)
 
-- [ ] API tests: `autoRead` defaults to false, round-trips through the Chat update, survives Reset, and a Branch of a Chat with it on has it on.
-- [ ] e2e at 390px:
+- [x] API tests: `autoRead` defaults to false, round-trips through the Chat update, survives Reset, and a Branch of a Chat with it on has it on.
+- [x] e2e at 390px:
   - with the switch on, a send plays the new reply after it settles (the fake records `read_aloud` calls for its items);
   - reloading the Chat plays nothing;
   - choosing another Reply version plays nothing;
   - with the switch off, a send records no speech call.
 - [ ] The handoff asks the user to check on their iPhone PWA that auto-read plays after Send. The agent can't test iOS autoplay itself.
-- [ ] Typecheck and the whole suites stay green.
+  Waiting for the user: check on the iPhone PWA that, with auto-read on, a new reply is read aloud after Send.
+- [x] Typecheck and the whole suites stay green.

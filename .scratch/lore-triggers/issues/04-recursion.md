@@ -6,6 +6,6 @@
 
 **Blocked by:** [03 — Patterns](03-patterns.md) (recursion searches entry text with patterns too)
 
-- [ ] Pure tests: one step; a chain of three steps comes in, a fourth does not; the opt-out; the reason names the bringer; brought-in entries are cut by the cap before came-up ones; a brought-in entry already chosen is not added twice.
-- [ ] API tests: a turn that mentions only entry A carries entry B named in A's text, after A in the block; with B's opt-out off it doesn't; Lore in play says "brought in by A"; Duplicate copies the flag.
-- [ ] e2e (390px): switching "Brought in by other entries" to No autosaves and survives a reload, and the header shows "Not from other entries".
+- [x] Pure tests: one step; a chain of three steps comes in, a fourth does not; the opt-out; the reason names the bringer; brought-in entries are cut by the cap before came-up ones; a brought-in entry already chosen is not added twice.
+- [x] API tests: a turn that mentions only entry A carries entry B named in A's text, after A in the block; with B's opt-out off it doesn't; Lore in play says "brought in by A"; Duplicate copies the flag.
+- [x] e2e (390px): switching "Brought in by other entries" to No autosaves and survives a reload, and the header shows "Not from other entries".

@@ -13,7 +13,7 @@ Part of: [Spec: Documents](../spec.md)
 
 - [x] Pure tests: the Suggested replies prompt has the block after Lore and before the instruction; with a long history it keeps fewer Messages with the block than without, and never goes over the budget.
 - [x] API tests through the fake gateway: Suggested replies carry the newest AI Message's passages with no `document_search` call; a removed Document's passages drop out; a `failed` or null record gives no block; a Story without Documents sends the same prompt as before.
-- [ ] (n/a: Write for me does not exist yet) If Write for me exists: the same three API checks for Write for me, and its history budget takes the block.
+- [x] If Write for me exists: the same three API checks for Write for me, and its history budget takes the block.
 - [x] The existing Suggested replies tests stay green.
 
 ## Comments

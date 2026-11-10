@@ -13,9 +13,9 @@ This ticket puts only the Second keywords field and its mode inside, so its summ
 
 **Blocked by:** [01 — Lore in play says why each entry is in](01-lore-in-play-says-why.md)
 
-- [ ] Existing entries behave as before (defaults: no second keywords, mode `alsoNeeds`).
-- [ ] Second keywords are cleaned like keywords (trimmed, blanks and repeats dropped; at most 20 of at most 100 characters).
-- [ ] Pure tests: both modes; a second keyword found in a scanned Message and in a chosen entry's text; a Thai second keyword matches anywhere; second keywords alone never bring an entry up; the `condition` reason.
-- [ ] API tests: CRUD carries both fields; Duplicate copies them; a turn leaves out an entry whose condition fails and Lore in play says so.
-- [ ] The card folds behave as before: their keys still mean "folded", and a device with nothing stored shows every card unfolded and every More triggers fold closed.
-- [ ] e2e (390px): More triggers is closed on a new card; opening it and setting second keywords and "Unless one of" autosaves and survives a reload, and the open state survives too; the header reads "More triggers" with "Unless: last year".
+- [x] Existing entries behave as before (defaults: no second keywords, mode `alsoNeeds`).
+- [x] Second keywords are cleaned like keywords (trimmed, blanks and repeats dropped; at most 20 of at most 100 characters).
+- [x] Pure tests: both modes; a second keyword found in a scanned Message and in a chosen entry's text; a Thai second keyword matches anywhere; second keywords alone never bring an entry up; the `condition` reason.
+- [x] API tests: CRUD carries both fields; Duplicate copies them; a turn leaves out an entry whose condition fails and Lore in play says so.
+- [x] The card folds behave as before: their keys still mean "folded", and a device with nothing stored shows every card unfolded and every More triggers fold closed.
+- [x] e2e (390px): More triggers is closed on a new card; opening it and setting second keywords and "Unless one of" autosaves and survives a reload, and the open state survives too; the header reads "More triggers" with "Unless: last year".

@@ -6,6 +6,6 @@
 
 **Blocked by:** [02 — Second keywords and the More triggers fold](02-second-keywords.md)
 
-- [ ] Pure tests: a pattern brings an entry up; case-insensitive; `^` matches at a line start inside an AI Message's `@Name:` text; a pattern's source is the `cameUp` trigger; second keywords still filter a pattern-triggered entry.
-- [ ] API tests: a broken pattern is `InvalidLorePatternError` and nothing of that write is saved; limits are validated; Duplicate copies patterns; a turn whose scan matches a pattern carries the entry.
-- [ ] e2e (390px): typing a broken pattern shows the error under Patterns; fixing it saves and survives a reload, and the header shows "1 pattern".
+- [x] Pure tests: a pattern brings an entry up; case-insensitive; `^` matches at a line start inside an AI Message's `@Name:` text; a pattern's source is the `cameUp` trigger; second keywords still filter a pattern-triggered entry.
+- [x] API tests: a broken pattern is `InvalidLorePatternError` and nothing of that write is saved; limits are validated; Duplicate copies patterns; a turn whose scan matches a pattern carries the entry.
+- [x] e2e (390px): typing a broken pattern shows the error under Patterns; fixing it saves and survives a reload, and the header shows "1 pattern".

@@ -17,15 +17,15 @@
 
 **Blocked by:** [01 — Speech in the Model Gateway](01-speech-in-the-gateway.md)
 
-- [ ] API tests:
+- [x] API tests:
   - setting and clearing both voices;
   - an unknown voice is refused with the new code;
   - Duplicate copies the voices;
   - a sample is made once (one `voice_preview` call, logged) and then served from disk with no call;
   - two test apps get different speech folders, and each is gone after `close()`;
   - a `SPEECH_DIR` inside the image folder fails config.
-- [ ] e2e at 390px:
+- [x] e2e at 390px:
   - choosing a Narration voice and a Speaking voice autosaves and survives a reload;
   - ▶ Sample plays and the fake records one call; a second tap records none.
-- [ ] `docs/error-codes.md` lists `UnknownVoiceError`, with the next free code at implementation time.
-- [ ] A Story with no voices set behaves exactly as before. Typecheck and the whole suites stay green.
+- [x] `docs/error-codes.md` lists `UnknownVoiceError`, with the next free code at implementation time.
+- [x] A Story with no voices set behaves exactly as before. Typecheck and the whole suites stay green.

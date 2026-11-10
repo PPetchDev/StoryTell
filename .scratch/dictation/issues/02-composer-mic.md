@@ -8,10 +8,10 @@
 
 Part of: [Spec: Dictation](../spec.md)
 
-- [ ] 🎤 ("Dictate") shows only with `getUserMedia` and `MediaRecorder`; disabled while a turn or write is in flight, while Write for me or a transcription runs, and when `imageCreditOut` (title says why).
-- [ ] Recording bar with Cancel, `role="timer"` elapsed time, the "Dictation language" switch (`storytell.dictationLanguage`, default `th`), and Done; the tool row is disabled meanwhile; the recorder uses the first supported of webm/opus, mp4, ogg/opus.
-- [ ] While a recording or a transcription runs, ⚡ and ✍️ are disabled, each by its own rule (✍️ only if Write for me has landed; otherwise Write for me's ticket wires it).
-- [ ] Done: under 1 s dropped with "That was too short."; otherwise "Transcribing…", then the text is appended after one space where needed (box not focused); empty text shows "Didn't catch anything."; the mic tracks are stopped every time.
-- [ ] Failure keeps the audio and offers Retry (same audio) and Discard; Venice credit out shows "Venice credit is used up."; blocked mic and no device show their notes and record nothing.
-- [ ] 2:00 finishes as Done; the page going hidden finishes as Done; leaving the Chat screen cancels.
-- [ ] e2e from the spec's Testing Decisions pass with Chromium's fake media device and a stubbed `NotAllowedError`; the existing composer e2e stays green.
+- [x] 🎤 ("Dictate") shows only with `getUserMedia` and `MediaRecorder`; disabled while a turn or write is in flight, while Write for me or a transcription runs, and when `imageCreditOut` (title says why).
+- [x] Recording bar with Cancel, `role="timer"` elapsed time, the "Dictation language" switch (`storytell.dictationLanguage`, default `th`), and Done; the tool row is disabled meanwhile; the recorder uses the first supported of webm/opus, mp4, ogg/opus.
+- [x] While a recording or a transcription runs, ⚡ and ✍️ are disabled, each by its own rule (✍️ only if Write for me has landed; otherwise Write for me's ticket wires it).
+- [x] Done: under 1 s dropped with "That was too short."; otherwise "Transcribing…", then the text is appended after one space where needed (box not focused); empty text shows "Didn't catch anything."; the mic tracks are stopped every time.
+- [x] Failure keeps the audio and offers Retry (same audio) and Discard; Venice credit out shows "Venice credit is used up."; blocked mic and no device show their notes and record nothing.
+- [x] 2:00 finishes as Done; the page going hidden finishes as Done; leaving the Chat screen cancels.
+- [x] e2e from the spec's Testing Decisions pass with Chromium's fake media device and a stubbed `NotAllowedError`; the existing composer e2e stays green.

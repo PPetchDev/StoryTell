@@ -212,6 +212,42 @@ describe('Write for me', () => {
             expect(body.text).toBe(WRITTEN);
         });
 
+        it("is not blocked by the previous reply's background call still running", async () => {
+            const storyId = await createStory();
+            const chat = await createChat(storyId);
+            // The judge is held open until the test lets it answer.
+            let answerJudge: (text: string) => void = () => {};
+            const judged = new Promise<string>((resolve) => (answerJudge = resolve));
+            const original = t.gateway.completeText.bind(t.gateway);
+            t.gateway.completeText = async (request) => {
+                if (request.kind !== 'judge') return original(request);
+                t.gateway.calls.push({ method: 'completeText', request });
+                return { text: await judged, model: FAKE_TEXT_MODEL, usage: { promptTokens: 0, completionTokens: 0 }, costUsd: 0 };
+            };
+            try {
+                t.gateway.scriptText('turn', 'Mira nods.');
+                t.gateway.scriptText('memory_extraction', NO_OPS);
+                await t.http.post(`/api/stories/${storyId}/chats/${chat.id}/messages`).send({ text: 'Hello?' }).expect(201);
+                const deadline = Date.now() + 5_000;
+                while (t.gateway.textCalls('judge').length === 0) {
+                    if (Date.now() > deadline) throw new Error('The judge was never called');
+                    await new Promise((resolve) => setTimeout(resolve, 20));
+                }
+                t.gateway.scriptText('write_for_me', WRITTEN);
+
+                const { body } = await write(storyId, chat.id, THAI_DRAFT).expect(200);
+
+                expect(body.text).toBe(WRITTEN);
+                // Answered while the judge was still running.
+                const during = await getChat(storyId, chat.id);
+                expect(during.messages.at(-1)!.judge?.status).toBe('pending');
+            } finally {
+                answerJudge(NO_CHANGE);
+                t.gateway.completeText = original;
+            }
+            expect((await settled(storyId, chat.id)).messages.at(-1)!.judge?.status).toBe('done');
+        });
+
         it('answers 404 for a Chat of another Story', async () => {
             const storyId = await createStory();
             const other = await createStory();

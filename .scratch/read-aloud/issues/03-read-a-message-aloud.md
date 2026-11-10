@@ -23,13 +23,13 @@
 
 **Blocked by:** [02 — Narration voice and Speaking voices in the Story editor](02-voices-in-the-story-editor.md), [Branch's copy ticket](../../branch/issues/02-branch-a-chat.md), [Replace rules on AI Messages as shown](../../saved-replies-and-replace-rules/issues/04-replace-rules-on-ai-messages.md)
 
-- [ ] Pure tests on `readAloudQueue`:
+- [x] Pure tests on `readAloudQueue`:
   - a paragraph per narration item, with its `paragraph` index;
   - actions in the Narration voice;
   - the fallbacks for a missing voice, a null link or a removed Character;
   - punctuation-only items dropped;
   - the 4,000-character split.
-- [ ] API tests:
+- [x] API tests:
   - the queue, and none for a User Message;
   - an item is made once and then answered from disk with `cached: true` and no call;
   - an out-of-range index is refused;
@@ -39,10 +39,10 @@
   - a Reply version's audio survives choosing another version;
   - a discarding edit, Reset, Delete Chat and Delete Story remove their Messages' folders;
   - a Branch of a Chat whose reply was read answers its items `cached: true` and plays them with no call.
-- [ ] e2e at 390px:
+- [x] e2e at 390px:
   - ▶ Read aloud highlights the first part, then the next, and ends idle;
   - Pause and Resume keep the place, and Stop ends it;
   - ▶ on an older Message stops the one playing;
   - Read aloud is not offered on a streaming reply;
   - the action row and a tapped Message's tools don't overflow.
-- [ ] `docs/error-codes.md` lists the two new codes, the next free ones at implementation time. Typecheck and the whole suites stay green.
+- [x] `docs/error-codes.md` lists the two new codes, the next free ones at implementation time. Typecheck and the whole suites stay green.

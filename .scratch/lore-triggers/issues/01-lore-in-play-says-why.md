@@ -6,10 +6,10 @@
 
 **Blocked by:** None — can start immediately.
 
-- [ ] Every prompt is byte-for-byte what it was before for the same Story and Chat: the API-level turn, Suggested replies, Snapshot and Story so far tests pass unchanged, and the Snapshot's Lore still comes from its hint and its 6-Message scan.
-- [ ] The pure prompt tests in the API's Lore tests that hand every entry to the turn and Suggested replies prompt builders and assert which are chosen are rewritten: choosing is asserted through the selection entry point, and the prompt tests hand in chosen entries and assert only the block's place and the unchanged system message (spec: "Testing Decisions").
-- [ ] The turn's selection runs once per turn; no prompt builder scans for Lore.
-- [ ] Pure tests: the scan at a point after a user Message (that Message plus the 4 before it) and after an AI Message (the 4 before the point); the Snapshot's scan (its hint, then the 6 Messages ending with its Message); reasons `always` and `cameUp` with the trigger and `messagesAgo`; an entry over the cap is in `leftOut` with `noRoom`.
-- [ ] API test: Lore in play answers reasons and the left-out list.
-- [ ] e2e (390px): after a turn that mentions an entry, the Memory drawer says it came up with the keyword; an entry that didn't fit shows under the closed left-out fold once opened.
-- [ ] The web's Lore in play types mirror the new DTO.
+- [x] Every prompt is byte-for-byte what it was before for the same Story and Chat: the API-level turn, Suggested replies, Snapshot and Story so far tests pass unchanged, and the Snapshot's Lore still comes from its hint and its 6-Message scan.
+- [x] The pure prompt tests in the API's Lore tests that hand every entry to the turn and Suggested replies prompt builders and assert which are chosen are rewritten: choosing is asserted through the selection entry point, and the prompt tests hand in chosen entries and assert only the block's place and the unchanged system message (spec: "Testing Decisions").
+- [x] The turn's selection runs once per turn; no prompt builder scans for Lore.
+- [x] Pure tests: the scan at a point after a user Message (that Message plus the 4 before it) and after an AI Message (the 4 before the point); the Snapshot's scan (its hint, then the 6 Messages ending with its Message); reasons `always` and `cameUp` with the trigger and `messagesAgo`; an entry over the cap is in `leftOut` with `noRoom`.
+- [x] API test: Lore in play answers reasons and the left-out list.
+- [x] e2e (390px): after a turn that mentions an entry, the Memory drawer says it came up with the keyword; an entry that didn't fit shows under the closed left-out fold once opened.
+- [x] The web's Lore in play types mirror the new DTO.

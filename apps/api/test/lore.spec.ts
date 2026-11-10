@@ -9,6 +9,7 @@ import {
 } from '../src/manager/chat/lore/lore-select.js';
 import { buildSuggestionsPrompt } from '../src/manager/chat/suggestions/suggestions-prompt.js';
 import { buildTurnPrompt, TurnPromptInput } from '../src/manager/chat/turn/prompt.js';
+import { buildWriteForMePrompt } from '../src/manager/chat/write-for-me/write-for-me-prompt.js';
 import { Pov, ReplyLength, Tense } from '../src/model/story/entities/story.entity.js';
 import { startTestApp, TestApp } from './harness/test-app.js';
 
@@ -145,6 +146,23 @@ describe('Lore: the turn and Suggested replies prompts (pure)', () => {
         const prompt = buildTurnPrompt(input({ lore: [tent, salt], userText: 'I enter the yurt.', chosenLore: [] }));
         expect(prompt.messages.at(-1)!.content.startsWith('Where things stand:')).toBe(true);
         expect(prompt.messages.map((message) => message.content).join('\n')).not.toContain('Round felt tents');
+    });
+
+    it('gives Suggested replies and Write for me only the chosen entries: neither scans the history itself', () => {
+        const yurt = entry({ name: 'Tent', keywords: ['yurt'], text: 'Round felt tents.' });
+        // The history mentions the yurt, but nothing was chosen: no block in either prompt.
+        const history = [
+            { role: 'assistant' as const, text: '@Nara: Sleep in my yurt.' },
+            { role: 'user' as const, text: 'The yurt, then.' },
+        ];
+        const suggestions = buildSuggestionsPrompt({ ...input({ lore: [yurt], chosenLore: [] }), history });
+        const written = buildWriteForMePrompt({ ...input({ lore: [yurt], chosenLore: [] }), history, draft: 'Into the yurt.' });
+        for (const prompt of [suggestions, written]) {
+            expect(prompt.messages.map((message) => message.content).join('\n')).not.toContain('Round felt tents');
+        }
+        // Handed in, it is there.
+        const chosen = buildWriteForMePrompt({ ...input({ lore: [yurt], chosenLore: [yurt] }), history, draft: '' });
+        expect(chosen.messages.at(-1)!.content).toContain('Round felt tents');
     });
 
     it('leaves the system message, and with it the cached prefix, exactly as without Lore', () => {

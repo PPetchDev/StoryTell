@@ -1,6 +1,8 @@
 # 07 — Offer Kimi K2.6 as a play model
 
-**Status:** ready-for-agent
+**Status:** needs-info
+
+**Waiting on:** ticket 05's paid smoke-test results, which only the user runs (see [05 — Smoke-test the candidates](05-smoke-test-candidates.md)).
 
 Part of: [Spec: Play models and Sampling](../spec.md)
 
