@@ -25,6 +25,10 @@ const nextConfig: NextConfig = {
         // default). A Character card goes through as picked, up to the API's 15 MB, so the body
         // must pass whole; a bigger one must reach the API too, so it answers its own size error.
         proxyClientMaxBodySize: '20mb',
+        // The /api rewrite gives up on an answer after 30 s by default ("socket hang up"), while
+        // the API goes on and the provider still bills. Drawing an Expression or a Reference image,
+        // a long Thai reading or Write for me can take longer, so wait as long as the slowest does.
+        proxyTimeout: 180_000,
     },
     poweredByHeader: false,
     // The dev-only route badge sits in a bottom corner, over the bottom nav's first tab.

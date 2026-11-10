@@ -190,6 +190,25 @@ test('a draw that fails says why in its row, out of image credit in the Referenc
     await expect(angry.locator('img')).toHaveCount(0);
 });
 
+// A real draw on Venice often takes longer than half a minute. The web's /api proxy used to cut
+// any request after 30 s ("socket hang up"), so the phone showed a failure while the API went on,
+// stored the picture and spent the credit, and a second tap paid again.
+test('a draw that takes longer than half a minute still arrives in its row', async ({ page, request }) => {
+    test.setTimeout(120_000);
+    const { storyId, characterId } = await createStoryWithMira(request);
+    await giveReferenceImage(request, storyId, characterId);
+    await request.post(`${FAKE}/image`, { data: { kind: 'expression_image', replies: [{ delayMs: 40_000 }] } });
+
+    await page.goto(`/stories/${storyId}?tab=characters`);
+    const fear = page.getByRole('region', { name: 'Character 1' }).getByRole('group', { name: 'Scared Expression' });
+    await fear.getByRole('button', { name: 'Draw · $0.05' }).tap();
+    await expect(fear.getByRole('status')).toHaveText('Drawing…');
+
+    await expect(fear.locator('img')).toHaveAttribute('src', /character-\d+-fear-[0-9a-f]+\.png$/, { timeout: 60_000 });
+    await expect(fear.getByRole('alert')).toHaveCount(0);
+    expect(await expressionCalls(request)).toHaveLength(1);
+});
+
 test('the Usage page lists Expression pictures under "Images and audio (Venice)"', async ({ page }) => {
     const pool = (byKind: object[]) => ({ spentUsd: 0.1, calls: 2, byKind, remainingUsd: 8, capUsd: 8, lowCreditPercent: 20, lowCredit: false });
     await page.route('**/api/usage', (route) =>
