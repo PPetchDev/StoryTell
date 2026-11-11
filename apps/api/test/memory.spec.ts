@@ -45,6 +45,7 @@ interface MemoryList {
     cast: Array<{ id: number; name: string }>;
     present: number[];
     memories: Memory[];
+    lockedWarning: boolean;
 }
 
 interface Story {
@@ -498,6 +499,50 @@ A Character knows only the Memories it is tagged on`);
             await play(story.id, chat.id, 'Four.', 'Reply four.');
             expect(systemPrompt(lastCall('turn'))).toContain('- [known by Mira] The gull took the bread.');
             expect(lastCall('memory_extraction').messages[1].content).toContain(`${gull.id}: - [known by Mira] [locked] The gull took the bread.`);
+        });
+    });
+
+    // .scratch/memory-by-meaning/spec.md, user story 6 and "The locked warning": "Unlock some you no longer need."
+    describe('unlocking', () => {
+        it('unlocks a Memory, so the AI may change it again, keeping its text and author', async () => {
+            const story = await createStory();
+            const chat = await createChat(story.id);
+            const added = (await t.http.post(`/api/stories/${story.id}/chats/${chat.id}/memories`).send({ text: 'The ferry runs on Sundays.' }).expect(201))
+                .body as { id: number; locked: boolean };
+            expect(added.locked).toBe(true);
+
+            const unlocked = await t.http.post(`/api/stories/${story.id}/chats/${chat.id}/memories/${added.id}/unlock`).expect(200);
+
+            expect(unlocked.body).toMatchObject({ id: added.id, text: 'The ferry runs on Sundays.', locked: false, writtenBy: 'user', archived: false });
+            expect((await memories(story.id, chat.id)).memories).toMatchObject([{ id: added.id, locked: false }]);
+            await play(story.id, chat.id, 'One.', 'Reply one.');
+            // Listed for the extraction without its lock, so the AI may update, merge or archive it.
+            expect(lastCall('memory_extraction').messages[1].content).toMatch(new RegExp(`${added.id}: - \\[known by [^\\]]+\\] The ferry runs on Sundays\\.`));
+            expect(lastCall('memory_extraction').messages[1].content).not.toContain('[locked] The ferry');
+        });
+
+        it('clears the locked warning once enough are unlocked', async () => {
+            const story = await createStory();
+            const chat = await createChat(story.id);
+            const ids: number[] = [];
+            for (let n = 0; n < 40; n++) {
+                const text = `{user} swore oath ${n} at the lamp: ${'never to let the light go dark, '.repeat(6)}`.trim();
+                ids.push((await t.http.post(`/api/stories/${story.id}/chats/${chat.id}/memories`).send({ text }).expect(201)).body.id as number);
+            }
+            expect((await memories(story.id, chat.id)).lockedWarning).toBe(true);
+
+            for (const id of ids.slice(0, 20)) await t.http.post(`/api/stories/${story.id}/chats/${chat.id}/memories/${id}/unlock`).expect(200);
+
+            expect((await memories(story.id, chat.id)).lockedWarning).toBe(false);
+        });
+
+        it('answers 404 for a Memory of another Chat', async () => {
+            const story = await createStory();
+            const chat = await createChat(story.id);
+            const other = await createChat(story.id);
+            const added = (await t.http.post(`/api/stories/${story.id}/chats/${other.id}/memories`).send({ text: 'Elsewhere.' }).expect(201)).body as { id: number };
+
+            await t.http.post(`/api/stories/${story.id}/chats/${chat.id}/memories/${added.id}/unlock`).expect(404);
         });
     });
 

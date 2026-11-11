@@ -9,7 +9,7 @@ const Id = (name: string) => Param(name, ParseIntPipe);
 
 /**
  * Memory per Chat (spec: "API surface"): list (active and archived), add, edit, delete,
- * restore. These are the user's own actions, never tied to a Message and never rolled back
+ * restore, unlock. These are the user's own actions, never tied to a Message and never rolled back
  * by an edit; the AI's changes come through extraction and the ledger.
  */
 @ApiTags('Memory')
@@ -63,5 +63,17 @@ export class MemoryApiController {
         @Id('memoryId') memoryId: number,
     ): Promise<MemoryResponseBodyDTO> {
         return this.memoryManager.restore(storyId, chatId, memoryId);
+    }
+
+    /** Takes the lock off, so the AI may update, merge or archive it again; its text and author stay. */
+    @Post(':memoryId/unlock')
+    @HttpCode(200)
+    @ApiOkResponse({ type: MemoryResponseBodyDTO })
+    unlock(
+        @Id('storyId') storyId: number,
+        @Id('chatId') chatId: number,
+        @Id('memoryId') memoryId: number,
+    ): Promise<MemoryResponseBodyDTO> {
+        return this.memoryManager.unlock(storyId, chatId, memoryId);
     }
 }

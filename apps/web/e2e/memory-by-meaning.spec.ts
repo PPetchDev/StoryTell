@@ -78,6 +78,36 @@ test('the Memory drawer marks "In play" on the Memories the last turn sent, and 
     }
 });
 
+test('Unlock on a locked Memory lets the AI change it again, and stays after a reload', async ({ page, request }) => {
+    const { storyId, chatId } = await storyAndChat(request);
+    try {
+        const added = await request.post(`/api/stories/${storyId}/chats/${chatId}/memories`, { data: { text: 'The ferry runs on Sundays.' } });
+        expect(added.ok()).toBe(true);
+        const memoryId = (await added.json()).id as number;
+
+        await page.goto(`/stories/${storyId}/chats/${chatId}`);
+        const drawer = await openMemory(page);
+        const memory = drawer.getByRole('listitem', { name: `Memory ${memoryId}` });
+        await expect(memory.getByText('🔒 Locked')).toBeVisible();
+
+        await memory.getByRole('button', { name: 'Unlock' }).click();
+
+        await expect(memory.getByText('🔒 Locked')).toHaveCount(0);
+        await expect(memory.getByRole('button', { name: 'Unlock' })).toHaveCount(0);
+        expect((await (await request.get(`/api/stories/${storyId}/chats/${chatId}/memories`)).json()).memories).toMatchObject([
+            { id: memoryId, locked: false, text: 'The ferry runs on Sundays.' },
+        ]);
+        await noSidewaysScroll(page);
+
+        await page.reload();
+        const again = (await openMemory(page)).getByRole('listitem', { name: `Memory ${memoryId}` });
+        await expect(again.getByText('The ferry runs on Sundays.')).toBeVisible();
+        await expect(again.getByText('🔒 Locked')).toHaveCount(0);
+    } finally {
+        await request.delete(`/api/stories/${storyId}`);
+    }
+});
+
 test('the Memory drawer warns once the locked Memories take more than half the room', async ({ page, request }) => {
     const { storyId, chatId } = await storyAndChat(request);
     try {

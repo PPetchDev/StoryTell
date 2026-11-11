@@ -60,6 +60,13 @@ test('the Scene editor adds a Bond gate by its word, which makes the Scene playa
         const strip = page.getByRole('button', { name: /Scene: Arrival/ });
         await expect(strip).toContainText('Waiting for: Nara toward you, Trust at least trusts');
         await expect(strip).not.toContainText(/\d/);
+        // Read whole on a phone: it wraps onto its own line instead of being cut off with "…".
+        const waiting = strip.getByText(/^Waiting for:/);
+        await expect(waiting).toBeVisible();
+        expect(await waiting.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+        const box = (await waiting.boundingBox())!;
+        expect(box.x + box.width).toBeLessThanOrEqual(390);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 
         // Removing the gate takes it out again, and Arrival needs its condition once more.
         await page.goto(`/stories/${storyId}?tab=scenes`);

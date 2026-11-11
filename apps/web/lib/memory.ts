@@ -74,6 +74,9 @@ export const memoryApi = {
     /** Brings an archived Memory back into play, locked. */
     restore: (storyId: number, chatId: number, memoryId: number) =>
         apiSend<Memory>('POST', `${base(storyId, chatId)}/${memoryId}/restore`),
+    /** Takes the lock off, so the AI may change it again (the locked warning's "Unlock some"). */
+    unlock: (storyId: number, chatId: number, memoryId: number) =>
+        apiSend<Memory>('POST', `${base(storyId, chatId)}/${memoryId}/unlock`),
 };
 
 const beliefBase = (storyId: number, chatId: number) => `/stories/${storyId}/chats/${chatId}/beliefs`;

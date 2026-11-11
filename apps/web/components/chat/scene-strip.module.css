@@ -2,7 +2,9 @@
 .strip {
     position: relative;
     display: flex;
-    gap: 0.9rem;
+    /* Only the Bond gates' line wraps, onto a line of its own (see .waiting). */
+    flex-wrap: wrap;
+    gap: 0.25rem 0.9rem;
     width: calc(100% + 1rem);
     min-height: 2rem;
     /* Half-way into the page's 1rem side padding, like the top bar; the width adds both halves. */
@@ -47,10 +49,13 @@
     text-overflow: ellipsis;
 }
 
-/* What the Scene's Bond gates wait for (.scratch/bond-axes/spec.md), after the goal. */
+/*
+ * What the Scene's Bond gates wait for (.scratch/bond-axes/spec.md), after the goal: on a line of
+ * its own, wrapping, so a phone reads it whole instead of cut off with "…".
+ */
 .waiting {
-    flex: 1;
+    flex: 1 0 100%;
     min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: normal;
+    overflow-wrap: anywhere;
 }

@@ -252,6 +252,7 @@ interface MemoryViewProps {
     onSaved(memory: Memory): void;
     onDelete(): void;
     onRestore(): void;
+    onUnlock(): void;
     onJump(messageId: number): void;
 }
 
@@ -259,7 +260,7 @@ interface MemoryViewProps {
  * One Memory (spec: "Memory drawer"): its text with `{user}` rendered, Known-by chips, who
  * wrote it, a lock when locked, and a jump to the causing Message. Edit locks it.
  */
-function MemoryView({ list, memory, highlighted, inPlay, busy, autosave, sendEdit, onSaved, onDelete, onRestore, onJump }: MemoryViewProps) {
+function MemoryView({ list, memory, highlighted, inPlay, busy, autosave, sendEdit, onSaved, onDelete, onRestore, onUnlock, onJump }: MemoryViewProps) {
     const [editing, setEditing] = useState(false);
     const nameOf = (id: number) => list.cast.find((character) => character.id === id)?.name ?? 'a removed Character';
     const label = `Memory ${memory.id}`;
@@ -321,6 +322,11 @@ function MemoryView({ list, memory, highlighted, inPlay, busy, autosave, sendEdi
                                 Edit
                             </button>
                         )}
+                        {memory.locked && !memory.archived && (
+                            <button type="button" className="button button-quiet button-small" disabled={busy} onClick={onUnlock}>
+                                Unlock
+                            </button>
+                        )}
                         <ConfirmButton
                             label="Delete"
                             danger
@@ -356,7 +362,7 @@ export interface MemoryDrawerProps {
 /**
  * The Memory drawer on the Chat screen (spec: "Memory drawer"): every Memory with its text,
  * Known-by chips, author, lock and jump-to-Message link; Archived in a collapsed section;
- * add, edit (which locks), delete, restore (which locks). Adds and edits save as they are
+ * add, edit (which locks), delete, restore (which locks), unlock. Adds and edits save as they are
  * typed, with the status in the drawer's header (spec: "Saving"). Opens from the Chat head and
  * from a "Memory added" toast, which lands on that Memory.
  */
@@ -470,6 +476,7 @@ export function MemoryDrawer({ storyId, chatId, focusMemoryId, version, onClose,
             onSaved={saved}
             onDelete={() => void write(() => memoryApi.remove(storyId, chatId, memory.id))}
             onRestore={() => void write(() => memoryApi.restore(storyId, chatId, memory.id))}
+            onUnlock={() => void write(() => memoryApi.unlock(storyId, chatId, memory.id))}
             onJump={onJump}
         />
     );

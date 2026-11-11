@@ -116,6 +116,20 @@ export class MemoryManagerService {
         return (await this.find(chat, memoryId)).toResponse(castOrder(story));
     }
 
+    /** The locked warning's "Unlock some you no longer need" (.scratch/memory-by-meaning/spec.md): the AI may change it again. */
+    async unlock(storyId: number, chatId: number, memoryId: number): Promise<MemoryResponse> {
+        const { story, chat } = await this.load(storyId, chatId);
+        const memory = await this.find(chat, memoryId);
+        await this.memoryModel.update(memory, {
+            text: memory.text,
+            knownBy: memory.knownByIds(),
+            writtenBy: memory.writtenBy,
+            locked: false,
+            archived: memory.archived,
+        });
+        return (await this.find(chat, memoryId)).toResponse(castOrder(story));
+    }
+
     private async listOf(story: StoryEntity, chat: ChatEntity): Promise<MemoryList> {
         const [memories, beliefs] = await Promise.all([this.memoryModel.findByChat(chat.id), this.beliefModel.findByChat(chat.id)]);
         return {

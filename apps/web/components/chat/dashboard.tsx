@@ -9,6 +9,7 @@ import { CharacterPortrait } from '@/components/portrait/character-portrait';
 import { BondChart } from './bond-chart';
 import { Cast, characterColour, Portraits } from '@/lib/character-colour';
 import { ApiError, ApiUnreachableError } from '@/lib/api';
+import { afterCause } from '@/lib/arcs';
 import {
     BondChange,
     chatApi,
@@ -133,7 +134,7 @@ function CharacterArc({ dashboard, character, pictures }: { dashboard: ChatDashb
                     <ol id={bodyId} hidden={folded} className="arc-changes">
                         {character.arcChanges.map((change, index) => (
                             <li key={`${change.messageId}:${index}`}>
-                                <p className="event">After {change.cause}</p>
+                                <p className="event">{afterCause(change.cause)}</p>
                                 <p className="muted small">
                                     {formatWhen(change.createdAt)} · <Cause dashboard={dashboard} messageId={change.messageId} />
                                 </p>
