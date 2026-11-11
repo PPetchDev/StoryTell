@@ -236,7 +236,7 @@ describe('The Bond, Arc and Scene judge, the ledger and the dashboard', () => {
                     toward: { characterId: null, name: 'Ash' },
                     label: 'Wary',
                     description: 'She expects the new keeper to leave by spring.',
-                    levels: null,
+                    levels: { trust: 0, affection: 0, desire: 0, tension: 0 },
                     history: [
                         {
                             id: expect.any(Number),
@@ -250,6 +250,15 @@ describe('The Bond, Arc and Scene judge, the ledger and the dashboard', () => {
                             createdAt: expect.any(String),
                         },
                     ],
+                    trend: [
+                        {
+                            id: expect.any(Number),
+                            messageId: null,
+                            position: null,
+                            levels: { trust: 0, affection: 0, desire: 0, tension: 0 },
+                            labelChanged: false,
+                        },
+                    ],
                 },
             ]);
             expect(character(board, 'Kai')).toMatchObject({ bonds: [], arcSteps: [], arcDirection: 'If trusted, his cheer turns to loyalty.' });
@@ -261,7 +270,7 @@ describe('The Bond, Arc and Scene judge, the ledger and the dashboard', () => {
 
             const system = systemPrompt(lastCall('turn'));
             expect(system).toContain(
-                '# Feelings (hidden from the user; show them only through behaviour)\n- Mira → the user (Ash): "Wary" — She expects the new keeper to leave by spring.\nEach Character knows only its OWN feelings.',
+                '# Feelings (hidden from the user; show them only through behaviour)\n- Mira → the user (Ash): "Wary" — She expects the new keeper to leave by spring. (Trust: unsure · Affection: indifferent · Desire: no pull · Tension: at ease)\nEach Character knows only its OWN feelings.',
             );
             expect(system).toContain(
                 '# Arcs\n- Mira: Arc so far: unchanged from the core definition.\n- Kai: Arc so far: unchanged from the core definition. Possible direction (author\'s intent, not yet happened): If trusted, his cheer turns to loyalty.',
@@ -305,7 +314,7 @@ describe('The Bond, Arc and Scene judge, the ledger and the dashboard', () => {
 The user plays Ash (refer to them as "user").
 
 # Current Bonds
-- Mira → user: "Wary" — She expects the new keeper to leave by spring. (levels not set yet)
+- Mira → user: "Wary" — She expects the new keeper to leave by spring. (Trust: unsure · Affection: indifferent · Desire: no pull · Tension: at ease)
 
 # Arc steps so far
 - Mira: no steps yet

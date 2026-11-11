@@ -5,11 +5,25 @@ import { KeyboardEvent, MouseEvent, useId, useMemo } from 'react';
 import { initialOf } from '@/components/portrait/character-portrait';
 import { DEFAULT_PORTRAIT_CROP } from '@/components/portrait/portrait-image';
 import { characterColour, Portrait, Portraits } from '@/lib/character-colour';
+import { BondLevels, bondLine } from '@/lib/bonds';
 import { Memory, MemoryList, renderUser } from '@/lib/memory';
 import { layoutMemoryGraph, MEMORY_RADIUS, memoryAbout, Person, PERSON_RADIUS } from '@/lib/memory-graph';
 
-/** What is picked in the graph: a person, whose Memories show under it, or one Memory. */
-export type GraphSelection = { kind: 'person'; person: Person } | { kind: 'memory'; id: number } | null;
+/** What is picked in the graph: a person, whose Memories show under it, one Memory, or one Bond's line. */
+export type GraphSelection =
+    | { kind: 'person'; person: Person }
+    | { kind: 'memory'; id: number }
+    | { kind: 'bond'; from: Person; to: Person }
+    | null;
+
+/** A current Bond drawn between two people (.scratch/bond-axes/spec.md, "The Memory graph"). */
+export interface GraphBond {
+    from: Person;
+    to: Person;
+    label: string;
+    /** null while it has no levels yet. */
+    levels: BondLevels | null;
+}
 
 /** How a Memory dot reads against what is picked. */
 type DotState = 'idle' | 'selected' | 'about' | 'other' | 'unknown';
@@ -24,6 +38,26 @@ export function personName(list: MemoryList, person: Person): string {
     return list.cast.find((character) => character.id === person)?.name ?? 'a removed Character';
 }
 
+/** "Nara toward Ash (you)": a Bond's direction in words. */
+export function bondDirection(list: MemoryList, bond: Pick<GraphBond, 'from' | 'to'>): string {
+    const named = (person: Person) => (person === 'user' ? `${list.identityName} (you)` : personName(list, person));
+    return `${named(bond.from)} toward ${named(bond.to)}`;
+}
+
+/**
+ * A Bond's line from one person to another, gently curved to the right of its direction, so the
+ * two Bonds between a pair bow apart rather than lying on each other.
+ */
+function bondPath(from: { x: number; y: number }, to: { x: number; y: number }): string {
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const length = Math.hypot(dx, dy) || 1;
+    const bow = Math.min(22, length * 0.18);
+    const cx = (from.x + to.x) / 2 - (dy / length) * bow;
+    const cy = (from.y + to.y) / 2 + (dx / length) * bow;
+    return `M ${from.x} ${from.y} Q ${cx} ${cy} ${to.x} ${to.y}`;
+}
+
 interface MemoryGraphProps {
     list: MemoryList;
     /** The active Memories; archived ones stay in the list view. */
@@ -32,6 +66,8 @@ interface MemoryGraphProps {
     onSelect(selection: GraphSelection): void;
     /** The Characters' Portraits; one without shows their initial. */
     portraits?: Portraits;
+    /** The Bonds to draw between the people, when "Show Bonds" is on; none draws none. */
+    bonds?: readonly GraphBond[];
 }
 
 /** Enter and Space press a node, as on a button. */
@@ -76,7 +112,7 @@ function PortraitInNode({ portrait, clipId }: { portrait: Portrait; clipId: stri
  * picked to light up the Memories about them and fade the ones a Character does not know; a dot
  * is picked to open that Memory under the graph. A tap on empty space clears the pick.
  */
-export function MemoryGraph({ list, memories, selected, onSelect, portraits = {} }: MemoryGraphProps) {
+export function MemoryGraph({ list, memories, selected, onSelect, portraits = {}, bonds = [] }: MemoryGraphProps) {
     const clipPrefix = `memory-graph-${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
     const castIds = list.cast.map((character) => character.id);
     const people: Person[] = ['user', ...castIds];
@@ -101,7 +137,7 @@ export function MemoryGraph({ list, memories, selected, onSelect, portraits = {}
 
     const selectedMemory = selected?.kind === 'memory' ? memories.find((memory) => memory.id === selected.id) : undefined;
     const dotState = (memory: Memory): DotState => {
-        if (!selected) return 'idle';
+        if (!selected || selected.kind === 'bond') return 'idle';
         if (selected.kind === 'memory') return memory.id === selected.id ? 'selected' : 'other';
         if (about.get(memory.id)?.includes(selected.person)) return 'about';
         if (selected.person !== 'user' && !memory.knownBy.includes(selected.person)) return 'unknown';
@@ -109,6 +145,7 @@ export function MemoryGraph({ list, memories, selected, onSelect, portraits = {}
     };
     const personLit = (person: Person) =>
         !selected ||
+        (selected.kind === 'bond' && (selected.from === person || selected.to === person)) ||
         (selected.kind === 'person' ? selected.person === person : !!selectedMemory && about.get(selectedMemory.id)!.includes(person));
 
     /** A tap on a node presses it, without reaching the picture's own tap, which clears the pick. */
@@ -150,6 +187,37 @@ export function MemoryGraph({ list, memories, selected, onSelect, portraits = {}
                     });
                 })}
             </g>
+            {bonds.map((bond) => {
+                const from = layout.people.get(bond.from);
+                const to = layout.people.get(bond.to);
+                if (!from || !to) return null;
+                const look = bondLine(bond.levels);
+                const path = bondPath(from, to);
+                const pressed = selected?.kind === 'bond' && selected.from === bond.from && selected.to === bond.to;
+                const press = () => onSelect(pressed ? null : { kind: 'bond', from: bond.from, to: bond.to });
+                return (
+                    <g
+                        key={`bond-${bond.from}-${bond.to}`}
+                        className="memory-graph-bond"
+                        data-axis={look.axis ?? 'none'}
+                        role="button"
+                        tabIndex={0}
+                        aria-pressed={pressed}
+                        aria-label={`${bondDirection(list, bond)}: ${bond.label}`}
+                        onClick={tap(press)}
+                        onKeyDown={(event) => pressOnKey(event, press)}
+                    >
+                        {/* A wide, unseen stroke makes the line easy to hit with a finger. */}
+                        <path d={path} className="memory-graph-bond-hit" />
+                        <path
+                            d={path}
+                            className="memory-graph-bond-line"
+                            stroke={look.colour}
+                            strokeDasharray={look.dashed ? '5 4' : undefined}
+                        />
+                    </g>
+                );
+            })}
             {memories.map((memory) => {
                 const at = layout.memories.get(memory.id);
                 if (!at) return null;

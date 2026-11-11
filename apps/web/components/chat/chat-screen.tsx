@@ -477,6 +477,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                     current={chat.currentScene}
                     timeOfDay={chat.timeOfDay}
                     scenes={scenes}
+                    characters={characters}
                     onHide={() => setSceneStripHidden(true)}
                 />
             )}
@@ -501,6 +502,8 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                     onClose={() => setDrawer((current) => ({ ...current, open: false, focus: null }))}
                     onJump={jumpTo}
                     portraits={portraits}
+                    bonds={chat.bonds}
+                    sittingOut={chat.sittingOut}
                 />
             )}
 

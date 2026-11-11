@@ -1,9 +1,10 @@
 'use client';
 
-import { Scene, SCENE_REMOVAL_WARNING } from '@/lib/story';
+import { Character, Role, Scene, SceneBondGate, SCENE_REMOVAL_WARNING } from '@/lib/story';
 import { ConfirmButton, OrderButtons, TextField, Toolbar } from './fields';
 import { FoldingCard } from './folding-card';
 import { FieldRewrites, rewritableField } from './rewrite';
+import { SceneGates } from './scene-gates';
 import styles from './story-editor.module.css';
 
 type TextKey = 'name' | 'situation' | 'moveOnCondition';
@@ -13,12 +14,16 @@ interface SceneCardProps {
     index: number;
     count: number;
     rewrites: FieldRewrites;
+    /** The Story's cast and Role, for its Bond gates. */
+    cast: Character[];
+    role: Role;
     onText(field: TextKey, value: string): void;
+    onGates(gates: SceneBondGate[]): void;
     onMove(direction: -1 | 1): void;
     onRemove(): void;
 }
 
-export function SceneCard({ scene, index, count, rewrites, onText, onMove, onRemove }: SceneCardProps) {
+export function SceneCard({ scene, index, count, rewrites, cast, role, onText, onGates, onMove, onRemove }: SceneCardProps) {
     const heading = scene.name.trim() === '' ? `Scene ${index + 1}` : scene.name;
     const last = index === count - 1;
     const rewritable = (field: TextKey) => rewritableField({ target: 'scene', id: scene.id, field }, rewrites);
@@ -68,11 +73,12 @@ export function SceneCard({ scene, index, count, rewrites, onText, onMove, onRem
                 hint={
                     last
                         ? 'Optional on the last Scene: leave it empty and play stays here, then continues freely.'
-                        : 'When the story moves to the next Scene, e.g. "once Mira trusts you". Feelings count.'
+                        : 'When the story moves to the next Scene, e.g. "once Mira trusts you". Feelings count. Or add a Bond gate below.'
                 }
                 onChange={(v) => onText('moveOnCondition', v)}
                 {...rewritable('moveOnCondition')}
             />
+            <SceneGates gates={scene.gates} cast={cast} role={role} onChange={onGates} />
         </FoldingCard>
     );
 }

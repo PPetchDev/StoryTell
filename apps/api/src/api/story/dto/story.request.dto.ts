@@ -20,10 +20,13 @@ import {
     RoleFields,
     LoreEntryFields,
     LoreTriggerFields,
+    SceneBondGateFields,
     SceneFields,
     StartingBondFields,
     StoryFields,
 } from '../../../manager/story/story.service.js';
+import { BOND_AXES, BOND_AXIS_RANGE } from '../../../model/ledger/bond-axes.js';
+import type { BondAxis } from '../../../model/ledger/bond-axes.js';
 import { LORE_GROUP_MAX, LORE_SECONDARY_MODES, LORE_TIMED_MAX } from '../../../model/story/entities/lore-entry.entity.js';
 import type { LoreSecondaryMode } from '../../../model/story/entities/lore-entry.entity.js';
 import { Backdrop, Pov, ReplyLength, Tense } from '../../../model/story/entities/story.entity.js';
@@ -186,6 +189,61 @@ export class StartingBondRequestBodyDTO implements StartingBondFields {
     @IsString()
     @MaxLength(TEXT_MAX)
     description?: string;
+
+    // Starting levels on the Bond axes (.scratch/bond-axes/spec.md, "Storage"); the editor shows only their words.
+    @ApiPropertyOptional({ minimum: -3, maximum: 3, description: 'Starting Trust: betrayed (−3) … trusts completely (+3). Default 0.' })
+    @IsOptional()
+    @IsInt()
+    @Min(BOND_AXIS_RANGE.trust.min)
+    @Max(BOND_AXIS_RANGE.trust.max)
+    trust?: number;
+
+    @ApiPropertyOptional({ minimum: -3, maximum: 3, description: 'Starting Affection: hates (−3) … devoted (+3). Default 0.' })
+    @IsOptional()
+    @IsInt()
+    @Min(BOND_AXIS_RANGE.affection.min)
+    @Max(BOND_AXIS_RANGE.affection.max)
+    affection?: number;
+
+    @ApiPropertyOptional({ minimum: -3, maximum: 3, description: 'Starting Desire: repelled (−3) … aches for (+3). Default 0.' })
+    @IsOptional()
+    @IsInt()
+    @Min(BOND_AXIS_RANGE.desire.min)
+    @Max(BOND_AXIS_RANGE.desire.max)
+    desire?: number;
+
+    @ApiPropertyOptional({ minimum: 0, maximum: 3, description: 'Starting Tension: at ease (0) … at breaking point (3). Default 0.' })
+    @IsOptional()
+    @IsInt()
+    @Min(BOND_AXIS_RANGE.tension.min)
+    @Max(BOND_AXIS_RANGE.tension.max)
+    tension?: number;
+}
+
+/**
+ * One Bond gate in the whole list a Scene's gates are replaced with (.scratch/bond-axes/spec.md,
+ * "API"). The level is checked against its own axis's range, and the Characters against the cast,
+ * when the list is saved.
+ */
+export class SceneBondGateRequestDTO implements SceneBondGateFields {
+    @ApiProperty({ description: 'The Character whose feelings it reads.' })
+    @IsInt()
+    fromCharacterId: number;
+
+    @ApiProperty({ type: Number, nullable: true, description: 'Toward whom; null means toward the user.' })
+    @ValidateIf((_object, value) => value !== null)
+    @IsInt()
+    toCharacterId: number | null;
+
+    @ApiProperty({ enum: BOND_AXES })
+    @IsIn(BOND_AXES)
+    axis: BondAxis;
+
+    @ApiProperty({ minimum: -3, maximum: 3, description: 'The least level: Trust, Affection and Desire −3 to 3, Tension 0 to 3.' })
+    @IsInt()
+    @Min(-3)
+    @Max(3)
+    atLeast: number;
 }
 
 export class NewStartingBondRequestBodyDTO extends StartingBondRequestBodyDTO implements NewStartingBond {

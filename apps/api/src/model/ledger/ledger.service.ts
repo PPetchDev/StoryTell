@@ -22,6 +22,8 @@ export interface BondSeed {
     toCharacterId: number | null;
     label: string;
     description: string;
+    /** Its starting levels on the Bond axes (.scratch/bond-axes/spec.md, "Storage"). */
+    levels: BondLevels;
 }
 
 export interface ArcDirectionSeed {
@@ -137,6 +139,7 @@ export class LedgerModelService {
                         description: bond.description,
                         beforeLabel: null,
                         beforeDescription: null,
+                        ...levelColumns(bond.levels),
                         event: null,
                         messageId: null,
                     }),

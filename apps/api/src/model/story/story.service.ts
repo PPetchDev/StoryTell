@@ -10,6 +10,7 @@ import { CharacterExpressionEntity } from './entities/character-expression.entit
 import { CharacterEntity, PortraitCrop } from './entities/character.entity.js';
 import { LoreEntryEntity } from './entities/lore-entry.entity.js';
 import { RoleEntity } from './entities/role.entity.js';
+import { SceneBondGateEntity } from './entities/scene-bond-gate.entity.js';
 import { SceneEntity } from './entities/scene.entity.js';
 import { StartingBondEntity } from './entities/starting-bond.entity.js';
 import { CoverFocus, StoryEntity } from './entities/story.entity.js';
@@ -19,7 +20,7 @@ const FULL_RELATIONS = {
     role: true,
     characters: { expressions: true },
     startingBonds: true,
-    scenes: true,
+    scenes: { gates: true },
     lore: true,
     documents: true,
     savedReplies: true,
@@ -52,6 +53,7 @@ function byPosition<T extends { position: number; id: number }>(items: T[]): T[]
 function sorted(story: StoryEntity): StoryEntity {
     story.characters = byPosition(story.characters);
     story.scenes = byPosition(story.scenes);
+    for (const scene of story.scenes) scene.gates = [...(scene.gates ?? [])].sort((a, b) => a.id - b.id);
     story.lore = byPosition(story.lore);
     story.documents = byPosition(story.documents);
     story.savedReplies = byPosition(story.savedReplies);
@@ -146,12 +148,26 @@ export class StoryModelService {
                         toCharacterId: bond.toCharacterId === null ? null : characterIds.get(bond.toCharacterId)!,
                         label: bond.label,
                         description: bond.description,
+                        // Its starting levels too (.scratch/bond-axes/spec.md, "Copying").
+                        ...bond.levels(),
                     }),
                 );
             }
             for (const scene of source.scenes) {
                 const { position, name, situation, moveOnCondition } = scene;
-                await manager.save(manager.create(SceneEntity, { storyId: story.id, position, name, situation, moveOnCondition }));
+                const copy = await manager.save(manager.create(SceneEntity, { storyId: story.id, position, name, situation, moveOnCondition }));
+                // Its Bond gates, onto the copy's Scene and Characters (.scratch/bond-axes/spec.md, "Copying").
+                for (const gate of scene.gates ?? []) {
+                    await manager.save(
+                        manager.create(SceneBondGateEntity, {
+                            sceneId: copy.id,
+                            fromCharacterId: characterIds.get(gate.fromCharacterId)!,
+                            toCharacterId: gate.toCharacterId === null ? null : characterIds.get(gate.toCharacterId)!,
+                            axis: gate.axis,
+                            atLeast: gate.atLeast,
+                        }),
+                    );
+                }
             }
             for (const entry of source.lore) {
                 // Every field the entry answers with, its trigger settings included (.scratch/lore-triggers/spec.md).
@@ -308,6 +324,17 @@ export class StoryModelService {
 
     async removeScene(scene: SceneEntity): Promise<void> {
         await this.scenes.delete({ id: scene.id });
+    }
+
+    /** Replaces a Scene's Bond gates with these, in one transaction, keeping their order. */
+    async replaceSceneGates(sceneId: number, gates: Array<Pick<SceneBondGateEntity, 'fromCharacterId' | 'toCharacterId' | 'axis' | 'atLeast'>>): Promise<void> {
+        await this.dataSource.transaction(async (manager) => {
+            await manager.delete(SceneBondGateEntity, { sceneId });
+            for (const gate of gates) {
+                const { fromCharacterId, toCharacterId, axis, atLeast } = gate;
+                await manager.save(manager.create(SceneBondGateEntity, { sceneId, fromCharacterId, toCharacterId, axis, atLeast }));
+            }
+        });
     }
 
     async setSceneOrder(ids: number[]): Promise<void> {

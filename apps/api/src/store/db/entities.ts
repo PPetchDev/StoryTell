@@ -20,6 +20,7 @@ import { DocumentPassageEntity } from '../../model/document/entities/document-pa
 import { DocumentEntity } from '../../model/document/entities/document.entity.js';
 import { RoleEntity } from '../../model/story/entities/role.entity.js';
 import { SceneEntity } from '../../model/story/entities/scene.entity.js';
+import { SceneBondGateEntity } from '../../model/story/entities/scene-bond-gate.entity.js';
 import { StartingBondEntity } from '../../model/story/entities/starting-bond.entity.js';
 import { StoryEntity } from '../../model/story/entities/story.entity.js';
 import { UsageRecordEntity } from '../../model/usage-record/entities/usage-record.entity.js';
@@ -36,6 +37,7 @@ export const entities = [
     CharacterEntity,
     CharacterExpressionEntity,
     StartingBondEntity,
+    SceneBondGateEntity,
     SceneEntity,
     LoreEntryEntity,
     DocumentEntity,

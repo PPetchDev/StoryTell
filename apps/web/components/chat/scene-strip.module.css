@@ -46,3 +46,11 @@
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
+/* What the Scene's Bond gates wait for (.scratch/bond-axes/spec.md), after the goal. */
+.waiting {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}

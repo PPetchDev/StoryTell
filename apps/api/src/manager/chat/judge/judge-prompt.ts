@@ -41,7 +41,8 @@ export interface JudgePromptInput {
     identityName: string;
     bonds: JudgeBond[];
     arcs: JudgeArc[];
-    scene: { name: string; moveOnCondition: string } | null;
+    /** `gatesOnly`: the Scene has Bond gates and no condition, so the app alone decides (.scratch/bond-axes/spec.md). */
+    scene: { name: string; moveOnCondition: string; gatesOnly?: boolean } | null;
     /** The Chat's Time of day; null while the story has not made one clear. Left out, it reads as null. */
     timeOfDay?: TimeOfDay | null;
     /** The Messages before the exchange, oldest first, as `Name: text` or the AI's `@Name:` text. */
@@ -172,7 +173,7 @@ ${bonds}
 ${arcs}
 
 # Current Scene
-${input.scene ? `${input.scene.name}. Move-on condition: ${input.scene.moveOnCondition || '(none)'}` : 'none'}
+${input.scene ? `${input.scene.name}. Move-on condition: ${input.scene.gatesOnly ? '(gates only)' : input.scene.moveOnCondition || '(none)'}` : 'none'}
 
 # Time of day
 ${input.timeOfDay ?? 'not yet known'}

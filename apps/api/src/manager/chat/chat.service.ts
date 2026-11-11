@@ -42,6 +42,7 @@ import { MemoryModelService } from '../../model/memory/memory.service.js';
 import { PersonaModelService } from '../../model/persona/persona.service.js';
 import { SnapshotModelService } from '../../model/snapshot/snapshot.service.js';
 import { SettingsModelService } from '../../model/settings/settings.service.js';
+import type { SceneEntity } from '../../model/story/entities/scene.entity.js';
 import { StoryEntity } from '../../model/story/entities/story.entity.js';
 import { StoryModelService } from '../../model/story/story.service.js';
 import {
@@ -70,7 +71,8 @@ import { TraySavedReply, trayLines } from '../saved-reply/tray.js';
 import { ChatReplaceRule, chatReplaceRules } from '../replace-rule/chat-rules.js';
 import { ReplaceRuleModelService } from '../../model/replace-rule/replace-rule.service.js';
 import { SavedReplyModelService } from '../../model/saved-reply/saved-reply.service.js';
-import { buildTurnPrompt, PromptArc, PromptBond, PromptHistoryMessage, PromptLayersInput, PromptMemory } from './turn/prompt.js';
+import { buildTurnPrompt, PromptArc, PromptBond, PromptHistoryMessage, PromptLayersInput, PromptMemory, PromptScene } from './turn/prompt.js';
+import { bondGateInWords } from './judge/bond-gates.js';
 import { chosenLore, LoreInPlay, loreInPlayOf, promptLore, selectLoreAt } from './lore/lore-select.js';
 import { documentQuery } from '../document/document-search.js';
 import { DocumentSearchManagerService, DocumentsInPlay, hasDocumentPassages } from './document-search.service.js';
@@ -163,6 +165,22 @@ export interface DashboardBond {
     levels: BondLevels | null;
     /** Every change of this Bond, newest first; the seed, if any, comes last. */
     history: BondChangeResponse[];
+    /** The same changes oldest first, as the Bond chart draws them (.scratch/bond-axes/spec.md, "The Dashboard"). */
+    trend: BondTrendPoint[];
+}
+
+/** One change of a Bond, as a point on its chart. */
+export interface BondTrendPoint {
+    /** The change, as the history lists it. */
+    id: number;
+    /** The causing Message; null for the seed. */
+    messageId: number | null;
+    /** That Message's place in the Chat; null for the seed, which stands at the start. */
+    position: number | null;
+    /** Its levels after the change; null while the Bond had none. */
+    levels: BondLevels | null;
+    /** A turning point: the label changed here (a pin on the chart). A Bond that forms in play has one at its first label; the seed is the start, not a turn. */
+    labelChanged: boolean;
 }
 
 export interface DashboardCharacter {
@@ -197,6 +215,8 @@ export interface ChatDashboard {
     };
     /** The background status of the most recent AI Messages, newest first. */
     background: DashboardBackground[];
+    /** The newest Message's place in the Chat: where the Bond charts end. */
+    lastPosition: number;
 }
 
 /** How many Reply versions the newest AI Message keeps, the shown one included (spec: .scratch/swipe/spec.md). */
@@ -564,6 +584,7 @@ export class ChatManagerService {
                 toCharacterId: bond.toCharacterId,
                 label: bond.label,
                 description: bond.description,
+                levels: bond.levels(),
             })),
             story.characters
                 .filter((character) => character.arcDirections.trim() !== '')
@@ -763,25 +784,31 @@ export class ChatManagerService {
                 ? identity.name
                 : (story.characters.find((c) => c.id === characterId)?.name ?? 'a removed Character');
 
+        const positions = new Map(chat.messages.map((message) => [message.id, message.position]));
         const characters: DashboardCharacter[] = story.characters.map((character) => ({
             id: character.id,
             name: character.name,
             bonds: currentBonds(state.bondChanges)
                 .filter((bond) => bond.fromCharacterId === character.id)
-                .map((bond) => ({
-                    toward: { characterId: bond.toCharacterId, name: nameOf(bond.toCharacterId) },
-                    label: bond.label,
-                    description: bond.description,
-                    levels: bond.levels(),
-                    history: state.bondChanges
-                        .filter(
-                            (change) =>
-                                change.fromCharacterId === bond.fromCharacterId &&
-                                change.toCharacterId === bond.toCharacterId,
-                        )
-                        .map((change) => change.toResponse())
-                        .reverse(),
-                })),
+                .map((bond) => {
+                    const changes = state.bondChanges.filter(
+                        (change) => change.fromCharacterId === bond.fromCharacterId && change.toCharacterId === bond.toCharacterId,
+                    );
+                    return {
+                        toward: { characterId: bond.toCharacterId, name: nameOf(bond.toCharacterId) },
+                        label: bond.label,
+                        description: bond.description,
+                        levels: bond.levels(),
+                        history: changes.map((change) => change.toResponse()).reverse(),
+                        trend: changes.map((change) => ({
+                            id: change.id,
+                            messageId: change.messageId,
+                            position: change.messageId === null ? null : (positions.get(change.messageId) ?? null),
+                            levels: change.levels(),
+                            labelChanged: change.messageId !== null && (change.beforeLabel === null || change.beforeLabel !== change.label),
+                        })),
+                    };
+                }),
             arcSteps: state.arcSteps.filter((step) => step.characterId === character.id).map((step) => step.toResponse()),
             arcDirection: state.arcDirections.find((direction) => direction.characterId === character.id)?.text ?? '',
         }));
@@ -810,6 +837,7 @@ export class ChatManagerService {
                 advance: advance ? advance.toResponse() : null,
             },
             background,
+            lastPosition: Math.max(0, ...chat.messages.map((message) => message.position)),
         };
     }
 
@@ -928,7 +956,7 @@ export class ChatManagerService {
         const prompt = buildTurnPrompt({
             story,
             identity,
-            scene,
+            scene: promptScene(story, scene, identity.name),
             ...promptLayers(story, state),
             memories: promptMemories(story, memories),
             storySoFar: promptStorySoFar(chat),
@@ -1039,10 +1067,11 @@ export class ChatManagerService {
     private async promptLayersFor(story: StoryEntity, chat: ChatEntity): Promise<PromptLayersInput> {
         const scene = story.scenes.find((candidate) => candidate.id === chat.currentSceneId) ?? null;
         const [state, memories] = await Promise.all([this.ledger.state(chat.id), this.memoryModel.findByChat(chat.id)]);
+        const identity = wornIdentity(story, chat);
         return {
             story,
-            identity: wornIdentity(story, chat),
-            scene,
+            identity,
+            scene: promptScene(story, scene, identity.name),
             ...promptLayers(story, state),
             memories: promptMemories(story, memories),
             storySoFar: promptStorySoFar(chat),
@@ -1202,6 +1231,19 @@ function promptHistory(messages: MessageEntity[]): PromptHistoryMessage[] {
 }
 
 /** The Feelings and Arcs layers from the ledger: every current Bond, and each Character's Arc. */
+/** The current Scene as the Narrator reads it, its Bond gates in words (.scratch/bond-axes/spec.md). */
+function promptScene(story: StoryEntity, scene: SceneEntity | null, identityName: string): PromptScene | null {
+    if (!scene) return null;
+    const nameOf = (characterId: number | null): string =>
+        characterId === null ? identityName : (story.characters.find((character) => character.id === characterId)?.name ?? 'someone');
+    return {
+        name: scene.name,
+        situation: scene.situation,
+        moveOnCondition: scene.moveOnCondition,
+        gates: (scene.gates ?? []).map((gate) => bondGateInWords(nameOf(gate.fromCharacterId), nameOf(gate.toCharacterId), gate.axis, gate.atLeast)),
+    };
+}
+
 function promptLayers(story: StoryEntity, state: LedgerState): { bonds: PromptBond[]; arcs: PromptArc[] } {
     const nameOf = (characterId: number): string | null =>
         story.characters.find((character) => character.id === characterId)?.name ?? null;

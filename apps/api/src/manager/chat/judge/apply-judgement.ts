@@ -1,6 +1,7 @@
 import { TimeOfDay } from '../../../model/chat/entities/chat.entity.js';
 import { BOND_AXES, BOND_AXIS_NAMES, BondLevels, clampToRange, sameBondLevels } from '../../../model/ledger/bond-axes.js';
 import { MessageChanges, NewBondChange, PartEmotion } from '../../../model/ledger/ledger.service.js';
+import { BondGate, bondGateInWords, GateBond, gatesHold } from './bond-gates.js';
 import { Judgement, JudgedExpression } from './judge-prompt.js';
 
 /**
@@ -28,6 +29,10 @@ export interface ApplyBond {
 export interface ApplyScene {
     id: number;
     name: string;
+    /** Left out, the Scene reads as having one: the Judge's move_on decides, as before gates. */
+    moveOnCondition?: string;
+    /** Its Bond gates (.scratch/bond-axes/spec.md); none, or left out, and the Judge's move_on alone decides. */
+    gates?: BondGate[];
 }
 
 export interface ApplyInput {
@@ -124,20 +129,35 @@ export function applyJudgement(input: ApplyInput, judgement: Judgement): Applied
     let scene: MessageChanges['scene'] = null;
     const moveOn = judgement.scenes.find((signal) => signal.moveOn);
     const index = input.scenes.findIndex((candidate) => candidate.id === input.currentSceneId);
-    if (moveOn && index >= 0) {
+    const here: ApplyScene | undefined = input.scenes[index];
+    const gates = here?.gates ?? [];
+    // A Scene with gates (.scratch/bond-axes/spec.md, "Moving on"): checked on the Bonds after this
+    // turn's changes, so a reply that opens a gate moves the Scene on in the same judgement.
+    const gatesOnly = gates.length > 0 && here?.moveOnCondition !== undefined && here.moveOnCondition.trim() === '';
+    const held = gates.length === 0 || gatesHold(gates, bondsAfter(input.bonds, bonds)).every(Boolean);
+    if (here && (gatesOnly ? held : moveOn && held)) {
         const next: ApplyScene | undefined = input.scenes[index + 1];
+        const nameOf = (characterId: number | null): string =>
+            characterId === null ? input.identityName : (input.cast.find((member) => member.id === characterId)?.name ?? 'someone');
         scene = {
-            fromSceneId: input.scenes[index].id,
-            fromSceneName: input.scenes[index].name,
+            fromSceneId: here.id,
+            fromSceneName: here.name,
             toSceneId: next?.id ?? null,
             toSceneName: next?.name ?? null,
-            event: moveOn.reason,
+            // When the gates decided it, the event names them.
+            event: gatesOnly
+                ? gates.map((gate) => bondGateInWords(nameOf(gate.fromCharacterId), nameOf(gate.toCharacterId), gate.axis, gate.atLeast)).join('; ')
+                : moveOn!.reason,
         };
         if (judgement.scenes.filter((signal) => signal.moveOn).length > 1) {
             rejected.push('Scene: a second advance in one turn');
         }
-    } else if (moveOn) {
+    } else if (moveOn && !here) {
         rejected.push('Scene: move on while in free play');
+    } else if (moveOn && gatesOnly) {
+        rejected.push('Scene: move on for a Scene its Bond gates alone decide');
+    } else if (moveOn) {
+        rejected.push('Scene: move on while a Bond gate does not hold');
     }
 
     const now = input.timeOfDay ?? null;
@@ -149,6 +169,18 @@ export function applyJudgement(input: ApplyInput, judgement: Judgement): Applied
     }
 
     return { bonds, arcs, scene, time, rejected };
+}
+
+/** Every Bond as it stands once this turn's changes are written. */
+function bondsAfter(current: readonly ApplyBond[], changes: readonly NewBondChange[]): GateBond[] {
+    const after = current.map((bond) => {
+        const change = changes.find((c) => c.fromCharacterId === bond.fromCharacterId && c.toCharacterId === bond.toCharacterId);
+        return { fromCharacterId: bond.fromCharacterId, toCharacterId: bond.toCharacterId, levels: change ? change.levels : bond.levels };
+    });
+    const formed = changes.filter(
+        (change) => !current.some((bond) => bond.fromCharacterId === change.fromCharacterId && bond.toCharacterId === change.toCharacterId),
+    );
+    return [...after, ...formed.map((change) => ({ fromCharacterId: change.fromCharacterId, toCharacterId: change.toCharacterId, levels: change.levels }))];
 }
 
 /**

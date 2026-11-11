@@ -46,6 +46,8 @@ export interface PromptScene {
     name: string;
     situation: string;
     moveOnCondition: string;
+    /** Its Bond gates in words (.scratch/bond-axes/spec.md); none, or left out, and the line is as before. */
+    gates?: string[];
 }
 
 export interface PromptStory {
@@ -258,7 +260,13 @@ function sceneLayer(scene: PromptScene | null): string {
     const moveOn = scene.moveOnCondition.trim()
         ? `\nThis Scene moves on once: ${scene.moveOnCondition.trim().replace(/[.!]+$/, '')}. Let that happen naturally; never force it. Don't hurry toward it: give the Scene room for many exchanges of everyday moments and the Characters' own wants first, and let the user's choices bring it about.`
         : '';
-    return `${PROMPT_LAYERS.scene}: ${scene.name}\n${scene.situation}${moveOn}`;
+    // Bond gates (.scratch/bond-axes/spec.md) steer without forcing: feelings grow only as the story earns them.
+    const gates = scene.gates?.length
+        ? scene.moveOnCondition.trim()
+            ? ` It also waits for these feelings, which must grow on their own: ${scene.gates.join('; ')}.`
+            : `\nThis Scene moves on once these feelings have grown: ${scene.gates.join('; ')}. Let them grow naturally through the story; never force them.`
+        : '';
+    return `${PROMPT_LAYERS.scene}: ${scene.name}\n${scene.situation}${moveOn}${gates}`;
 }
 
 /**

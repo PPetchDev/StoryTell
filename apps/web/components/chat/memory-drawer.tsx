@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 
-import { GraphSelection, MemoryGraph, memoriesAbout, personName } from '@/components/chat/memory-graph';
+import { bondDirection, GraphBond, GraphSelection, MemoryGraph, memoriesAbout, personName } from '@/components/chat/memory-graph';
 import { DocumentsInPlayCard } from '@/components/chat/documents-in-play-card';
 import { LoreInPlayCard } from '@/components/chat/lore-in-play-card';
 import { StorySoFarCard } from '@/components/chat/story-so-far-card';
@@ -11,7 +11,9 @@ import { Autosave, useAutosave } from '@/components/story-editor/autosave';
 import { ConfirmButton } from '@/components/story-editor/fields';
 import { SaveStatus } from '@/components/story-editor/save-status';
 import { ApiError, ApiUnreachableError } from '@/lib/api';
+import { bondLevelsInWords } from '@/lib/bonds';
 import { Portraits } from '@/lib/character-colour';
+import type { ChatBond } from '@/lib/chat';
 import { devicePreference } from '@/lib/device-preference';
 import { Memory, memoryApi, MemoryList, renderUser } from '@/lib/memory';
 
@@ -24,6 +26,24 @@ const memoryViewKind = devicePreference<MemoryViewKind>({
     parse: (stored) => (stored === 'list' || stored === 'graph' ? stored : null),
     serialise: (kind) => kind,
 });
+
+/** Whether the Memory graph draws the Bonds between the people (.scratch/bond-axes/spec.md). Starts off. */
+const memoryGraphBonds = devicePreference<boolean>({
+    key: 'storytell.memoryGraphBonds',
+    fallback: false,
+    parse: (stored) => (stored === 'on' ? true : stored === 'off' ? false : null),
+    serialise: (on) => (on ? 'on' : null),
+});
+
+/** "Show Bonds", a switch beside the List / Graph choice. */
+function ShowBondsSwitch({ on, onChange }: { on: boolean; onChange(on: boolean): void }) {
+    return (
+        <button type="button" role="switch" aria-checked={on} className="memory-bonds-switch" onClick={() => onChange(!on)}>
+            <span className="memory-bonds-switch-track" aria-hidden="true" />
+            Show Bonds
+        </button>
+    );
+}
 
 const VIEW_KINDS: readonly { kind: MemoryViewKind; label: string }[] = [
     { kind: 'list', label: 'List' },
@@ -323,6 +343,10 @@ export interface MemoryDrawerProps {
     onJump(messageId: number): void;
     /** The Characters' Portraits, for the Memory graph's people. */
     portraits?: Portraits;
+    /** The Chat's current Bonds, which "Show Bonds" draws in the graph. */
+    bonds?: readonly ChatBond[];
+    /** The Characters sitting out, whose Bonds are not drawn. */
+    sittingOut?: readonly number[];
 }
 
 /**
@@ -332,7 +356,7 @@ export interface MemoryDrawerProps {
  * typed, with the status in the drawer's header (spec: "Saving"). Opens from the Chat head and
  * from a "Memory added" toast, which lands on that Memory.
  */
-export function MemoryDrawer({ storyId, chatId, focusMemoryId, version, onClose, onJump, portraits }: MemoryDrawerProps) {
+export function MemoryDrawer({ storyId, chatId, focusMemoryId, version, onClose, onJump, portraits, bonds = [], sittingOut = [] }: MemoryDrawerProps) {
     const { reportUnreachable } = useConnection();
     const autosave = useAutosave();
     const [list, setList] = useState<MemoryList | null>(null);
@@ -343,6 +367,7 @@ export function MemoryDrawer({ storyId, chatId, focusMemoryId, version, onClose,
     const [addedId, setAddedId] = useState<number | null>(null);
     const focusedRef = useRef<number | null>(null);
     const viewKind = memoryViewKind.useValue();
+    const showBonds = memoryGraphBonds.useValue();
     const [selection, setSelection] = useState<GraphSelection>(null);
     /**
      * The Memories about the picked person when they were picked. They stay under the graph while
@@ -434,8 +459,34 @@ export function MemoryDrawer({ storyId, chatId, focusMemoryId, version, onClose,
         />
     );
 
+    /**
+     * The Bonds the graph draws while "Show Bonds" is on: each current Bond between the user and the
+     * Characters of the cast, leaving out any with a Character who sits out.
+     */
+    const graphBonds = (shownList: MemoryList): GraphBond[] => {
+        if (!showBonds) return [];
+        const inPlay = (characterId: number) =>
+            shownList.cast.some((character) => character.id === characterId) && !sittingOut.includes(characterId);
+        return bonds
+            .filter((bond) => inPlay(bond.fromCharacterId) && (bond.toCharacterId === null || inPlay(bond.toCharacterId)))
+            .map((bond) => ({ from: bond.fromCharacterId, to: bond.toCharacterId ?? 'user', label: bond.label, levels: bond.levels }));
+    };
+
     /** What shows under the graph: the picked Memory's card, the Memories about the picked person, or a hint. */
     const graphPick = (shownList: MemoryList) => {
+        if (selection?.kind === 'bond') {
+            const bond = graphBonds(shownList).find((each) => each.from === selection.from && each.to === selection.to);
+            if (bond) {
+                const direction = bondDirection(shownList, bond);
+                return (
+                    <section className="memory-graph-pick" aria-label={direction}>
+                        <h3>{direction}</h3>
+                        <p className="bond-label">{bond.label}</p>
+                        <p className="muted small">{bond.levels ? bondLevelsInWords(bond.levels) : 'Not measured yet'}</p>
+                    </section>
+                );
+            }
+        }
         const picked = selection?.kind === 'memory' ? active.find((memory) => memory.id === selection.id) : undefined;
         if (picked) {
             return (
@@ -511,12 +562,22 @@ export function MemoryDrawer({ storyId, chatId, focusMemoryId, version, onClose,
                     <StorySoFarCard storyId={storyId} chatId={chatId} version={version} />
                     <LoreInPlayCard storyId={storyId} chatId={chatId} version={version} />
                     <DocumentsInPlayCard storyId={storyId} chatId={chatId} version={version} />
-                    <MemoryViewSwitch value={viewKind} onChange={memoryViewKind.set} />
+                    <div className="memory-view-row">
+                        <MemoryViewSwitch value={viewKind} onChange={memoryViewKind.set} />
+                        {viewKind === 'graph' && <ShowBondsSwitch on={showBonds} onChange={memoryGraphBonds.set} />}
+                    </div>
                     {active.length === 0 ? (
                         <p className="muted">Nothing remembered yet.</p>
                     ) : viewKind === 'graph' ? (
                         <>
-                            <MemoryGraph list={list} memories={active} selected={selection} onSelect={select} portraits={portraits} />
+                            <MemoryGraph
+                                list={list}
+                                memories={active}
+                                selected={selection}
+                                onSelect={select}
+                                portraits={portraits}
+                                bonds={graphBonds(list)}
+                            />
                             {graphPick(list)}
                         </>
                     ) : (

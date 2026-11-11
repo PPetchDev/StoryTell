@@ -3,8 +3,10 @@
 import { useState } from 'react';
 
 import { CharacterPortrait } from '@/components/portrait/character-portrait';
+import { BOND_AXES, BondAxis } from '@/lib/bonds';
 import { Portrait } from '@/lib/character-colour';
 import { Character, Role, StartingBond } from '@/lib/story';
+import { BondLevelField } from './bond-level-field';
 import { TextField } from './fields';
 import { FoldingCard } from './folding-card';
 import { FieldRewrites, rewritableField } from './rewrite';
@@ -23,6 +25,8 @@ interface StartingBondsCardProps {
     rewrites: FieldRewrites;
     onAdd(toCharacterId: number | null): void;
     onText(bondId: number, field: 'label' | 'description', value: string): void;
+    /** A starting level picked by its word (.scratch/bond-axes/spec.md). */
+    onLevel(bondId: number, axis: BondAxis, level: number): void;
     onRemove(bondId: number): void;
 }
 
@@ -88,6 +92,11 @@ export function StartingBondsCard(props: StartingBondsCardProps) {
                         onChange={(v) => props.onText(bond.id, 'description', v)}
                         {...rewritable(bond.id, 'description')}
                     />
+                    <div role="group" aria-label="Starting levels" className={styles.bondLevels}>
+                        {BOND_AXES.map((axis) => (
+                            <BondLevelField key={axis} axis={axis} value={bond[axis]} onChange={(level) => props.onLevel(bond.id, axis, level)} />
+                        ))}
+                    </div>
                 </div>
             ))}
             {targets.length > 0 && (

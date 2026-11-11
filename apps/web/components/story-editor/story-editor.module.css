@@ -428,3 +428,46 @@
     font-size: 0.8125rem;
     color: var(--muted);
 }
+
+/* A Starting Bond's four level pickers (.scratch/bond-axes/spec.md): two by two, one column when narrow. */
+.bondLevels {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    align-items: start;
+    gap: 0 0.75rem;
+}
+
+.bondLevels > * {
+    margin-bottom: 0.75rem;
+}
+
+/* A Scene's Bond gates (.scratch/bond-axes/spec.md): each a small group of pickers. */
+.gates {
+    border-top: 1px solid var(--line);
+    padding-top: 0.75rem;
+    margin-top: 0.25rem;
+}
+
+.gatesTitle {
+    margin: 0 0 0.25rem;
+    font-size: 0.875rem;
+    font-weight: 700;
+}
+
+.gate {
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+    padding: 0.75rem;
+    margin: 0.75rem 0;
+}
+
+.gateFields {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    align-items: start;
+    gap: 0 0.75rem;
+}
+
+.gateFields > * {
+    margin-bottom: 0.75rem;
+}

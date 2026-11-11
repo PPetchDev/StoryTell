@@ -1,4 +1,5 @@
 import { apiFetch, apiSend } from './api';
+import type { BondAxis, BondLevels } from './bonds';
 import type { MessagePart } from './chat';
 import type { Expression, ExpressionEmotion } from './expressions';
 import type { SavedReply } from './saved-replies';
@@ -77,7 +78,8 @@ export interface Character {
     expressions: Expression[];
 }
 
-export interface StartingBond {
+/** Its starting levels on the Bond axes ride along flat; the editor shows only their words. */
+export interface StartingBond extends BondLevels {
     id: number;
     fromCharacterId: number;
     /** null means toward the Role. */
@@ -91,6 +93,17 @@ export interface Scene {
     name: string;
     situation: string;
     moveOnCondition: string;
+    /** Its Bond gates: it moves on only when every one holds (.scratch/bond-axes/spec.md). */
+    gates: SceneBondGate[];
+}
+
+/** One Bond at least a level on one axis (CONTEXT.md: "Bond gate"); the editor shows the level only as its word. */
+export interface SceneBondGate {
+    fromCharacterId: number;
+    /** null means toward the user. */
+    toCharacterId: number | null;
+    axis: BondAxis;
+    atLeast: number;
 }
 
 /** A note about the Story's world, sent when its name or a keyword comes up (mirrors LoreEntryDTO). */
@@ -215,8 +228,8 @@ export interface Story {
 
 export type StoryFields = Partial<Pick<Story, 'title' | 'setting' | 'opening' | 'narrationVoice' | 'backdrop'> & Style>;
 export type CharacterFields = Partial<Omit<Character, 'id' | 'referenceImagePath' | 'portraitCrop' | 'expressions'>>;
-export type SceneFields = Partial<Omit<Scene, 'id'>>;
-export type StartingBondFields = Partial<Pick<StartingBond, 'label' | 'description'>>;
+export type SceneFields = Partial<Omit<Scene, 'id' | 'gates'>>;
+export type StartingBondFields = Partial<Pick<StartingBond, 'label' | 'description'> & BondLevels>;
 export type LoreEntryFields = Partial<Omit<LoreEntry, 'id'>>;
 
 export const POV_LABELS: Record<Pov, string> = {
@@ -325,6 +338,9 @@ export const storyApi = {
         apiSend<Story>('POST', `/stories/${storyId}/scenes`, fields),
     updateScene: (storyId: number, sceneId: number, fields: SceneFields) =>
         apiSend<Story>('PATCH', `/stories/${storyId}/scenes/${sceneId}`, fields),
+    /** Replaces a Scene's Bond gates with the whole list. */
+    setSceneGates: (storyId: number, sceneId: number, gates: SceneBondGate[]) =>
+        apiSend<Story>('PUT', `/stories/${storyId}/scenes/${sceneId}/gates`, gates),
     removeScene: (storyId: number, sceneId: number) =>
         apiSend<Story>('DELETE', `/stories/${storyId}/scenes/${sceneId}`),
     reorderScenes: (storyId: number, sceneIds: number[]) =>

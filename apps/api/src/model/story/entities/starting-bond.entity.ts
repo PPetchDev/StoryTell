@@ -8,10 +8,12 @@ import {
 } from 'typeorm';
 import type { Relation } from 'typeorm';
 
+import type { BondLevels } from '../../ledger/bond-axes.js';
 import type { CharacterEntity } from './character.entity.js';
 import type { StoryEntity } from './story.entity.js';
 
-export interface StartingBondResponse {
+/** Its starting levels on the four Bond axes ride along flat, as the columns hold them. */
+export interface StartingBondResponse extends BondLevels {
     id: number;
     fromCharacterId: number;
     /** `null` means toward the Role. */
@@ -58,6 +60,25 @@ export class StartingBondEntity {
     @Column({ type: 'text', default: '' })
     description: string;
 
+    // Where the Bond starts on the Bond axes (.scratch/bond-axes/spec.md, "Storage"): the middle
+    // unless the author picks another level.
+    @Column({ type: 'smallint', default: 0 })
+    trust: number;
+
+    @Column({ type: 'smallint', default: 0 })
+    affection: number;
+
+    @Column({ type: 'smallint', default: 0 })
+    desire: number;
+
+    @Column({ type: 'smallint', default: 0 })
+    tension: number;
+
+    /** Its starting levels, as a Chat's seed change records them. */
+    levels(): BondLevels {
+        return { trust: this.trust, affection: this.affection, desire: this.desire, tension: this.tension };
+    }
+
     toResponse(): StartingBondResponse {
         return {
             id: this.id,
@@ -65,6 +86,7 @@ export class StartingBondEntity {
             toCharacterId: this.toCharacterId,
             label: this.label,
             description: this.description,
+            ...this.levels(),
         };
     }
 }

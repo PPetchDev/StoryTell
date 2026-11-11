@@ -6,6 +6,7 @@ import { useId, useState } from 'react';
 import { useConnection } from '@/components/connection';
 import { FoldTitle } from '@/components/fold/fold-button';
 import { CharacterPortrait } from '@/components/portrait/character-portrait';
+import { BondChart } from './bond-chart';
 import { Cast, characterColour, Portraits } from '@/lib/character-colour';
 import { ApiError, ApiUnreachableError } from '@/lib/api';
 import {
@@ -54,6 +55,7 @@ function BondView({ dashboard, bond, from }: { dashboard: ChatDashboard; bond: D
                 <span className="message-text bond-description">{bond.description}</span>
                 {latest?.event && <span className="event">Because: {latest.event}</span>}
             </summary>
+            <BondChart dashboard={dashboard} bond={bond} from={from} />
             <BondHistory dashboard={dashboard} history={bond.history} />
         </details>
     );

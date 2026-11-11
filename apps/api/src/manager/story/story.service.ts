@@ -5,6 +5,7 @@ import {
     CastFullError,
     CharacterNotFoundError,
     DuplicateStartingBondError,
+    InvalidBondGateError,
     InvalidCoverChoiceError,
     InvalidOrderError,
     InvalidLorePatternError,
@@ -21,6 +22,7 @@ import { cleanPatterns, compileLorePattern } from '../chat/lore/lore-pattern.js'
 import { ImageNotFoundError, SnapshotNotFoundError, UnsupportedImageError } from '../../errors/image.errors.js';
 import { ChatModelService } from '../../model/chat/chat.service.js';
 import { DocumentModelService } from '../../model/document/document.service.js';
+import { BOND_AXES, BOND_AXIS_NAMES, BondAxis, BondLevels, isBondLevel } from '../../model/ledger/bond-axes.js';
 import { LedgerModelService } from '../../model/ledger/ledger.service.js';
 import { SnapshotModelService } from '../../model/snapshot/snapshot.service.js';
 import { CharacterEntity, PortraitCrop } from '../../model/story/entities/character.entity.js';
@@ -110,10 +112,13 @@ export interface CharacterFields {
     speakingVoice?: string | null;
 }
 
-export interface StartingBondFields {
+/** Its text and its starting levels on the Bond axes (.scratch/bond-axes/spec.md, "Storage"). */
+export interface StartingBondFields extends Partial<BondLevels> {
     label?: string;
     description?: string;
 }
+
+const STARTING_BOND_FIELDS: Array<keyof StartingBondFields & keyof StartingBondEntity> = ['label', 'description', ...BOND_AXES];
 
 export interface NewStartingBond extends StartingBondFields {
     fromCharacterId: number;
@@ -140,6 +145,15 @@ export interface SceneFields {
     name?: string;
     situation?: string;
     moveOnCondition?: string;
+}
+
+/** One Bond gate of a Scene (.scratch/bond-axes/spec.md, "Bond gates and the Scene"). */
+export interface SceneBondGateFields {
+    fromCharacterId: number;
+    /** null means toward the user. */
+    toCharacterId: number | null;
+    axis: BondAxis;
+    atLeast: number;
 }
 
 /** Copies the fields that were sent, one by one, onto the target. */
@@ -597,7 +611,7 @@ export class StoryManagerService {
             fromCharacterId: bond.fromCharacterId,
             toCharacterId: bond.toCharacterId,
         });
-        assignSent(entity, bond, ['label', 'description']);
+        assignSent(entity, bond, STARTING_BOND_FIELDS);
         await this.storyModel.saveStartingBond(entity);
         return this.saved(storyId);
     }
@@ -609,7 +623,7 @@ export class StoryManagerService {
     ): Promise<StoryDetail> {
         const story = await this.load(storyId);
         const bond = this.findStartingBond(story, bondId);
-        assignSent(bond, fields, ['label', 'description']);
+        assignSent(bond, fields, STARTING_BOND_FIELDS);
         await this.storyModel.saveStartingBond(bond);
         return this.saved(storyId);
     }
@@ -651,6 +665,29 @@ export class StoryManagerService {
         const scene = this.findScene(story, sceneId);
         assignSent(scene, fields, ['name', 'situation', 'moveOnCondition']);
         await this.storyModel.saveScene(scene);
+        return this.saved(storyId);
+    }
+
+    /**
+     * A Scene's Bond gates, replaced as a whole list (.scratch/bond-axes/spec.md, "API"). Each names
+     * a Character of the cast, toward the user or another Character of the cast, and a level within
+     * its axis's range; one Bond's axis is gated at most once. Nothing is saved unless all are.
+     */
+    async setSceneGates(storyId: number, sceneId: number, gates: SceneBondGateFields[]): Promise<StoryDetail> {
+        const story = await this.load(storyId);
+        const scene = this.findScene(story, sceneId);
+        const inCast = (characterId: number) => story.characters.some((character) => character.id === characterId);
+        const seen = new Set<string>();
+        for (const gate of gates) {
+            if (!inCast(gate.fromCharacterId)) throw new InvalidBondGateError('its Character is not in this Story.');
+            if (gate.toCharacterId !== null && !inCast(gate.toCharacterId)) throw new InvalidBondGateError('the Character it is toward is not in this Story.');
+            if (gate.toCharacterId === gate.fromCharacterId) throw new InvalidBondGateError('a Character has no Bond toward itself.');
+            if (!isBondLevel(gate.axis, gate.atLeast)) throw new InvalidBondGateError(`that level is outside ${BOND_AXIS_NAMES[gate.axis]}'s scale.`);
+            const key = `${gate.fromCharacterId}->${gate.toCharacterId ?? 'user'}:${gate.axis}`;
+            if (seen.has(key)) throw new InvalidBondGateError(`it sets ${BOND_AXIS_NAMES[gate.axis]} on the same Bond twice.`);
+            seen.add(key);
+        }
+        await this.storyModel.replaceSceneGates(scene.id, gates);
         return this.saved(storyId);
     }
 

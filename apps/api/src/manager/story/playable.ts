@@ -23,7 +23,7 @@ function blank(text: string): boolean {
  * A Story is playable when every required field is filled (spec: "Playable is derived, never
  * stored"). Required: title, Setting, Opening, the Role's name and description, at least one
  * Character, each Character's name, appearance, personality and voice, each Scene's name and
- * situation, and each Scene's move-on condition except the last Scene's. Style always has a
+ * situation, and each Scene's move-on condition or Bond gate except the last Scene's. Style always has a
  * value; Image style, example lines, background, secrets, Arc directions, StartingBonds and
  * Scenes themselves are optional.
  */
@@ -55,8 +55,9 @@ export function playableStatus(story: StoryEntity): PlayableStatus {
         need(!blank(scene.name), `${at}.name`, `${which}: Name`);
         need(!blank(scene.situation), `${at}.situation`, `${which}: Situation`);
         const last = index === story.scenes.length - 1;
+        // A Bond gate is a way to move on too (.scratch/bond-axes/spec.md, "Playable").
         need(
-            last || !blank(scene.moveOnCondition),
+            last || !blank(scene.moveOnCondition) || (scene.gates ?? []).length > 0,
             `${at}.moveOnCondition`,
             `${which}: Move-on condition`,
         );

@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 import {
+    BondTrendPoint,
     ChatBond,
     ChatDashboard,
     ChatDetail,
@@ -377,6 +378,26 @@ export class DashboardBondDTO implements DashboardBond {
 
     @ApiProperty({ type: [BondChangeDTO], description: 'Every change of this Bond, newest first; the seed, if any, last.' })
     history: BondChangeDTO[];
+
+    @ApiProperty({ type: () => [BondTrendPointDTO], description: 'The same changes oldest first, as the Bond chart draws them.' })
+    trend: BondTrendPointDTO[];
+}
+
+export class BondTrendPointDTO implements BondTrendPoint {
+    @ApiProperty({ description: 'The change, as the history lists it.' })
+    id: number;
+
+    @ApiProperty({ type: Number, nullable: true, description: 'The causing Message; null for the seed.' })
+    messageId: number | null;
+
+    @ApiProperty({ type: Number, nullable: true, description: "That Message's place in the Chat; null for the seed, which stands at the start." })
+    position: number | null;
+
+    @ApiProperty({ type: BondLevelsDTO, nullable: true, description: 'Its levels after the change; null while the Bond had none.' })
+    levels: BondLevelsDTO | null;
+
+    @ApiProperty({ description: 'True where the label changed: a pin on the chart. Never on the seed.' })
+    labelChanged: boolean;
 }
 
 export class ArcStepDTO implements ArcStepResponse {
@@ -480,4 +501,7 @@ export class ChatDashboardResponseBodyDTO implements ChatDashboard {
 
     @ApiProperty({ type: [DashboardBackgroundDTO], description: 'The most recent AI Messages, newest first.' })
     background: DashboardBackgroundDTO[];
+
+    @ApiProperty({ description: "The newest Message's place in the Chat: where the Bond charts end." })
+    lastPosition: number;
 }

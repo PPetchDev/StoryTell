@@ -8,6 +8,7 @@ import { useConnection } from '@/components/connection';
 import { StoryAssistantSheet } from '@/components/story-assistant/story-assistant-sheet';
 import { fieldOf, useStoryAssistant } from '@/components/story-assistant/use-story-assistant';
 import { ApiUnreachableError } from '@/lib/api';
+import type { BondAxis } from '@/lib/bonds';
 import { FROM_CARD_PARAM, tidyMessage } from '@/lib/character-card';
 import { characterColour, portraitsOf } from '@/lib/character-colour';
 import { isFolded, setFolded } from '@/lib/folds';
@@ -22,6 +23,7 @@ import {
     POV_LABELS,
     REPLY_LENGTH_LABELS,
     RewriteRequest,
+    SceneBondGate,
     Story,
     storyApi,
     storyTitle,
@@ -313,12 +315,27 @@ export function StoryEditor({ initial }: { initial: Story }) {
             applyStatus,
         );
     };
+    const setBondLevel = (bondId: number, axis: BondAxis, level: number) => {
+        setStory((current) => ({
+            ...current,
+            startingBonds: current.startingBonds.map((b) => (b.id === bondId ? { ...b, [axis]: level } : b)),
+        }));
+        queue(`bond.${bondId}.${axis}`, () => storyApi.updateStartingBond(storyId, bondId, { [axis]: level }), applyStatus);
+    };
     const setSceneText = (sceneId: number, field: 'name' | 'situation' | 'moveOnCondition', value: string) => {
         setStory((current) => ({
             ...current,
             scenes: current.scenes.map((s) => (s.id === sceneId ? { ...s, [field]: value } : s)),
         }));
         queue(`scene.${sceneId}.${field}`, () => storyApi.updateScene(storyId, sceneId, { [field]: value }), applyStatus);
+    };
+    const setSceneGates = (sceneId: number, gates: SceneBondGate[]) => {
+        setStory((current) => ({
+            ...current,
+            scenes: current.scenes.map((s) => (s.id === sceneId ? { ...s, gates } : s)),
+        }));
+        // The whole list each time: the newest one wins (.scratch/bond-axes/spec.md, "API").
+        queue(`scene.${sceneId}.gates`, () => storyApi.setSceneGates(storyId, sceneId, gates), applyStatus);
     };
     const setDocumentTitle = (documentId: number, title: string) => {
         setStory((current) => ({
@@ -684,6 +701,7 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                         )
                                     }
                                     onText={setBondText}
+                                    onLevel={setBondLevel}
                                     onRemove={(bondId) => void commit(() => storyApi.removeStartingBond(storyId, bondId), applyWhole)}
                                 />
                             ))}
@@ -702,7 +720,10 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                     index={index}
                                     count={story.scenes.length}
                                     rewrites={fieldRewrites}
+                                    cast={story.characters}
+                                    role={story.role}
                                     onText={(field, value) => setSceneText(scene.id, field, value)}
+                                    onGates={(gates) => setSceneGates(scene.id, gates)}
                                     onMove={(direction) =>
                                         void commit(() => storyApi.reorderScenes(storyId, moved(story.scenes, scene.id, direction)), applyWhole)
                                     }

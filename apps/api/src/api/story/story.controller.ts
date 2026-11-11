@@ -5,12 +5,13 @@ import {
     Get,
     HttpCode,
     Param,
+    ParseArrayPipe,
     ParseIntPipe,
     Patch,
     Post,
     Put,
 } from '@nestjs/common';
-import { ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 
 import { StoryManagerService } from '../../manager/story/story.service.js';
 import { untaggedPartResponse } from '../../model/chat/entities/message-part.entity.js';
@@ -20,6 +21,7 @@ import {
     LoreEntryRequestBodyDTO,
     NewStartingBondRequestBodyDTO,
     RoleRequestBodyDTO,
+    SceneBondGateRequestDTO,
     SceneOrderRequestBodyDTO,
     SceneRequestBodyDTO,
     StartingBondRequestBodyDTO,
@@ -190,6 +192,18 @@ export class StoryApiController {
         @Body() body: SceneRequestBodyDTO,
     ): Promise<StoryResponseBodyDTO> {
         return this.storyManager.updateScene(storyId, sceneId, body);
+    }
+
+    /** A Scene's Bond gates, replaced by the whole list sent (.scratch/bond-axes/spec.md, "API"). */
+    @Put(':storyId/scenes/:sceneId/gates')
+    @ApiBody({ type: [SceneBondGateRequestDTO] })
+    @ApiOkResponse({ type: StoryResponseBodyDTO })
+    setSceneGates(
+        @Id('storyId') storyId: number,
+        @Id('sceneId') sceneId: number,
+        @Body(new ParseArrayPipe({ items: SceneBondGateRequestDTO, whitelist: true })) body: SceneBondGateRequestDTO[],
+    ): Promise<StoryResponseBodyDTO> {
+        return this.storyManager.setSceneGates(storyId, sceneId, body);
     }
 
     @Delete(':storyId/scenes/:sceneId')

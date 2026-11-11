@@ -1,6 +1,6 @@
 # 03 — The Dashboard charts each Bond, in words
 
-**Status:** ready-for-agent
+**Status:** done
 
 **What to build:** Each Bond on the Dashboard gets a small chart of its four axes over the Chat, inside its existing fold. The chart has:
 - axis words at the ends, and no numbers anywhere;
@@ -16,7 +16,7 @@ Follow the spec's "The Dashboard":
 
 **Part of:** [Spec: Bond axes](../spec.md)
 
-- [ ] Pure test (a Playwright test with no page, as the line-picture helper's): the layout gives a point per change and a pin where the label changed, and its text holds no digits.
-- [ ] API test: `trend` lists each change in order, with its Message, its levels or null, and whether the label changed.
-- [ ] e2e at 390px: the chart shows axis words; tapping a pin shows its event and the link; no digit appears inside the chart; an unmeasured Bond reads "Not measured yet".
-- [ ] Typecheck and the whole suites stay green.
+- [x] Pure test (a Playwright test with no page, as the line-picture helper's): the layout gives a point per change and a pin where the label changed, and its text holds no digits.
+- [x] API test: `trend` lists each change in order, with its Message, its levels or null, and whether the label changed.
+- [x] e2e at 390px: the chart shows axis words; tapping a pin shows its event and the link; no digit appears inside the chart; an unmeasured Bond reads "Not measured yet".
+- [x] Typecheck and the whole suites stay green.

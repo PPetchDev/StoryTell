@@ -15,6 +15,9 @@ import { LORE_SECONDARY_MODES, LoreEntryResponse } from '../../../model/story/en
 import type { LoreSecondaryMode } from '../../../model/story/entities/lore-entry.entity.js';
 import { SceneResponse } from '../../../model/story/entities/scene.entity.js';
 import { StartingBondResponse } from '../../../model/story/entities/starting-bond.entity.js';
+import { SceneBondGateResponse } from '../../../model/story/entities/scene-bond-gate.entity.js';
+import { BOND_AXES } from '../../../model/ledger/bond-axes.js';
+import type { BondAxis } from '../../../model/ledger/bond-axes.js';
 import {
     Backdrop,
     CoverFocus,
@@ -239,6 +242,18 @@ export class StartingBondDTO implements StartingBondResponse {
 
     @ApiProperty()
     description: string;
+
+    @ApiProperty({ minimum: -3, maximum: 3, description: 'Starting Trust: betrayed (−3) … trusts completely (+3).' })
+    trust: number;
+
+    @ApiProperty({ minimum: -3, maximum: 3, description: 'Starting Affection: hates (−3) … devoted (+3).' })
+    affection: number;
+
+    @ApiProperty({ minimum: -3, maximum: 3, description: 'Starting Desire: repelled (−3) … aches for (+3).' })
+    desire: number;
+
+    @ApiProperty({ minimum: 0, maximum: 3, description: 'Starting Tension: at ease (0) … at breaking point (3).' })
+    tension: number;
 }
 
 export class SceneDTO implements SceneResponse {
@@ -253,6 +268,24 @@ export class SceneDTO implements SceneResponse {
 
     @ApiProperty()
     moveOnCondition: string;
+
+    @ApiProperty({ type: () => [SceneBondGateDTO], description: 'Its Bond gates: the Scene moves on only when every one holds.' })
+    gates: SceneBondGateDTO[];
+}
+
+/** A Bond gate (.scratch/bond-axes/spec.md): one Bond at least a level on one axis. */
+export class SceneBondGateDTO implements SceneBondGateResponse {
+    @ApiProperty({ description: 'The Character whose feelings it reads.' })
+    fromCharacterId: number;
+
+    @ApiProperty({ type: Number, nullable: true, description: 'Toward whom; null means toward the user.' })
+    toCharacterId: number | null;
+
+    @ApiProperty({ enum: BOND_AXES })
+    axis: BondAxis;
+
+    @ApiProperty({ minimum: -3, maximum: 3, description: "The least level, within the axis's range (Tension 0 to 3)." })
+    atLeast: number;
 }
 
 export class LoreEntryDTO implements LoreEntryResponse {

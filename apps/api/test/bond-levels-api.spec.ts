@@ -1,3 +1,5 @@
+import pg from 'pg';
+
 import { TextCompletionRequest } from '../src/service/model-gateway/model-gateway.js';
 import { startTestApp, TestApp } from './harness/test-app.js';
 
@@ -89,8 +91,23 @@ describe('Bond levels from the Judge', () => {
         return (await t.http.get(`/api/stories/${storyId}`).expect(200)).body as Story;
     }
 
+    /**
+     * A Chat as it was seeded before Starting Bonds had levels (ticket 02): its seed Bond has none
+     * yet, as in every Chat that existed then, which is what these tests are about.
+     */
     async function createChat(storyId: number): Promise<Chat> {
-        return (await t.http.post(`/api/stories/${storyId}/chats`).expect(201)).body as Chat;
+        const chat = (await t.http.post(`/api/stories/${storyId}/chats`).expect(201)).body as Chat;
+        const client = new pg.Client({ connectionString: t.databaseUrl });
+        await client.connect();
+        try {
+            await client.query(
+                `UPDATE "bond_change" SET "trust" = NULL, "affection" = NULL, "desire" = NULL, "tension" = NULL WHERE "chat_id" = $1 AND "message_id" IS NULL`,
+                [chat.id],
+            );
+        } finally {
+            await client.end();
+        }
+        return getChat(storyId, chat.id);
     }
 
     async function getChat(storyId: number, chatId: number): Promise<Chat> {

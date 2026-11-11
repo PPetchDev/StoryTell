@@ -78,6 +78,15 @@
     --character-8: #7fe0a0;
     --character-neutral: #c4bdd6;
     --on-character: #16131f;
+    /*
+     * Bond axes (.scratch/bond-axes/spec.md): one colour each on the Bond chart and the Memory graph's
+     * Bond lines, taken from the Character palette so each theme's contrast-checked values apply.
+     */
+    --bond-trust: var(--character-4);
+    --bond-affection: var(--character-3);
+    --bond-desire: var(--character-7);
+    --bond-tension: var(--character-1);
+    --bond-neutral: var(--character-neutral);
     /* Chat looks ticket 03: the page colour laid over a Backdrop picture, so lines on it stay readable. */
     --backdrop-dim: rgba(22, 19, 31, 0.94);
     /* Friendly UI ticket 10: a modeless sheet's height, and the room a page leaves under it. */
@@ -1412,4 +1421,177 @@ a {
 .card-import-greeting input {
     margin-top: 0.25rem;
     flex: none;
+}
+
+/* --- The Bond chart on the Dashboard (.scratch/bond-axes/spec.md, "The Dashboard") --- */
+.bond-chart {
+    margin: 0.75rem 0 0;
+}
+
+.bond-chart-figure {
+    position: relative;
+    margin: 0;
+    max-width: 30rem;
+}
+
+.bond-chart-pins {
+    position: relative;
+    height: 1.75rem;
+}
+
+.bond-chart-pin {
+    position: absolute;
+    top: 0;
+    transform: translateX(-50%);
+    /* A finger-sized target around a small mark. */
+    min-width: 1.75rem;
+    height: 1.75rem;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--event);
+    font: inherit;
+    font-size: 0.875rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.bond-chart-pin[aria-pressed='true'] {
+    background: var(--accent-soft);
+}
+
+.bond-chart-svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+}
+
+.bond-chart-name {
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.bond-chart-ends {
+    font-size: 9px;
+    fill: var(--muted);
+}
+
+.bond-chart-plot {
+    fill: var(--status-item-tint);
+    stroke: var(--line);
+    stroke-width: 0.5;
+}
+
+.bond-chart-pin-line {
+    stroke: var(--event);
+    stroke-width: 1;
+    stroke-dasharray: 2 3;
+}
+
+.bond-chart-event {
+    margin: 0.5rem 0 0;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+    background: var(--surface-raised);
+}
+
+.bond-chart-event p {
+    margin: 0 0 0.25rem;
+}
+
+.bond-unmeasured {
+    margin: 0.75rem 0 0;
+}
+
+/* --- "Show Bonds" in the Memory graph (.scratch/bond-axes/spec.md, "The Memory graph") --- */
+.memory-view-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.memory-view-row .memory-view-switch {
+    flex: 1;
+    min-width: 0;
+}
+
+.memory-bonds-switch {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    padding: 0 0.25rem;
+    background: transparent;
+    border: 0;
+    font: inherit;
+    font-size: 0.875rem;
+    color: var(--text);
+    cursor: pointer;
+}
+
+.memory-bonds-switch-track {
+    position: relative;
+    width: 2.25rem;
+    height: 1.25rem;
+    border-radius: 1rem;
+    background: var(--quiet-fill);
+    border: 1px solid var(--line);
+    transition: background 0.2s;
+}
+
+.memory-bonds-switch-track::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: calc(1.25rem - 6px);
+    height: calc(1.25rem - 6px);
+    border-radius: 50%;
+    background: var(--text);
+    transition: transform 0.2s;
+}
+
+.memory-bonds-switch[aria-checked='true'] .memory-bonds-switch-track {
+    background: var(--accent-fill);
+}
+
+.memory-bonds-switch[aria-checked='true'] .memory-bonds-switch-track::after {
+    transform: translateX(1rem);
+    background: var(--accent-text);
+}
+
+.memory-bonds-switch:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 0.5rem;
+}
+
+.memory-graph-bond {
+    cursor: pointer;
+}
+
+.memory-graph-bond-hit {
+    fill: none;
+    stroke: transparent;
+    stroke-width: 16;
+}
+
+.memory-graph-bond-line {
+    fill: none;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    opacity: 0.85;
+}
+
+.memory-graph-bond[aria-pressed='true'] .memory-graph-bond-line {
+    stroke-width: 4;
+    opacity: 1;
+}
+
+.memory-graph-bond:focus-visible .memory-graph-bond-line {
+    stroke-width: 4;
 }

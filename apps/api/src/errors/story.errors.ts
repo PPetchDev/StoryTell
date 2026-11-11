@@ -163,3 +163,13 @@ export class ExpressionNotFoundError extends AppError {
         super('404.003.022', 'That Character has no Expression for that emotion.');
     }
 }
+
+/**
+ * A Scene's Bond gates that name a Character outside the cast, point a Character at itself, ask for
+ * a level outside the axis's range, or set one Bond's axis twice (.scratch/bond-axes/spec.md, "API").
+ */
+export class InvalidBondGateError extends AppError {
+    constructor(reason: string) {
+        super('422.003.024', `That Bond gate can't be set: ${reason}`);
+    }
+}

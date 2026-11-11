@@ -148,7 +148,14 @@ export class JudgeManagerService {
                     name: character.name,
                     steps: state.arcSteps.filter((step) => step.characterId === character.id).map((step) => step.step),
                 })),
-                scene: scene ? { name: scene.name, moveOnCondition: scene.moveOnCondition } : null,
+                // A Scene its Bond gates alone move on shows "(gates only)": its move_on is not asked for (.scratch/bond-axes/spec.md).
+                scene: scene
+                    ? {
+                          name: scene.name,
+                          moveOnCondition: scene.moveOnCondition,
+                          ...((scene.gates ?? []).length > 0 && scene.moveOnCondition.trim() === '' ? { gatesOnly: true } : {}),
+                      }
+                    : null,
                 timeOfDay: chat.timeOfDay,
                 recent: context.map((entry) => messageLine(entry, identityName)),
                 userText,
@@ -175,7 +182,12 @@ export class JudgeManagerService {
                         description: bond.description,
                         levels: bond.levels(),
                     })),
-                    scenes: story.scenes.map((candidate) => ({ id: candidate.id, name: candidate.name })),
+                    scenes: story.scenes.map((candidate) => ({
+                        id: candidate.id,
+                        name: candidate.name,
+                        moveOnCondition: candidate.moveOnCondition,
+                        gates: (candidate.gates ?? []).map(({ fromCharacterId, toCharacterId, axis, atLeast }) => ({ fromCharacterId, toCharacterId, axis, atLeast })),
+                    })),
                     currentSceneId: chat.currentSceneId,
                     timeOfDay: chat.timeOfDay,
                     sittingOut,

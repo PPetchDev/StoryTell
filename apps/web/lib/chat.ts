@@ -170,6 +170,22 @@ export interface DashboardBond {
     levels: BondLevels | null;
     /** Newest first. */
     history: BondChange[];
+    /** The same changes oldest first, as the Bond chart draws them. */
+    trend: BondTrendPoint[];
+}
+
+/** One change of a Bond, as a point on its chart (.scratch/bond-axes/spec.md, "The Dashboard"). */
+export interface BondTrendPoint {
+    /** The change, as the history lists it. */
+    id: number;
+    /** The causing Message; null for the seed. */
+    messageId: number | null;
+    /** That Message's place in the Chat; null for the seed, which stands at the start. */
+    position: number | null;
+    /** null while the Bond had no levels. */
+    levels: BondLevels | null;
+    /** The label changed here: a pin on the chart. */
+    labelChanged: boolean;
 }
 
 export interface ArcStep {
@@ -214,6 +230,8 @@ export interface ChatDashboard {
     characters: DashboardCharacter[];
     scene: { current: { id: number; name: string } | null; advance: SceneAdvance | null };
     background: DashboardBackground[];
+    /** The newest Message's place in the Chat: where the Bond charts end. */
+    lastPosition: number;
 }
 
 /**
