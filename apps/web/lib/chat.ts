@@ -199,12 +199,12 @@ export interface BondTrendPoint {
     labelChanged: boolean;
 }
 
-export interface ArcStep {
-    id: number;
-    characterId: number;
-    step: string;
-    event: string;
+/** One change to a Character's Arc: what caused it and where, never the step's words (.scratch/arc-changes/spec.md). */
+export interface ArcChange {
+    /** The causing AI Message. */
     messageId: number;
+    /** The story event that caused it. */
+    cause: string;
     createdAt: string;
 }
 
@@ -212,8 +212,8 @@ export interface DashboardCharacter {
     id: number;
     name: string;
     bonds: DashboardBond[];
-    arcSteps: ArcStep[];
-    arcDirection: string;
+    /** Every change to their Arc, in story order. The Arc direction is never given in play. */
+    arcChanges: ArcChange[];
 }
 
 export interface SceneAdvance {

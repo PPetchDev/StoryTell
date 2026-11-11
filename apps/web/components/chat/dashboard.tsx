@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useId, useState } from 'react';
 
 import { useConnection } from '@/components/connection';
-import { FoldTitle } from '@/components/fold/fold-button';
+import { FoldTitle, useFoldedState } from '@/components/fold/fold-button';
 import { CharacterPortrait } from '@/components/portrait/character-portrait';
 import { BondChart } from './bond-chart';
 import { Cast, characterColour, Portraits } from '@/lib/character-colour';
@@ -107,29 +107,40 @@ function CharacterBonds({ dashboard, character, pictures }: { dashboard: ChatDas
     );
 }
 
-/** One Character's Arc, under "How they've changed". */
+/**
+ * One Character's Arc, under "How they've changed" (.scratch/arc-changes/spec.md): that they
+ * changed and what caused it, never the author's direction or the step's own words. The list
+ * starts folded and stays as the user leaves it on this device.
+ */
 function CharacterArc({ dashboard, character, pictures }: { dashboard: ChatDashboard; character: DashboardCharacter; pictures: Pictures }) {
+    const bodyId = useId();
+    const foldKey = `arcChanges:${character.id}`;
+    const folded = useFoldedState(foldKey, true);
+    const count = character.arcChanges.length;
     return (
         <section className="dashboard-person" aria-label={character.name}>
             <div className="dashboard-person-head">
                 <Portrait character={character} pictures={pictures} />
                 <h3>{character.name}</h3>
             </div>
-            {character.arcDirection && <p className="muted small">Author&apos;s direction: {character.arcDirection}</p>}
-            {character.arcSteps.length === 0 ? (
-                <p className="muted">Unchanged from the core definition.</p>
+            {count === 0 ? (
+                <p className="muted">Hasn&apos;t changed yet</p>
             ) : (
-                <ol className="arc-steps">
-                    {character.arcSteps.map((step) => (
-                        <li key={step.id}>
-                            <p className="message-text">{step.step}</p>
-                            <p className="event">Because: {step.event}</p>
-                            <p className="muted small">
-                                {formatWhen(step.createdAt)} · <Cause dashboard={dashboard} messageId={step.messageId} />
-                            </p>
-                        </li>
-                    ))}
-                </ol>
+                <>
+                    <FoldTitle foldKey={foldKey} controls={bodyId} as="h4" startsFolded>
+                        Changed {count} {count === 1 ? 'time' : 'times'}
+                    </FoldTitle>
+                    <ol id={bodyId} hidden={folded} className="arc-changes">
+                        {character.arcChanges.map((change, index) => (
+                            <li key={`${change.messageId}:${index}`}>
+                                <p className="event">After {change.cause}</p>
+                                <p className="muted small">
+                                    {formatWhen(change.createdAt)} · <Cause dashboard={dashboard} messageId={change.messageId} />
+                                </p>
+                            </li>
+                        ))}
+                    </ol>
+                </>
             )}
         </section>
     );
@@ -152,10 +163,10 @@ function updateStatusOf(entry: DashboardBackground): UpdateStatus {
 
 /**
  * The read-only dashboard (spec: "Dashboard"), in plain words: how the Characters feel (their
- * Bonds with history), how they've changed (their Arc steps), where the story is (the current
- * Scene and the event that moved it on), and whether each recent reply's updates finished,
- * with Retry. Nothing here is editable; every item links to the Message that caused it, which
- * is where a bad change is rewound.
+ * Bonds with history), how they've changed (the events that changed them, never the plan),
+ * where the story is (the current Scene and the event that moved it on), and whether each
+ * recent reply's updates finished, with Retry. Nothing here is editable; every item links to
+ * the Message that caused it, which is where a bad change is rewound.
  */
 export function Dashboard({ initial, cast = [], portraits = {} }: { initial: ChatDashboard; cast?: Cast; portraits?: Portraits }) {
     const pictures: Pictures = { cast, portraits };

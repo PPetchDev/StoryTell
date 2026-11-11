@@ -54,7 +54,7 @@ interface Dashboard {
     characters: Array<{
         name: string;
         bonds: Array<{ toward: { name: string }; label: string }>;
-        arcSteps: Array<{ step: string }>;
+        arcChanges: Array<{ cause: string }>;
     }>;
     scene: { current: { name: string } | null; advance: unknown };
 }
@@ -228,7 +228,7 @@ describe('Regenerate', () => {
         const mira = board.characters.find((character) => character.name === 'Mira')!;
         const kai = board.characters.find((character) => character.name === 'Kai')!;
         expect(mira.bonds.map((bond) => [bond.toward.name, bond.label])).toEqual([['Ash', 'Wary']]);
-        expect(kai.arcSteps).toEqual([]);
+        expect(kai.arcChanges).toEqual([]);
         expect(board.scene).toEqual({ current: { id: story.scenes[0].id, name: 'Arrival' }, advance: null });
         // The rerun prompt saw the rolled-back state.
         const system = turnCalls()[1].messages[0].content;

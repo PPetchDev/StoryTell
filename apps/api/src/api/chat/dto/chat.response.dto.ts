@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 import {
+    ArcChange,
     BondTrendPoint,
     ChatBond,
     ChatDashboard,
@@ -16,7 +17,6 @@ import { EMOTIONS } from '../../../model/story/emotion.js';
 import type { Emotion } from '../../../model/story/emotion.js';
 import { BackgroundCallResponse, BackgroundStatus, MemoriesUsed, ReplyVersionsResponse } from '../../../model/chat/entities/message.entity.js';
 import { BeliefDTO } from '../../memory/dto/belief.response.dto.js';
-import { ArcStepResponse } from '../../../model/ledger/entities/arc-step.entity.js';
 import { BondLevels } from '../../../model/ledger/bond-axes.js';
 import { BondChangeResponse } from '../../../model/ledger/entities/bond-change.entity.js';
 import { SceneAdvanceResponse } from '../../../model/ledger/entities/scene-advance.entity.js';
@@ -416,21 +416,13 @@ export class BondTrendPointDTO implements BondTrendPoint {
     labelChanged: boolean;
 }
 
-export class ArcStepDTO implements ArcStepResponse {
-    @ApiProperty()
-    id: number;
-
-    @ApiProperty()
-    characterId: number;
-
-    @ApiProperty({ description: 'The lasting change to the personality.' })
-    step: string;
-
-    @ApiProperty({ description: 'The story event that caused it.' })
-    event: string;
-
+/** One change to a Character's Arc: its cause and Message, never the step's words (.scratch/arc-changes/spec.md). */
+export class ArcChangeDTO implements ArcChange {
     @ApiProperty({ description: 'The causing AI Message.' })
     messageId: number;
+
+    @ApiProperty({ description: 'The story event that caused it, shown as "After …".' })
+    cause: string;
 
     @ApiProperty()
     createdAt: string;
@@ -446,11 +438,11 @@ export class DashboardCharacterDTO implements DashboardCharacter {
     @ApiProperty({ type: [DashboardBondDTO], description: "This Character's current Bonds." })
     bonds: DashboardBondDTO[];
 
-    @ApiProperty({ type: [ArcStepDTO], description: 'Oldest first.' })
-    arcSteps: ArcStepDTO[];
-
-    @ApiProperty({ description: 'The Arc directions copied into this Chat; empty when the author wrote none.' })
-    arcDirection: string;
+    @ApiProperty({
+        type: [ArcChangeDTO],
+        description: 'Every change to their Arc, in story order. Neither the Arc direction nor the step text is given in play.',
+    })
+    arcChanges: ArcChangeDTO[];
 }
 
 export class SceneAdvanceDTO implements SceneAdvanceResponse {

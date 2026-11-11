@@ -537,7 +537,7 @@ describe('Sitting out: the API', () => {
 
         async function dashboard(storyId: number, chatId: number) {
             const { body } = await t.http.get(`/api/stories/${storyId}/chats/${chatId}/dashboard`).expect(200);
-            return body as { characters: Array<{ name: string; bonds: Array<{ toward: { name: string }; label: string }>; arcSteps: Array<{ step: string }> }> };
+            return body as { characters: Array<{ name: string; bonds: Array<{ toward: { name: string }; label: string }>; arcChanges: Array<{ cause: string }> }> };
         }
 
         it('the judge marks them in its cast and gives them no Bond change or Arc step, while a Bond toward them still changes', async () => {
@@ -554,8 +554,8 @@ describe('Sitting out: the API', () => {
                     { from: 'Kai', to: 'user', label: 'trusting' },
                 ],
                 arcs: [
-                    { character: 'Mira', step: 'Learns to forgive.' },
-                    { character: 'Kai', step: 'Stops running.' },
+                    { character: 'Mira', step: 'Learns to forgive.', cause: 'Kai owned up to the lie.' },
+                    { character: 'Kai', step: 'Stops running.', cause: 'Ash would not let him leave.' },
                 ],
             });
             for (const chat of [away, plain]) await play(storyId, chat.id, 'I tell Kai that Mira left.', '@Kai: Typical.', { judge: judged });
@@ -564,7 +564,7 @@ describe('Sitting out: the API', () => {
             const [mira, kai] = board.characters;
             expect(mira.name).toBe('Mira');
             expect(mira.bonds).toEqual([]);
-            expect(mira.arcSteps).toEqual([]);
+            expect(mira.arcChanges).toEqual([]);
             expect(kai.bonds.map((bond) => [bond.toward.name, bond.label])).toEqual(
                 expect.arrayContaining([
                     ['Mira', 'resentful'],
@@ -572,12 +572,12 @@ describe('Sitting out: the API', () => {
                 ]),
             );
             expect(kai.bonds).toHaveLength(2);
-            expect(kai.arcSteps.map((step) => step.step)).toEqual(['Stops running.']);
+            expect(kai.arcChanges.map((change) => change.cause)).toEqual(['Ash would not let him leave.']);
 
             // The same judgement in a Chat where she is in applies all of it.
             const [plainMira] = (await dashboard(storyId, plain.id)).characters;
             expect(plainMira.bonds).toHaveLength(2);
-            expect(plainMira.arcSteps.map((step) => step.step)).toEqual(['Learns to forgive.']);
+            expect(plainMira.arcChanges.map((change) => change.cause)).toEqual(['Kai owned up to the lie.']);
 
             // The prompt: Mira's cast line carries the mark, and nothing else differs.
             const [awayJudge, plainJudge] = t.gateway.textCalls('judge');

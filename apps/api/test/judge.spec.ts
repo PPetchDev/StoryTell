@@ -56,8 +56,7 @@ interface Dashboard {
             levels: { trust: number; affection: number; desire: number; tension: number } | null;
             history: BondChange[];
         }>;
-        arcSteps: Array<{ id: number; characterId: number; step: string; event: string; messageId: number }>;
-        arcDirection: string;
+        arcChanges: Array<{ messageId: number; cause: string; createdAt: string }>;
     }>;
     scene: {
         current: { id: number; name: string } | null;
@@ -224,6 +223,21 @@ describe('The Bond, Arc and Scene judge, the ledger and the dashboard', () => {
         }
     }
 
+    /**
+     * The Arc direction the Chat holds for a Character; "" for none. The Dashboard no longer
+     * gives it (.scratch/arc-changes/spec.md), so the copy is read where it is kept.
+     */
+    async function heldDirection(chatId: number, characterId: number): Promise<string> {
+        const client = new pg.Client({ connectionString: t.databaseUrl });
+        await client.connect();
+        try {
+            const { rows } = await client.query('SELECT text FROM chat_arc_direction WHERE chat_id = $1 AND character_id = $2', [chatId, characterId]);
+            return rows.length === 0 ? '' : (rows[0].text as string);
+        } finally {
+            await client.end();
+        }
+    }
+
     describe('seeding and the prompt layers', () => {
         it('seeds StartingBonds and Arc directions at Chat start, and the first prompt carries them as Feelings and Arcs', async () => {
             const story = await createStory();
@@ -261,8 +275,9 @@ describe('The Bond, Arc and Scene judge, the ledger and the dashboard', () => {
                     ],
                 },
             ]);
-            expect(character(board, 'Kai')).toMatchObject({ bonds: [], arcSteps: [], arcDirection: 'If trusted, his cheer turns to loyalty.' });
-            expect(character(board, 'Mira').arcDirection).toBe('');
+            expect(character(board, 'Kai')).toMatchObject({ bonds: [], arcChanges: [] });
+            expect(await heldDirection(chat.id, story.characters[1].id)).toBe('If trusted, his cheer turns to loyalty.');
+            expect(await heldDirection(chat.id, story.characters[0].id)).toBe('');
             expect(board.scene).toEqual({ current: { id: story.scenes[0].id, name: 'Arrival' }, advance: null });
             expect(board.background).toEqual([]);
 
@@ -371,12 +386,9 @@ Ash: I take them off.
                 messageId: reply.id,
             });
             expect(mira.bonds[0].history[1]).toMatchObject({ label: 'Wary', before: null, event: null, messageId: null });
-            expect(mira.arcSteps).toEqual([
+            expect(mira.arcChanges).toEqual([
                 {
-                    id: expect.any(Number),
-                    characterId: story.characters[0].id,
-                    step: 'Lets herself hope for company.',
-                    event: 'The letter from her brother.',
+                    cause: 'The letter from her brother.',
                     messageId: reply.id,
                     createdAt: expect.any(String),
                 },
@@ -467,7 +479,7 @@ Ash: I take them off.
             expect(mira.bonds[1]).toMatchObject({ toward: { characterId: story.characters[1].id, name: 'Kai' }, description: 'An old friend.' });
             expect(mira.bonds[1].history).toMatchObject([{ before: null, event: 'Kai brought bread.' }]);
             expect(character(board, 'Kai').bonds).toEqual([]);
-            expect(board.characters.flatMap((entry) => entry.arcSteps)).toEqual([]);
+            expect(board.characters.flatMap((entry) => entry.arcChanges)).toEqual([]);
             expect(board.scene).toMatchObject({ current: { name: 'The lamp' }, advance: { fromSceneName: 'Arrival', toSceneName: 'The lamp', event: 'Met once.' } });
             expect(await countRows('scene_advance', chat.id)).toBe(1);
             expect(await countRows('bond_change', chat.id)).toBe(2);
@@ -526,7 +538,7 @@ Ash: I take them off.
             const board = await dashboard(story.id, chat.id);
             expect(character(board, 'Mira').bonds.map((bond) => [bond.toward.name, bond.label])).toEqual([['Ash', 'Curious']]);
             expect(character(board, 'Mira').bonds[0].history.map((change) => change.label)).toEqual(['Curious', 'Wary']);
-            expect(character(board, 'Kai')).toMatchObject({ arcSteps: [], bonds: [{ toward: { name: 'Ash' }, label: 'Amused' }] });
+            expect(character(board, 'Kai')).toMatchObject({ arcChanges: [], bonds: [{ toward: { name: 'Ash' }, label: 'Amused' }] });
             expect(character(board, 'Kai').bonds[0].history[0].messageId).toBe(lastAi(settled).id);
             expect(board.scene).toMatchObject({ current: { name: 'The lamp' }, advance: { event: 'She let Ash up.' } });
             // The new turn's prompt saw the rolled-back state: no Arc step for Kai, no Fond, no Trusting.
@@ -624,7 +636,7 @@ Ash: I take them off.
                 .send({ label: 'Hostile', description: 'She wants the keeper gone.' })
                 .expect(200);
             await t.http.patch(`/api/stories/${story.id}/characters/${story.characters[1].id}`).send({ arcDirections: 'If betrayed, he hardens.' }).expect(200);
-            expect(character(await dashboard(story.id, chat.id), 'Kai').arcDirection).toBe('If trusted, his cheer turns to loyalty.');
+            expect(await heldDirection(chat.id, story.characters[1].id)).toBe('If trusted, his cheer turns to loyalty.');
 
             const { body } = await t.http.post(`/api/stories/${story.id}/chats/${chat.id}/reset`).expect(200);
 
@@ -634,7 +646,8 @@ Ash: I take them off.
                 { toward: { name: 'Ash' }, label: 'Hostile', description: 'She wants the keeper gone.', history: [{ before: null, event: null, messageId: null }] },
             ]);
             expect(character(board, 'Mira').bonds[0].history).toHaveLength(1);
-            expect(character(board, 'Kai')).toMatchObject({ bonds: [], arcSteps: [], arcDirection: 'If betrayed, he hardens.' });
+            expect(character(board, 'Kai')).toMatchObject({ bonds: [], arcChanges: [] });
+            expect(await heldDirection(chat.id, story.characters[1].id)).toBe('If betrayed, he hardens.');
             expect(board.scene).toEqual({ current: { id: story.scenes[0].id, name: 'Arrival' }, advance: null });
             expect(board.background).toEqual([]);
             expect(await countRows('bond_change', chat.id)).toBe(1);
@@ -824,6 +837,70 @@ Ash: I take them off.
             for (const table of ['bond_change', 'arc_step', 'scene_advance', 'chat_arc_direction', 'memory', 'memory_change']) {
                 expect(await countRows(table, chat.id)).toBe(0);
             }
+        });
+    });
+
+    /** .scratch/arc-changes/spec.md: the Dashboard shows that a Character changed, and why, never the plan. */
+    describe('Arc changes on the dashboard', () => {
+        const DIRECTION = 'If trusted, his cheer turns to loyalty.';
+        const FIRST_STEP = 'Lets himself rely on the keeper.';
+        const FIRST_CAUSE = 'Ash shared the last of the bread.';
+        const SECOND_STEP = 'Shuts the keeper out again.';
+        const SECOND_CAUSE = 'Ash read the letter without asking.';
+
+        /** Two turns that each change Kai's Arc, the second turning the first back. */
+        async function playTwoChanges(storyId: number, chatId: number): Promise<Chat> {
+            await play(storyId, chatId, 'I hand Kai the bread.', 'Kai eats in silence.', judgement({ arcs: [{ character: 'Kai', step: FIRST_STEP, cause: FIRST_CAUSE }] }));
+            return play(storyId, chatId, 'I open the letter.', 'Kai turns away.', judgement({ arcs: [{ character: 'Kai', step: SECOND_STEP, cause: SECOND_CAUSE }] }));
+        }
+
+        it('lists each scripted Arc step as an arcChange with its cause and Message in story order, a turned-back one included', async () => {
+            const story = await createStory();
+            const chat = await createChat(story.id);
+
+            const played = await playTwoChanges(story.id, chat.id);
+
+            const board = await dashboard(story.id, chat.id);
+            expect(character(board, 'Kai').arcChanges).toEqual([
+                { messageId: played.messages[2].id, cause: FIRST_CAUSE, createdAt: expect.any(String) },
+                { messageId: played.messages[4].id, cause: SECOND_CAUSE, createdAt: expect.any(String) },
+            ]);
+            expect(character(board, 'Mira').arcChanges).toEqual([]);
+        });
+
+        it('holds neither the Arc direction nor the step\'s words, which the Narrator and the Judge still read', async () => {
+            const story = await createStory();
+            const chat = await createChat(story.id);
+            await playTwoChanges(story.id, chat.id);
+
+            const json = JSON.stringify(await dashboard(story.id, chat.id));
+
+            for (const hidden of [DIRECTION, FIRST_STEP, SECOND_STEP]) expect(json).not.toContain(hidden);
+            // The stored step text and the direction still reach the next turn's prompts.
+            await play(story.id, chat.id, 'I wait.', 'Kai says nothing.');
+            expect(systemPrompt(lastCall('turn'))).toContain(`- Kai: Arc so far: ${FIRST_STEP} → ${SECOND_STEP} Possible direction (author's intent, not yet happened): ${DIRECTION}`);
+            expect(lastCall('judge').messages[1].content).toContain(`- Kai: ${FIRST_STEP} → ${SECOND_STEP}`);
+            expect(lastCall('judge').messages[1].content).toContain(`(Author's Arc direction: ${DIRECTION})`);
+        });
+
+        it('drops a rolled-back step: editing the User Message before it takes its change off the list', async () => {
+            const story = await createStory();
+            const chat = await createChat(story.id);
+            const played = await playTwoChanges(story.id, chat.id);
+            t.gateway.scriptText('turn', 'Kai shrugs.');
+            t.gateway.scriptText('judge', NO_CHANGE);
+            t.gateway.scriptText('memory_extraction', NO_OPS);
+
+            const { body } = await t.http
+                .patch(`/api/stories/${story.id}/chats/${chat.id}/messages/${played.messages[3].id}`)
+                .send({ text: 'I leave the letter sealed.' })
+                .expect(200);
+            expect(body.rolledBack).toMatchObject({ arcSteps: 1 });
+            await awaitJudge(story.id, chat.id);
+
+            expect(character(await dashboard(story.id, chat.id), 'Kai').arcChanges).toEqual([
+                { messageId: played.messages[2].id, cause: FIRST_CAUSE, createdAt: expect.any(String) },
+            ]);
         });
     });
 });

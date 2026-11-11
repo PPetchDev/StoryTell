@@ -7,7 +7,8 @@ import { useSyncExternalStore } from 'react';
  * `character:<id>`, `bonds:<characterId>`, `scene:<id>`, `lore:<id>`, `feelings:<characterId>`,
  * and in the Gallery `galleryStory:<storyId>` and `galleryChat:<storyId>:<chatId or "deleted">`.
  * A Lore card's More triggers fold starts folded, so its key, `loreMoreOpen:<id>`, records the
- * opposite: that it is open (FoldTitle's `startsFolded`).
+ * opposite: that it is open (FoldTitle's `startsFolded`). So does a Character's Arc changes fold
+ * on the Dashboard, `arcChanges:<characterId>`.
  */
 const STORAGE_KEY = 'storytell.folded';
 

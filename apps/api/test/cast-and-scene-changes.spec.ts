@@ -39,8 +39,7 @@ interface Dashboard {
         id: number;
         name: string;
         bonds: Array<{ toward: { characterId: number | null; name: string }; label: string; history: unknown[] }>;
-        arcSteps: Array<{ step: string }>;
-        arcDirection: string;
+        arcChanges: Array<{ messageId: number; cause: string; createdAt: string }>;
     }>;
     scene: {
         current: { id: number; name: string } | null;
@@ -190,6 +189,21 @@ describe('Cast and Scene changes reaching existing Chats', () => {
         }
     }
 
+    /**
+     * The Arc direction a Chat holds for a Character; "" for none. The Dashboard no longer
+     * gives it (.scratch/arc-changes/spec.md), so the copy is read where it is kept.
+     */
+    async function heldDirection(chatId: number, characterId: number): Promise<string> {
+        const client = new pg.Client({ connectionString: t.databaseUrl });
+        await client.connect();
+        try {
+            const { rows } = await client.query('SELECT text FROM chat_arc_direction WHERE chat_id = $1 AND character_id = $2', [chatId, characterId]);
+            return rows.length === 0 ? '' : (rows[0].text as string);
+        } finally {
+            await client.end();
+        }
+    }
+
     /** A Snapshot of the latest AI Message with these Characters in frame, waited for. */
     async function snapshot(storyId: number, chatId: number, inFrame: string[]): Promise<void> {
         t.gateway.scriptText('snapshot_prompt', JSON.stringify({ in_frame: inFrame, scene: 'By the lamp.' }));
@@ -237,7 +251,7 @@ describe('Cast and Scene changes reaching existing Chats', () => {
                 expect(read.messages[0].parts?.map((part) => part.text)).toEqual(['The lamp went out an hour ago.', 'Boots off, keeper.']);
                 const board = await dashboard(story.id, chat.id);
                 expect(character(board, 'Mira')!.bonds.find((bond) => bond.toward.characterId === null)!.label).toBe('Wary');
-                expect(character(board, 'Kai')!.arcDirection).toBe('If trusted, his cheer turns to loyalty.');
+                expect(await heldDirection(chat.id, kai.id)).toBe('If trusted, his cheer turns to loyalty.');
             }
 
             // A reset Chat and a new one take the Story as it is now.
@@ -248,7 +262,7 @@ describe('Cast and Scene changes reaching existing Chats', () => {
                 expect(read.messages[0].parts?.[0].text).toBe('Fog.');
                 const board = await dashboard(story.id, chatId);
                 expect(character(board, 'Mira')!.bonds.find((bond) => bond.toward.characterId === null)!.label).toBe('Hostile');
-                expect(character(board, 'Kai')!.arcDirection).toBe('He leaves.');
+                expect(await heldDirection(chatId, kai.id)).toBe('He leaves.');
             }
             // The first Chat was neither reset nor new.
             expect(character(await dashboard(story.id, first.id), 'Mira')!.bonds.find((bond) => bond.toward.characterId === null)!.label).toBe('Wary');
@@ -280,9 +294,9 @@ describe('Cast and Scene changes reaching existing Chats', () => {
                     id: lena.id,
                     name: 'Lena',
                     bonds: [],
-                    arcSteps: [],
-                    arcDirection: 'She may come to trust the keeper.',
+                    arcChanges: [],
                 });
+                expect(await heldDirection(chat.id, lena.id)).toBe('She may come to trust the keeper.');
                 // Nobody has a Bond toward her either.
                 for (const other of board.characters) {
                     expect(other.bonds.filter((bond) => bond.toward.characterId === lena.id)).toEqual([]);
@@ -315,7 +329,8 @@ describe('Cast and Scene changes reaching existing Chats', () => {
 
             expect(await count('chat_arc_direction WHERE character_id = $1', [tomas.id])).toBe(0);
             for (const chat of [first, second]) {
-                expect(character(await dashboard(story.id, chat.id), 'Tomas')).toMatchObject({ bonds: [], arcDirection: '' });
+                expect(character(await dashboard(story.id, chat.id), 'Tomas')).toMatchObject({ bonds: [] });
+                expect(await heldDirection(chat.id, tomas.id)).toBe('');
             }
             // A new Chat seeds the StartingBond.
             const third = await createChat(story.id);
@@ -341,7 +356,7 @@ describe('Cast and Scene changes reaching existing Chats', () => {
                 .send({ arcDirections: 'He may speak of the wreck.' })
                 .expect(200);
             for (const chat of [first, second]) {
-                expect(character(await dashboard(story.id, chat.id), 'Tomas')!.arcDirection).toBe('He may speak of the wreck.');
+                expect(await heldDirection(chat.id, tomas.id)).toBe('He may speak of the wreck.');
             }
 
             // Once a Chat holds a copy, later edits are the author's and reach only new or reset Chats.
@@ -350,11 +365,11 @@ describe('Cast and Scene changes reaching existing Chats', () => {
                 .send({ arcDirections: 'He leaves on the supply boat.' })
                 .expect(200);
             for (const chat of [first, second]) {
-                expect(character(await dashboard(story.id, chat.id), 'Tomas')!.arcDirection).toBe('He may speak of the wreck.');
+                expect(await heldDirection(chat.id, tomas.id)).toBe('He may speak of the wreck.');
             }
             expect(await count('chat_arc_direction WHERE character_id = $1', [tomas.id])).toBe(2);
             // Kai's copy, made when the Chats started, is untouched by any of this.
-            expect(character(await dashboard(story.id, first.id), 'Kai')!.arcDirection).toBe('If trusted, his cheer turns to loyalty.');
+            expect(await heldDirection(first.id, story.characters[1].id)).toBe('If trusted, his cheer turns to loyalty.');
         });
     });
 

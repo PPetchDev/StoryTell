@@ -13,15 +13,6 @@ import type { ChatEntity } from '../../chat/entities/chat.entity.js';
 import type { MessageEntity } from '../../chat/entities/message.entity.js';
 import type { CharacterEntity } from '../../story/entities/character.entity.js';
 
-export interface ArcStepResponse {
-    id: number;
-    characterId: number;
-    step: string;
-    event: string;
-    messageId: number;
-    createdAt: string;
-}
-
 /**
  * One lasting change to a Character's personality within a Chat (spec: "Arc"), always
  * caused by a story event in an AI Message. The core Character definition is never
@@ -63,15 +54,4 @@ export class ArcStepEntity {
 
     @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
     createdAt: Date;
-
-    toResponse(): ArcStepResponse {
-        return {
-            id: this.id,
-            characterId: this.characterId,
-            step: this.step,
-            event: this.event,
-            messageId: this.messageId,
-            createdAt: this.createdAt.toISOString(),
-        };
-    }
 }

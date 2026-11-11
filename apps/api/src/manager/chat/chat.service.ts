@@ -33,7 +33,6 @@ import {
     MessageKind,
     MessageResponse,
 } from '../../model/chat/entities/message.entity.js';
-import { ArcStepResponse } from '../../model/ledger/entities/arc-step.entity.js';
 import { BondLevels } from '../../model/ledger/bond-axes.js';
 import { BondChangeResponse } from '../../model/ledger/entities/bond-change.entity.js';
 import { SceneAdvanceResponse } from '../../model/ledger/entities/scene-advance.entity.js';
@@ -209,10 +208,20 @@ export interface DashboardCharacter {
     id: number;
     name: string;
     bonds: DashboardBond[];
-    /** Oldest first. */
-    arcSteps: ArcStepResponse[];
-    /** The Arc directions copied into this Chat. */
-    arcDirection: string;
+    /**
+     * Every change to their Arc, in story order (.scratch/arc-changes/spec.md): only the event
+     * that caused it, never the step's words or the Arc direction, which would give the story away.
+     */
+    arcChanges: ArcChange[];
+}
+
+/** One change to a Character's Arc, as the Dashboard shows it: what caused it, and where. */
+export interface ArcChange {
+    /** The causing AI Message. */
+    messageId: number;
+    /** The story event that caused it. */
+    cause: string;
+    createdAt: string;
 }
 
 export interface DashboardBackground {
@@ -839,8 +848,12 @@ export class ChatManagerService {
                         })),
                     };
                 }),
-            arcSteps: state.arcSteps.filter((step) => step.characterId === character.id).map((step) => step.toResponse()),
-            arcDirection: state.arcDirections.find((direction) => direction.characterId === character.id)?.text ?? '',
+            // Story order: by the causing Message's place in the Chat, then as recorded.
+            arcChanges: state.arcSteps
+                .filter((step) => step.characterId === character.id)
+                .map((step) => ({ step, position: positions.get(step.messageId) ?? 0 }))
+                .sort((a, b) => a.position - b.position || a.step.id - b.step.id)
+                .map(({ step }) => ({ messageId: step.messageId, cause: step.event, createdAt: step.createdAt.toISOString() })),
         }));
 
         const scene = story.scenes.find((candidate) => candidate.id === chat.currentSceneId);

@@ -15,7 +15,7 @@ interface Dashboard {
     characters: Array<{
         name: string;
         bonds: Array<{ toward: { name: string }; label: string }>;
-        arcSteps: Array<{ step: string }>;
+        arcChanges: Array<{ cause: string }>;
     }>;
     scene: { current: { name: string } | null };
 }
@@ -99,14 +99,14 @@ describe('Ledger rollback inside a caller\'s transaction', () => {
         const mira = board.characters.find((character) => character.name === 'Mira')!;
         return {
             bonds: mira.bonds.map((bond) => bond.label),
-            arcSteps: mira.arcSteps.map((step) => step.step),
+            arcChanges: mira.arcChanges.map((change) => change.cause),
             scene: board.scene.current?.name ?? null,
             memories: memories.map((memory) => memory.text),
         };
     }
 
-    const PLAYED = { bonds: ['Curious'], arcSteps: ['Softens.'], scene: 'The lamp', memories: ['Mira let {user} up.'] };
-    const ROLLED_BACK = { bonds: ['Wary'], arcSteps: [], scene: 'Arrival', memories: [] };
+    const PLAYED = { bonds: ['Curious'], arcChanges: ['Ash stayed.'], scene: 'The lamp', memories: ['Mira let {user} up.'] };
+    const ROLLED_BACK = { bonds: ['Wary'], arcChanges: [], scene: 'Arrival', memories: [] };
 
     it('writes nothing until the outer transaction commits, then the rollback lands', async () => {
         const { storyId, chatId } = await playedChat();

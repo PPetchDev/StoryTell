@@ -100,7 +100,7 @@ test('shows a scripted Bond change with its event on the dashboard, and editing 
         await expect(bond).toContainText('She wonders why a keeper would come in a storm.');
         await expect(bond).toContainText('Because: Ash climbed the cliff path in the storm.');
         const changed = page.getByRole('region', { name: "How they've changed" });
-        await expect(changed.getByRole('region', { name: 'Mira' })).toContainText('Unchanged from the core definition.');
+        await expect(changed.getByRole('region', { name: 'Mira' })).toContainText("Hasn't changed yet");
         await expect(page.getByRole('region', { name: 'Where the story is' })).toContainText('Free play');
         await expect(updateOf(page, 'Reply 2')).toContainText('Up to date');
         await expectNoInternalWords(page);

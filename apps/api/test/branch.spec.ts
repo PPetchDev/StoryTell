@@ -62,8 +62,8 @@ interface Dashboard {
     characters: Array<{
         name: string;
         bonds: Array<{ toward: { name: string }; label: string; history: Array<{ label: string }> }>;
-        arcSteps: Array<{ step: string }>;
-        arcDirection: string;
+        id: number;
+        arcChanges: Array<{ cause: string }>;
     }>;
     scene: { current: { name: string } | null };
 }
@@ -72,10 +72,10 @@ const OPENING = 'The lamp went out an hour ago.\n\n@Mira: Boots off, keeper.';
 const NO_CHANGE = '{"bond_changes":[],"arc_steps":[],"scene":{"move_on":false,"reason":"nothing yet"}}';
 const NO_OPS = '{"operations":[]}';
 
-function judgement(fields: { bonds?: Array<{ from: string; to: string; label: string }>; arcs?: Array<{ character: string; step: string }>; moveOn?: boolean; time?: string }): string {
+function judgement(fields: { bonds?: Array<{ from: string; to: string; label: string }>; arcs?: Array<{ character: string; step: string; cause?: string }>; moveOn?: boolean; time?: string }): string {
     return JSON.stringify({
         bond_changes: (fields.bonds ?? []).map((bond) => ({ ...bond, description: `${bond.label}, in a word.`, cause: 'it happened' })),
-        arc_steps: (fields.arcs ?? []).map((arc) => ({ ...arc, cause: 'it happened' })),
+        arc_steps: (fields.arcs ?? []).map((arc) => ({ cause: 'it happened', ...arc })),
         scene: { move_on: fields.moveOn ?? false, reason: 'because' },
         ...(fields.time ? { time_of_day: fields.time } : {}),
     });
@@ -167,16 +167,27 @@ describe('Branch', () => {
         return (await t.http.get(`/api/stories/${storyId}/chats/${chatId}/dashboard`).expect(200)).body as Dashboard;
     }
 
-    /** The dashboard as the story reads it, without ids or times: Bonds with their history, Arc steps, Arc directions and the Scene. */
+    /**
+     * The Arc direction the Chat holds for a Character; "" for none. The Dashboard no longer
+     * gives it (.scratch/arc-changes/spec.md), so the copy is read where it is kept.
+     */
+    async function heldDirection(chatId: number, characterId: number): Promise<string> {
+        const rows = await sql('SELECT "text" FROM "chat_arc_direction" WHERE "chat_id" = $1 AND "character_id" = $2', [chatId, characterId]);
+        return rows.length === 0 ? '' : (rows[0].text as string);
+    }
+
+    /** The dashboard as the story reads it, without ids or times: Bonds with their history, Arc changes by cause, the Chat's Arc directions and the Scene. */
     async function feelings(storyId: number, chatId: number) {
         const board = await dashboard(storyId, chatId);
         return {
-            characters: board.characters.map((character) => ({
-                name: character.name,
-                bonds: character.bonds.map((bond) => [bond.toward.name, bond.label, bond.history.map((change) => change.label)]),
-                arcSteps: character.arcSteps.map((step) => step.step),
-                arcDirection: character.arcDirection,
-            })),
+            characters: await Promise.all(
+                board.characters.map(async (character) => ({
+                    name: character.name,
+                    bonds: character.bonds.map((bond) => [bond.toward.name, bond.label, bond.history.map((change) => change.label)]),
+                    arcChanges: character.arcChanges.map((change) => change.cause),
+                    arcDirection: await heldDirection(chatId, character.id),
+                })),
+            ),
             scene: board.scene.current?.name ?? null,
         };
     }
@@ -236,7 +247,7 @@ describe('Branch', () => {
             chatId,
             'I climb the stairs.',
             '@Mira: Fine. Come up.',
-            judgement({ bonds: [{ from: 'Mira', to: 'user', label: 'Curious' }], arcs: [{ character: 'Kai', step: 'Grows loyal.' }], time: 'evening' }),
+            judgement({ bonds: [{ from: 'Mira', to: 'user', label: 'Curious' }], arcs: [{ character: 'Kai', step: 'Grows loyal.', cause: 'Ash climbed up to them.' }], time: 'evening' }),
             extraction([{ op: 'add', text: 'Mira let {user} up the stairs.', known_by: ['Mira'] }]),
         );
         return play(
@@ -244,7 +255,7 @@ describe('Branch', () => {
             chatId,
             'I light the lamp.',
             '@Mira: It burns.\n\nThe beam sweeps the sea.',
-            judgement({ bonds: [{ from: 'Mira', to: 'user', label: 'Trusting' }], arcs: [{ character: 'Mira', step: 'Softens.' }], moveOn: true, time: 'night' }),
+            judgement({ bonds: [{ from: 'Mira', to: 'user', label: 'Trusting' }], arcs: [{ character: 'Mira', step: 'Softens.', cause: 'Ash lit the lamp.' }], moveOn: true, time: 'night' }),
             extraction([{ op: 'add', text: '{user} lit the lamp.', known_by: ['Mira', 'Kai'] }]),
         );
     }
@@ -280,8 +291,8 @@ describe('Branch', () => {
             expect(twinEdited.timeOfDay).toBe(made.timeOfDay);
             expect(await feelings(story.id, made.id)).toMatchObject({
                 characters: [
-                    { name: 'Mira', bonds: [['Ash', 'Curious', ['Curious', 'Wary']]], arcSteps: [], arcDirection: 'If trusted, she softens.' },
-                    { name: 'Kai', bonds: [], arcSteps: ['Grows loyal.'] },
+                    { name: 'Mira', bonds: [['Ash', 'Curious', ['Curious', 'Wary']]], arcChanges: [], arcDirection: 'If trusted, she softens.' },
+                    { name: 'Kai', bonds: [], arcChanges: ['Ash climbed up to them.'] },
                 ],
                 scene: 'Arrival',
             });
@@ -314,7 +325,7 @@ describe('Branch', () => {
             expect(made.identityName).toBe('Rowan');
             expect(made.personaId).toBe(persona.body.id);
             const mira = (await dashboard(story.id, made.id)).characters.find((character) => character.name === 'Mira')!;
-            expect(mira.arcDirection).toBe('If trusted, she softens.');
+            expect(await heldDirection(made.id, mira.id)).toBe('If trusted, she softens.');
             expect(mira.bonds.map((bond) => bond.label)).toEqual(['Wary']);
         });
 
