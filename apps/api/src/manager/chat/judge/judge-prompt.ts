@@ -1,5 +1,6 @@
 import { UnparseableOutputError } from '../../../errors/model-gateway.errors.js';
 import { TimeOfDay, TIMES_OF_DAY } from '../../../model/chat/entities/chat.entity.js';
+import { BOND_AXES, bondAxisScale, BondLevels, bondLevelsInWords, isBondLevel } from '../../../model/ledger/bond-axes.js';
 import { Emotion, isEmotion } from '../../../model/story/emotion.js';
 import { PromptMessage } from '../../../service/model-gateway/model-gateway.js';
 import { exchangeUserLine } from '../exchange.js';
@@ -25,6 +26,8 @@ export interface JudgeBond {
     toName: string | null;
     label: string;
     description: string;
+    /** Its levels on the Bond axes; null or left out while it has none ("levels not set yet"). */
+    levels?: BondLevels | null;
 }
 
 export interface JudgeArc {
@@ -79,9 +82,13 @@ export const EMOTION_MEANINGS: Record<Emotion, string> = {
 const SYSTEM = `You track hidden feelings (Bonds) and lasting personality changes (Arcs) for Characters in an interactive story. You judge only what CHANGED in the latest exchange.
 
 Bond rules:
-- A Bond is directional: one Character's feelings toward the user ("user") or toward another Character. Shape: a 1–3 word English label plus a 1–2 sentence description.
-- Bonds shift GRADUALLY. Expect NO change on most turns — a normal conversation, flirting, or a feeling simply growing a little stronger is not a change.
-- Change a Bond only when the feeling changes in KIND (e.g. suspicion → trust, desire → betrayal), or on a major event (betrayal, rescue, confession, first intimacy, a serious threat). Never just rephrase or intensify the current label.
+- A Bond is directional: one Character's feelings toward the user ("user") or toward another Character. Shape: a 1–3 word English label plus a 1–2 sentence description, and a level on four axes:
+${BOND_AXES.map((axis) => `  ${bondAxisScale(axis)}`).join('\n')}
+- Bonds shift GRADUALLY. Expect NO change on most turns — a normal conversation, flirting, or a feeling simply growing a little stronger is not a new label.
+- Change a Bond's label only when the feeling changes in KIND (e.g. suspicion → trust, desire → betrayal), or on a major event (betrayal, rescue, confession, first intimacy, a serious threat). Never just rephrase or intensify the current label.
+- Move a level only when the latest exchange clearly moves that feeling. Each axis moves at most ONE step per turn; Tension may rise two steps but falls only one. A change may move levels and keep the same label.
+- When a Bond shows "levels not set yet", give a change for it setting all four levels to where the feeling stands now, keeping its label unless the feeling changed.
+- "levels" gives the NEW level of each axis, as a number.
 - At most one change per Bond per turn.
 - Only Characters who witnessed the event, or plausibly learned of it, can change.
 - Create a new pair only where real feelings have formed.
@@ -104,7 +111,7 @@ Time of day rule:
 - Give the in-story time of day only when the latest exchange moves it on to a new one, or first makes it clear: one of "dawn", "morning", "noon", "afternoon", "evening" or "night". Otherwise null. Read it from the story (light, meals, sleep, the sky); never guess.
 
 Reply with JSON only:
-{"bond_changes":[{"from":"Name","to":"user|Name","label":"...","description":"...","cause":"..."}],
+{"bond_changes":[{"from":"Name","to":"user|Name","label":"...","description":"...","levels":{"trust":0,"affection":0,"desire":0,"tension":0},"cause":"..."}],
  "arc_steps":[{"character":"Name","step":"...","cause":"..."}],
  "scene":{"reason":"...","move_on":false},
  "time_of_day":null}
@@ -144,7 +151,12 @@ export function buildJudgePrompt(input: JudgePromptInput): { messages: PromptMes
         .join('\n');
     const bonds =
         input.bonds
-            .map((bond) => `- ${bond.fromName} → ${bond.toName ?? 'user'}: "${bond.label}" — ${bond.description}`)
+            .map(
+                (bond) =>
+                    `- ${bond.fromName} → ${bond.toName ?? 'user'}: "${bond.label}" — ${bond.description} (${
+                        bond.levels ? bondLevelsInWords(bond.levels) : 'levels not set yet'
+                    })`,
+            )
             .join('\n') || '(none yet — everyone is a stranger)';
     const arcs = input.arcs
         .map((arc) => `- ${arc.name}: ${arc.steps.join(' → ') || 'no steps yet'}`)
@@ -187,6 +199,8 @@ export interface JudgedBondChange {
     label: string;
     description: string;
     cause: string;
+    /** The new level of each axis the judge gave, whole and in range; null when it gave no `levels` object. */
+    levels: Partial<BondLevels> | null;
 }
 
 export interface JudgedArcStep {
@@ -243,6 +257,7 @@ export function parseJudgement(text: string): Judgement {
                       label: str(item.label),
                       description: str(item.description),
                       cause: str(item.cause),
+                      levels: readLevels(item.levels),
                   },
               ]
             : [],
@@ -262,6 +277,17 @@ export function parseJudgement(text: string): Judgement {
         return isEmotion(emotion) ? [{ line: item.line, emotion }] : [];
     });
     return { bondChanges, arcSteps, scenes, timeOfDay: readTimeOfDay(json.time_of_day), expressions };
+}
+
+/** Read loosely: an axis whose level is not a whole number in its range, or an unknown axis, is ignored. */
+function readLevels(value: unknown): Partial<BondLevels> | null {
+    if (!isObject(value) || Array.isArray(value)) return null;
+    const levels: Partial<BondLevels> = {};
+    for (const axis of BOND_AXES) {
+        const level = value[axis];
+        if (isBondLevel(axis, level)) levels[axis] = level;
+    }
+    return levels;
 }
 
 /** One of the six, in any case; a missing field, a null or anything else means unchanged. */

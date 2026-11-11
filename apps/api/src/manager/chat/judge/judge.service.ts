@@ -141,7 +141,7 @@ export class JudgeManagerService {
                     const fromName = nameOf(bond.fromCharacterId);
                     const toName = nameOf(bond.toCharacterId);
                     return fromName && (bond.toCharacterId === null || toName)
-                        ? [{ fromName, toName, label: bond.label, description: bond.description }]
+                        ? [{ fromName, toName, label: bond.label, description: bond.description, levels: bond.levels() }]
                         : [];
                 }),
                 arcs: story.characters.map((character) => ({
@@ -168,7 +168,13 @@ export class JudgeManagerService {
                 {
                     cast: story.characters.map((character) => ({ id: character.id, name: character.name })),
                     identityName,
-                    bonds,
+                    bonds: bonds.map((bond) => ({
+                        fromCharacterId: bond.fromCharacterId,
+                        toCharacterId: bond.toCharacterId,
+                        label: bond.label,
+                        description: bond.description,
+                        levels: bond.levels(),
+                    })),
                     scenes: story.scenes.map((candidate) => ({ id: candidate.id, name: candidate.name })),
                     currentSceneId: chat.currentSceneId,
                     timeOfDay: chat.timeOfDay,

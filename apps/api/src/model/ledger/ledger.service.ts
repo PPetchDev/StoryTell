@@ -8,6 +8,7 @@ import { MemoryKnownByEntity } from '../memory/entities/memory-known-by.entity.j
 import { MemoryAuthor, MemoryEntity, MemorySnapshot } from '../memory/entities/memory.entity.js';
 import { createMemory, setKnownBy } from '../memory/memory.service.js';
 import type { Emotion } from '../story/emotion.js';
+import { BondLevels } from './bond-axes.js';
 import { ArcStepEntity } from './entities/arc-step.entity.js';
 import { BondChangeEntity } from './entities/bond-change.entity.js';
 import { ChatArcDirectionEntity } from './entities/chat-arc-direction.entity.js';
@@ -33,6 +34,8 @@ export interface NewBondChange {
     toCharacterId: number | null;
     label: string;
     description: string;
+    /** Its levels after the change; null while the Bond has none yet. */
+    levels: BondLevels | null;
     before: { label: string; description: string } | null;
     event: string;
 }
@@ -181,6 +184,11 @@ export class LedgerModelService {
         return { bondChanges, arcSteps, sceneAdvances, arcDirections };
     }
 
+    /** The Chat's BondChanges alone, oldest first: what the current Bonds are read from. */
+    bondChangesOf(chatId: number): Promise<BondChangeEntity[]> {
+        return this.bondChanges.find({ where: { chatId }, order: { id: 'ASC' } });
+    }
+
     /** The Chat's latest SceneAdvance, or null while it has never moved on from a Scene. */
     lastSceneAdvance(chatId: number): Promise<SceneAdvanceEntity | null> {
         return this.sceneAdvances.findOne({ where: { chatId }, order: { id: 'DESC' } });
@@ -204,6 +212,7 @@ export class LedgerModelService {
                         description: bond.description,
                         beforeLabel: bond.before?.label ?? null,
                         beforeDescription: bond.before?.description ?? null,
+                        ...levelColumns(bond.levels),
                         event: bond.event,
                         messageId,
                     }),
@@ -375,6 +384,16 @@ export class LedgerModelService {
             await manager.delete(ChatArcDirectionEntity, { chatId });
         });
     }
+}
+
+/** A Bond change's level columns: all four null while the Bond has no levels yet. */
+function levelColumns(levels: BondLevels | null): Pick<BondChangeEntity, 'trust' | 'affection' | 'desire' | 'tension'> {
+    return {
+        trust: levels?.trust ?? null,
+        affection: levels?.affection ?? null,
+        desire: levels?.desire ?? null,
+        tension: levels?.tension ?? null,
+    };
 }
 
 /**

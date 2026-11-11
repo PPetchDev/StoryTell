@@ -33,6 +33,7 @@ import {
     MessageResponse,
 } from '../../model/chat/entities/message.entity.js';
 import { ArcStepResponse } from '../../model/ledger/entities/arc-step.entity.js';
+import { BondLevels } from '../../model/ledger/bond-axes.js';
 import { BondChangeResponse } from '../../model/ledger/entities/bond-change.entity.js';
 import { SceneAdvanceResponse } from '../../model/ledger/entities/scene-advance.entity.js';
 import { LedgerModelService, LedgerState, RollbackCounts } from '../../model/ledger/ledger.service.js';
@@ -129,6 +130,18 @@ export interface ChatDetail extends ChatSummary {
     savedReplies: TraySavedReply[];
     /** The Chat's Replace rules in apply order, app-wide then the Story's, parked ones left out. */
     replaceRules: ChatReplaceRule[];
+    /** Every current Bond (.scratch/bond-axes/spec.md), in the order the ledger first saw each. */
+    bonds: ChatBond[];
+}
+
+/** A current Bond as the Chat screen reads it: its direction, label and levels. */
+export interface ChatBond {
+    fromCharacterId: number;
+    /** null means toward the user. */
+    toCharacterId: number | null;
+    label: string;
+    /** null while the Bond has no levels yet. */
+    levels: BondLevels | null;
 }
 
 /** What a Branch answers with: the new Chat, plus the User Message's text when it was branched from one. */
@@ -146,6 +159,8 @@ export interface DashboardBond {
     toward: { characterId: number | null; name: string };
     label: string;
     description: string;
+    /** Its current levels on the Bond axes; null while it has none yet. */
+    levels: BondLevels | null;
     /** Every change of this Bond, newest first; the seed, if any, comes last. */
     history: BondChangeResponse[];
 }
@@ -757,6 +772,7 @@ export class ChatManagerService {
                     toward: { characterId: bond.toCharacterId, name: nameOf(bond.toCharacterId) },
                     label: bond.label,
                     description: bond.description,
+                    levels: bond.levels(),
                     history: state.bondChanges
                         .filter(
                             (change) =>
@@ -1110,7 +1126,7 @@ export class ChatManagerService {
     }
 
     private async detail(story: StoryEntity, chat: ChatEntity): Promise<ChatDetail> {
-        const [settings, creditOut, source, readings, appSavedReplies, appReplaceRules] = await Promise.all([
+        const [settings, creditOut, source, readings, appSavedReplies, appReplaceRules, bondChanges] = await Promise.all([
             this.settingsModel.get(),
             this.creditOut(),
             // Read live, so a rename of the source shows.
@@ -1118,6 +1134,7 @@ export class ChatManagerService {
             this.chatModel.findThaiReadings(chat.messages.map((message) => message.id)),
             this.savedReplyModel.findByScope(null),
             this.replaceRuleModel.findByScope(null),
+            this.ledger.bondChangesOf(chat.id),
         ]);
         const scene = story.scenes.find((candidate) => candidate.id === chat.currentSceneId);
         const lastModel = lastAiModel(chat);
@@ -1153,6 +1170,12 @@ export class ChatManagerService {
             sittingOut: sittingOutOf(story, chat).map((character) => character.id),
             savedReplies: trayLines(story.savedReplies, appSavedReplies),
             replaceRules: chatReplaceRules(appReplaceRules, story.replaceRules),
+            bonds: currentBonds(bondChanges).map((bond) => ({
+                fromCharacterId: bond.fromCharacterId,
+                toCharacterId: bond.toCharacterId,
+                label: bond.label,
+                levels: bond.levels(),
+            })),
         };
     }
 
@@ -1187,7 +1210,7 @@ function promptLayers(story: StoryEntity, state: LedgerState): { bonds: PromptBo
             const fromName = nameOf(bond.fromCharacterId);
             const toName = bond.toCharacterId === null ? null : nameOf(bond.toCharacterId);
             if (!fromName || (bond.toCharacterId !== null && !toName)) return [];
-            return [{ fromName, toName, label: bond.label, description: bond.description }];
+            return [{ fromName, toName, label: bond.label, description: bond.description, levels: bond.levels() }];
         }),
         arcs: story.characters.map((character) => ({
             name: character.name,

@@ -1,5 +1,6 @@
 import { Pov, ReplyLength, Tense } from '../../../model/story/entities/story.entity.js';
 import type { TimeOfDay } from '../../../model/chat/entities/chat.entity.js';
+import { BondLevels, bondLevelsInWords } from '../../../model/ledger/bond-axes.js';
 import { PromptMessage } from '../../../service/model-gateway/model-gateway.js';
 import { MEMORY_CAP_TOKENS, memoryLine } from '../memory/memory-prompt.js';
 import { memoryIsAbout } from '../memory/present.js';
@@ -73,6 +74,8 @@ export interface PromptBond {
     toName: string | null;
     label: string;
     description: string;
+    /** Its levels on the Bond axes, stated in words; null or left out while it has none, and then the line is as before. */
+    levels?: BondLevels | null;
 }
 
 /** A Character's Arc so far and the author's Arc direction, as the Arcs layer states them. */
@@ -268,7 +271,9 @@ function feelingsLayer(bonds: PromptBond[], identity: string): string {
             ? ['No feelings have formed yet — everyone is a stranger unless the story says otherwise.']
             : bonds.map(
                   (bond) =>
-                      `- ${bond.fromName} → ${bond.toName ?? `the user (${identity})`}: "${bond.label}" — ${bond.description}`,
+                      `- ${bond.fromName} → ${bond.toName ?? `the user (${identity})`}: "${bond.label}" — ${bond.description}${
+                          bond.levels ? ` (${bondLevelsInWords(bond.levels)})` : ''
+                      }`,
               );
     return `${PROMPT_LAYERS.feelings} (hidden from the user; show them only through behaviour)
 ${lines.join('\n')}

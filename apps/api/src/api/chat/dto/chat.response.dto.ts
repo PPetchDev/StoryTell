@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 import {
+    ChatBond,
     ChatDashboard,
     ChatDetail,
     ChatListItem,
@@ -14,6 +15,7 @@ import { EMOTIONS } from '../../../model/story/emotion.js';
 import type { Emotion } from '../../../model/story/emotion.js';
 import { BackgroundCallResponse, BackgroundStatus, ReplyVersionsResponse } from '../../../model/chat/entities/message.entity.js';
 import { ArcStepResponse } from '../../../model/ledger/entities/arc-step.entity.js';
+import { BondLevels } from '../../../model/ledger/bond-axes.js';
 import { BondChangeResponse } from '../../../model/ledger/entities/bond-change.entity.js';
 import { SceneAdvanceResponse } from '../../../model/ledger/entities/scene-advance.entity.js';
 import { RollbackCounts } from '../../../model/ledger/ledger.service.js';
@@ -193,6 +195,35 @@ export class DriftDTO {
     playModelLabel: string;
 }
 
+/** A Bond's level on each Bond axis (.scratch/bond-axes/spec.md); the user only ever sees them in words. */
+export class BondLevelsDTO implements BondLevels {
+    @ApiProperty({ minimum: -3, maximum: 3, description: 'betrayed (−3) … trusts completely (+3).' })
+    trust: number;
+
+    @ApiProperty({ minimum: -3, maximum: 3, description: 'hates (−3) … devoted (+3).' })
+    affection: number;
+
+    @ApiProperty({ minimum: -3, maximum: 3, description: 'repelled (−3) … aches for (+3).' })
+    desire: number;
+
+    @ApiProperty({ minimum: 0, maximum: 3, description: 'at ease (0) … at breaking point (3).' })
+    tension: number;
+}
+
+export class ChatBondDTO implements ChatBond {
+    @ApiProperty()
+    fromCharacterId: number;
+
+    @ApiProperty({ type: Number, nullable: true, description: 'null means toward the user.' })
+    toCharacterId: number | null;
+
+    @ApiProperty({ description: 'The current label.' })
+    label: string;
+
+    @ApiProperty({ type: BondLevelsDTO, nullable: true, description: 'null while the Bond has no levels yet.' })
+    levels: BondLevelsDTO | null;
+}
+
 /** The whole Chat as the Chat screen reads it. Every write answers with this. */
 export class ChatResponseBodyDTO extends ChatSummaryDTO implements Omit<ChatDetail, 'messages'> {
     @ApiProperty({ type: CurrentSceneDTO, nullable: true, description: 'null means free play.' })
@@ -255,6 +286,9 @@ export class ChatResponseBodyDTO extends ChatSummaryDTO implements Omit<ChatDeta
 
     @ApiProperty({ type: [ChatReplaceRuleDTO], description: "The Chat's Replace rules in apply order, app-wide then the Story's; parked rules (both targets off) left out." })
     replaceRules: ChatReplaceRuleDTO[];
+
+    @ApiProperty({ type: [ChatBondDTO], description: 'Every current Bond in the Chat, with its levels or null.' })
+    bonds: ChatBondDTO[];
 }
 
 /** A Branch answers with the new Chat, plus the User Message's text when it was branched from one. */
@@ -337,6 +371,9 @@ export class DashboardBondDTO implements DashboardBond {
 
     @ApiProperty({ description: 'The current description.' })
     description: string;
+
+    @ApiProperty({ type: BondLevelsDTO, nullable: true, description: 'The current levels; null while the Bond has none yet.' })
+    levels: BondLevelsDTO | null;
 
     @ApiProperty({ type: [BondChangeDTO], description: 'Every change of this Bond, newest first; the seed, if any, last.' })
     history: BondChangeDTO[];

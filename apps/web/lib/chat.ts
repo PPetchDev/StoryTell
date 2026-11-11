@@ -1,4 +1,5 @@
 import { apiFetch, apiSend, apiSendStream } from './api';
+import type { BondLevels } from './bonds';
 import type { Emotion } from './expressions';
 import { MissingField } from './story';
 import type { TraySavedReply } from './saved-replies';
@@ -116,6 +117,18 @@ export interface Chat extends ChatSummary {
     savedReplies: TraySavedReply[];
     /** The Chat's Replace rules in apply order, app-wide then the Story's; parked ones left out. */
     replaceRules: ChatReplaceRule[];
+    /** Every current Bond in the Chat. */
+    bonds: ChatBond[];
+}
+
+/** A current Bond as the Chat reads it: its direction, label and levels. */
+export interface ChatBond {
+    fromCharacterId: number;
+    /** null means toward the user. */
+    toCharacterId: number | null;
+    label: string;
+    /** null while the Bond has no levels yet ("Not measured yet"). */
+    levels: BondLevels | null;
 }
 
 export interface RollbackCounts {
@@ -153,6 +166,8 @@ export interface DashboardBond {
     toward: { characterId: number | null; name: string };
     label: string;
     description: string;
+    /** Its current levels; null while it has none yet. */
+    levels: BondLevels | null;
     /** Newest first. */
     history: BondChange[];
 }

@@ -1,6 +1,6 @@
 # 01 — The Judge sets Bond levels, and the Narrator reads them in words
 
-**Status:** ready-for-agent
+**Status:** done
 
 **What to build:** Every Bond gains a level on the four Bond axes, recorded on the ledger's Bond changes. The Judge sets them a step at a time, and every prompt that reads Bonds shows them in words. A Bond with no levels yet gets its first measure the next time the Judge touches it. Follow the spec's "The axes and their words", "Storage" (the `bond_change` columns), "The Judge" and "Prompts that read Bonds":
 
@@ -16,6 +16,6 @@
 
 **Part of:** [Spec: Bond axes](../spec.md)
 
-- [ ] Pure tests: prompt words and "levels not set yet"; parse; each clamp rule; first measure; same label with new levels is kept; nothing different is dropped.
-- [ ] API tests: a scripted Judge change writes levels and the dashboard shows them; a Branch at an earlier Message carries the levels as they were then; a Story whose Bonds have no levels sends the Narrator exactly today's feelings text.
-- [ ] Typecheck and the whole suites stay green.
+- [x] Pure tests: prompt words and "levels not set yet"; parse; each clamp rule; first measure; same label with new levels is kept; nothing different is dropped.
+- [x] API tests: a scripted Judge change writes levels and the dashboard shows them; a Branch at an earlier Message carries the levels as they were then; a Story whose Bonds have no levels sends the Narrator exactly today's feelings text.
+- [x] Typecheck and the whole suites stay green.

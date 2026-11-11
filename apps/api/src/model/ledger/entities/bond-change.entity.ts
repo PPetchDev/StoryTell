@@ -12,6 +12,7 @@ import type { Relation } from 'typeorm';
 import type { ChatEntity } from '../../chat/entities/chat.entity.js';
 import type { MessageEntity } from '../../chat/entities/message.entity.js';
 import type { CharacterEntity } from '../../story/entities/character.entity.js';
+import type { BondLevels } from '../bond-axes.js';
 
 export interface BondChangeResponse {
     id: number;
@@ -73,6 +74,20 @@ export class BondChangeEntity {
     @Column({ name: 'before_description', type: 'text', nullable: true })
     beforeDescription: string | null;
 
+    // The Bond's levels on the Bond axes after this change (.scratch/bond-axes/spec.md, "Storage"):
+    // all four null while the Bond has no levels yet.
+    @Column({ type: 'smallint', nullable: true })
+    trust: number | null;
+
+    @Column({ type: 'smallint', nullable: true })
+    affection: number | null;
+
+    @Column({ type: 'smallint', nullable: true })
+    desire: number | null;
+
+    @Column({ type: 'smallint', nullable: true })
+    tension: number | null;
+
     @Column({ type: 'text', nullable: true })
     event: string | null;
 
@@ -86,6 +101,14 @@ export class BondChangeEntity {
 
     @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
     createdAt: Date;
+
+    /** The Bond's levels after this change; null while it has none yet (any column null reads as none). */
+    levels(): BondLevels | null {
+        const { trust, affection, desire, tension } = this;
+        return trust === null || affection === null || desire === null || tension === null
+            ? null
+            : { trust, affection, desire, tension };
+    }
 
     toResponse(): BondChangeResponse {
         return {

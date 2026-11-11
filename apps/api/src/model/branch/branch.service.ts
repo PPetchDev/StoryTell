@@ -201,9 +201,9 @@ const copyLedger: CopyStep = async ({ manager, sourceChatId, chatId, messageIds 
     const remap = `unnest($3::int[], $4::int[]) AS msg("old_id", "new_id") ON msg."old_id" = s."message_id"`;
     await manager.query(
         `INSERT INTO "bond_change" ("chat_id", "from_character_id", "to_character_id", "label", "description",
-                "before_label", "before_description", "event", "message_id", "created_at")
+                "before_label", "before_description", "trust", "affection", "desire", "tension", "event", "message_id", "created_at")
          SELECT $1, s."from_character_id", s."to_character_id", s."label", s."description",
-                s."before_label", s."before_description", s."event", msg."new_id", s."created_at"
+                s."before_label", s."before_description", s."trust", s."affection", s."desire", s."tension", s."event", msg."new_id", s."created_at"
          FROM "bond_change" s LEFT JOIN ${remap} WHERE s."chat_id" = $2 ORDER BY s."id"`,
         params,
     );

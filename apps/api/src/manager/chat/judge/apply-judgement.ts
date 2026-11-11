@@ -1,13 +1,14 @@
 import { TimeOfDay } from '../../../model/chat/entities/chat.entity.js';
+import { BOND_AXES, BOND_AXIS_NAMES, BondLevels, clampToRange, sameBondLevels } from '../../../model/ledger/bond-axes.js';
 import { MessageChanges, NewBondChange, PartEmotion } from '../../../model/ledger/ledger.service.js';
 import { Judgement, JudgedExpression } from './judge-prompt.js';
 
 /**
  * The backend rules for applying a judgement (spec: "Backend rules when applying a
- * judgement"): drop unknown names and self-Bonds, drop a Bond "change" to the same label,
- * keep one change per Bond per turn, advance at most one Scene, drop a Time of day equal to
- * the current one. A Character sitting out gets no Bond change from them and no Arc step. Pure
- * logic.
+ * judgement"): drop unknown names and self-Bonds, drop a Bond "change" that changes neither the
+ * label nor any level (.scratch/bond-axes/spec.md), hold levels to the step limits, keep one
+ * change per Bond per turn, advance at most one Scene, drop a Time of day equal to the current
+ * one. A Character sitting out gets no Bond change from them and no Arc step. Pure logic.
  */
 
 export interface ApplyCastMember {
@@ -20,6 +21,8 @@ export interface ApplyBond {
     toCharacterId: number | null;
     label: string;
     description: string;
+    /** null while the Bond has no levels yet. */
+    levels: BondLevels | null;
 }
 
 export interface ApplyScene {
@@ -85,16 +88,21 @@ export function applyJudgement(input: ApplyInput, judgement: Judgement): Applied
             continue;
         }
         const before = current.get(key);
-        if (before && same(before.label, change.label)) {
-            rejected.push(`Bond ${key}: same label "${change.label}" — not a change`);
+        const step = stepLevels(before?.levels ?? null, change.levels);
+        for (const clamp of step.clamped) rejected.push(`Bond ${key}: ${clamp}`);
+        const sameLabel = before !== undefined && same(before.label, change.label);
+        if (sameLabel && sameBondLevels(before.levels, step.levels)) {
+            rejected.push(`Bond ${key}: same label "${change.label}" and levels — not a change`);
             continue;
         }
         changed.add(key);
         bonds.push({
             fromCharacterId: from.id,
             toCharacterId: toId,
-            label: change.label,
-            description: change.description,
+            // A same-label change only moved levels: it keeps the label as it was written, and its description unless given a new one.
+            label: sameLabel ? before.label : change.label,
+            description: sameLabel && !change.description ? before.description : change.description,
+            levels: step.levels,
             before: before ? { label: before.label, description: before.description } : null,
             event: change.cause,
         });
@@ -141,6 +149,38 @@ export function applyJudgement(input: ApplyInput, judgement: Judgement): Applied
     }
 
     return { bonds, arcs, scene, time, rejected };
+}
+
+/**
+ * A Bond's levels after a change (.scratch/bond-axes/spec.md, "Step limits"). Measured levels move
+ * at most one step per axis, Tension up to two steps up but one down, and stay in range; an axis the
+ * change leaves out, or a change with no `levels`, keeps its level. A Bond with no levels yet takes
+ * the judge's as they are (its first measure), the middle for an axis left out; with none given it
+ * stays unmeasured. Each clamp is described for the log.
+ */
+export function stepLevels(
+    current: BondLevels | null,
+    judged: Partial<BondLevels> | null,
+): { levels: BondLevels | null; clamped: string[] } {
+    const clamped: string[] = [];
+    if (current === null) {
+        if (judged === null || BOND_AXES.every((axis) => judged[axis] === undefined)) return { levels: null, clamped };
+        const first = Object.fromEntries(
+            BOND_AXES.map((axis) => [axis, clampToRange(axis, judged[axis] ?? 0)]),
+        ) as BondLevels;
+        return { levels: first, clamped };
+    }
+    if (judged === null) return { levels: current, clamped };
+    const levels = { ...current };
+    for (const axis of BOND_AXES) {
+        const wanted = judged[axis];
+        if (wanted === undefined) continue;
+        const up = axis === 'tension' ? 2 : 1;
+        const moved = clampToRange(axis, Math.min(current[axis] + up, Math.max(current[axis] - 1, wanted)));
+        if (moved !== wanted) clamped.push(`${BOND_AXIS_NAMES[axis]} ${current[axis]} → ${wanted} clamped to ${moved}`);
+        levels[axis] = moved;
+    }
+    return { levels, clamped };
 }
 
 /**

@@ -53,6 +53,7 @@ interface Dashboard {
             toward: { characterId: number | null; name: string };
             label: string;
             description: string;
+            levels: { trust: number; affection: number; desire: number; tension: number } | null;
             history: BondChange[];
         }>;
         arcSteps: Array<{ id: number; characterId: number; step: string; event: string; messageId: number }>;
@@ -235,6 +236,7 @@ describe('The Bond, Arc and Scene judge, the ledger and the dashboard', () => {
                     toward: { characterId: null, name: 'Ash' },
                     label: 'Wary',
                     description: 'She expects the new keeper to leave by spring.',
+                    levels: null,
                     history: [
                         {
                             id: expect.any(Number),
@@ -303,7 +305,7 @@ describe('The Bond, Arc and Scene judge, the ledger and the dashboard', () => {
 The user plays Ash (refer to them as "user").
 
 # Current Bonds
-- Mira → user: "Wary" — She expects the new keeper to leave by spring.
+- Mira → user: "Wary" — She expects the new keeper to leave by spring. (levels not set yet)
 
 # Arc steps so far
 - Mira: no steps yet

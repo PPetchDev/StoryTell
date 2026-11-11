@@ -326,7 +326,7 @@ describe('The ledger records the tags in the judgement\'s one transaction', () =
         const ledger = t.app.get(LedgerModelService);
         const scenes = (await t.http.get(`/api/stories/${storyId}`).expect(200)).body.scenes as Array<{ id: number; name: string }>;
         const changes = {
-            bonds: [{ fromCharacterId: mira, toCharacterId: null, label: 'Curious', description: 'Curious.', before: null, event: 'Ash stayed.' }],
+            bonds: [{ fromCharacterId: mira, toCharacterId: null, label: 'Curious', description: 'Curious.', levels: null, before: null, event: 'Ash stayed.' }],
             arcs: [{ characterId: mira, step: 'Softens.', event: 'Ash stayed.' }],
             scene: { fromSceneId: scenes[0].id, fromSceneName: 'Arrival', toSceneId: scenes[1].id, toSceneName: 'The lamp', event: 'Up the stairs.' },
             time: { fromTime: null, toTime: 'night' as const },
