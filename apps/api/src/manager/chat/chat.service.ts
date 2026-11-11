@@ -29,6 +29,7 @@ import {
     BackgroundCallResponse,
     BackgroundStatus,
     MessageEntity,
+    MemoriesUsed,
     MessageKind,
     MessageResponse,
 } from '../../model/chat/entities/message.entity.js';
@@ -37,7 +38,8 @@ import { BondLevels } from '../../model/ledger/bond-axes.js';
 import { BondChangeResponse } from '../../model/ledger/entities/bond-change.entity.js';
 import { SceneAdvanceResponse } from '../../model/ledger/entities/scene-advance.entity.js';
 import { LedgerModelService, LedgerState, RollbackCounts } from '../../model/ledger/ledger.service.js';
-import { MemoryEntity } from '../../model/memory/entities/memory.entity.js';
+import { BeliefModelService } from '../../model/memory/belief.service.js';
+import { BeliefResponse } from '../../model/memory/entities/belief.entity.js';
 import { MemoryModelService } from '../../model/memory/memory.service.js';
 import { PersonaModelService } from '../../model/persona/persona.service.js';
 import { SnapshotModelService } from '../../model/snapshot/snapshot.service.js';
@@ -61,6 +63,9 @@ import { WornIdentity, wornIdentity } from './identity.js';
 import { currentBonds, JudgeManagerService, latestJudged, SettledBackground } from './judge/judge.service.js';
 import { latestExtracted, MemoryExtractionManagerService } from './memory/extraction.service.js';
 import { charactersInExchange } from './memory/present.js';
+import { choiceMemories, chooseForChat, memoriesInPlayOf, memoryRoomTokens, presentForMemory } from './memory/chat-memory-choice.js';
+import { ChoiceBelief, ContextQueryVector, MemoryChoice, memorySearchLogLine } from './memory/memory-choice.js';
+import { beliefResponses, choiceBeliefs } from './memory/beliefs.js';
 import { promptStorySoFar, StorySoFarManagerService } from './story-so-far/story-so-far.service.js';
 import { SuggestedRepliesManagerService } from './suggestions/suggested-replies.service.js';
 import { WriteForMeManagerService } from './write-for-me/write-for-me.service.js';
@@ -71,11 +76,21 @@ import { TraySavedReply, trayLines } from '../saved-reply/tray.js';
 import { ChatReplaceRule, chatReplaceRules } from '../replace-rule/chat-rules.js';
 import { ReplaceRuleModelService } from '../../model/replace-rule/replace-rule.service.js';
 import { SavedReplyModelService } from '../../model/saved-reply/saved-reply.service.js';
-import { buildTurnPrompt, PromptArc, PromptBond, PromptHistoryMessage, PromptLayersInput, PromptMemory, PromptScene } from './turn/prompt.js';
+import {
+    buildTurnPrompt,
+    PromptArc,
+    PromptBelief,
+    PromptBond,
+    PromptHistoryMessage,
+    PromptLayersInput,
+    PromptMemory,
+    PromptScene,
+} from './turn/prompt.js';
 import { bondGateInWords } from './judge/bond-gates.js';
 import { chosenLore, LoreInPlay, loreInPlayOf, promptLore, selectLoreAt } from './lore/lore-select.js';
 import { documentQuery } from '../document/document-search.js';
 import { DocumentSearchManagerService, DocumentsInPlay, hasDocumentPassages } from './document-search.service.js';
+import { TurnMemoryRecord } from '../../model/chat/chat.service.js';
 import { CastName, ParseOptions, parseReply, partsToText, releasedText, ReplyPart } from './turn/reply-parser.js';
 import { TurnStoppedError, TurnStream } from './turn/turn-stream.js';
 
@@ -134,6 +149,13 @@ export interface ChatDetail extends ChatSummary {
     replaceRules: ChatReplaceRule[];
     /** Every current Bond (.scratch/bond-axes/spec.md), in the order the ledger first saw each. */
     bonds: ChatBond[];
+    /**
+     * The Memories and Beliefs the last turn sent (.scratch/memory-by-meaning/spec.md: "Used last
+     * turn"), for "In play" in the Memory drawer; both empty before any turn chose.
+     */
+    memoriesInPlay: MemoriesUsed;
+    /** Every Belief of the Chat, given-up ones included, oldest first (.scratch/memory-by-meaning/spec.md: "GET comes with the Chat"). */
+    beliefs: BeliefResponse[];
 }
 
 /** A current Bond as the Chat screen reads it: its direction, label and levels. */
@@ -247,6 +269,11 @@ export class ChatManagerService {
     private readonly inFlight = new Set<number>();
     /** Each Chat's latest background chain: the judge and the extraction, then the Story so far check. */
     private readonly background = new Map<number, Promise<void>>();
+    /**
+     * A turn's background calls, waiting for the turn's answer to be read: started as the turn lock
+     * is let go, so the answer always shows them pending, however fast they run.
+     */
+    private readonly startAfterTurn = new Map<number, () => void>();
 
     constructor(
         private readonly chatModel: ChatModelService,
@@ -256,6 +283,7 @@ export class ChatManagerService {
         private readonly settingsModel: SettingsModelService,
         private readonly ledger: LedgerModelService,
         private readonly memoryModel: MemoryModelService,
+        private readonly beliefModel: BeliefModelService,
         private readonly personaModel: PersonaModelService,
         private readonly savedReplyModel: SavedReplyModelService,
         private readonly replaceRuleModel: ReplaceRuleModelService,
@@ -575,7 +603,7 @@ export class ChatManagerService {
         await this.chatModel.addAiMessage(chatId, 0, AUTHOR_MODEL, opening.parts, null);
     }
 
-    /** Spec: StartingBonds seed the Chat's first BondChanges, Arc directions are copied in. */
+    /** Spec: StartingBonds seed the Chat's first BondChanges, Arc directions are copied in, Starting Beliefs seed its Beliefs. */
     private seedLedger(story: StoryEntity, chatId: number): Promise<void> {
         return this.ledger.seed(
             chatId,
@@ -589,6 +617,8 @@ export class ChatManagerService {
             story.characters
                 .filter((character) => character.arcDirections.trim() !== '')
                 .map((character) => ({ characterId: character.id, text: character.arcDirections })),
+            // Starting Beliefs seed the Chat's first Beliefs (.scratch/memory-by-meaning/spec.md).
+            (story.startingBeliefs ?? []).map((belief) => ({ characterId: belief.characterId, text: belief.text })),
         );
     }
 
@@ -950,15 +980,38 @@ export class ChatManagerService {
         const scene = story.scenes.find((candidate) => candidate.id === chat.currentSceneId) ?? null;
         const identity: WornIdentity = wornIdentity(story, chat);
         const sittingOut = sittingOutOf(story, chat);
+        const [state, memories, held] = await Promise.all([
+            this.ledger.state(chat.id),
+            this.memoryModel.findByChat(chat.id),
+            this.beliefModel.findByChat(chat.id),
+        ]);
+        const beliefs = choiceBeliefs(story, held);
         // Before the prompt is built (.scratch/documents/spec.md): out of text credit fails the turn here, with nothing stored.
-        const documents = await this.documentSearch.forTurn(story, chat.id, documentQuery(history, userText));
-        const [state, memories] = await Promise.all([this.ledger.state(chat.id), this.memoryModel.findByChat(chat.id)]);
+        // One search for Documents and Memory (.scratch/memory-by-meaning/spec.md: "The query").
+        const search = await this.documentSearch.embedQuery(
+            story,
+            chat.id,
+            documentQuery(history, userText),
+            memories.some((memory) => memory.embedding !== null),
+        );
+        const documents = await this.documentSearch.forTurn(story, chat.id, search);
+        const query: ContextQueryVector | null = search.status === 'found' ? { vector: search.vector, model: search.model } : null;
+        const choice = chooseForChat({
+            story,
+            memories,
+            beliefs,
+            present: presentForMemory(story, chat, userText !== null ? chat.messages.length - 1 : chat.messages.length, userText),
+            identityName: identity.name,
+            query,
+        });
+        if (query) this.logger.debug(memorySearchLogLine(story.id, chat.id, choice));
+        const memoryRecord: TurnMemoryRecord = { used: memoriesUsedOf(choice), query };
         const prompt = buildTurnPrompt({
             story,
             identity,
             scene: promptScene(story, scene, identity.name),
             ...promptLayers(story, state),
-            memories: promptMemories(story, memories),
+            ...promptMemoryLayer(choice, choiceMemories(story, memories), beliefs),
             storySoFar: promptStorySoFar(chat),
             timeOfDay: chat.timeOfDay,
             lore: promptLore(story),
@@ -1009,11 +1062,11 @@ export class ChatManagerService {
         let aiMessageId: number;
         if (replacing) {
             // Regenerate: the new reply is the Message's last Reply version.
-            await this.chatModel.replaceReply(replacing, result.model, parts, MAX_REPLY_VERSIONS, documents.record);
+            await this.chatModel.replaceReply(replacing, result.model, parts, MAX_REPLY_VERSIONS, documents.record, memoryRecord);
             aiMessageId = replacing.id;
         } else {
             aiMessageId = (
-                await this.chatModel.addAiMessage(chat.id, chat.messages.length, result.model, parts, BackgroundStatus.Pending, documents.record)
+                await this.chatModel.addAiMessage(chat.id, chat.messages.length, result.model, parts, BackgroundStatus.Pending, documents.record, memoryRecord)
             ).id;
             // A Message after the one with versions settles it on its shown version.
             await this.chatModel.dropReplyVersions(chat.id);
@@ -1021,7 +1074,8 @@ export class ChatManagerService {
         // Last, and only once stored: the client's final parts are the stored Message.
         stream?.onParts(parts);
         await this.chatModel.touchPlayed(chat.id);
-        this.startBackground(story, chat.id, aiMessageId);
+        // Started once the turn's answer has been read (see `writingTurn`).
+        this.startAfterTurn.set(chat.id, () => this.startBackground(story, chat.id, aiMessageId));
     }
 
     /**
@@ -1066,14 +1120,30 @@ export class ChatManagerService {
      */
     private async promptLayersFor(story: StoryEntity, chat: ChatEntity): Promise<PromptLayersInput> {
         const scene = story.scenes.find((candidate) => candidate.id === chat.currentSceneId) ?? null;
-        const [state, memories] = await Promise.all([this.ledger.state(chat.id), this.memoryModel.findByChat(chat.id)]);
+        const newest = newestAiMessage(chat);
+        const [state, memories, held, query] = await Promise.all([
+            this.ledger.state(chat.id),
+            this.memoryModel.findByChat(chat.id),
+            this.beliefModel.findByChat(chat.id),
+            // The last turn's query: the same choice, with no search call of its own (.scratch/memory-by-meaning/spec.md).
+            newest ? this.chatModel.contextQueryOf(newest.id) : null,
+        ]);
+        const beliefs = choiceBeliefs(story, held);
         const identity = wornIdentity(story, chat);
+        const choice = chooseForChat({
+            story,
+            memories,
+            beliefs,
+            present: presentForMemory(story, chat, chat.messages.length),
+            identityName: identity.name,
+            query,
+        });
         return {
             story,
             identity,
             scene: promptScene(story, scene, identity.name),
             ...promptLayers(story, state),
-            memories: promptMemories(story, memories),
+            ...promptMemoryLayer(choice, choiceMemories(story, memories), beliefs),
             storySoFar: promptStorySoFar(chat),
             timeOfDay: chat.timeOfDay,
             lore: promptLore(story),
@@ -1091,6 +1161,10 @@ export class ChatManagerService {
         try {
             return await work();
         } finally {
+            // A turn written in `work` starts its background calls now, after its answer was read, still under the lock.
+            const start = this.startAfterTurn.get(chatId);
+            this.startAfterTurn.delete(chatId);
+            start?.();
             this.inFlight.delete(chatId);
         }
     }
@@ -1155,7 +1229,7 @@ export class ChatManagerService {
     }
 
     private async detail(story: StoryEntity, chat: ChatEntity): Promise<ChatDetail> {
-        const [settings, creditOut, source, readings, appSavedReplies, appReplaceRules, bondChanges] = await Promise.all([
+        const [settings, creditOut, source, readings, appSavedReplies, appReplaceRules, bondChanges, beliefs] = await Promise.all([
             this.settingsModel.get(),
             this.creditOut(),
             // Read live, so a rename of the source shows.
@@ -1164,6 +1238,7 @@ export class ChatManagerService {
             this.savedReplyModel.findByScope(null),
             this.replaceRuleModel.findByScope(null),
             this.ledger.bondChangesOf(chat.id),
+            this.beliefModel.findByChat(chat.id),
         ]);
         const scene = story.scenes.find((candidate) => candidate.id === chat.currentSceneId);
         const lastModel = lastAiModel(chat);
@@ -1205,6 +1280,8 @@ export class ChatManagerService {
                 label: bond.label,
                 levels: bond.levels(),
             })),
+            memoriesInPlay: memoriesInPlayOf(chat),
+            beliefs: beliefResponses(beliefs, chat),
         };
     }
 
@@ -1262,16 +1339,25 @@ function promptLayers(story: StoryEntity, state: LedgerState): { bonds: PromptBo
     };
 }
 
-/** The Memory layer: every non-archived Memory in the stable order, with its Known by as names. */
-function promptMemories(story: StoryEntity, memories: MemoryEntity[]): PromptMemory[] {
-    const order = story.characters.map((character) => character.id);
-    const nameOf = (characterId: number): string[] => {
-        const character = story.characters.find((candidate) => candidate.id === characterId);
-        return character ? [character.name] : [];
+/**
+ * The Memory layer from the Memory choice (.scratch/memory-by-meaning/spec.md): the chosen Memories
+ * in story order, with their Known by as names, and the room the next turn may need for Memory.
+ */
+function promptMemoryLayer(
+    choice: MemoryChoice,
+    all: ReturnType<typeof choiceMemories>,
+    beliefs: ChoiceBelief[],
+): { memories: PromptMemory[]; beliefs: PromptBelief[]; memoryRoomTokens: number } {
+    return {
+        memories: choice.memories.map(({ memory }) => ({ text: memory.text, knownBy: memory.knownBy, locked: memory.locked })),
+        beliefs: choice.beliefs.map(({ belief }) => ({ characterName: belief.characterName, text: belief.text })),
+        memoryRoomTokens: memoryRoomTokens(all, beliefs),
     };
-    return memories
-        .filter((memory) => !memory.archived)
-        .map((memory) => ({ text: memory.text, knownBy: memory.knownByIds(order).flatMap(nameOf), locked: memory.locked }));
+}
+
+/** What a turn's choice sent, by id, as its AI Message records it. */
+function memoriesUsedOf(choice: MemoryChoice): MemoriesUsed {
+    return { memoryIds: choice.memories.map(({ memory }) => memory.id), beliefIds: choice.beliefs.map(({ belief }) => belief.id) };
 }
 
 /**

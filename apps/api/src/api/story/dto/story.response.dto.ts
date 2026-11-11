@@ -14,6 +14,7 @@ import { ReplaceRuleDTO } from '../../replace-rule/dto/replace-rule.response.dto
 import { LORE_SECONDARY_MODES, LoreEntryResponse } from '../../../model/story/entities/lore-entry.entity.js';
 import type { LoreSecondaryMode } from '../../../model/story/entities/lore-entry.entity.js';
 import { SceneResponse } from '../../../model/story/entities/scene.entity.js';
+import { StartingBeliefResponse } from '../../../model/story/entities/starting-belief.entity.js';
 import { StartingBondResponse } from '../../../model/story/entities/starting-bond.entity.js';
 import { SceneBondGateResponse } from '../../../model/story/entities/scene-bond-gate.entity.js';
 import { BOND_AXES } from '../../../model/ledger/bond-axes.js';
@@ -227,6 +228,17 @@ export class CharacterDTO implements CharacterResponse {
     expressions: ExpressionDTO[];
 }
 
+export class StartingBeliefDTO implements StartingBeliefResponse {
+    @ApiProperty()
+    id: number;
+
+    @ApiProperty({ description: 'The Character who believes it when a Chat starts.' })
+    characterId: number;
+
+    @ApiProperty({ description: 'What they believe, with `{user}` where it names the user.' })
+    text: string;
+}
+
 export class StartingBondDTO implements StartingBondResponse {
     @ApiProperty()
     id: number;
@@ -388,6 +400,9 @@ export class StoryResponseBodyDTO implements StoryDetail {
 
     @ApiProperty({ type: [StartingBondDTO] })
     startingBonds: StartingBondDTO[];
+
+    @ApiProperty({ type: [StartingBeliefDTO], description: 'What Characters believe when a Chat starts, in order. New and reset Chats seed one Belief from each.' })
+    startingBeliefs: StartingBeliefDTO[];
 
     @ApiProperty({ type: [SceneDTO], description: 'In play order.' })
     scenes: SceneDTO[];

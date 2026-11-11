@@ -116,8 +116,8 @@ describe('Documents in turns', () => {
         expect(trailing).not.toContain(BREAD);
         expect(t.gateway.textCalls('turn')[0].messages[0].content).not.toContain(LIGHTHOUSE);
         // One search, for this Story and Chat, made before the turn.
-        expect(t.gateway.embeddingCalls('document_search')).toEqual([
-            { kind: 'document_search', inputs: [expect.stringContaining(QUESTION)], servedFor: { storyId, chatId } },
+        expect(t.gateway.embeddingCalls('context_search')).toEqual([
+            { kind: 'context_search', inputs: [expect.stringContaining(QUESTION)], servedFor: { storyId, chatId } },
         ]);
         const order = t.gateway.calls.map((call) => (call.method === 'embedTexts' ? 'search' : call.method === 'completeText' || call.method === 'streamText' ? call.request.kind : null));
         expect(order.indexOf('search')).toBeLessThan(order.indexOf('turn'));
@@ -129,7 +129,7 @@ describe('Documents in turns', () => {
         await addDocument(storyId, 'Gull Point light', LIGHTHOUSE);
         const chatId = await newChat(storyId);
         t.gateway.reset();
-        const searches = () => t.gateway.embeddingCalls('document_search');
+        const searches = () => t.gateway.embeddingCalls('context_search');
 
         // A send whose turn fails, then Retry.
         t.gateway.scriptText('turn', new ProviderOutageError('Down.'));
@@ -174,7 +174,7 @@ describe('Documents in turns', () => {
         const plainPrompt = t.gateway.textCalls('turn')[0].messages;
 
         const documentsMessages = await send(withDocuments, documentsChat, QUESTION);
-        expect(t.gateway.embeddingCalls('document_search')).toHaveLength(1);
+        expect(t.gateway.embeddingCalls('context_search')).toHaveLength(1);
         expect(t.gateway.textCalls('turn')[1].messages).toEqual(plainPrompt);
         expect(await recordOf(documentsMessages.at(-1)!.id)).toEqual({ status: 'found', passageIds: [] });
     });
@@ -204,7 +204,7 @@ describe('Documents in turns', () => {
         await addDocument(storyId, 'Gull Point light', LIGHTHOUSE);
         const chatId = await newChat(storyId);
         const warn = vi.spyOn(Logger.prototype, 'warn');
-        t.gateway.scriptEmbedding('document_search', error);
+        t.gateway.scriptEmbedding('context_search', error);
 
         const messages = await send(storyId, chatId, QUESTION);
 
@@ -219,7 +219,7 @@ describe('Documents in turns', () => {
         await addDocument(storyId, 'Gull Point light', LIGHTHOUSE);
         const chatId = await newChat(storyId);
         t.gateway.reset();
-        t.gateway.scriptEmbedding('document_search', new OutOfCreditError('text'));
+        t.gateway.scriptEmbedding('context_search', new OutOfCreditError('text'));
 
         const { body } = await t.http.post(`/api/stories/${storyId}/chats/${chatId}/messages`).send({ text: QUESTION }).expect(402);
 
@@ -312,7 +312,7 @@ describe('Documents in turns', () => {
             const storyId = await playableStory();
             await addDocument(storyId, 'Gull Point light', LIGHTHOUSE);
             const chatId = await newChat(storyId);
-            t.gateway.scriptEmbedding('document_search', new ProviderOutageError('Down.'));
+            t.gateway.scriptEmbedding('context_search', new ProviderOutageError('Down.'));
             await send(storyId, chatId, QUESTION);
 
             expect(await inPlay(storyId, chatId)).toEqual({ hasDocuments: true, status: 'failed', passages: [] });
@@ -382,7 +382,7 @@ ${LIGHTHOUSE}`);
             const instruction = await suggest(storyId, chatId);
 
             expect(instruction).not.toContain(DOCUMENTS_HEADING);
-            expect(t.gateway.embeddingCalls('document_search')).toHaveLength(1);
+            expect(t.gateway.embeddingCalls('context_search')).toHaveLength(1);
         });
 
         it('have no block after a failed search, or before any turn searched', async () => {
@@ -392,7 +392,7 @@ ${LIGHTHOUSE}`);
             // The Opening has no record.
             expect(await suggest(storyId, chatId)).not.toContain(DOCUMENTS_HEADING);
 
-            t.gateway.scriptEmbedding('document_search', new ProviderOutageError('Down.'));
+            t.gateway.scriptEmbedding('context_search', new ProviderOutageError('Down.'));
             await send(storyId, chatId, QUESTION);
             expect(await suggest(storyId, chatId)).not.toContain(DOCUMENTS_HEADING);
         });
@@ -453,19 +453,19 @@ ${LIGHTHOUSE}`);
             await t.http.delete(`/api/stories/${storyId}/documents/${lighthouse}`).expect(200);
 
             expect(await writeForMe(storyId, chatId)).not.toContain(DOCUMENTS_HEADING);
-            expect(t.gateway.embeddingCalls('document_search')).toHaveLength(1);
+            expect(t.gateway.embeddingCalls('context_search')).toHaveLength(1);
         });
 
         it('has no block after a failed search, and searches nothing itself', async () => {
             const storyId = await playableStory();
             await addDocument(storyId, 'Gull Point light', LIGHTHOUSE);
             const chatId = await newChat(storyId);
-            t.gateway.scriptEmbedding('document_search', new ProviderOutageError('Down.'));
+            t.gateway.scriptEmbedding('context_search', new ProviderOutageError('Down.'));
             await send(storyId, chatId, QUESTION);
-            const searches = t.gateway.embeddingCalls('document_search').length;
+            const searches = t.gateway.embeddingCalls('context_search').length;
 
             expect(await writeForMe(storyId, chatId)).not.toContain(DOCUMENTS_HEADING);
-            expect(t.gateway.embeddingCalls('document_search')).toHaveLength(searches);
+            expect(t.gateway.embeddingCalls('context_search')).toHaveLength(searches);
         });
 
         it('sends the same prompt as before for a Story without Documents', async () => {

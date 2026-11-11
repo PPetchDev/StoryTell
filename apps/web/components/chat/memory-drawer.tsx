@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 
 import { bondDirection, GraphBond, GraphSelection, MemoryGraph, memoriesAbout, personName } from '@/components/chat/memory-graph';
+import { BeliefsSection } from '@/components/chat/beliefs-section';
 import { DocumentsInPlayCard } from '@/components/chat/documents-in-play-card';
 import { LoreInPlayCard } from '@/components/chat/lore-in-play-card';
 import { StorySoFarCard } from '@/components/chat/story-so-far-card';
@@ -15,7 +16,7 @@ import { bondLevelsInWords } from '@/lib/bonds';
 import { Portraits } from '@/lib/character-colour';
 import type { ChatBond } from '@/lib/chat';
 import { devicePreference } from '@/lib/device-preference';
-import { Memory, memoryApi, MemoryList, renderUser } from '@/lib/memory';
+import { beliefApi, LOCKED_WARNING, Memory, memoryApi, MemoryList, renderUser } from '@/lib/memory';
 
 /** How the drawer shows the Memories: the list, or the Memory graph. A per-device preference. */
 type MemoryViewKind = 'list' | 'graph';
@@ -243,6 +244,8 @@ interface MemoryViewProps {
     list: MemoryList;
     memory: Memory;
     highlighted: boolean;
+    /** The last turn sent it (.scratch/memory-by-meaning/spec.md: "Used last turn"). */
+    inPlay: boolean;
     busy: boolean;
     autosave: Autosave;
     sendEdit(text: string, knownBy: number[]): Promise<Memory>;
@@ -256,7 +259,7 @@ interface MemoryViewProps {
  * One Memory (spec: "Memory drawer"): its text with `{user}` rendered, Known-by chips, who
  * wrote it, a lock when locked, and a jump to the causing Message. Edit locks it.
  */
-function MemoryView({ list, memory, highlighted, busy, autosave, sendEdit, onSaved, onDelete, onRestore, onJump }: MemoryViewProps) {
+function MemoryView({ list, memory, highlighted, inPlay, busy, autosave, sendEdit, onSaved, onDelete, onRestore, onJump }: MemoryViewProps) {
     const [editing, setEditing] = useState(false);
     const nameOf = (id: number) => list.cast.find((character) => character.id === id)?.name ?? 'a removed Character';
     const label = `Memory ${memory.id}`;
@@ -295,6 +298,7 @@ function MemoryView({ list, memory, highlighted, busy, autosave, sendEdit, onSav
                     <p className="muted small memory-meta">
                         <span>{memory.writtenBy === 'ai' ? 'Written by the AI' : 'Written by you'}</span>
                         {memory.locked && <span className="memory-lock">🔒 Locked</span>}
+                        {inPlay && <span className="memory-in-play">In play</span>}
                         {memory.messageId !== null && (
                             <a
                                 href={`#message-${memory.messageId}`}
@@ -434,6 +438,16 @@ export function MemoryDrawer({ storyId, chatId, focusMemoryId, version, onClose,
         setBusy(false);
     };
 
+    /** A Belief write, then the list re-read: whether it saved, so a form that failed keeps what was typed. */
+    const writeBelief = async (work: () => Promise<unknown>): Promise<boolean> => {
+        let saved = false;
+        await write(async () => {
+            await work();
+            saved = true;
+        });
+        return saved;
+    };
+
     const closeNew = () => {
         setAdding(false);
         setAddedId(null);
@@ -449,6 +463,7 @@ export function MemoryDrawer({ storyId, chatId, focusMemoryId, version, onClose,
             list={shownList}
             memory={memory}
             highlighted={memory.id === focusMemoryId}
+            inPlay={shownList.inPlay.memoryIds.includes(memory.id)}
             busy={busy}
             autosave={autosave}
             sendEdit={(text, knownBy) => memoryApi.edit(storyId, chatId, memory.id, { text, knownBy })}
@@ -540,6 +555,11 @@ export function MemoryDrawer({ storyId, chatId, focusMemoryId, version, onClose,
                     {error}
                 </p>
             )}
+            {list?.lockedWarning && (
+                <p role="note" className="memory-locked-warning">
+                    {LOCKED_WARNING}
+                </p>
+            )}
             {!list ? (
                 <p className="muted">Loading…</p>
             ) : (
@@ -598,6 +618,14 @@ export function MemoryDrawer({ storyId, chatId, focusMemoryId, version, onClose,
                             </ul>
                         </details>
                     )}
+                    <BeliefsSection
+                        list={list}
+                        busy={busy}
+                        onAdd={(fields) => writeBelief(() => beliefApi.add(storyId, chatId, fields))}
+                        onEdit={(beliefId, fields) => writeBelief(() => beliefApi.edit(storyId, chatId, beliefId, fields))}
+                        onDelete={(beliefId) => void writeBelief(() => beliefApi.remove(storyId, chatId, beliefId))}
+                        onJump={onJump}
+                    />
                 </>
             )}
         </aside>

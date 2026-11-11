@@ -78,6 +78,7 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | `422.003.021` | `UnknownVoiceError` | A Narration voice, Speaking voice or voice sample (`POST /api/voices/:voiceId/preview`) naming a voice that `GET /api/voices` doesn't list. Nothing changes and no call is made; `null` (the default) is always allowed. |
 | `404.003.022` | `ExpressionNotFoundError` | Setting or resetting the square of, or removing, an Expression the Character does not have for that emotion. An emotion outside the seven (`neutral` included) is a validation error (`400.000.000`). |
 | `409.003.023` | `NoReferenceImageToDrawError` | Drawing an Expression (`POST .../expressions/:emotion/draw`) for a Character with no Reference image. No call is made. Add a Reference image first. |
+| `422.003.025` | `EmptyStartingBeliefError` | Starting Beliefs (`PUT /api/stories/:storyId/starting-beliefs`) with one whose text is nothing but whitespace. The whole list is refused and nothing changes. A Character outside the cast is `CharacterNotFoundError`. |
 | `404.004.001` | `ChatNotFoundError` | No Chat with that id in this Story. |
 | `422.004.002` | `StoryNotPlayableError` | The Story has a required field empty. The message names the missing fields. Blocks starting a Chat, sending, Continue and Regenerate. |
 | `409.004.003` | `NoTurnToRetryError` | Retry when the Chat is not waiting for a reply to a User Message. |
@@ -101,6 +102,8 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | `409.004.021` | `NudgeSittingOutError` | A send, Retry, Continue, Regenerate or User Message edit whose `nudgeCharacterId` names a Character sitting out of the Chat. Checked before anything is stored; nothing changes. "<Name> is sitting out. Bring them back before nudging them." |
 | `404.004.022` | `NotReadableError` | Read aloud (`GET` or `POST /api/stories/:storyId/chats/:chatId/messages/:messageId/speech`) on a User Message: only AI Messages have a play queue. No call. |
 | `404.004.023` | `SpeechItemNotFoundError` | A Read aloud item (`POST .../speech/:index`) outside the Message's queue as it reads now: an edit, a Regenerate or a Replace rule may have changed it since the queue was read. No call; read the queue again. |
+| `404.004.024` | `BeliefNotFoundError` | No Belief with that id in this Chat: an edit or delete (`PATCH`/`DELETE /api/stories/:storyId/chats/:chatId/beliefs/:beliefId`) of one that is gone, or another Chat's. Nothing changes. |
+| `422.004.025` | `EmptyBeliefError` | A Belief added or edited with nothing but whitespace. Nothing changes. |
 | `502.005.001` | `UnreadableDraftError` | The model's draft or rewrite could not be read (no JSON object, or no text). Nothing saved. Show with Retry. |
 | `502.005.002` | `InvalidDraftError` | The draft does not fit a Story (0 or 7 Characters, a Style value outside its set, a required field empty, a bad StartingBond). Nothing saved. Show with Retry. |
 | `422.005.003` | `EmptyIdeaError` | A draft was asked for with a blank idea. |

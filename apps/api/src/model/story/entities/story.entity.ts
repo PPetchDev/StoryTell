@@ -19,6 +19,7 @@ import type { CharacterEntity, CharacterResponse } from './character.entity.js';
 import type { LoreEntryEntity, LoreEntryResponse } from './lore-entry.entity.js';
 import type { RoleEntity, RoleResponse } from './role.entity.js';
 import type { SceneEntity, SceneResponse } from './scene.entity.js';
+import type { StartingBeliefEntity, StartingBeliefResponse } from './starting-belief.entity.js';
 import type { StartingBondEntity, StartingBondResponse } from './starting-bond.entity.js';
 
 export enum Pov {
@@ -86,6 +87,8 @@ export interface StoryResponse extends StorySummary {
     role: RoleResponse;
     characters: CharacterResponse[];
     startingBonds: StartingBondResponse[];
+    /** What Characters believe when a Chat starts (.scratch/memory-by-meaning/spec.md), in the author's order. */
+    startingBeliefs: StartingBeliefResponse[];
     scenes: SceneResponse[];
     /** In add order. */
     lore: LoreEntryResponse[];
@@ -175,6 +178,9 @@ export class StoryEntity {
     @OneToMany('StartingBondEntity', 'story')
     startingBonds: Relation<StartingBondEntity[]>;
 
+    @OneToMany('StartingBeliefEntity', 'story')
+    startingBeliefs: Relation<StartingBeliefEntity[]>;
+
     @OneToMany('SceneEntity', 'story')
     scenes: Relation<SceneEntity[]>;
 
@@ -222,6 +228,7 @@ export class StoryEntity {
             role: this.role.toResponse(),
             characters: this.characters.map((character) => character.toResponse()),
             startingBonds: this.startingBonds.map((bond) => bond.toResponse()),
+            startingBeliefs: (this.startingBeliefs ?? []).map((belief) => belief.toResponse()),
             scenes: this.scenes.map((scene) => scene.toResponse()),
             lore: this.lore.map((entry) => entry.toResponse()),
             documents: this.documents.map((document) => document.toSummary()),

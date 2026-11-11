@@ -35,15 +35,24 @@ export interface DocumentsInPlay {
     passages: DocumentPassageInPlay[];
 }
 
+/**
+ * The turn's one search (.scratch/memory-by-meaning/spec.md, "The query"): `none` when no call
+ * was made (nothing to search, or a blank query), `failed` when the embedding host failed, or the
+ * query's vector at unit length with the model that made it, for both Documents and Memory.
+ */
+export type TurnContextQuery = { status: 'none' } | { status: 'failed' } | { status: 'found'; vector: number[]; model: string };
+
 /** Whether the Story (loaded with its Documents) has any passage to search. */
 export function hasDocumentPassages(story: StoryEntity): boolean {
     return (story.documents ?? []).some((document) => Number(document.passageCount ?? 0) > 0);
 }
 
 /**
- * Each turn's Document search (.scratch/documents/spec.md: "Each turn: the search"): one
- * `document_search` call for the latest exchange, compared with every passage of the Story.
- * Made only when the Story has a passage, and only as part of a turn.
+ * Each turn's search (.scratch/documents/spec.md: "Each turn: the search", and
+ * .scratch/memory-by-meaning/spec.md: "The query"): one `context_search` call for the latest
+ * exchange, whose vector is compared with every passage of the Story and every Memory of the
+ * Chat. Made only when the Story has a passage or the Chat a Memory with a vector, and only as
+ * part of a turn.
  */
 @Injectable()
 export class DocumentSearchManagerService {
@@ -55,29 +64,46 @@ export class DocumentSearchManagerService {
     ) {}
 
     /**
-     * The passages for a turn. A failure at the embedding host lets the turn go on without
-     * Documents, recorded as `failed`; out of text credit fails the turn, as the turn's own call
-     * would, since both draw on the same balance.
+     * The turn's one search call, when there is anything to search. A failure at the embedding
+     * host lets the turn go on, without Documents and with the newest Memories, recorded as
+     * `failed`; out of text credit fails the turn, as the turn's own call would, since both draw on
+     * the same balance.
      */
-    async forTurn(story: StoryEntity, chatId: number, query: string): Promise<TurnDocuments> {
-        if (!hasDocumentPassages(story)) return { record: null, passages: [], hasDocuments: false };
-        if (query.trim() === '') return { record: { status: 'found', passageIds: [] }, passages: [], hasDocuments: true };
+    async embedQuery(story: StoryEntity, chatId: number, query: string, hasMemoryVectors: boolean): Promise<TurnContextQuery> {
+        const hasDocuments = hasDocumentPassages(story);
+        if ((!hasDocuments && !hasMemoryVectors) || query.trim() === '') return { status: 'none' };
 
         let result: EmbeddingResult;
         try {
-            result = await this.gateway.embedTexts({ kind: 'document_search', inputs: [query], servedFor: { storyId: story.id, chatId } });
+            result = await this.gateway.embedTexts({ kind: 'context_search', inputs: [query], servedFor: { storyId: story.id, chatId } });
         } catch (error) {
             if (error instanceof OutOfCreditError || !(error instanceof ModelGatewayError)) throw error;
-            this.logger.warn(`Story ${story.id}, Chat ${chatId}: the Document search failed, so this turn uses no Documents: ${error.message}`);
-            return { record: { status: 'failed', passageIds: [] }, passages: [], hasDocuments: true };
+            if (hasDocuments) {
+                this.logger.warn(`Story ${story.id}, Chat ${chatId}: the Document search failed, so this turn uses no Documents: ${error.message}`);
+            }
+            if (hasMemoryVectors) {
+                this.logger.warn(`Story ${story.id}, Chat ${chatId}: the Memory search failed, so this turn uses the newest Memories: ${error.message}`);
+            }
+            return { status: 'failed' };
         }
+        return { status: 'found', vector: unitLength(result.vectors[0]), model: result.model };
+    }
 
-        const selection = selectPassages(await this.documentModel.passagesOf(story.id), unitLength(result.vectors[0]), result.model);
+    /**
+     * The passages for a turn, from its search: none for a Story with no passages, `failed` when
+     * the search failed, and none found for a blank query, which makes no call.
+     */
+    async forTurn(story: StoryEntity, chatId: number, query: TurnContextQuery): Promise<TurnDocuments> {
+        if (!hasDocumentPassages(story)) return { record: null, passages: [], hasDocuments: false };
+        if (query.status === 'none') return { record: { status: 'found', passageIds: [] }, passages: [], hasDocuments: true };
+        if (query.status === 'failed') return { record: { status: 'failed', passageIds: [] }, passages: [], hasDocuments: true };
+
+        const selection = selectPassages(await this.documentModel.passagesOf(story.id), query.vector, query.model);
         const titleOf = (documentId: number) => story.documents.find((document) => document.id === documentId)?.title ?? '';
         if (selection.otherModel.length > 0) {
             const documents = new Set(selection.otherModel.map((passage) => titleOf(passage.documentId)));
             this.logger.warn(
-                `Story ${story.id}: skipped ${selection.otherModel.length} passages of ${[...documents].map((title) => `"${title}"`).join(', ')}, embedded by another model than ${result.model}; add them again to use them`,
+                `Story ${story.id}: skipped ${selection.otherModel.length} passages of ${[...documents].map((title) => `"${title}"`).join(', ')}, embedded by another model than ${query.model}; add them again to use them`,
             );
         }
         this.logger.debug(searchLogLine(story.id, chatId, selection, titleOf));

@@ -282,6 +282,10 @@ export class FakeModelGateway extends ModelGateway {
         return { image: FAKE_PNG, model: FAKE_IMAGE_MODEL, costUsd: 0, ...result };
     }
 
+    embeddingModel(): string {
+        return FAKE_EMBEDDING_MODEL;
+    }
+
     /** Deterministic vectors from each input's words (see `fakeEmbedding`), unless scripted to fail. */
     async embedTexts(request: EmbeddingRequest): Promise<EmbeddingResult> {
         this.calls.push({ method: 'embedTexts', request });

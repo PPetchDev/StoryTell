@@ -4,12 +4,14 @@ import { DataSource, EntityManager, In, MoreThanOrEqual, Repository } from 'type
 
 import { ChatEntity, TimeOfDay } from '../chat/entities/chat.entity.js';
 import { BackgroundStatus, MessageEntity } from '../chat/entities/message.entity.js';
+import { BeliefAuthor, BeliefEntity, BeliefSnapshot } from '../memory/entities/belief.entity.js';
 import { MemoryKnownByEntity } from '../memory/entities/memory-known-by.entity.js';
 import { MemoryAuthor, MemoryEntity, MemorySnapshot } from '../memory/entities/memory.entity.js';
 import { createMemory, setKnownBy } from '../memory/memory.service.js';
 import type { Emotion } from '../story/emotion.js';
 import { BondLevels } from './bond-axes.js';
 import { ArcStepEntity } from './entities/arc-step.entity.js';
+import { BeliefChangeEntity, BeliefChangeKind } from './entities/belief-change.entity.js';
 import { BondChangeEntity } from './entities/bond-change.entity.js';
 import { ChatArcDirectionEntity } from './entities/chat-arc-direction.entity.js';
 import { MemoryChangeEntity, MemoryChangeKind } from './entities/memory-change.entity.js';
@@ -24,6 +26,12 @@ export interface BondSeed {
     description: string;
     /** Its starting levels on the Bond axes (.scratch/bond-axes/spec.md, "Storage"). */
     levels: BondLevels;
+}
+
+/** A Starting Belief as it is seeded into a Chat: the author's, with no causing Message. */
+export interface BeliefSeed {
+    characterId: number;
+    text: string;
 }
 
 export interface ArcDirectionSeed {
@@ -93,6 +101,14 @@ export type NewMemoryChange =
     | { kind: 'archive'; memoryId: number; event: string }
     | { kind: 'known_by'; memoryId: number; add: number[]; event: string };
 
+/**
+ * What an extraction does to the Beliefs, after the apply rules (.scratch/memory-by-meaning/spec.md,
+ * "Beliefs"): a Belief made, or an active one given up. Applied in order, after the Memory changes.
+ */
+export type NewBeliefChange =
+    | { kind: 'add'; characterId: number; text: string; contradictsMemoryId: number | null; event: string }
+    | { kind: 'give_up'; beliefId: number; event: string };
+
 /** Everything the ledger holds for a Chat, oldest first. */
 export interface LedgerState {
     bondChanges: BondChangeEntity[];
@@ -126,8 +142,11 @@ export class LedgerModelService {
         @InjectRepository(ChatArcDirectionEntity) private readonly arcDirections: Repository<ChatArcDirectionEntity>,
     ) {}
 
-    /** Seeds a Chat's first BondChanges from StartingBonds and copies the Arc directions in. */
-    seed(chatId: number, bonds: BondSeed[], directions: ArcDirectionSeed[]): Promise<void> {
+    /**
+     * Seeds a Chat's first BondChanges from StartingBonds, copies the Arc directions in, and writes one
+     * Belief per Starting Belief (.scratch/memory-by-meaning/spec.md), the author's, tied to no Message.
+     */
+    seed(chatId: number, bonds: BondSeed[], directions: ArcDirectionSeed[], beliefs: BeliefSeed[] = []): Promise<void> {
         return this.dataSource.transaction(async (manager) => {
             await manager.save(
                 bonds.map((bond) =>
@@ -154,6 +173,19 @@ export class LedgerModelService {
                     }),
                 ),
             );
+            for (const belief of beliefs) {
+                await manager.save(
+                    manager.create(BeliefEntity, {
+                        chatId,
+                        characterId: belief.characterId,
+                        text: belief.text,
+                        contradictsMemoryId: null,
+                        writtenBy: BeliefAuthor.User,
+                        messageId: null,
+                        givenUpMessageId: null,
+                    }),
+                );
+            }
         });
     }
 
@@ -257,11 +289,18 @@ export class LedgerModelService {
      * transaction. The Memories are re-read here, not trusted from the call's input: the
      * user may have locked or deleted one while the extraction ran, and a locked Memory takes
      * nothing but Known-by additions (spec: "Backend rules"). Returns the ids of the Memories
-     * added, for the "Memory added" toast.
+     * added and of those whose text it changed, which are then embedded
+     * (.scratch/memory-by-meaning/spec.md, "Embedding Memories").
      */
-    recordMemories(chatId: number, messageId: number, changes: NewMemoryChange[]): Promise<number[]> {
+    recordMemories(
+        chatId: number,
+        messageId: number,
+        changes: NewMemoryChange[],
+        beliefChanges: NewBeliefChange[] = [],
+    ): Promise<{ added: number[]; reworded: number[] }> {
         return this.dataSource.transaction(async (manager) => {
             const added: number[] = [];
+            const reworded: number[] = [];
             const load = (memoryId: number) =>
                 manager.findOne(MemoryEntity, { where: { id: memoryId, chatId }, relations: { knownBy: true } });
             const note = (memoryId: number, kind: MemoryChangeKind, before: MemorySnapshot | null, after: MemorySnapshot | null, event: string) =>
@@ -294,8 +333,10 @@ export class LedgerModelService {
                 }
                 if (memory.locked) continue;
                 if (change.kind === 'update') {
-                    await manager.update(MemoryEntity, { id: memory.id }, { text: change.text });
+                    // New text drops the old text's vector until it is embedded again.
+                    await manager.update(MemoryEntity, { id: memory.id }, { text: change.text, embedding: null, embeddingModel: null });
                     await note(memory.id, MemoryChangeKind.Update, before, { ...before, text: change.text }, change.event);
+                    if (!reworded.includes(memory.id)) reworded.push(memory.id);
                 } else if (change.kind === 'archive') {
                     await manager.update(MemoryEntity, { id: memory.id }, { archived: true });
                     await note(memory.id, MemoryChangeKind.Archive, before, { ...before, archived: true }, change.event);
@@ -304,12 +345,13 @@ export class LedgerModelService {
                     await note(memory.id, MemoryChangeKind.Delete, before, null, change.event);
                 }
             }
+            await recordBeliefChanges(manager, chatId, messageId, beliefChanges);
             await manager.update(
                 MessageEntity,
                 { id: messageId },
                 { memoryStatus: BackgroundStatus.Done, memoryError: null },
             );
-            return added;
+            return { added, reworded };
         });
     }
 
@@ -338,6 +380,12 @@ export class LedgerModelService {
                         b.id - a.id,
                 );
 
+            // Beliefs first: a Belief made or given up there goes back before the Memories do (not counted, as a Time change isn't).
+            const beliefChanges = newestFirst(await manager.find(BeliefChangeEntity, { where: { messageId: In(ids) } }));
+            for (const change of beliefChanges) {
+                await undoBeliefChange(manager, chatId, change);
+                await manager.delete(BeliefChangeEntity, { id: change.id });
+            }
             const memoryChanges = newestFirst(await manager.find(MemoryChangeEntity, { where: { messageId: In(ids) } }));
             for (const change of memoryChanges) {
                 await undoMemoryChange(manager, chatId, change);
@@ -379,6 +427,8 @@ export class LedgerModelService {
         return this.dataSource.transaction(async (manager: EntityManager) => {
             await manager.delete(TimeChangeEntity, { chatId });
             await manager.update(ChatEntity, { id: chatId }, { timeOfDay: null });
+            await manager.delete(BeliefChangeEntity, { chatId });
+            await manager.delete(BeliefEntity, { chatId });
             await manager.delete(MemoryChangeEntity, { chatId });
             await manager.delete(MemoryEntity, { chatId });
             await manager.delete(SceneAdvanceEntity, { chatId });
@@ -386,6 +436,72 @@ export class LedgerModelService {
             await manager.delete(BondChangeEntity, { chatId });
             await manager.delete(ChatArcDirectionEntity, { chatId });
         });
+    }
+}
+
+/**
+ * Writes what an extraction does to the Beliefs, each with its record. Re-read here: a Belief the
+ * user deleted or a give-up already recorded is skipped, and a Memory gone since (a merge in
+ * the same extraction) is no longer linked.
+ */
+async function recordBeliefChanges(manager: EntityManager, chatId: number, messageId: number, changes: NewBeliefChange[]): Promise<void> {
+    const note = (beliefId: number, kind: BeliefChangeKind, before: BeliefSnapshot | null, after: BeliefSnapshot | null, event: string) =>
+        manager.save(manager.create(BeliefChangeEntity, { chatId, beliefId, kind, before, after, event, messageId }));
+    for (const change of changes) {
+        if (change.kind === 'add') {
+            const contradicts =
+                change.contradictsMemoryId !== null && (await manager.exists(MemoryEntity, { where: { id: change.contradictsMemoryId, chatId } }))
+                    ? change.contradictsMemoryId
+                    : null;
+            const belief = await manager.save(
+                manager.create(BeliefEntity, {
+                    chatId,
+                    characterId: change.characterId,
+                    text: change.text,
+                    contradictsMemoryId: contradicts,
+                    writtenBy: BeliefAuthor.Ai,
+                    messageId,
+                    givenUpMessageId: null,
+                }),
+            );
+            await note(belief.id, BeliefChangeKind.Add, null, belief.snapshot(), change.event);
+            continue;
+        }
+        const belief = await manager.findOne(BeliefEntity, { where: { id: change.beliefId, chatId } });
+        if (!belief || belief.givenUpMessageId !== null) continue;
+        const before = belief.snapshot();
+        await manager.update(BeliefEntity, { id: belief.id }, { givenUpMessageId: messageId });
+        await note(belief.id, BeliefChangeKind.GiveUp, before, { ...before, givenUpMessageId: messageId }, change.event);
+    }
+}
+
+/**
+ * Puts a Belief back as it was before one change. An add is undone by deleting the Belief, whatever
+ * the user did to it since; a give-up by holding it again; an update by its old text; a delete by
+ * re-inserting it under its old id, linked only to what this Chat still holds.
+ */
+async function undoBeliefChange(manager: EntityManager, chatId: number, change: BeliefChangeEntity): Promise<void> {
+    if (change.kind === BeliefChangeKind.Add) {
+        await manager.delete(BeliefEntity, { id: change.beliefId, chatId });
+        return;
+    }
+    const before = change.before;
+    if (!before) return;
+    if (change.kind === BeliefChangeKind.Delete) {
+        if (await manager.exists(BeliefEntity, { where: { id: change.beliefId } })) return;
+        const memoryHeld = before.contradictsMemoryId !== null && (await manager.exists(MemoryEntity, { where: { id: before.contradictsMemoryId, chatId } }));
+        const messageHeld = before.givenUpMessageId !== null && (await manager.exists(MessageEntity, { where: { id: before.givenUpMessageId, chatId } }));
+        await manager.query(
+            `INSERT INTO "belief" ("id", "chat_id", "character_id", "text", "contradicts_memory_id", "written_by", "message_id", "given_up_message_id")
+             VALUES ($1, $2, $3, $4, $5, $6, NULL, $7)`,
+            [change.beliefId, chatId, before.characterId, before.text, memoryHeld ? before.contradictsMemoryId : null, before.writtenBy, messageHeld ? before.givenUpMessageId : null],
+        );
+        return;
+    }
+    if (change.kind === BeliefChangeKind.GiveUp) {
+        await manager.update(BeliefEntity, { id: change.beliefId, chatId }, { givenUpMessageId: null });
+    } else {
+        await manager.update(BeliefEntity, { id: change.beliefId, chatId }, { text: before.text });
     }
 }
 
@@ -430,7 +546,8 @@ async function undoMemoryChange(manager: EntityManager, chatId: number, change: 
     const memory = await manager.findOne(MemoryEntity, { where: { id: change.memoryId, chatId }, relations: { knownBy: true } });
     if (!memory) return;
     if (change.kind === MemoryChangeKind.Update) {
-        if (!memory.locked) await manager.update(MemoryEntity, { id: memory.id }, { text: before.text });
+        // The text goes back, so the vector of the undone text goes; the next extraction embeds it again.
+        if (!memory.locked) await manager.update(MemoryEntity, { id: memory.id }, { text: before.text, embedding: null, embeddingModel: null });
     } else if (change.kind === MemoryChangeKind.Archive) {
         await manager.update(MemoryEntity, { id: memory.id }, { archived: before.archived });
     } else {

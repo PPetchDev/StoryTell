@@ -12,6 +12,7 @@ import {
 } from '../turn/prompt.js';
 import { documentsReserveTokens } from '../../document/document-search.js';
 import { loreReserveTokens } from '../lore/lore-select.js';
+import { beliefCost, memoryCost } from '../memory/memory-choice.js';
 
 /**
  * The Story so far (spec: "Story so far"): when it is written, and the call that writes it.
@@ -47,6 +48,13 @@ export function storySoFarCoverage(layers: PromptLayersInput, history: PromptHis
         loreReserveTokens(layers.lore ?? []) +
         // So is the Documents block's cap, when the Story has passages (.scratch/documents/spec.md: "Budget").
         documentsReserveTokens(layers.hasDocuments) +
+        // The Memory the next turn may choose, past what the layer holds now (.scratch/memory-by-meaning/spec.md: "The budget is reserved").
+        Math.max(
+            0,
+            (layers.memoryRoomTokens ?? 0) -
+                layers.memories.reduce((sum, memory) => sum + memoryCost(memory), 0) -
+                (layers.beliefs ?? []).reduce((sum, belief) => sum + beliefCost({ id: 0, ...belief }), 0),
+        ) +
         // A Nudge line may ride on the next turn (.scratch/speaker-controls/spec.md): a small fixed allowance.
         NUDGE_RESERVE_TOKENS +
         // The Author's note, as the Chat holds it when the check runs.

@@ -8,6 +8,8 @@ import { ArcStepEntity } from '../../model/ledger/entities/arc-step.entity.js';
 import { BondChangeEntity } from '../../model/ledger/entities/bond-change.entity.js';
 import { ChatArcDirectionEntity } from '../../model/ledger/entities/chat-arc-direction.entity.js';
 import { MemoryChangeEntity } from '../../model/ledger/entities/memory-change.entity.js';
+import { BeliefChangeEntity } from '../../model/ledger/entities/belief-change.entity.js';
+import { BeliefEntity } from '../../model/memory/entities/belief.entity.js';
 import { SceneAdvanceEntity } from '../../model/ledger/entities/scene-advance.entity.js';
 import { TimeChangeEntity } from '../../model/ledger/entities/time-change.entity.js';
 import { MemoryKnownByEntity } from '../../model/memory/entities/memory-known-by.entity.js';
@@ -21,6 +23,7 @@ import { DocumentEntity } from '../../model/document/entities/document.entity.js
 import { RoleEntity } from '../../model/story/entities/role.entity.js';
 import { SceneEntity } from '../../model/story/entities/scene.entity.js';
 import { SceneBondGateEntity } from '../../model/story/entities/scene-bond-gate.entity.js';
+import { StartingBeliefEntity } from '../../model/story/entities/starting-belief.entity.js';
 import { StartingBondEntity } from '../../model/story/entities/starting-bond.entity.js';
 import { StoryEntity } from '../../model/story/entities/story.entity.js';
 import { UsageRecordEntity } from '../../model/usage-record/entities/usage-record.entity.js';
@@ -37,6 +40,7 @@ export const entities = [
     CharacterEntity,
     CharacterExpressionEntity,
     StartingBondEntity,
+    StartingBeliefEntity,
     SceneBondGateEntity,
     SceneEntity,
     LoreEntryEntity,
@@ -58,6 +62,8 @@ export const entities = [
     MemoryEntity,
     MemoryKnownByEntity,
     MemoryChangeEntity,
+    BeliefEntity,
+    BeliefChangeEntity,
     PersonaEntity,
     SnapshotEntity,
     SnapshotCharacterEntity,

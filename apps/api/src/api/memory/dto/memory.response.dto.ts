@@ -1,5 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 
+import { MemoriesInPlayDTO } from '../../chat/dto/chat.response.dto.js';
+import { BeliefDTO } from './belief.response.dto.js';
 import { MemoryList } from '../../../manager/chat/memory/memory.service.js';
 import { MemoryAuthor, MemoryResponse } from '../../../model/memory/entities/memory.entity.js';
 
@@ -56,6 +58,15 @@ export class MemoryListResponseBodyDTO implements MemoryList {
 
     @ApiProperty({ type: [MemoryDTO], description: 'Active and archived, oldest first.' })
     memories: MemoryDTO[];
+
+    @ApiProperty({ type: [BeliefDTO], description: 'Every Belief, given-up ones included, oldest first.' })
+    beliefs: BeliefDTO[];
+
+    @ApiProperty({ type: MemoriesInPlayDTO, description: 'The Memories and Beliefs the last turn sent, shown as "In play".' })
+    inPlay: MemoriesInPlayDTO;
+
+    @ApiProperty({ description: 'True when the locked Memories alone take more than half the Memory budget.' })
+    lockedWarning: boolean;
 }
 
 export class MemoryResponseBodyDTO extends MemoryDTO {}

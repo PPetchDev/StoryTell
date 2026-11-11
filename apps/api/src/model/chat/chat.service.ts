@@ -5,7 +5,25 @@ import { DataSource, EntityManager, In, IsNull, MoreThan, Not, Repository } from
 import { ChatSittingOutEntity } from './entities/chat-sitting-out.entity.js';
 import { ChatEntity, StorySoFarAuthor } from './entities/chat.entity.js';
 import { MessagePartEntity, MessagePartKind } from './entities/message-part.entity.js';
-import { BackgroundStatus, DocumentPassagesUsed, MessageEntity, MessageKind } from './entities/message.entity.js';
+import { BackgroundStatus, DocumentPassagesUsed, MemoriesUsed, MessageEntity, MessageKind } from './entities/message.entity.js';
+
+/**
+ * What a turn chose of the Memory, kept on its AI Message (.scratch/memory-by-meaning/spec.md):
+ * the Memories and Beliefs it sent, and its search query as a vector, null when it made none.
+ */
+export interface TurnMemoryRecord {
+    used: MemoriesUsed;
+    query: { vector: number[]; model: string } | null;
+}
+
+/** A turn's Memory record as the Message's columns hold it. */
+function memoryColumns(record: TurnMemoryRecord | null): Pick<MessageEntity, 'memoriesUsed' | 'contextQuery' | 'contextQueryModel'> {
+    return {
+        memoriesUsed: record?.used ?? null,
+        contextQuery: record?.query?.vector ?? null,
+        contextQueryModel: record?.query?.model ?? null,
+    };
+}
 import { ReplyVersionEntity } from './entities/reply-version.entity.js';
 import { ThaiReadingEntity } from './entities/thai-reading.entity.js';
 
@@ -230,6 +248,7 @@ export class ChatModelService {
         parts: NewMessagePart[],
         background: BackgroundStatus | null,
         documentPassages: DocumentPassagesUsed | null = null,
+        memory: TurnMemoryRecord | null = null,
     ): Promise<MessageEntity> {
         return this.dataSource.transaction(async (manager) => {
             const message = await manager.save(
@@ -239,6 +258,7 @@ export class ChatModelService {
                     kind: MessageKind.Ai,
                     model,
                     documentPassages,
+                    ...memoryColumns(memory),
                     judgeStatus: background,
                     judgeError: null,
                     memoryStatus: background,
@@ -248,6 +268,16 @@ export class ChatModelService {
             message.parts = await manager.save(partEntities(manager, message.id, parts));
             return message;
         });
+    }
+
+    /** The search query a turn recorded on its AI Message, or null when it made none (or no turn wrote it). */
+    async contextQueryOf(messageId: number): Promise<{ vector: number[]; model: string } | null> {
+        const rows: Array<{ context_query: number[] | null; context_query_model: string | null }> = await this.dataSource.query(
+            'SELECT "context_query", "context_query_model" FROM "message" WHERE "id" = $1',
+            [messageId],
+        );
+        const row = rows[0];
+        return row?.context_query && row.context_query_model ? { vector: row.context_query, model: row.context_query_model } : null;
     }
 
     findMessage(messageId: number): Promise<MessageEntity | null> {
@@ -302,10 +332,11 @@ export class ChatModelService {
         parts: NewMessagePart[],
         maxVersions: number,
         documentPassages: DocumentPassagesUsed | null = null,
+        memory: TurnMemoryRecord | null = null,
     ): Promise<void> {
         return this.dataSource.transaction(async (manager) => {
-            // The new turn's own search replaces the old one's record (.scratch/documents/spec.md).
-            await manager.update(MessageEntity, { id: message.id }, { documentPassages });
+            // The new turn's own search and Memory choice replace the old one's records (.scratch/documents/spec.md).
+            await manager.update(MessageEntity, { id: message.id }, { documentPassages, ...memoryColumns(memory) });
             const shown = message.versionOrdinal ?? 1;
             const kept = await manager.find(ReplyVersionEntity, { where: { messageId: message.id }, order: { ordinal: 'ASC' } });
             const putAway = await this.putAway(manager, message, shown);

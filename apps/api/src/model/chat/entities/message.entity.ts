@@ -26,6 +26,15 @@ export interface DocumentPassagesUsed {
     passageIds: number[];
 }
 
+/**
+ * What a turn's Memory choice sent (.scratch/memory-by-meaning/spec.md: "Used last turn"): the
+ * Memories and the Beliefs, by id, for "In play" in the Memory drawer.
+ */
+export interface MemoriesUsed {
+    memoryIds: number[];
+    beliefIds: number[];
+}
+
 /** The model recorded on the Opening, which no model wrote. */
 export const AUTHOR_MODEL = 'author';
 
@@ -151,6 +160,24 @@ export class MessageEntity {
      */
     @Column({ name: 'document_passages', type: 'jsonb', nullable: true })
     documentPassages: DocumentPassagesUsed | null;
+
+    /**
+     * What the turn that wrote this AI Message chose of the Memory (.scratch/memory-by-meaning/spec.md);
+     * NULL on the Opening and on turns from before. Overwritten as `documentPassages` is.
+     */
+    @Column({ name: 'memories_used', type: 'jsonb', nullable: true })
+    memoriesUsed: MemoriesUsed | null;
+
+    /**
+     * The turn's search query as a vector at unit length, and its model: what Suggested replies,
+     * Write for me and Snapshots choose Memories with. NULL when the turn made no search or it
+     * failed. Not loaded with the Message (ChatModelService.contextQueryOf reads it).
+     */
+    @Column({ name: 'context_query', type: 'real', array: true, nullable: true, select: false })
+    contextQuery?: number[] | null;
+
+    @Column({ name: 'context_query_model', type: 'text', nullable: true, select: false })
+    contextQueryModel?: string | null;
 
     // The shown Reply version's place among the Message's versions; NULL while it has no others.
     @Column({ name: 'version_ordinal', type: 'integer', nullable: true })

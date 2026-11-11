@@ -1,4 +1,5 @@
 import { apiFetch, apiSend, apiSendStream } from './api';
+import type { Belief } from './memory';
 import type { BondLevels } from './bonds';
 import type { Emotion } from './expressions';
 import { MissingField } from './story';
@@ -119,6 +120,16 @@ export interface Chat extends ChatSummary {
     replaceRules: ChatReplaceRule[];
     /** Every current Bond in the Chat. */
     bonds: ChatBond[];
+    /** The Memories and Beliefs the last turn sent, shown as "In play" in the Memory drawer; empty before any turn. */
+    memoriesInPlay: MemoriesInPlay;
+    /** Every Belief of the Chat, given-up ones included, oldest first. */
+    beliefs: Belief[];
+}
+
+/** What the last turn's Memory choice sent, by id. */
+export interface MemoriesInPlay {
+    memoryIds: number[];
+    beliefIds: number[];
 }
 
 /** A current Bond as the Chat reads it: its direction, label and levels. */

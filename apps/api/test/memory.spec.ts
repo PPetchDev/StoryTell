@@ -1,7 +1,7 @@
 import pg from 'pg';
 
 import { ProviderOutageError } from '../src/errors/model-gateway.errors.js';
-import { MEMORY_CAP_TOKENS } from '../src/manager/chat/memory/memory-prompt.js';
+import { MEMORY_BUDGET_TOKENS } from '../src/manager/chat/memory/memory-choice.js';
 import { TextCompletionRequest } from '../src/service/model-gateway/model-gateway.js';
 import { startTestApp, TestApp } from './harness/test-app.js';
 
@@ -190,6 +190,9 @@ Mira
 
 # Current Memories (id: [known by] text)
 ${firstMemory.id}: - [known by Mira] {user} knocked on the lighthouse door.
+
+# Active Beliefs (id: who believes what)
+(none)
 
 # LATEST EXCHANGE (extract from this)
 Ash: I take them off.
@@ -498,29 +501,37 @@ A Character knows only the Memories it is tagged on`);
         });
     });
 
+    // .scratch/memory-by-meaning/spec.md, "Keeping every Memory": the cap is gone. These two were the cap's
+    // tests (past 2,000 tokens of Memory lines, or past 60 Memories, the extraction was told to merge and
+    // archive); they now pin that it never is, and that every Memory is kept.
     describe('the cap', () => {
-        it('asks the extraction to merge and archive once the Memory lines pass the cap', async () => {
+        /** The old cap on the Memory lines, which no longer asks anything of the extraction. */
+        const OLD_CAP_TOKENS = 2_000;
+
+        it('asks the extraction for no merge or archive once the Memory lines pass the old cap, and sends every locked one to the turn', async () => {
             const story = await createStory();
             const chat = await createChat(story.id);
             const line = 'The keeper before Mira left a crate of candles in the store room under the stairs, which nobody has opened since the spring.';
-            // Hand-written here for speed; the cap measures the prompt lines whoever wrote them.
-            const needed = Math.ceil((MEMORY_CAP_TOKENS * 4) / (line.length + 20)) + 1;
+            // Hand-written here for speed; the old cap measured the prompt lines whoever wrote them.
+            const needed = Math.ceil((OLD_CAP_TOKENS * 4) / (line.length + 20)) + 1;
             for (let i = 0; i < needed; i++) {
                 await t.http.post(`/api/stories/${story.id}/chats/${chat.id}/memories`).send({ text: `${line} (${i})` }).expect(201);
             }
 
             await play(story.id, chat.id, 'One.', 'Reply one.');
 
-            expect(systemPrompt(lastCall('memory_extraction'))).toContain(
-                `The Memory list is over its size cap: ${needed} Memories, where about 50 fit. Besides the exchange, this turn you MUST return at least ${Math.max(3, Math.min(12, needed - 50))} "merge" or "archive" operations`,
-            );
-            expect(systemPrompt(lastCall('memory_extraction'))).toContain('Never archive or merge a [locked] Memory.');
-            expect(lastCall('memory_extraction').maxTokens).toBe(2500);
-            // Locked Memories are never left out of the turn prompt, whatever the cap.
+            expect(systemPrompt(lastCall('memory_extraction'))).not.toContain('over its size cap');
+            expect(systemPrompt(lastCall('memory_extraction'))).not.toContain('MUST return');
+            // Locked Memories still take no merge or archive.
+            expect(systemPrompt(lastCall('memory_extraction'))).toContain('never update, delete, merge or archive them');
+            expect(lastCall('memory_extraction').maxTokens).toBe(1200);
+            // Every Memory is still listed for the extraction.
+            for (let i = 0; i < needed; i++) expect(lastCall('memory_extraction').messages[1].content).toContain(`${line} (${i})`);
+            // Locked Memories are never left out of the turn prompt.
             for (let i = 0; i < needed; i++) expect(systemPrompt(lastCall('turn'))).toContain(`${line} (${i})`);
         });
 
-        it('counts too: short Memories past 60 of them are over the cap as well', async () => {
+        it('keeps every one of more than 60 Memories after an extraction that merges nothing, and never asks for merges', async () => {
             const story = await createStory();
             const chat = await createChat(story.id);
             await play(story.id, chat.id, 'One.', 'Reply one.', extraction(Array.from({ length: 60 }, (_, i) => add(`Fact ${i}.`))));
@@ -530,15 +541,20 @@ A Character knows only the Memories it is tagged on`);
             await play(story.id, chat.id, 'Three.', 'Reply three.', extraction([add('Fact 60.')]));
             await play(story.id, chat.id, 'Four.', 'Reply four.');
 
-            expect(systemPrompt(lastCall('memory_extraction'))).toContain('The Memory list is over its size cap: 61 Memories, where about 50 fit.');
-            expect(systemPrompt(lastCall('memory_extraction'))).toContain('at least 11 "merge" or "archive" operations');
+            expect(systemPrompt(lastCall('memory_extraction'))).not.toContain('over its size cap');
+            expect(systemPrompt(lastCall('memory_extraction'))).not.toContain('"merge" or "archive" operations');
+            const kept = (await memories(story.id, chat.id)).memories;
+            expect(kept).toHaveLength(61);
+            expect(kept.every((memory) => !memory.archived)).toBe(true);
+            expect(kept.map((memory) => memory.text)).toEqual(Array.from({ length: 61 }, (_, i) => `Fact ${i}.`));
         });
 
         it('leaves the oldest unlocked Memories out of the turn prompt past the cap, keeping locked ones', async () => {
             const story = await createStory();
             const chat = await createChat(story.id);
             const line = 'The keeper before Mira left a crate of candles in the store room under the stairs, which nobody has opened since the spring.';
-            const needed = Math.ceil((MEMORY_CAP_TOKENS * 4) / (line.length + 20)) + 1;
+            // The turn's Memory budget is 4,000 tokens now (.scratch/memory-by-meaning/spec.md, "Choosing Memories for a turn").
+            const needed = Math.ceil((MEMORY_BUDGET_TOKENS * 4) / (line.length + 20)) + 1;
             await t.http.post(`/api/stories/${story.id}/chats/${chat.id}/memories`).send({ text: 'Mine, first.' }).expect(201);
             await play(story.id, chat.id, 'One.', 'Reply one.', extraction(Array.from({ length: needed }, (_, i) => add(`${line} (${i})`))));
 
@@ -552,15 +568,19 @@ A Character knows only the Memories it is tagged on`);
             expect(lastCall('memory_extraction').messages[1].content).toContain(`${line} (0)`);
         });
 
-        it('past the cap keeps an old Memory about a Character in the latest exchange, in the turn and the Suggested replies', async () => {
+        // .scratch/memory-by-meaning/spec.md, "Choosing Memories for a turn": past the 4,000-token budget an old
+        // Memory comes back by its meaning, and the rest of the room goes to the newest about who is present.
+        it('past the budget brings back an old Memory about a Character in the latest exchange by its meaning, in the turn and the Suggested replies', async () => {
             const story = await createStory();
             const chat = await createChat(story.id);
             const line = 'A crate of candles sits in the store room under the stairs, unopened since the spring storms came through.';
-            const needed = Math.ceil((MEMORY_CAP_TOKENS * 4) / (line.length + 20)) + 1;
+            const needed = Math.ceil((MEMORY_BUDGET_TOKENS * 4) / (line.length + 20)) + 1;
             await play(story.id, chat.id, 'One.', 'Reply one.', extraction([add('Kai buried a tin box by the well.')]));
-            await play(story.id, chat.id, 'Two.', 'Reply two.', extraction(Array.from({ length: needed }, (_, i) => add(`${line} (${i})`))));
+            // Known by Kai, so about Kai: only the Memories about who is present fill the room by recency.
+            await play(story.id, chat.id, 'Two.', 'Reply two.', extraction(Array.from({ length: needed }, (_, i) => add(`${line} (${i})`, ['Kai']))));
 
-            await play(story.id, chat.id, 'Kai, come here.', '@Kai: Coming!');
+            // The user's text is about the tin box, so the search finds it.
+            await play(story.id, chat.id, 'Kai, come here. Is the tin box still buried by the well?', '@Kai: Coming!');
             expect(systemPrompt(lastCall('turn'))).toContain('Kai buried a tin box by the well.');
             expect(systemPrompt(lastCall('turn'))).not.toContain(`${line} (0)`);
             expect(systemPrompt(lastCall('turn'))).toContain(`${line} (${needed - 1})`);

@@ -2,7 +2,8 @@ import { Pov, ReplyLength, Tense } from '../../../model/story/entities/story.ent
 import type { TimeOfDay } from '../../../model/chat/entities/chat.entity.js';
 import { BondLevels, bondLevelsInWords } from '../../../model/ledger/bond-axes.js';
 import { PromptMessage } from '../../../service/model-gateway/model-gateway.js';
-import { MEMORY_CAP_TOKENS, memoryLine } from '../memory/memory-prompt.js';
+import { memoryLine } from '../memory/memory-prompt.js';
+import { beliefLine, MEMORY_BUDGET_TOKENS } from '../memory/memory-choice.js';
 import { memoryIsAbout } from '../memory/present.js';
 import { renderUser } from '../memory/render-user.js';
 import { documentsBlock, PromptPassage } from '../../document/document-search.js';
@@ -95,6 +96,13 @@ export interface PromptMemory {
     locked: boolean;
 }
 
+/** A Belief as the Memory layer tells it (.scratch/memory-by-meaning/spec.md, "Told to the Narrator"). */
+export interface PromptBelief {
+    characterName: string;
+    /** With `{user}`, rendered by the layer. */
+    text: string;
+}
+
 /** Spec: "Story so far": the events of the oldest Messages, which then stop being sent word for word. */
 export interface PromptStorySoFar {
     text: string;
@@ -110,8 +118,18 @@ export interface TurnPromptInput {
     bonds: PromptBond[];
     /** One per Character, in cast order (spec: "Arcs"). */
     arcs: PromptArc[];
-    /** Every non-archived Memory, in the stable order (spec: "Memory block"). */
+    /**
+     * The Memories the Memory choice picked for this prompt, in story order
+     * (.scratch/memory-by-meaning/spec.md, "Choosing Memories for a turn").
+     */
     memories: PromptMemory[];
+    /** The active Beliefs the Memory choice picked, of the Characters present, oldest first; left out, none. */
+    beliefs?: PromptBelief[];
+    /**
+     * The most the Memory layer may take on the next turn, which the Story so far trigger reserves
+     * (spec: "The budget is reserved"); left out, only the layer as it stands is counted.
+     */
+    memoryRoomTokens?: number;
     /** The Chat's Story so far; null or left out while the whole Chat still fits. */
     storySoFar?: PromptStorySoFar | null;
     /** Every Message of the Chat before the new one, oldest first. */
@@ -149,7 +167,11 @@ export interface TurnPromptInput {
     documentPassages?: PromptPassage[];
     /** Whether the Story has any Document passage: the Story so far then reserves room for the block. */
     hasDocuments?: boolean;
-    /** The Memory layer's cap in tokens (spec: "about 2k tokens"); past it, Memories are left out in `memoryLeaveOutOrder`. */
+    /**
+     * The Memory layer's cap in tokens, 4,000 unless given (.scratch/memory-by-meaning/spec.md); past
+     * it, Memories are left out in `memoryLeaveOutOrder`. The Memory choice already keeps to it, so
+     * this only guards a caller that passes more.
+     */
     memoryCapTokens?: number;
     /**
      * The Chat's Author's note (.scratch/authors-note/spec.md): the user's standing direction,
@@ -309,6 +331,7 @@ function arcsLayer(arcs: PromptArc[]): string {
  */
 function memoryLayer(
     memories: PromptMemory[],
+    beliefs: PromptBelief[],
     identity: string,
     present: string[],
     cap: number,
@@ -324,14 +347,16 @@ function memoryLayer(
     }
     const kept = keptNow();
     const leftOut = leftOutIndexes.size;
+    // Each Belief of a Character present is a line of its own, after the Memories (.scratch/memory-by-meaning/spec.md).
+    const believed = beliefs.map((belief) => beliefLine(belief.characterName, renderUser(belief.text, identity)));
     const lines =
-        kept.length === 0
+        kept.length === 0 && believed.length === 0
             ? ['Nothing has been established in this Chat yet.']
-            : kept.map((memory) => memoryLine({ text: renderUser(memory.text, identity), knownBy: memory.knownBy }));
+            : [...kept.map((memory) => memoryLine({ text: renderUser(memory.text, identity), knownBy: memory.knownBy })), ...believed];
     return {
         text: `${PROMPT_LAYERS.memory} (what has happened in this Chat so far)
 ${lines.join('\n')}
-A Character knows only the Memories it is tagged on and acts as if the rest never happened; the Narrator knows them all.`,
+A Character knows only the Memories it is tagged on and acts as if the rest never happened; the Narrator knows them all. A Character acts on what they believe, even when it is wrong.`,
         leftOut,
     };
 }
@@ -383,7 +408,7 @@ export type PromptLayersInput = Omit<TurnPromptInput, 'history' | 'userText' | '
 export function systemPrompt(input: PromptLayersInput): { text: string; memoriesLeftOut: number } {
     const identity = input.identity.name;
     const castNames = input.story.characters.map((character) => character.name);
-    const memory = memoryLayer(input.memories, identity, input.present ?? [], input.memoryCapTokens ?? MEMORY_CAP_TOKENS);
+    const memory = memoryLayer(input.memories, input.beliefs ?? [], identity, input.present ?? [], input.memoryCapTokens ?? MEMORY_BUDGET_TOKENS);
     const text = [
         rulesLayer(identity, castNames),
         `${PROMPT_LAYERS.setting}\n${input.story.setting}`,

@@ -92,6 +92,20 @@ export class EmptyMemoryError extends AppError {
     }
 }
 
+/** No Belief with that id in this Chat (.scratch/memory-by-meaning/spec.md, "API"). */
+export class BeliefNotFoundError extends AppError {
+    constructor() {
+        super('404.004.024', 'Belief not found.');
+    }
+}
+
+/** A Belief added or edited with nothing but whitespace. */
+export class EmptyBeliefError extends AppError {
+    constructor() {
+        super('422.004.025', 'Write what they believe.');
+    }
+}
+
 /** A Continue while the last User Message still awaits its reply: Retry is the way on. */
 export class AwaitingReplyError extends AppError {
     constructor() {

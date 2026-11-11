@@ -24,6 +24,7 @@ import {
     SceneBondGateRequestDTO,
     SceneOrderRequestBodyDTO,
     SceneRequestBodyDTO,
+    StartingBeliefsRequestBodyDTO,
     StartingBondRequestBodyDTO,
     StoryRequestBodyDTO,
 } from './dto/story.request.dto.js';
@@ -164,6 +165,13 @@ export class StoryApiController {
         @Id('bondId') bondId: number,
     ): Promise<StoryResponseBodyDTO> {
         return this.storyManager.removeStartingBond(storyId, bondId);
+    }
+
+    /** The whole list of Starting Beliefs (.scratch/memory-by-meaning/spec.md): it replaces the Story's, and answers the Story. */
+    @Put(':storyId/starting-beliefs')
+    @ApiOkResponse({ type: StoryResponseBodyDTO })
+    setStartingBeliefs(@Id('storyId') storyId: number, @Body() body: StartingBeliefsRequestBodyDTO): Promise<StoryResponseBodyDTO> {
+        return this.storyManager.setStartingBeliefs(storyId, body.startingBeliefs);
     }
 
     @Post(':storyId/scenes')

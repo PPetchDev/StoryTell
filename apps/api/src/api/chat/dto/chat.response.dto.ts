@@ -14,7 +14,8 @@ import {
 import { ChatSummary, TimeOfDay, TIMES_OF_DAY } from '../../../model/chat/entities/chat.entity.js';
 import { EMOTIONS } from '../../../model/story/emotion.js';
 import type { Emotion } from '../../../model/story/emotion.js';
-import { BackgroundCallResponse, BackgroundStatus, ReplyVersionsResponse } from '../../../model/chat/entities/message.entity.js';
+import { BackgroundCallResponse, BackgroundStatus, MemoriesUsed, ReplyVersionsResponse } from '../../../model/chat/entities/message.entity.js';
+import { BeliefDTO } from '../../memory/dto/belief.response.dto.js';
 import { ArcStepResponse } from '../../../model/ledger/entities/arc-step.entity.js';
 import { BondLevels } from '../../../model/ledger/bond-axes.js';
 import { BondChangeResponse } from '../../../model/ledger/entities/bond-change.entity.js';
@@ -225,6 +226,15 @@ export class ChatBondDTO implements ChatBond {
     levels: BondLevelsDTO | null;
 }
 
+/** What the last turn's Memory choice sent (.scratch/memory-by-meaning/spec.md: "Used last turn"). */
+export class MemoriesInPlayDTO implements MemoriesUsed {
+    @ApiProperty({ type: [Number], description: 'The Memories the last turn sent; empty before any turn chose.' })
+    memoryIds: number[];
+
+    @ApiProperty({ type: [Number], description: 'The Beliefs the last turn sent; empty before any turn chose.' })
+    beliefIds: number[];
+}
+
 /** The whole Chat as the Chat screen reads it. Every write answers with this. */
 export class ChatResponseBodyDTO extends ChatSummaryDTO implements Omit<ChatDetail, 'messages'> {
     @ApiProperty({ type: CurrentSceneDTO, nullable: true, description: 'null means free play.' })
@@ -290,6 +300,12 @@ export class ChatResponseBodyDTO extends ChatSummaryDTO implements Omit<ChatDeta
 
     @ApiProperty({ type: [ChatBondDTO], description: 'Every current Bond in the Chat, with its levels or null.' })
     bonds: ChatBondDTO[];
+
+    @ApiProperty({ type: MemoriesInPlayDTO, description: 'The Memories and Beliefs the last turn sent, for "In play" in the Memory drawer.' })
+    memoriesInPlay: MemoriesInPlayDTO;
+
+    @ApiProperty({ type: [BeliefDTO], description: 'Every Belief of the Chat, given-up ones included, oldest first.' })
+    beliefs: BeliefDTO[];
 }
 
 /** A Branch answers with the new Chat, plus the User Message's text when it was branched from one. */

@@ -4,12 +4,18 @@ import { ChatNotFoundError, EmptyMemoryError, MemoryNotFoundError } from '../../
 import { StoryNotFoundError } from '../../../errors/story.errors.js';
 import { ChatModelService } from '../../../model/chat/chat.service.js';
 import { ChatEntity } from '../../../model/chat/entities/chat.entity.js';
-import { MessageKind } from '../../../model/chat/entities/message.entity.js';
+import { MemoriesUsed, MessageKind } from '../../../model/chat/entities/message.entity.js';
 import { MemoryAuthor, MemoryEntity, MemoryResponse } from '../../../model/memory/entities/memory.entity.js';
+import { BeliefModelService } from '../../../model/memory/belief.service.js';
+import { BeliefResponse } from '../../../model/memory/entities/belief.entity.js';
 import { MemoryModelService } from '../../../model/memory/memory.service.js';
+import { beliefResponses } from './beliefs.js';
 import { StoryEntity } from '../../../model/story/entities/story.entity.js';
 import { StoryModelService } from '../../../model/story/story.service.js';
 import { wornIdentity } from '../identity.js';
+import { MemoryEmbeddingManagerService } from './memory-embedding.service.js';
+import { choiceMemories, memoriesInPlayOf } from './chat-memory-choice.js';
+import { lockedOverHalf } from './memory-choice.js';
 import { presentCharacters } from './present.js';
 
 /** The Memory drawer's data: every Memory, plus what it needs to render and add one. */
@@ -27,6 +33,12 @@ export interface MemoryList {
     present: number[];
     /** Active and archived, oldest first. */
     memories: MemoryResponse[];
+    /** Every Belief, given-up ones included, oldest first (.scratch/memory-by-meaning/spec.md, "In the Memory drawer"). */
+    beliefs: BeliefResponse[];
+    /** What the last turn sent (.scratch/memory-by-meaning/spec.md: "Used last turn"), shown as "In play". */
+    inPlay: MemoriesUsed;
+    /** Spec: "The locked warning": the locked Memories alone take more than half the Memory budget. */
+    lockedWarning: boolean;
 }
 
 /**
@@ -40,6 +52,8 @@ export class MemoryManagerService {
         private readonly storyModel: StoryModelService,
         private readonly chatModel: ChatModelService,
         private readonly memoryModel: MemoryModelService,
+        private readonly memoryEmbedding: MemoryEmbeddingManagerService,
+        private readonly beliefModel: BeliefModelService,
     ) {}
 
     async list(storyId: number, chatId: number): Promise<MemoryList> {
@@ -60,6 +74,8 @@ export class MemoryManagerService {
             archived: false,
             messageId: null,
         });
+        // Found by meaning from the next turn on (.scratch/memory-by-meaning/spec.md); a failure leaves it unembedded.
+        await this.memoryEmbedding.embedSaved(story.id, chat.id, [memory.id]);
         return memory.toResponse(castOrder(story));
     }
 
@@ -76,6 +92,7 @@ export class MemoryManagerService {
             locked: true,
             archived: memory.archived,
         });
+        if (text !== memory.text) await this.memoryEmbedding.embedSaved(story.id, chat.id, [memory.id]);
         return (await this.find(chat, memoryId)).toResponse(castOrder(story));
     }
 
@@ -100,7 +117,7 @@ export class MemoryManagerService {
     }
 
     private async listOf(story: StoryEntity, chat: ChatEntity): Promise<MemoryList> {
-        const memories = await this.memoryModel.findByChat(chat.id);
+        const [memories, beliefs] = await Promise.all([this.memoryModel.findByChat(chat.id), this.beliefModel.findByChat(chat.id)]);
         return {
             chatId: chat.id,
             storyId: story.id,
@@ -108,6 +125,9 @@ export class MemoryManagerService {
             cast: story.characters.map((character) => ({ id: character.id, name: character.name })),
             present: present(story, chat),
             memories: memories.map((memory) => memory.toResponse(castOrder(story))),
+            beliefs: beliefResponses(beliefs, chat),
+            inPlay: memoriesInPlayOf(chat),
+            lockedWarning: lockedOverHalf(choiceMemories(story, memories)),
         };
     }
 

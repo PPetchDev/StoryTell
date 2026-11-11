@@ -1,6 +1,6 @@
 # 02 — Each turn chooses Memories by meaning, in a 4k budget
 
-**Status:** ready-for-agent
+**Status:** done
 
 **What to build:** One `context_search` embedding per turn, of the Documents query, serves both Documents and Memory. A pure choice fills a 4,000-token Memory budget, in this order:
 1. locked Memories, never left out;
@@ -17,12 +17,12 @@ The search runs when the Story has passages or the Chat has embedded Memories. T
 
 **Part of:** [Spec: Memory by meaning](../spec.md)
 
-- [ ] Pure tests: the fill order; locked past the budget; no vector falls back to newest; an archived Memory can be found; story order with each reason.
-- [ ] API tests:
+- [x] Pure tests: the fill order; locked past the budget; no vector falls back to newest; an archived Memory can be found; story order with each reason.
+- [x] API tests:
   - a turn makes one `context_search` call, even with Documents too;
   - its prompt carries the Memory closest to the query over an older unrelated one;
   - a failed search writes the turn with the newest Memories;
   - Snapshot, Suggested replies and Write for me use the chosen Memories;
   - the locked warning flag past half the budget.
-- [ ] e2e at 390px: "In play" on the used Memories; the locked warning.
-- [ ] Typecheck and the whole suites stay green.
+- [x] e2e at 390px: "In play" on the used Memories; the locked warning.
+- [x] Typecheck and the whole suites stay green.

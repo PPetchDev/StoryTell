@@ -5,6 +5,7 @@ import {
     CastFullError,
     CharacterNotFoundError,
     DuplicateStartingBondError,
+    EmptyStartingBeliefError,
     InvalidBondGateError,
     InvalidCoverChoiceError,
     InvalidOrderError,
@@ -631,6 +632,22 @@ export class StoryManagerService {
     async removeStartingBond(storyId: number, bondId: number): Promise<StoryDetail> {
         const story = await this.load(storyId);
         await this.storyModel.removeStartingBond(this.findStartingBond(story, bondId));
+        return this.saved(storyId);
+    }
+
+    /**
+     * .scratch/memory-by-meaning/spec.md, "Starting Beliefs": the whole list at once, in order, each
+     * held by one of the Story's Characters and with text. A bad item refuses the whole list, and
+     * nothing changes. New and reset Chats seed from it; Chats already going keep theirs.
+     */
+    async setStartingBeliefs(storyId: number, beliefs: Array<{ characterId: number; text: string }>): Promise<StoryDetail> {
+        const story = await this.load(storyId);
+        const cleaned = beliefs.map((belief) => ({ characterId: belief.characterId, text: belief.text.trim() }));
+        for (const belief of cleaned) {
+            this.findCharacter(story, belief.characterId);
+            if (belief.text === '') throw new EmptyStartingBeliefError();
+        }
+        await this.storyModel.replaceStartingBeliefs(storyId, cleaned);
         return this.saved(storyId);
     }
 

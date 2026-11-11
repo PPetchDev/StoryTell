@@ -9,6 +9,9 @@ import { SavedReplyEntity } from '../src/model/saved-reply/entities/saved-reply.
 import { ReplaceRuleEntity } from '../src/model/replace-rule/entities/replace-rule.entity.js';
 import { UsageRecordEntity } from '../src/model/usage-record/entities/usage-record.entity.js';
 import { CharacterExpressionEntity } from '../src/model/story/entities/character-expression.entity.js';
+import { BeliefChangeEntity } from '../src/model/ledger/entities/belief-change.entity.js';
+import { BeliefEntity } from '../src/model/memory/entities/belief.entity.js';
+import { StartingBeliefEntity } from '../src/model/story/entities/starting-belief.entity.js';
 
 import { startTestApp, TestApp } from './harness/test-app.js';
 
@@ -40,7 +43,7 @@ describe('Database schema', () => {
 
     // Older migrations name their constraints their own way, so the whole schema can't be diffed
     // against the entities. Newer tables are checked column by column instead.
-    it.each([DocumentEntity, DocumentPassageEntity, ThaiReadingEntity, SavedReplyEntity, ReplaceRuleEntity, UsageRecordEntity, CharacterExpressionEntity])('migrates every column %o declares, with its type and nullability', async (entity) => {
+    it.each([DocumentEntity, DocumentPassageEntity, ThaiReadingEntity, SavedReplyEntity, ReplaceRuleEntity, UsageRecordEntity, CharacterExpressionEntity, BeliefEntity, BeliefChangeEntity, StartingBeliefEntity])('migrates every column %o declares, with its type and nullability', async (entity) => {
         const metadata = t.app.get(DataSource).getMetadata(entity);
         const client = new pg.Client({ connectionString: t.databaseUrl });
         await client.connect();

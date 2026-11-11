@@ -88,6 +88,14 @@ export interface StartingBond extends BondLevels {
     description: string;
 }
 
+/** What a Character believes when a Chat starts, which may be false (.scratch/memory-by-meaning/spec.md). */
+export interface StartingBelief {
+    id: number;
+    characterId: number;
+    /** With `{user}` where it names the one the user plays. */
+    text: string;
+}
+
 export interface Scene {
     id: number;
     name: string;
@@ -205,6 +213,8 @@ export interface Story {
     role: Role;
     characters: Character[];
     startingBonds: StartingBond[];
+    /** In the author's order; every new Chat and Reset begins with them as Beliefs. */
+    startingBeliefs: StartingBelief[];
     scenes: Scene[];
     /** In add order. */
     lore: LoreEntry[];
@@ -333,6 +343,9 @@ export const storyApi = {
         apiSend<Story>('PATCH', `/stories/${storyId}/starting-bonds/${bondId}`, fields),
     removeStartingBond: (storyId: number, bondId: number) =>
         apiSend<Story>('DELETE', `/stories/${storyId}/starting-bonds/${bondId}`),
+    /** The whole list of Starting Beliefs, in order; it replaces the Story's. */
+    setStartingBeliefs: (storyId: number, beliefs: Array<{ characterId: number; text: string }>) =>
+        apiSend<Story>('PUT', `/stories/${storyId}/starting-beliefs`, { startingBeliefs: beliefs }),
 
     addScene: (storyId: number, fields: SceneFields = {}) =>
         apiSend<Story>('POST', `/stories/${storyId}/scenes`, fields),

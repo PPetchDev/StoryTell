@@ -194,7 +194,7 @@ test('the Memory drawer lists the passages the last turn used, and says when its
         await drawer.getByRole('button', { name: 'Close' }).first().click();
 
         // The next turn's search fails at the embedding host: the turn still plays.
-        await request.post('/api/testing/fake-gateway/embedding', { data: { kind: 'document_search', replies: [{ error: 'outage' }] } });
+        await request.post('/api/testing/fake-gateway/embedding', { data: { kind: 'context_search', replies: [{ error: 'outage' }] } });
         await scriptTurn(request);
         await page.getByLabel('Write as Petch').fill('And the ledger?');
         await page.getByRole('button', { name: 'Send' }).click();

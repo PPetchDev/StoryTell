@@ -455,7 +455,7 @@ Nobody moves to help.`;
             // The Memory layer is last in the system message and empty on the first turn.
             expect(system.content.endsWith(`${PROMPT_LAYERS.memory} (what has happened in this Chat so far)
 Nothing has been established in this Chat yet.
-A Character knows only the Memories it is tagged on and acts as if the rest never happened; the Narrator knows them all.`)).toBe(true);
+A Character knows only the Memories it is tagged on and acts as if the rest never happened; the Narrator knows them all. A Character acts on what they believe, even when it is wrong.`)).toBe(true);
 
             expect(system.content).toContain('A lighthouse on a storm-cut island, 1890s.');
             expect(system.content).toContain('Ash: The new keeper, arrived this morning.');

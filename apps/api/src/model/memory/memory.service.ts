@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, IsNull, Not, Repository } from 'typeorm';
 
 import { MemoryKnownByEntity } from './entities/memory-known-by.entity.js';
 import { MemoryAuthor, MemoryEntity } from './entities/memory.entity.js';
@@ -37,7 +37,11 @@ export class MemoryModelService {
         return this.dataSource.transaction((manager) => createMemory(manager, fields));
     }
 
-    /** Replaces the text, the Known-by set and the flags in one transaction. */
+    /**
+     * Replaces the text, the Known-by set and the flags in one transaction. New text drops the
+     * vector of the old one (.scratch/memory-by-meaning/spec.md: "A Memory whose text changes loses
+     * its vector until it is embedded again").
+     */
     update(
         memory: MemoryEntity,
         fields: { text: string; knownBy: number[]; writtenBy: MemoryAuthor; locked: boolean; archived: boolean },
@@ -46,7 +50,13 @@ export class MemoryModelService {
             await manager.update(
                 MemoryEntity,
                 { id: memory.id },
-                { text: fields.text, writtenBy: fields.writtenBy, locked: fields.locked, archived: fields.archived },
+                {
+                    text: fields.text,
+                    writtenBy: fields.writtenBy,
+                    locked: fields.locked,
+                    archived: fields.archived,
+                    ...(fields.text === memory.text ? {} : { embedding: null, embeddingModel: null }),
+                },
             );
             await setKnownBy(manager, memory.id, fields.knownBy);
         });
@@ -54,6 +64,42 @@ export class MemoryModelService {
 
     async remove(memoryId: number): Promise<void> {
         await this.memories.delete({ id: memoryId });
+    }
+
+    /** The Chat's Memories with these ids, oldest first; ids of other Chats or of deleted Memories are skipped. */
+    findByIds(chatId: number, memoryIds: number[]): Promise<MemoryEntity[]> {
+        if (memoryIds.length === 0) return Promise.resolve([]);
+        return this.memories.find({ where: { chatId, id: In(memoryIds) }, order: { id: 'ASC' } });
+    }
+
+    /** The Chat's Memories with no vector, or with one `model` didn't make, oldest first. */
+    findUnembedded(chatId: number, model: string): Promise<MemoryEntity[]> {
+        return this.memories.find({
+            where: [
+                { chatId, embedding: IsNull() },
+                { chatId, embeddingModel: Not(model) },
+            ],
+            order: { id: 'ASC' },
+        });
+    }
+
+    /** Every Chat (with its Story) that holds a Memory with no vector, or with one `model` didn't make, by Chat id. */
+    async chatsWithUnembedded(model: string): Promise<Array<{ chatId: number; storyId: number }>> {
+        const rows: Array<{ chat_id: number; story_id: number }> = await this.dataSource.query(
+            `SELECT DISTINCT m."chat_id", c."story_id" FROM "memory" m JOIN "chat" c ON c."id" = m."chat_id"
+             WHERE m."embedding" IS NULL OR m."embedding_model" IS DISTINCT FROM $1
+             ORDER BY m."chat_id"`,
+            [model],
+        );
+        return rows.map((row) => ({ chatId: row.chat_id, storyId: row.story_id }));
+    }
+
+    /**
+     * Stores a Memory's vector, but only while its text is still `text`: a vector of words the
+     * Memory no longer holds is never kept.
+     */
+    async setEmbedding(memoryId: number, text: string, embedding: number[], model: string): Promise<void> {
+        await this.memories.update({ id: memoryId, text }, { embedding, embeddingModel: model });
     }
 }
 

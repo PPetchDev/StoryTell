@@ -1037,6 +1037,42 @@ a {
     color: var(--event);
 }
 
+/* The last turn sent this Memory (.scratch/memory-by-meaning/spec.md: "Used last turn"). */
+.memory-in-play {
+    color: var(--accent);
+    font-weight: 600;
+}
+
+/* Beliefs, under the Memories (.scratch/memory-by-meaning/spec.md, "In the Memory drawer"). */
+.memory-beliefs {
+    margin-top: 1.5rem;
+}
+
+.memory-beliefs h3 {
+    margin: 0 0 0.25rem;
+}
+
+.memory-beliefs > .button {
+    margin-top: 0.75rem;
+}
+
+.belief-holder {
+    font-weight: 600;
+}
+
+.belief-truth {
+    border-left: 3px solid var(--event);
+    padding-left: 0.5rem;
+}
+
+.memory-locked-warning {
+    margin: 0.5rem 0;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    background: var(--quiet-fill);
+    border-left: 3px solid var(--event);
+}
+
 .memory-form {
     display: grid;
     gap: 0.5rem;

@@ -23,6 +23,8 @@ const CALL_KINDS = Object.keys({
     expression_image: true,
     document_embedding: true,
     document_search: true,
+    memory_embedding: true,
+    context_search: true,
     dictation: true,
     read_aloud: true,
     voice_preview: true,

@@ -12,7 +12,7 @@ export type IdMap = Map<number, number>;
 /**
  * What every copy step gets: the transaction's manager, the source and new Chat, the position
  * of the last Message the Branch keeps, and the id maps filled so far (Messages first, then
- * Memories). A step reads the source and writes only rows of the new Chat.
+ * Memories, then Beliefs). A step reads the source and writes only rows of the new Chat.
  */
 export interface CopyContext {
     manager: EntityManager;
@@ -22,6 +22,7 @@ export interface CopyContext {
     through: number;
     messageIds: IdMap;
     memoryIds: IdMap;
+    beliefIds: IdMap;
 }
 
 export type CopyStep = (context: CopyContext) => Promise<void>;
@@ -57,7 +58,7 @@ export class BranchModelService {
     copy(sourceChatId: number, through: number, fields: BranchFields): Promise<{ chatId: number; messageIds: IdMap }> {
         return this.dataSource.transaction('REPEATABLE READ', async (manager) => {
             const chatId = await copyChat(manager, sourceChatId, through, fields);
-            const context: CopyContext = { manager, sourceChatId, chatId, through, messageIds: new Map(), memoryIds: new Map() };
+            const context: CopyContext = { manager, sourceChatId, chatId, through, messageIds: new Map(), memoryIds: new Map(), beliefIds: new Map() };
             for (const step of COPY_STEPS) await step(context);
             // The ledger's step ends here: undo every change the Messages after N caused.
             await this.ledger.rollbackFrom(chatId, through + 1, manager);
@@ -116,10 +117,11 @@ const copyMessages: CopyStep = async ({ manager, sourceChatId, chatId, through, 
     const keepVersions = newest[0]?.position === through;
     await manager.query(
         `INSERT INTO "message" ("id", "chat_id", "position", "kind", "text", "identity_name", "persona_id", "model",
-                "judge_status", "judge_error", "memory_status", "memory_error", "version_ordinal", "document_passages", "created_at")
+                "judge_status", "judge_error", "memory_status", "memory_error", "version_ordinal", "document_passages",
+                "memories_used", "context_query", "context_query_model", "created_at")
          SELECT m."new_id", $1, s."position", s."kind", s."text", s."identity_name", s."persona_id", s."model",
                 s."judge_status", s."judge_error", s."memory_status", s."memory_error",
-                s."version_ordinal", s."document_passages", s."created_at"
+                s."version_ordinal", s."document_passages", s."memories_used", s."context_query", s."context_query_model", s."created_at"
          FROM "message" s JOIN unnest($3::int[], $4::int[]) AS m("old_id", "new_id") ON m."old_id" = s."id"
          WHERE s."chat_id" = $2 ORDER BY s."id"`,
         [chatId, sourceChatId, olds, news],
@@ -165,8 +167,8 @@ const copyMemories: CopyStep = async ({ manager, sourceChatId, chatId, messageId
     const [messageOlds, messageNews] = oldAndNewIds(messageIds);
     const [memoryOlds, memoryNews] = oldAndNewIds(memoryIds);
     await manager.query(
-        `INSERT INTO "memory" ("id", "chat_id", "text", "written_by", "locked", "archived", "message_id", "created_at")
-         SELECT mm."new_id", $1, s."text", s."written_by", s."locked", s."archived", msg."new_id", s."created_at"
+        `INSERT INTO "memory" ("id", "chat_id", "text", "written_by", "locked", "archived", "message_id", "embedding", "embedding_model", "created_at")
+         SELECT mm."new_id", $1, s."text", s."written_by", s."locked", s."archived", msg."new_id", s."embedding", s."embedding_model", s."created_at"
          FROM "memory" s JOIN unnest($3::int[], $4::int[]) AS mm("old_id", "new_id") ON mm."old_id" = s."id"
          LEFT JOIN unnest($5::int[], $6::int[]) AS msg("old_id", "new_id") ON msg."old_id" = s."message_id"
          WHERE s."chat_id" = $2 ORDER BY s."id"`,
@@ -260,8 +262,88 @@ const copyThaiReadings: CopyStep = async ({ manager, sourceChatId, through, mess
         [sourceChatId, olds, news, through],
     );
 };
-/** In order: Messages before anything that points at them, Memories before their changes. */
-const COPY_STEPS: CopyStep[] = [copyMessages, copyMessageParts, copyThaiReadings, copyMemories, copyLedger, copySittingOut];
+/**
+ * Beliefs and every BeliefChange (.scratch/memory-by-meaning/spec.md: "Branch copies Beliefs and
+ * their changes with remapped ids"), as Memories are copied: every Belief id the source mentions
+ * gets a fresh one in ascending order, and the Messages and the contradicted Memory move to the
+ * Branch's own. The ledger's rollback then undoes what the Messages after N made or gave up.
+ */
+const copyBeliefs: CopyStep = async ({ manager, sourceChatId, chatId, messageIds, memoryIds, beliefIds }) => {
+    const rows: Array<{ id: number }> = await manager.query(
+        `SELECT "id" FROM "belief" WHERE "chat_id" = $1
+         UNION SELECT "belief_id" FROM "belief_change" WHERE "chat_id" = $1
+         ORDER BY 1`,
+        [sourceChatId],
+    );
+    mapInOrder(beliefIds, rows.map((row) => row.id), await reserveIds(manager, 'belief', rows.length));
+    const [messageOlds, messageNews] = oldAndNewIds(messageIds);
+    const [memoryOlds, memoryNews] = oldAndNewIds(memoryIds);
+    const [beliefOlds, beliefNews] = oldAndNewIds(beliefIds);
+    await manager.query(
+        `INSERT INTO "belief" ("id", "chat_id", "character_id", "text", "contradicts_memory_id", "written_by", "message_id", "given_up_message_id", "created_at")
+         SELECT b."new_id", $1, s."character_id", s."text", mem."new_id", s."written_by", msg."new_id", gone."new_id", s."created_at"
+         FROM "belief" s JOIN unnest($3::int[], $4::int[]) AS b("old_id", "new_id") ON b."old_id" = s."id"
+         LEFT JOIN unnest($5::int[], $6::int[]) AS msg("old_id", "new_id") ON msg."old_id" = s."message_id"
+         LEFT JOIN unnest($5::int[], $6::int[]) AS gone("old_id", "new_id") ON gone."old_id" = s."given_up_message_id"
+         LEFT JOIN unnest($7::int[], $8::int[]) AS mem("old_id", "new_id") ON mem."old_id" = s."contradicts_memory_id"
+         WHERE s."chat_id" = $2 ORDER BY s."id"`,
+        [chatId, sourceChatId, beliefOlds, beliefNews, messageOlds, messageNews, memoryOlds, memoryNews],
+    );
+    // The snapshots in the records name the source's Memories and Messages: moved to the Branch's own, so an undo puts back the right ones.
+    const changes: Array<{ id: number; belief_id: number; kind: string; before: Snapshot | null; after: Snapshot | null; event: string; message_id: number; created_at: Date }> =
+        await manager.query(`SELECT * FROM "belief_change" WHERE "chat_id" = $1 ORDER BY "id"`, [sourceChatId]);
+    for (const change of changes) {
+        const messageId = messageIds.get(change.message_id);
+        if (messageId === undefined) continue;
+        await manager.query(
+            `INSERT INTO "belief_change" ("chat_id", "belief_id", "kind", "before", "after", "event", "message_id", "created_at")
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            [
+                chatId,
+                beliefIds.get(change.belief_id),
+                change.kind,
+                remapSnapshot(change.before, messageIds, memoryIds),
+                remapSnapshot(change.after, messageIds, memoryIds),
+                change.event,
+                messageId,
+                change.created_at,
+            ],
+        );
+    }
+};
+
+type Snapshot = { contradictsMemoryId: number | null; givenUpMessageId: number | null } & Record<string, unknown>;
+
+/** A Belief snapshot with its Memory and Message moved to the Branch's own, or null where the Branch holds none. */
+function remapSnapshot(snapshot: Snapshot | null, messageIds: IdMap, memoryIds: IdMap): string | null {
+    if (!snapshot) return null;
+    return JSON.stringify({
+        ...snapshot,
+        contradictsMemoryId: snapshot.contradictsMemoryId === null ? null : (memoryIds.get(snapshot.contradictsMemoryId) ?? null),
+        givenUpMessageId: snapshot.givenUpMessageId === null ? null : (messageIds.get(snapshot.givenUpMessageId) ?? null),
+    });
+}
+
+/**
+ * What each copied turn's Memory choice sent (.scratch/memory-by-meaning/spec.md: "Used last
+ * turn"), with its Memory and Belief ids moved to the Branch's own; an id the copy doesn't hold is dropped.
+ */
+const remapMemoriesUsed: CopyStep = async ({ manager, chatId, memoryIds, beliefIds }) => {
+    const rows: Array<{ id: number; memories_used: { memoryIds: number[]; beliefIds: number[] } }> = await manager.query(
+        'SELECT "id", "memories_used" FROM "message" WHERE "chat_id" = $1 AND "memories_used" IS NOT NULL',
+        [chatId],
+    );
+    for (const row of rows) {
+        const used = {
+            memoryIds: row.memories_used.memoryIds.flatMap((id) => (memoryIds.has(id) ? [memoryIds.get(id)!] : [])),
+            beliefIds: row.memories_used.beliefIds.flatMap((id) => (beliefIds.has(id) ? [beliefIds.get(id)!] : [])),
+        };
+        await manager.query('UPDATE "message" SET "memories_used" = $2 WHERE "id" = $1', [row.id, JSON.stringify(used)]);
+    }
+};
+
+/** In order: Messages before anything that points at them, Memories before their changes and the Beliefs that contradict them. */
+const COPY_STEPS: CopyStep[] = [copyMessages, copyMessageParts, copyThaiReadings, copyMemories, copyBeliefs, remapMemoriesUsed, copyLedger, copySittingOut];
 
 /** `count` fresh ids from `table`'s id sequence, ascending. */
 async function reserveIds(manager: EntityManager, table: string, count: number): Promise<number[]> {

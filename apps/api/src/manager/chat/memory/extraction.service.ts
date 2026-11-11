@@ -6,6 +6,7 @@ import { ChatModelService } from '../../../model/chat/chat.service.js';
 import { ChatEntity } from '../../../model/chat/entities/chat.entity.js';
 import { BackgroundStatus, MessageEntity, MessageKind } from '../../../model/chat/entities/message.entity.js';
 import { LedgerModelService } from '../../../model/ledger/ledger.service.js';
+import { BeliefModelService } from '../../../model/memory/belief.service.js';
 import { MemoryModelService } from '../../../model/memory/memory.service.js';
 import { StoryEntity } from '../../../model/story/entities/story.entity.js';
 import { ModelGateway } from '../../../service/model-gateway/model-gateway.js';
@@ -15,7 +16,8 @@ import { Attempt, BackgroundRuns } from '../background-runs.js';
 import { SettledBackground, sleep } from '../judge/judge.service.js';
 import { partsToText } from '../turn/reply-parser.js';
 import { applyExtraction } from './apply-extraction.js';
-import { buildExtractionPrompt, overMemoryCap, parseExtraction } from './memory-prompt.js';
+import { MemoryEmbeddingManagerService } from './memory-embedding.service.js';
+import { buildExtractionPrompt, parseExtraction } from './memory-prompt.js';
 import { presentCharacters } from './present.js';
 
 /** The latest AI Message a model wrote, which is the only one whose extraction can be pending or failed. */
@@ -47,6 +49,8 @@ export class MemoryExtractionManagerService {
         private readonly ledger: LedgerModelService,
         private readonly gateway: ModelGateway,
         private readonly config: AppConfig,
+        private readonly memoryEmbedding: MemoryEmbeddingManagerService,
+        private readonly beliefModel: BeliefModelService,
     ) {
         this.runs = new BackgroundRuns(config.backgroundRetryMs);
     }
@@ -101,7 +105,7 @@ export class MemoryExtractionManagerService {
             const nameOf = (characterId: number): string | null => cast.find((member) => member.id === characterId)?.name ?? null;
             const parts = message.parts.map((part) => part.toResponse());
 
-            const memories = await this.memoryModel.findByChat(chat.id);
+            const [memories, beliefs] = await Promise.all([this.memoryModel.findByChat(chat.id), this.beliefModel.findByChat(chat.id)]);
             const active = memories.filter((memory) => !memory.archived);
             const lines = active.map((memory) => ({
                 id: memory.id,
@@ -109,16 +113,20 @@ export class MemoryExtractionManagerService {
                 knownBy: memory.knownByIds(cast.map((member) => member.id)).flatMap((id) => nameOf(id) ?? []),
                 locked: memory.locked,
             }));
-            const overCap = overMemoryCap(lines);
-            if (overCap) this.logger.log(`Chat ${chat.id}: Memory is over the cap; asking the extraction to merge and archive`);
             const prompt = buildExtractionPrompt({
                 cast: cast.map((member) => member.name),
                 identityName,
                 present: presentCharacters(inStory, userText ?? '', parts).map((member) => member.name),
                 memories: lines,
+                // The active Beliefs, numbered (.scratch/memory-by-meaning/spec.md: "The extraction makes and gives up Beliefs").
+                beliefs: beliefs
+                    .filter((belief) => belief.active)
+                    .flatMap((belief) => {
+                        const characterName = nameOf(belief.characterId);
+                        return characterName ? [{ id: belief.id, characterName, text: belief.text, contradicts: belief.contradictsMemoryId }] : [];
+                    }),
                 userText,
                 aiText: partsToText(parts),
-                overCap,
             });
 
             const result = await this.gateway.completeText({
@@ -140,6 +148,7 @@ export class MemoryExtractionManagerService {
                         locked: memory.locked,
                         archived: memory.archived,
                     })),
+                    beliefs: beliefs.map((belief) => ({ id: belief.id, characterId: belief.characterId, text: belief.text, active: belief.active })),
                     sittingOut,
                 },
                 extraction,
@@ -147,7 +156,9 @@ export class MemoryExtractionManagerService {
             for (const reason of applied.rejected) {
                 this.logger.log(`Chat ${chat.id}, Message ${message.id}: extraction item dropped: ${reason}`);
             }
-            await this.ledger.recordMemories(chat.id, message.id, applied.changes);
+            await this.ledger.recordMemories(chat.id, message.id, applied.changes, applied.beliefChanges);
+            // Once recorded, the new and reworded Memories are embedded; a failure there never fails the extraction.
+            await this.memoryEmbedding.embedAfterExtraction(story.id, chat.id);
             return { ok: true };
         } catch (error) {
             const reason = error instanceof AppError ? error.message : `Unexpected error: ${String(error)}`;

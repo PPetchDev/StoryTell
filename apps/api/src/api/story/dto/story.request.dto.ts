@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
     ArrayMaxSize,
     IsArray,
@@ -10,6 +11,7 @@ import {
     IsString,
     Max,
     MaxLength,
+    ValidateNested,
     Min,
     ValidateIf,
 } from 'class-validator';
@@ -393,4 +395,26 @@ export class SceneOrderRequestBodyDTO {
     @IsArray()
     @IsInt({ each: true })
     sceneIds: number[];
+}
+
+/** One Starting Belief (.scratch/memory-by-meaning/spec.md, "Starting Beliefs"). */
+export class StartingBeliefRequestDTO {
+    @ApiProperty({ description: 'The Character who believes it when a Chat starts.' })
+    @IsInt()
+    characterId: number;
+
+    @ApiProperty({ description: 'What they believe, which may be false. Write `{user}` where it names the user.' })
+    @IsString()
+    @MaxLength(2_000)
+    text: string;
+}
+
+/** The whole list of Starting Beliefs, in order: it replaces what the Story has. */
+export class StartingBeliefsRequestBodyDTO {
+    @ApiProperty({ type: [StartingBeliefRequestDTO] })
+    @IsArray()
+    @ArrayMaxSize(50)
+    @ValidateNested({ each: true })
+    @Type(() => StartingBeliefRequestDTO)
+    startingBeliefs: StartingBeliefRequestDTO[];
 }

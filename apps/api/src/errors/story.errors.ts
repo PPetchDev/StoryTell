@@ -168,6 +168,13 @@ export class ExpressionNotFoundError extends AppError {
  * A Scene's Bond gates that name a Character outside the cast, point a Character at itself, ask for
  * a level outside the axis's range, or set one Bond's axis twice (.scratch/bond-axes/spec.md, "API").
  */
+/** A Starting Belief saved with nothing but whitespace (.scratch/memory-by-meaning/spec.md). */
+export class EmptyStartingBeliefError extends AppError {
+    constructor() {
+        super('422.003.025', 'Write what the Character believes.');
+    }
+}
+
 export class InvalidBondGateError extends AppError {
     constructor(reason: string) {
         super('422.003.024', `That Bond gate can't be set: ${reason}`);

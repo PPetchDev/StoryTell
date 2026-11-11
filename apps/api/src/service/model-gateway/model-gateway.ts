@@ -27,6 +27,12 @@ export abstract class ModelGateway {
     abstract embedTexts(request: EmbeddingRequest): Promise<EmbeddingResult>;
 
     /**
+     * The model `embedTexts` answers with now, the same name its results carry. Makes no call:
+     * the Memory backfill reads it to find vectors another model made.
+     */
+    abstract embeddingModel(): string;
+
+    /**
      * Transcription for Dictation (.scratch/dictation/spec.md, "Model Gateway"): one recording, transcribed
      * in the language asked for. Venice pool; callers never name the model.
      */
@@ -64,8 +70,14 @@ export type TextCallKind =
 /** `expression_image`: a Character's Expression, drawn from their Reference image (.scratch/expressions/spec.md). */
 export type ImageCallKind = 'snapshot_image' | 'reference_image' | 'expression_image';
 
-/** A Document's passages turned into vectors on Add, and one query per turn. Both in the text pool. */
-export type EmbeddingCallKind = 'document_embedding' | 'document_search';
+/**
+ * A Document's passages turned into vectors on Add; a Chat's Memories turned into vectors as they
+ * are made, edited or backfilled (`memory_embedding`); and one query per turn, searched for both
+ * Memories and Documents (`context_search`, .scratch/memory-by-meaning/spec.md). `document_search`
+ * is the per-turn search's kind from before Memories joined it: no call makes it now, but its
+ * usage records keep their label. All in the text pool.
+ */
+export type EmbeddingCallKind = 'document_embedding' | 'document_search' | 'memory_embedding' | 'context_search';
 
 /**
  * Venice audio, in the Venice (`image`) pool: one type shared by Dictation and Read aloud

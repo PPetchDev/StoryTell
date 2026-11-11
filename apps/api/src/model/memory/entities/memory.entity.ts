@@ -87,6 +87,18 @@ export class MemoryEntity {
     @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
     createdAt: Date;
 
+    /**
+     * Its meaning as a vector at unit length, as a Document passage stores one
+     * (.scratch/memory-by-meaning/spec.md, "Embedding Memories"); null until it is embedded, and
+     * again from the moment its text changes until it is embedded anew. Never sent to the client.
+     */
+    @Column({ type: 'real', array: true, nullable: true })
+    embedding: number[] | null;
+
+    /** The model that made `embedding`; null with it. */
+    @Column({ name: 'embedding_model', type: 'text', nullable: true })
+    embeddingModel: string | null;
+
     // Loaded with the Memory (MemoryModelService); a removed Character drops out through CASCADE.
     @OneToMany('MemoryKnownByEntity', 'memory')
     knownBy: Relation<MemoryKnownByEntity[]>;

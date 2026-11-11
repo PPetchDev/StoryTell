@@ -1,6 +1,6 @@
 # 04 — Beliefs: made and given up by the extraction, told to the Narrator, shown in the drawer
 
-**Status:** ready-for-agent
+**Status:** done
 
 **What to build:** A Character can hold a Belief that may be false. Follow the spec's "Beliefs", except Starting Beliefs, which are ticket 05:
 - the `belief` table and the `belief_change` ledger, which an edit, a Regenerate or a Reply-version choice rolls back;
@@ -17,13 +17,13 @@
 
 **Part of:** [Spec: Memory by meaning](../spec.md)
 
-- [ ] Pure tests: `believe` and `give_up` parse and apply; the drops; the choice places Beliefs of those present after locked Memories.
-- [ ] API tests:
+- [x] Pure tests: `believe` and `give_up` parse and apply; the drops; the choice places Beliefs of those present after locked Memories.
+- [x] API tests:
   - a scripted `believe` shows in the Chat and reaches the Narrator as "X believes: …";
   - `give_up` takes it out;
   - Regenerate undoes a Belief the replaced reply made;
   - Branch carries Beliefs;
   - Reset clears them;
   - the Beliefs API, and its 404.
-- [ ] e2e at 390px: the Beliefs section reads "Nara believes …" with "Doesn't match"; adding a Belief from the drawer.
-- [ ] Typecheck and the whole suites stay green.
+- [x] e2e at 390px: the Beliefs section reads "Nara believes …" with "Doesn't match"; adding a Belief from the drawer.
+- [x] Typecheck and the whole suites stay green.

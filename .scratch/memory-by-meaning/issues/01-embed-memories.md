@@ -1,6 +1,6 @@
 # 01 — Every Memory is embedded
 
-**Status:** ready-for-agent
+**Status:** done
 
 **What to build:** Memories gain a vector, as Document passages have. Follow the spec's "Embedding Memories":
 - the migration: `embedding` (`real[]`, unit length, nullable) and `embedding_model`;
@@ -17,10 +17,10 @@ Nothing chooses Memories by meaning yet.
 
 **Part of:** [Spec: Memory by meaning](../spec.md)
 
-- [ ] API tests through the fake gateway:
+- [x] API tests through the fake gateway:
   - one `memory_embedding` call for an extraction's new Memories;
   - a user-added Memory is embedded;
   - a rewording re-embeds it;
   - a scripted embedding failure leaves the extraction recorded and the vector null;
   - the backfill embeds Memories with no vector and leaves current ones alone.
-- [ ] Typecheck and the whole suites stay green.
+- [x] Typecheck and the whole suites stay green.

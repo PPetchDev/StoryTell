@@ -219,6 +219,10 @@ export class RealModelGateway extends ModelGateway {
      * with the cost OpenRouter reports, or the list price times the prompt tokens when it
      * reports none.
      */
+    embeddingModel(): string {
+        return EMBEDDING_MODEL;
+    }
+
     async embedTexts(request: EmbeddingRequest): Promise<EmbeddingResult> {
         if (request.inputs.length === 0) throw new RangeError('embedTexts needs at least one input');
         const modelName = EMBEDDING_MODEL;

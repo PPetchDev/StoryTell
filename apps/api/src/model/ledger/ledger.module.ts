@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { ArcStepEntity } from './entities/arc-step.entity.js';
+import { BeliefChangeEntity } from './entities/belief-change.entity.js';
 import { BondChangeEntity } from './entities/bond-change.entity.js';
 import { ChatArcDirectionEntity } from './entities/chat-arc-direction.entity.js';
 import { MemoryChangeEntity } from './entities/memory-change.entity.js';
@@ -18,6 +19,7 @@ import { LedgerModelService } from './ledger.service.js';
             TimeChangeEntity,
             ChatArcDirectionEntity,
             MemoryChangeEntity,
+            BeliefChangeEntity,
         ]),
     ],
     providers: [LedgerModelService],

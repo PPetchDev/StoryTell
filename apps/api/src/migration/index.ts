@@ -38,6 +38,10 @@ import { StoryBackdrop1764080000000 } from './1764080000000-StoryBackdrop.js';
 import { BondLevels1764090000000 } from './1764090000000-BondLevels.js';
 import { StartingBondLevels1764100000000 } from './1764100000000-StartingBondLevels.js';
 import { SceneBondGates1764110000000 } from './1764110000000-SceneBondGates.js';
+import { MemoryEmbedding1764120000000 } from './1764120000000-MemoryEmbedding.js';
+import { MemoriesUsed1764130000000 } from './1764130000000-MemoriesUsed.js';
+import { Beliefs1764140000000 } from './1764140000000-Beliefs.js';
+import { StartingBeliefs1764150000000 } from './1764150000000-StartingBeliefs.js';
 
 // Listed by hand, oldest first, so migrations load the same way from compiled JS, the
 // TypeORM CLI and Vitest. Add every new migration here.
@@ -82,4 +86,8 @@ export const migrations = [
     BondLevels1764090000000,
     StartingBondLevels1764100000000,
     SceneBondGates1764110000000,
+    MemoryEmbedding1764120000000,
+    MemoriesUsed1764130000000,
+    Beliefs1764140000000,
+    StartingBeliefs1764150000000,
 ];

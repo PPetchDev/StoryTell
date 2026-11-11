@@ -75,6 +75,8 @@ export type CallKind =
     | 'expression_image'
     | 'document_embedding'
     | 'document_search'
+    | 'memory_embedding'
+    | 'context_search'
     | 'dictation'
     | 'read_aloud'
     | 'voice_preview';
@@ -97,6 +99,8 @@ export const CALL_KIND_LABEL: Record<CallKind, string> = {
     expression_image: 'Expression pictures',
     document_embedding: 'Document adding',
     document_search: 'Document search',
+    memory_embedding: 'Memory embedding',
+    context_search: 'Memory and Document search',
     dictation: 'Dictation',
     read_aloud: 'Read aloud',
     voice_preview: 'Voice samples',

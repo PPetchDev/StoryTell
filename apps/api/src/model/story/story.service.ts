@@ -12,6 +12,7 @@ import { LoreEntryEntity } from './entities/lore-entry.entity.js';
 import { RoleEntity } from './entities/role.entity.js';
 import { SceneBondGateEntity } from './entities/scene-bond-gate.entity.js';
 import { SceneEntity } from './entities/scene.entity.js';
+import { StartingBeliefEntity } from './entities/starting-belief.entity.js';
 import { StartingBondEntity } from './entities/starting-bond.entity.js';
 import { CoverFocus, StoryEntity } from './entities/story.entity.js';
 
@@ -20,6 +21,7 @@ const FULL_RELATIONS = {
     role: true,
     characters: { expressions: true },
     startingBonds: true,
+    startingBeliefs: true,
     scenes: { gates: true },
     lore: true,
     documents: true,
@@ -59,6 +61,7 @@ function sorted(story: StoryEntity): StoryEntity {
     story.savedReplies = byPosition(story.savedReplies);
     story.replaceRules = byPosition(story.replaceRules);
     story.startingBonds = [...story.startingBonds].sort((a, b) => a.id - b.id);
+    story.startingBeliefs = [...(story.startingBeliefs ?? [])].sort((a, b) => a.id - b.id);
     return story;
 }
 
@@ -105,7 +108,7 @@ export class StoryModelService {
 
     /**
      * A new Story holding a copy of everything authored under `source` (loaded by `findFull`):
-     * its text and style, Role, Characters, StartingBonds, Scenes, Lore, Documents, Saved replies and Replace rules, in one transaction. Reference
+     * its text and style, Role, Characters, StartingBonds, Starting Beliefs, Scenes, Lore, Documents, Saved replies and Replace rules, in one transaction. Reference
      * images (with their Portrait crops) and the Cover are left empty for the caller, who copies the files. Answers the new
      * Story's id and each source Character's id mapped to its copy's.
      */
@@ -151,6 +154,12 @@ export class StoryModelService {
                         // Its starting levels too (.scratch/bond-axes/spec.md, "Copying").
                         ...bond.levels(),
                     }),
+                );
+            }
+            // Onto the copy's Characters, in the same order (.scratch/memory-by-meaning/spec.md: "Duplicate copies Starting Beliefs").
+            for (const belief of source.startingBeliefs ?? []) {
+                await manager.save(
+                    manager.create(StartingBeliefEntity, { storyId: story.id, characterId: characterIds.get(belief.characterId)!, text: belief.text }),
                 );
             }
             for (const scene of source.scenes) {
@@ -312,6 +321,16 @@ export class StoryModelService {
 
     async removeStartingBond(bond: StartingBondEntity): Promise<void> {
         await this.bonds.delete({ id: bond.id });
+    }
+
+    /** Makes the Story's Starting Beliefs exactly `beliefs`, in that order, in one transaction. */
+    replaceStartingBeliefs(storyId: number, beliefs: Array<{ characterId: number; text: string }>): Promise<void> {
+        return this.dataSource.transaction(async (manager) => {
+            await manager.delete(StartingBeliefEntity, { storyId });
+            for (const belief of beliefs) {
+                await manager.save(manager.create(StartingBeliefEntity, { storyId, characterId: belief.characterId, text: belief.text }));
+            }
+        });
     }
 
     createScene(fields: Partial<SceneEntity>): SceneEntity {

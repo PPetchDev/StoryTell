@@ -24,6 +24,7 @@ import {
     REPLY_LENGTH_LABELS,
     RewriteRequest,
     SceneBondGate,
+    StartingBelief,
     Story,
     storyApi,
     storyTitle,
@@ -58,6 +59,7 @@ import { storySavedReplies } from '@/lib/saved-replies';
 import { ReplaceRuleList } from '@/components/replace-rules/replace-rule-list';
 import { storyReplaceRules } from '@/lib/replace-rules';
 import { SceneCard } from './scene-card';
+import { StartingBeliefsCard } from './starting-beliefs-card';
 import { StartingBondsCard } from './starting-bonds-card';
 import { StatusBox } from './status-box';
 import styles from './story-editor.module.css';
@@ -321,6 +323,15 @@ export function StoryEditor({ initial }: { initial: Story }) {
             startingBonds: current.startingBonds.map((b) => (b.id === bondId ? { ...b, [axis]: level } : b)),
         }));
         queue(`bond.${bondId}.${axis}`, () => storyApi.updateStartingBond(storyId, bondId, { [axis]: level }), applyStatus);
+    };
+    /**
+     * The Starting Beliefs as the author now has them: the whole list is saved, without the ones
+     * still waiting for text (.scratch/memory-by-meaning/spec.md: "the whole list").
+     */
+    const setStartingBeliefs = (beliefs: StartingBelief[]) => {
+        setStory((current) => ({ ...current, startingBeliefs: beliefs }));
+        const written = beliefs.filter((belief) => belief.text.trim() !== '').map((belief) => ({ characterId: belief.characterId, text: belief.text }));
+        queue('startingBeliefs', () => storyApi.setStartingBeliefs(storyId, written), applyStatus);
     };
     const setSceneText = (sceneId: number, field: 'name' | 'situation' | 'moveOnCondition', value: string) => {
         setStory((current) => ({
@@ -705,6 +716,7 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                     onRemove={(bondId) => void commit(() => storyApi.removeStartingBond(storyId, bondId), applyWhole)}
                                 />
                             ))}
+                            <StartingBeliefsCard cast={story.characters} beliefs={story.startingBeliefs ?? []} onChange={setStartingBeliefs} />
                         </section>
                     )}
 

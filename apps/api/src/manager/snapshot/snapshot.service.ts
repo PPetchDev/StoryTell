@@ -10,6 +10,7 @@ import { StoryNotFoundError } from '../../errors/story.errors.js';
 import { ChatModelService } from '../../model/chat/chat.service.js';
 import { ChatEntity } from '../../model/chat/entities/chat.entity.js';
 import { MessageEntity, MessageKind } from '../../model/chat/entities/message.entity.js';
+import { BeliefModelService } from '../../model/memory/belief.service.js';
 import { MemoryModelService } from '../../model/memory/memory.service.js';
 import { SnapshotEntity, SnapshotResponse } from '../../model/snapshot/entities/snapshot.entity.js';
 import { SnapshotModelService } from '../../model/snapshot/snapshot.service.js';
@@ -21,6 +22,8 @@ import { ImageStoreService, StoredImage } from '../../store/image/image-store.se
 import { wornIdentity } from '../chat/identity.js';
 import { chosenLore, promptLore, selectLoreAt } from '../chat/lore/lore-select.js';
 import { renderUser } from '../chat/memory/render-user.js';
+import { chooseForChat, presentForMemory } from '../chat/memory/chat-memory-choice.js';
+import { choiceBeliefs } from '../chat/memory/beliefs.js';
 import { partsToText } from '../chat/turn/reply-parser.js';
 import {
     InFrameCharacter,
@@ -82,6 +85,7 @@ export class SnapshotManagerService {
         private readonly storyModel: StoryModelService,
         private readonly chatModel: ChatModelService,
         private readonly memoryModel: MemoryModelService,
+        private readonly beliefModel: BeliefModelService,
         private readonly snapshotModel: SnapshotModelService,
         private readonly imageStore: ImageStoreService,
         private readonly gateway: ModelGateway,
@@ -214,9 +218,20 @@ export class SnapshotManagerService {
         const moment = momentText(chat.messages[index]);
 
         const identity = wornIdentity(story, chat);
-        const memories = (await this.memoryModel.findByChat(chat.id))
-            .filter((memory) => !memory.archived)
-            .map((memory) => renderUser(memory.text, identity.name));
+        // The Memories the Memory choice picks at this Message, with the query its turn searched
+        // with (.scratch/memory-by-meaning/spec.md: "Every reader uses it"); no search of its own.
+        let aiAt = index;
+        while (aiAt >= 0 && chat.messages[aiAt].kind !== MessageKind.Ai) aiAt--;
+        const beliefs = choiceBeliefs(story, await this.beliefModel.findByChat(chat.id));
+        const choice = chooseForChat({
+            story,
+            memories: await this.memoryModel.findByChat(chat.id),
+            beliefs,
+            present: presentForMemory(story, chat, index + 1),
+            identityName: identity.name,
+            query: aiAt >= 0 ? await this.chatModel.contextQueryOf(chat.messages[aiAt].id) : null,
+        });
+        const memories = choice.memories.map(({ memory }) => renderUser(memory.text, identity.name));
         const hintNames = namesInHint(job.hint, story.characters);
         // .scratch/speaker-controls/spec.md: someone sitting out is out of the frame, unless the user's hint names them.
         const sittingOut = chat.sittingOutIds();
