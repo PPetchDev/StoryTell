@@ -13,8 +13,12 @@ The place, situation and premise a Story takes place in; every Story has one.
 _Avoid_: Scene, world, background
 
 **Scene**:
-An optional, author-defined stage of a Story that the plot moves through in order, each ending when its plain-language move-on condition is met; a Scene steers the story but never limits what the user or the Characters can do.
+An optional, author-defined stage of a Story that the plot moves through in order, each ending when its plain-language move-on condition is met and its Bond gates all hold; a Scene steers the story but never limits what the user or the Characters can do.
 _Avoid_: Chapter, act, stage
+
+**Bond gate**:
+A condition on a Scene that one Bond has reached at least a given level on one Bond axis ("Nara toward the user: Trust at least *close*"). A Scene moves on only when all its gates hold, as well as its move-on condition when it has one.
+_Avoid_: Bond requirement, unlock, threshold
 
 **Lore**:
 A Story's notes about its world, each a **Lore entry**: a name, keywords and a short text about a place, people, custom or object. An entry reaches the Narrator only when its triggers come up in the latest exchange or in another entry already chosen, for a few Messages after that when it is set to stay, or on every turn when it is set to always be included; the Setting stays the short core sent on every turn. Lore is common knowledge in the world, so every Character knows it; a Character's secrets stay on their card. It belongs to the Story and is shared by all its Chats, where a Memory belongs to one Chat.
@@ -135,11 +139,15 @@ One of three things the user might write next, offered on request in the voice o
 _Avoid_: Smart reply, quick reply, hint
 
 **Memory**:
-A fact established during one Chat — an event that happened, a detail of the world, something learned about the user, or an open promise or plan — that the Chat carries forward; it is known only to the Characters who witnessed or learned of it, never records feelings (a Bond) or a change of personality (an Arc), and the user can see, add, edit and delete it. A Chat starts with no Memories.
+A fact established during one Chat — an event that happened, a detail of the world, something learned about the user, or an open promise or plan — that the Chat carries forward; it is known only to the Characters who witnessed or learned of it, never records feelings (a Bond) or a change of personality (an Arc), and the user can see, add, edit and delete it. A Chat starts with no Memories and keeps every one it makes; each turn, the ones the user locked and the ones closest in meaning to the moment reach the Narrator.
 _Avoid_: Note, lorebook entry, context, summary
 
+**Belief**:
+Something one Character holds to be true within one Chat, which may be false: a lie they were told, a mistake, a guess. Unlike a Memory it is that Character's alone, and it may contradict a Memory; when the story shows them the truth, the Belief is given up. A Story may set **Starting Beliefs** that every new Chat begins with.
+_Avoid_: False memory, misconception, rumour
+
 **Memory graph**:
-A picture of a Chat's Memories, shown in place of their list when the user chooses it: the identity the user wears and the Characters as people, and each Memory as a dot linked to the people it is about. Who a Memory is about is read from its text (`{user}` or a name), or failing that is the Characters who know it; it is not stored, and it is a different thing from who knows the Memory.
+A picture of a Chat's Memories, shown in place of their list when the user chooses it: the identity the user wears and the Characters as people, and each Memory as a dot linked to the people it is about. Who a Memory is about is read from its text (`{user}` or a name), or failing that is the Characters who know it; it is not stored, and it is a different thing from who knows the Memory. On request it also draws the Bonds between the people.
 _Avoid_: Mind map, knowledge graph, relationship map
 
 **Story so far**:
@@ -151,11 +159,11 @@ Where a Chat's story is in the day — dawn, morning, noon, afternoon, evening o
 _Avoid_: Clock, hour, daytime
 
 **Bond**:
-A Character's feelings toward the user or toward another Character within one Chat, which change as the story unfolds; in play they show only through how the Character behaves, and the user can look at them but never edit them.
-_Avoid_: Affection, affinity, relationship, love meter
+A Character's feelings toward the user or toward another Character within one Chat, which change as the story unfolds: a short label and description in words, and a level on each of four **Bond axes** — Trust, Affection, Desire and Tension. In play they show only through how the Character behaves; the user can look at them, and how they moved over time, but never edit them, and never sees a level as a number.
+_Avoid_: Affinity, relationship, love meter, stat, score
 
 **Arc**:
-An intended, lasting change to a Character's personality within one Chat, always traceable to an event in the story that caused it; a later event can turn it back.
+An intended, lasting change to a Character's personality within one Chat, always traceable to an event in the story that caused it; a later event can turn it back. The user can see that a Character has changed and the events that changed them, but never the direction the author set, which would give the story away.
 _Avoid_: Drift, character development, evolution
 
 **Drift**:
