@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { Ref, useEffect, useId, useRef, useState } from 'react';
 
+import { announce } from '@/components/announcer';
+import { ICON_BUTTON, SEND_BUTTON } from '@/components/chat/chat-classes';
 import { useConnection } from '@/components/connection';
+import { CloseIcon } from '@/components/icons';
 import { ApiError, ApiUnreachableError } from '@/lib/api';
 import { chatApi } from '@/lib/chat';
-
-import styles from './chat-composer.module.css';
 
 /**
  * .scratch/dictation/spec.md, "Web: the composer". 🎤 records in the browser, Done sends the
@@ -168,6 +169,8 @@ export function useDictation(storyId: number, chatId: number, draft: string, onD
         current.ending = ending;
         current.durationMs = performance.now() - current.startedAt;
         live.current = null;
+        // Said, since the bar that showed the recording is gone (audit H9).
+        announce(ending === 'done' ? 'Recording stopped.' : 'Recording thrown away.');
         current.stream.getTracks().forEach((track) => track.stop());
         if (current.recorder.state === 'inactive') stopped(current);
         else current.recorder.stop();
@@ -221,6 +224,8 @@ export function useDictation(storyId: number, chatId: number, draft: string, onD
         live.current = current;
         setElapsedMs(0);
         setPhase({ kind: 'recording' });
+        // The microphone is on: said, since the red dot and the timer are silent (audit H9).
+        announce('Recording. Done stops it and writes what was heard in the box.');
     };
 
     const recording = phase.kind === 'recording';
@@ -270,6 +275,17 @@ export function useDictation(storyId: number, chatId: number, draft: string, onD
         setPhase({ kind: 'idle', note: null });
     };
 
+    /** 🎤 tapped while it can't be used: why, in the panel, where a tap and a screen reader both find it (audit M26). */
+    const explain = (reason: string) => setPhase((current) => (current.kind === 'idle' ? { kind: 'idle', note: reason } : current));
+
+    // The two-minute finish is near: said once, as well as shown (audit L16).
+    const warned = elapsedMs >= WARN_FROM_MS;
+    useEffect(() => {
+        if (warned && recording) announce(`${Math.round((MAX_RECORDING_MS - WARN_FROM_MS) / 1000)} seconds of recording left.`);
+        // Once per recording: `warned` turns true once.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [warned]);
+
     return {
         supported,
         language,
@@ -285,101 +301,153 @@ export function useDictation(storyId: number, chatId: number, draft: string, onD
         cancel: () => finish('cancel'),
         retry: () => void transcribe(),
         discard,
+        explain,
     };
 }
 
 export type Dictation = ReturnType<typeof useDictation>;
 
-/** The panel's dictation line: the wait, a failure with Retry and Discard, or a short note. */
-export function DictationStatus({ dictation }: { dictation: Dictation }) {
-    const { phase } = dictation;
-    if (phase.kind === 'transcribing') {
-        return (
-            <p className={styles.suggesting} role="status">
-                Transcribing…
-            </p>
-        );
-    }
-    if (phase.kind === 'failed') {
-        return (
-            <p role="alert" className="turn-error">
-                {phase.message}{' '}
-                <button type="button" className="button button-quiet" onClick={dictation.retry}>
-                    Retry
-                </button>{' '}
-                <button type="button" className="button button-quiet" onClick={dictation.discard}>
-                    Discard
-                </button>
-            </p>
-        );
-    }
-    if (phase.kind === 'idle' && phase.note) {
-        return (
-            <p className={styles.suggesting} role="status">
-                {phase.note}
-            </p>
-        );
-    }
-    return null;
-}
-
-/** Whether the panel has a dictation line to show. */
+/** Whether the panel has a dictation line to show: the wait, a failure (with Retry and Discard), or a short note. */
 export function hasDictationStatus(dictation: Dictation): boolean {
     const { phase } = dictation;
     return phase.kind === 'transcribing' || phase.kind === 'failed' || (phase.kind === 'idle' && phase.note !== null);
 }
 
-/** 🎤 in the box row, between the box and the send slot. */
-export function DictateButton({ dictation, disabledReason }: { dictation: Dictation; disabledReason: string | null }) {
+/** The panel's dictation line, said through its status region: "Transcribing…", or a short note. A failure is an alert instead. */
+export function dictationNote(dictation: Dictation): string | null {
+    const { phase } = dictation;
+    if (phase.kind === 'transcribing') return 'Transcribing…';
+    if (phase.kind === 'idle') return phase.note;
+    return null;
+}
+
+const MIC = 'bare-button grid size-11 shrink-0 place-items-center rounded-full press focus-ring';
+
+/**
+ * 🎤 in the box row, between the box and the send slot. When it can't be used it stays focusable
+ * (aria-disabled), says why to screen readers, and a tap shows why in the panel (audit M26).
+ */
+export function DictateButton({ dictation, disabledReason, ref }: { dictation: Dictation; disabledReason: string | null; ref?: Ref<HTMLButtonElement> }) {
+    const reasonId = useId();
+    const unavailable = disabledReason !== null || dictation.active;
+    const look = dictation.transcribing ? 'cursor-progress bg-accent-soft text-accent' : unavailable ? 'cursor-not-allowed text-faint' : 'cursor-pointer text-muted';
     return (
-        <button
-            type="button"
-            className={styles.mic}
-            aria-label="Dictate"
-            title={disabledReason ?? 'Speak instead of typing'}
-            aria-busy={dictation.transcribing}
-            disabled={disabledReason !== null || dictation.active}
-            onClick={dictation.start}
-        >
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <rect x="9" y="3" width="6" height="11" rx="3" />
-                <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" />
-            </svg>
-        </button>
+        <>
+            <button
+                ref={ref}
+                type="button"
+                className={`${MIC} ${look}`}
+                aria-label="Dictate"
+                title={disabledReason ?? 'Speak instead of typing'}
+                aria-busy={dictation.transcribing}
+                aria-disabled={unavailable}
+                aria-describedby={disabledReason ? reasonId : undefined}
+                onClick={() => {
+                    if (disabledReason !== null && !dictation.active) dictation.explain(`${disabledReason}.`);
+                    if (!unavailable) dictation.start();
+                }}
+            >
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <rect x="9" y="3" width="6" height="11" rx="3" />
+                    <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" />
+                </svg>
+            </button>
+            {disabledReason && (
+                <span id={reasonId} hidden>
+                    {disabledReason}
+                </span>
+            )}
+        </>
     );
 }
 
-/** The box row while recording: ✕ Cancel, the red dot and time, the language switch, ✓ Done. */
+/** Past this, Cancel asks before it throws the recording away (audit L13). */
+const ASK_BEFORE_CANCEL_MS = 10_000;
+
+/**
+ * The box row while recording: ✕ Cancel, the red dot and time, the language switch, ✓ Done.
+ * Focus starts on Done (audit H9). Near the two-minute finish the time says how much is left in
+ * words as well as colour (L16); a long recording asks before Cancel throws it away (L13).
+ */
 export function RecordingBar({ dictation }: { dictation: Dictation }) {
     const { language, elapsedMs } = dictation;
     const warning = elapsedMs >= WARN_FROM_MS;
+    const [asking, setAsking] = useState(false);
+    const doneRef = useRef<HTMLButtonElement>(null);
+    const cancelRef = useRef<HTMLButtonElement>(null);
+    const keepRef = useRef<HTMLButtonElement>(null);
+    const ready = dictation.phase.kind === 'recording';
+
+    useEffect(() => {
+        doneRef.current?.focus({ preventScroll: true });
+    }, []);
+    useEffect(() => {
+        if (asking) keepRef.current?.focus({ preventScroll: true });
+    }, [asking]);
+
+    if (asking) {
+        return (
+            <div className="flex min-h-11 flex-wrap items-center gap-2" role="group" aria-label="Recording">
+                <p className="m-0 flex-1 text-md">Throw away {clock(elapsedMs)} of recording?</p>
+                <button
+                    ref={keepRef}
+                    type="button"
+                    className="button button-quiet"
+                    onClick={() => {
+                        setAsking(false);
+                        requestAnimationFrame(() => cancelRef.current?.focus({ preventScroll: true }));
+                    }}
+                >
+                    Keep recording
+                </button>
+                <button type="button" className="button button-danger" onClick={dictation.cancel}>
+                    Throw away
+                </button>
+            </div>
+        );
+    }
+
+    const left = Math.max(0, Math.ceil((MAX_RECORDING_MS - elapsedMs) / 1000));
     return (
-        <div className={styles.recordingBar} role="group" aria-label="Recording">
-            <button type="button" className={styles.tool} aria-label="Cancel" title="Throw this recording away" onClick={dictation.cancel}>
-                <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-                    <path d="M6 6l12 12M18 6L6 18" />
-                </svg>
+        <div className="flex min-h-11 items-center gap-2 pl-0.5" role="group" aria-label="Recording">
+            <button
+                ref={cancelRef}
+                type="button"
+                className={ICON_BUTTON}
+                aria-label="Cancel"
+                title="Throw this recording away"
+                onClick={() => (elapsedMs > ASK_BEFORE_CANCEL_MS ? setAsking(true) : dictation.cancel())}
+            >
+                <CloseIcon size={20} />
             </button>
-            <span className={styles.recDot} aria-hidden="true" />
-            <span role="timer" aria-live="off" className={`${styles.recTime} ${warning ? styles.recTimeWarn : ''}`}>
-                {clock(elapsedMs)}
+            <span className="size-2.5 shrink-0 rounded-full bg-danger motion-safe:animate-pulse-soft" aria-hidden="true" />
+            <span className={`flex-1 tabular-nums ${warning ? 'font-semibold text-warning' : 'text-text'}`}>
+                <span role="timer" aria-live="off">
+                    {clock(elapsedMs)}
+                </span>
+                {warning && ` · ${left}s left`}
             </span>
             <button
                 type="button"
-                className={styles.language}
-                aria-label="Dictation language"
+                className="bare-button min-h-11 min-w-13 shrink-0 cursor-pointer rounded-full border border-field-line bg-surface-raised px-3 text-text press focus-ring"
+                // Names the language it is on (audit M27), as the word on it shows.
+                aria-label={language === 'th' ? 'Dictation language: Thai' : 'Dictation language: English'}
                 title={language === 'th' ? 'Thai: tap for English' : 'English: tap for Thai'}
                 onClick={() => dictation.setLanguage(language === 'th' ? 'en' : 'th')}
             >
-                {language === 'th' ? 'ไทย' : 'EN'}
+                <span lang={language}>{language === 'th' ? 'ไทย' : 'EN'}</span>
             </button>
             <button
+                ref={doneRef}
                 type="button"
-                className={styles.send}
+                className={SEND_BUTTON}
                 aria-label="Done"
                 title="Stop and transcribe"
-                disabled={dictation.phase.kind !== 'recording'}
-                onClick={dictation.done}
+                // Focusable while the microphone starts, so focus can wait here (audit H9).
+                aria-disabled={!ready}
+                onClick={() => {
+                    if (ready) dictation.done();
+                }}
             >
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="M5 12.5l4.5 4.5L19 7.5" />
