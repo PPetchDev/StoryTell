@@ -233,7 +233,8 @@ test('deleting a Persona moves focus to the next one, and the save status stays 
         await wren.getByRole('button', { name: 'Delete Wren' }).tap();
         await wren.getByRole('group', { name: /Delete "Wren"/ }).getByRole('button', { name: 'Delete' }).tap();
         await expect(wren).toHaveCount(0);
-        expect(await focusedName(page)).toBe(`persona-${made[1]}-name`);
+        // Focus moves a frame after the delete settles, so wait for it rather than read it once.
+        await expect.poll(() => focusedName(page)).toBe(`persona-${made[1]}-name`);
 
         // M17: the header with the save status is sticky.
         await expect(page.getByRole('heading', { name: 'Personas', level: 1 }).locator('..')).toHaveCSS('position', 'sticky');
