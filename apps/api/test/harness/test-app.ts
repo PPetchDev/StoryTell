@@ -49,6 +49,8 @@ export interface TestAppOptions {
     backgroundRetryMs?: number;
     /** The backup job's status file. Default: unset, as in dev. */
     backupStatusFile?: string;
+    /** The owner's sign-in password (.scratch/sign-in/spec.md). Default: unset, so sign-in is off as in dev. */
+    loginPassword?: string;
     /**
      * The speech folder. Default: a fresh temporary folder, removed on close. Without one, every
      * test app would share the default `speech` folder beside their image folders in the system
@@ -95,6 +97,8 @@ export async function startTestApp(options: TestAppOptions = {}): Promise<TestAp
                 backgroundWaitMs: options.backgroundWaitMs ?? 1_500,
                 backgroundRetryMs: options.backgroundRetryMs ?? 0,
                 backupStatusFile: options.backupStatusFile,
+                host: '127.0.0.1',
+                loginPassword: options.loginPassword,
                 providerKeys: {
                     openRouter: undefined,
                     venice: undefined,

@@ -31,6 +31,7 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | 007 | Character cards |
 | 008 | Saved replies and Replace rules |
 | 009 | Audio (Dictation) |
+| 010 | Sign-in |
 
 ## Codes
 
@@ -133,3 +134,6 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | `415.009.002` | `UnsupportedAudioError` | A dictation whose bytes are not a WebM, MP4/M4A, Ogg or WAV recording (read from the first bytes, not the label). No call. |
 | `413.009.003` | `AudioTooLargeError` | A dictation recording over 10 MB. No call. |
 | `422.009.004` | `RecordingTooLongError` | A dictation whose `durationMs` is over 125,000 (the two-minute limit and five seconds' grace). No call. A `language` other than `th` or `en`, or a missing duration, is a validation error (`400.000.000`); the Venice pool known to be used up answers `402.001.004`. |
+| `401.010.001` | `SignInRequiredError` | Sign-in is on (`LOGIN_PASSWORD` set) and the request has no valid session cookie: none, forged, expired, or signed for an older password. Every route but health and `/api/auth/*` answers it. The web app shows the sign-in screen. |
+| `401.010.002` | `WrongPasswordError` | `POST /api/auth/login` with the wrong password. No cookie is set; it counts toward the lockout. |
+| `429.010.003` | `TooManySignInTriesError` | Ten wrong passwords within 15 minutes: every sign-in, the right password too, is refused until 15 minutes after the tenth. The message says how many minutes are left. |

@@ -6,6 +6,7 @@ import { BottomNav } from '@/components/bottom-nav/bottom-nav';
 import { ConnectionBoundary } from '@/components/connection';
 import { LowCreditBanner } from '@/components/low-credit-banner';
 import { ServiceWorkerRegistration } from '@/components/service-worker';
+import { SignInGate } from '@/components/sign-in-gate';
 import { ThemeSync } from '@/components/theme-sync';
 import { appName } from '@/lib/instance';
 import { THEME_SCRIPT } from '@/lib/theme-script';
@@ -36,12 +37,15 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 <ThemeSync />
                 <ServiceWorkerRegistration />
                 <Announcer />
-                <ConnectionBoundary>
-                    {children}
-                    {/* After the page, so it arrives below what is already there (audit M3). */}
-                    <LowCreditBanner />
-                    <BottomNav />
-                </ConnectionBoundary>
+                {/* Outside the connection boundary: signed out, nothing of the app shows, the nav neither. */}
+                <SignInGate>
+                    <ConnectionBoundary>
+                        {children}
+                        {/* After the page, so it arrives below what is already there (audit M3). */}
+                        <LowCreditBanner />
+                        <BottomNav />
+                    </ConnectionBoundary>
+                </SignInGate>
             </body>
         </html>
     );

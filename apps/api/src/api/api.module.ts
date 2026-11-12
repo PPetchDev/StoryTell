@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 
+import { AuthApiModule } from './auth/auth.module.js';
 import { BackupApiModule } from './backup/backup.module.js';
 import { CharacterCardApiModule } from './character-card/character-card.module.js';
 import { DocumentApiModule } from './document/document.module.js';
@@ -23,6 +24,7 @@ import { VoiceApiModule } from './voice/voice.module.js';
 
 @Module({
     imports: [
+        AuthApiModule,
         ImageApiModule,
         StoryApiModule,
         DocumentApiModule,

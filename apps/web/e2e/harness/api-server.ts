@@ -121,16 +121,17 @@ export interface RunningApi {
  */
 export async function runApi(env: Record<string, string>): Promise<RunningApi> {
     let pid: number | undefined = await spawnApi(env);
-    const actions: Record<string, () => Promise<void>> = {
+    // `/start` may carry extra environment as a JSON body (the sign-in spec starts it with a password).
+    const actions: Record<string, (extra: Record<string, string>) => Promise<void>> = {
         '/stop': async () => {
             if (pid !== undefined) await killApi(pid);
             pid = undefined;
         },
-        '/start': async () => {
+        '/start': async (extra) => {
             if (await isUp()) return;
             // It died on its own: make sure that process is gone before the port is taken again.
             if (pid !== undefined) await killApi(pid);
-            pid = await spawnApi(env);
+            pid = await spawnApi({ ...env, ...extra });
         },
     };
     // One request at a time, in order, so a stop and a start never overlap.
@@ -141,7 +142,10 @@ export async function runApi(env: Record<string, string>): Promise<RunningApi> {
             response.writeHead(404).end();
             return;
         }
-        queue = queue.then(action).then(
+        let body = '';
+        request.on('data', (chunk: Buffer) => (body += chunk.toString()));
+        const extra = new Promise<Record<string, string>>((resolve) => request.on('end', () => resolve(body ? JSON.parse(body) : {})));
+        queue = queue.then(async () => action(await extra)).then(
             () => void response.writeHead(204).end(),
             (error: unknown) => void response.writeHead(500).end(String(error)),
         );
@@ -159,8 +163,8 @@ export async function runApi(env: Record<string, string>): Promise<RunningApi> {
     };
 }
 
-async function askGlobalSetup(action: 'stop' | 'start'): Promise<void> {
-    const response = await fetch(`${readState().controlUrl}/${action}`, { method: 'POST' });
+async function askGlobalSetup(action: 'stop' | 'start', extra: Record<string, string> = {}): Promise<void> {
+    const response = await fetch(`${readState().controlUrl}/${action}`, { method: 'POST', body: JSON.stringify(extra) });
     if (!response.ok) throw new Error(`Global setup could not ${action} the API: ${await response.text()}`);
 }
 
@@ -169,7 +173,10 @@ export async function stopApi(): Promise<void> {
     await askGlobalSetup('stop');
 }
 
-/** Starts the API again after stopApi(), against the same database and image folder. */
-export async function startApi(): Promise<void> {
-    await askGlobalSetup('start');
+/**
+ * Starts the API again after stopApi(), against the same database and image folder. `extra` is
+ * environment for this start only, e.g. `LOGIN_PASSWORD`; the next plain start drops it.
+ */
+export async function startApi(extra: Record<string, string> = {}): Promise<void> {
+    await askGlobalSetup('start', extra);
 }

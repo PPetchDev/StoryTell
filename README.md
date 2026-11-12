@@ -72,6 +72,8 @@ The API reads its environment only through `apps/api/src/config/app-config.ts`:
 | `OPENROUTER_API_KEY` | for `real` | OpenRouter key: every text call, and the text credit balance |
 | `VENICE_API_KEY` (or `VENICE_INFERENCE_KEY`) | for `real` | Venice inference key: Snapshots, Reference images, Expressions, Dictation and Read aloud |
 | `VENICE_ADMIN_KEY` | no | Venice Admin key, only to read the image credit balance. Without it the Usage view shows image spend but no remaining credit. |
+| `LOGIN_PASSWORD` | for a public address | The owner's sign-in password, at least 12 characters (`.scratch/sign-in/spec.md`). Set: every route needs a sign-in, once per device for 90 days. Unset: sign-in is off. Any instance reachable from the internet, through a tunnel or a host like Vercel too, must set it. Changing it signs every device out. |
+| `HOST` | no | Address the API listens on. Default `127.0.0.1`. Anything but loopback without `LOGIN_PASSWORD` refuses to start. |
 | `ENV_FILE` | no | Load the variables above from this file at startup |
 
 The frontend reads `API_ORIGIN` (where to proxy `/api`, needed at both `next build` and

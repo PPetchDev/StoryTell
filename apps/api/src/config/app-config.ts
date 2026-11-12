@@ -34,7 +34,15 @@ export abstract class AppConfig {
      * can show a failure. Live sets it; dev and tests leave it unset, and then nothing is shown.
      */
     abstract readonly backupStatusFile: string | undefined;
+    /** The address the API listens on. Anything but loopback needs `loginPassword` (.scratch/sign-in/spec.md). */
+    abstract readonly host: string;
+    /** The owner's sign-in password. Unset: sign-in is off, as in dev and tests. */
+    abstract readonly loginPassword: string | undefined;
 }
+
+/** Spec: "Sign-in". A shorter password is refused at start-up. */
+export const LOGIN_PASSWORD_MIN = 12;
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', '::1', 'localhost']);
 
 export const DEFAULT_BACKGROUND_WAIT_MS = 8_000;
 export const DEFAULT_BACKGROUND_RETRY_MS = 20_000;
@@ -86,8 +94,20 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
         );
     }
 
+    const host = env.HOST || '127.0.0.1';
+    const loginPassword = env.LOGIN_PASSWORD || undefined;
+    if (loginPassword !== undefined && loginPassword.length < LOGIN_PASSWORD_MIN) {
+        throw new ConfigError(`LOGIN_PASSWORD must be at least ${LOGIN_PASSWORD_MIN} characters.`);
+    }
+    // Never open on a public address by mistake: every route would answer anyone.
+    if (!LOOPBACK_HOSTS.has(host) && loginPassword === undefined) {
+        throw new ConfigError(`HOST is ${host}, which is not loopback: set LOGIN_PASSWORD so the API needs a sign-in.`);
+    }
+
     return {
         port,
+        host,
+        loginPassword,
         databaseUrl: env.DATABASE_URL!,
         imageDir,
         speechDir,

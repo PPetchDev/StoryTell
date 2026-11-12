@@ -1,6 +1,8 @@
 import { Body, Controller, Delete, Get, HttpCode, Post, Put } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 
+import { Public } from '../api/auth/public.decorator.js';
+
 import {
     ModelGatewayError,
     ModelRefusalError,
@@ -95,6 +97,8 @@ function isScriptedError(reply: unknown): reply is ScriptedErrorJson {
  * Mounted only when MODEL_GATEWAY=fake (see AppModule). Not part of the product API.
  */
 @ApiExcludeController()
+// e2e drives the fake from outside the browser's session; the routes exist only with the fake gateway.
+@Public()
 @Controller('testing/fake-gateway')
 export class FakeGatewayControlController {
     private readonly fake: FakeModelGateway;

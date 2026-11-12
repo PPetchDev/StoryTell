@@ -37,7 +37,7 @@ describe('Images', () => {
         expect(response.headers['content-type']).toBe('image/png');
         expect(Buffer.compare(response.body as Buffer, FAKE_PNG.bytes)).toBe(0);
         // A stored image never changes under its name (audit H33).
-        expect(response.headers['cache-control']).toBe('public, max-age=31536000, immutable');
+        expect(response.headers['cache-control']).toBe('private, max-age=31536000, immutable');
     });
 
     it('answers a WebP thumbnail at a width it offers, made once and kept beside the image folder', async () => {
@@ -52,7 +52,7 @@ describe('Images', () => {
             .expect(200);
 
         expect(response.headers['content-type']).toBe('image/webp');
-        expect(response.headers['cache-control']).toBe('public, max-age=31536000, immutable');
+        expect(response.headers['cache-control']).toBe('private, max-age=31536000, immutable');
         const meta = await sharp(response.body as Buffer).metadata();
         expect(meta.format).toBe('webp');
         expect(meta.width).toBe(320);

@@ -9,8 +9,10 @@ import { THUMBNAIL_WIDTHS } from '../../store/image/image-store.service.js';
 /**
  * Every stored image has a name of its own, and a replaced picture gets a new one, so what a path
  * answers never changes: browsers may keep it for a year without asking again (audit H33).
+ * Private, because images need a sign-in (.scratch/sign-in/spec.md): no shared cache in front
+ * (a tunnel, a CDN) may keep one and hand it to anyone.
  */
-const IMMUTABLE = 'public, max-age=31536000, immutable';
+const IMMUTABLE = 'private, max-age=31536000, immutable';
 
 @ApiTags('Images')
 @Controller('images')

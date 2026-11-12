@@ -11,6 +11,7 @@ import { SamplingFold } from '@/components/settings/sampling-fold';
 import { AppSavedRepliesCard } from '@/components/saved-replies/app-saved-replies-card';
 import { AppReplaceRulesCard } from '@/components/replace-rules/app-replace-rules-card';
 import { SaveStatus } from '@/components/story-editor/save-status';
+import { SignOutSetting } from '@/components/sign-in-gate';
 import { TextSizeSetting } from '@/components/text-size-setting';
 import { ThemeSetting } from '@/components/theme-setting';
 import { apiSend } from '@/lib/api';
@@ -301,6 +302,7 @@ export default function SettingsPage() {
              */}
             <ThemeSetting />
             <TextSizeSetting />
+            <SignOutSetting />
             {(settings.status === 'loading' || backup === undefined) && settings.status !== 'error' && (
                 <Loading label="Loading Settings…" className="card" />
             )}

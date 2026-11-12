@@ -63,13 +63,23 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     return readJsonAnswer<T>(response);
 }
 
+/** Sent on `window` when an API answer says the session ran out (.scratch/sign-in/spec.md: "Web"). */
+export const SIGNED_OUT_EVENT = 'storytell:signed-out';
+const SIGN_IN_REQUIRED = '401.010.001';
+
+/** A typed API error, after telling the sign-in gate when it says the session is gone. */
+function apiError(status: number, code: string, message: string): ApiError {
+    if (code === SIGN_IN_REQUIRED && typeof window !== 'undefined') window.dispatchEvent(new Event(SIGNED_OUT_EVENT));
+    return new ApiError(status, code, message);
+}
+
 /** An API answer read as JSON: the body, or its typed error. */
 async function readJsonAnswer<T>(response: Response): Promise<T> {
     if (response.status === 204) return undefined as T;
     const body: unknown = await response.json().catch(() => undefined);
     if (response.ok && body !== undefined) return body as T;
     if (isErrorBody(body)) {
-        throw new ApiError(response.status, body.error.code, body.error.message);
+        throw apiError(response.status, body.error.code, body.error.message);
     }
     // The API always answers in JSON, and its errors always carry a code. Anything else came
     // from the proxy in front of it, which means the API itself was not there.
@@ -131,7 +141,7 @@ export async function apiSendStream<T>(
             if (event === 'done') return data as T;
             if (event === 'error') {
                 if (!isErrorBody(data)) throw new StreamBrokenError();
-                throw new ApiError(Number(data.error.code.slice(0, 3)), data.error.code, data.error.message);
+                throw apiError(Number(data.error.code.slice(0, 3)), data.error.code, data.error.message);
             }
             onEvent(event, data);
         }
