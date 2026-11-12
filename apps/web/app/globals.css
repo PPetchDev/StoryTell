@@ -1,4 +1,179 @@
-/* public/offline.html repeats the tokens and .cant-connect rules inline. Keep them in step. */
+/*
+ * The app's one global stylesheet: Tailwind, the colour tokens, the base element styles and the
+ * shared classes. docs/adr/0004-tailwind-css.md is the rulebook: read it before adding CSS here.
+ *
+ * Order matters. Tailwind's layers come first, so the shared classes below can sit in `components`
+ * and a utility on the same element wins over them. The area files under ./styles hold what was
+ * left of each screen's rules, moved here unchanged and still unlayered: they beat both, as they
+ * did before. New CSS is layered; nothing new goes in unlayered.
+ *
+ * Preflight is off: only Tailwind's theme and utilities are imported, and the base styles below
+ * stand in for it until every area has converted (the ADR's TODO turns it on).
+ */
+@layer theme, base, components, utilities;
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities) source('..');
+
+@import './styles/home.css';
+@import './styles/editor.css';
+@import './styles/chats.css';
+@import './styles/chat.css';
+@import './styles/dashboard.css';
+@import './styles/memory.css';
+
+/* `light:` styles an element for the light theme, which the head script marks on <html>. */
+@custom-variant light (&:where([data-theme='light'], [data-theme='light'] *));
+
+/*
+ * Every colour utility is a token: `bg-surface text-muted border-field-line`. Each answers
+ * var(--token), so it follows data-theme. Tailwind's own palette is cleared: no raw colours.
+ */
+@theme inline {
+    --color-*: initial;
+    --color-bg: var(--bg);
+    --color-surface: var(--surface);
+    --color-surface-raised: var(--surface-raised);
+    --color-text: var(--text);
+    --color-muted: var(--muted);
+    --color-faint: var(--faint);
+    --color-accent: var(--accent);
+    --color-accent-text: var(--accent-text);
+    --color-accent-fill: var(--accent-fill);
+    --color-accent-soft: var(--accent-soft);
+    --color-accent-line: var(--accent-line);
+    --color-line: var(--line);
+    --color-field-line: var(--field-line);
+    --color-danger: var(--danger);
+    --color-danger-soft: var(--danger-soft);
+    --color-danger-text: var(--danger-text);
+    --color-warning: var(--warning);
+    --color-warning-surface: var(--warning-surface);
+    --color-warning-line: var(--warning-line);
+    --color-warning-soft: var(--warning-soft);
+    --color-quiet-fill: var(--quiet-fill);
+    --color-ok-surface: var(--ok-surface);
+    --color-ok-text: var(--ok-text);
+    --color-banner-surface: var(--banner-surface);
+    --color-banner-line: var(--banner-line);
+    --color-caution-text: var(--caution-text);
+    --color-error-text: var(--error-text);
+    --color-notice-surface: var(--notice-surface);
+    --color-notice-line: var(--notice-line);
+    --color-rollback-surface: var(--rollback-surface);
+    --color-rollback-line: var(--rollback-line);
+    --color-toast-surface: var(--toast-surface);
+    --color-toast-line: var(--toast-line);
+    --color-event: var(--event);
+    --color-confirm-warning-text: var(--confirm-warning-text);
+    --color-earlier-text: var(--earlier-text);
+    --color-rewrite-text: var(--rewrite-text);
+    --color-snapshot-failed-surface: var(--snapshot-failed-surface);
+    --color-snapshot-failed-line: var(--snapshot-failed-line);
+    --color-status-ok-surface: var(--status-ok-surface);
+    --color-status-ok-line: var(--status-ok-line);
+    --color-status-ok-text: var(--status-ok-text);
+    --color-status-toggle-text: var(--status-toggle-text);
+    --color-status-item-tint: var(--status-item-tint);
+    --color-picture-chip: var(--picture-chip);
+    --color-on-picture-text: var(--on-picture-text);
+    --color-on-picture-warning: var(--on-picture-warning);
+    --color-scrim: var(--scrim);
+    --color-shadow-soft: var(--shadow-soft);
+    --color-shadow: var(--shadow);
+    --color-shadow-strong: var(--shadow-strong);
+    --color-character-1: var(--character-1);
+    --color-character-2: var(--character-2);
+    --color-character-3: var(--character-3);
+    --color-character-4: var(--character-4);
+    --color-character-5: var(--character-5);
+    --color-character-6: var(--character-6);
+    --color-character-7: var(--character-7);
+    --color-character-8: var(--character-8);
+    --color-character-neutral: var(--character-neutral);
+    --color-on-character: var(--on-character);
+    --color-bond-trust: var(--bond-trust);
+    --color-bond-affection: var(--bond-affection);
+    --color-bond-desire: var(--bond-desire);
+    --color-bond-tension: var(--bond-tension);
+    --color-bond-neutral: var(--bond-neutral);
+    --color-backdrop-dim: var(--backdrop-dim);
+}
+
+/*
+ * The scales (audit M5, M7, M8). Spacing keeps Tailwind's 4px step (`p-4` is 1rem). Breakpoints:
+ * md 768px (it replaces the old 720px), lg 1024px (the side rail and the desktop layout).
+ */
+@theme {
+    --breakpoint-*: initial;
+    --breakpoint-md: 48rem;
+    --breakpoint-lg: 64rem;
+
+    /* Radius: fields and small boxes, banners and chips' boxes, cards, sections and dialogs, sheets. */
+    --radius-*: initial;
+    --radius-sm: 0.5rem;
+    --radius-md: 0.75rem;
+    --radius-lg: 0.875rem;
+    --radius-xl: 1rem;
+    --radius-2xl: 1.25rem;
+
+    /* Type: nothing under 12px (M7). Every step keeps the body's 1.5 line height; headings set their own. */
+    --text-*: initial;
+    --text-xs: 0.75rem;
+    --text-xs--line-height: 1.5;
+    --text-sm: 0.8125rem;
+    --text-sm--line-height: 1.5;
+    --text-md: 0.875rem;
+    --text-md--line-height: 1.5;
+    --text-note: 0.9375rem;
+    --text-note--line-height: 1.5;
+    --text-base: 1rem;
+    --text-base--line-height: 1.5;
+    --text-lg: 1.125rem;
+    --text-lg--line-height: 1.5;
+    --text-xl: 1.25rem;
+    --text-xl--line-height: 1.4;
+    --text-2xl: 1.75rem;
+    --text-2xl--line-height: 1.25;
+    --text-3xl: 2rem;
+    --text-3xl--line-height: 1.25;
+
+    /* Motion: an exit is quicker than its entrance. Each keyframe is guarded by motion-reduce: at the use. */
+    --animate-sheet-in: sheet-in 180ms cubic-bezier(0.2, 0, 0, 1);
+    --animate-sheet-out: sheet-out 120ms cubic-bezier(0.4, 0, 1, 1) forwards;
+    --animate-fade-in: fade-in 180ms ease-out;
+    --animate-fade-out: fade-out 120ms ease-in forwards;
+    --animate-pulse-soft: pulse-soft 1.4s ease-in-out infinite;
+
+    @keyframes sheet-in {
+        from {
+            transform: translateY(30%);
+            opacity: 0.4;
+        }
+    }
+    @keyframes sheet-out {
+        to {
+            transform: translateY(100%);
+            opacity: 0;
+        }
+    }
+    @keyframes fade-in {
+        from {
+            opacity: 0;
+        }
+    }
+    @keyframes fade-out {
+        to {
+            opacity: 0;
+        }
+    }
+    @keyframes pulse-soft {
+        50% {
+            opacity: 0.55;
+        }
+    }
+}
+
+/* public/offline.html repeats some of these tokens and the .page and .button rules inline. Keep them in step. */
 :root {
     --bg: #16131f;
     --surface: #221d30;
@@ -15,6 +190,8 @@
     /* Friendly UI: a raised surface, hairlines, a soft accent tint, and the danger and warning colours. */
     --surface-raised: #2c2540;
     --line: #3a3150;
+    /* Audit H14: the edge of an input, select or text box, 3:1 or more on the page, the surface and the raised surface. */
+    --field-line: #7a6f9b;
     --accent-soft: rgba(143, 115, 255, 0.18);
     --accent-line: rgba(143, 115, 255, 0.35);
     --danger: #ff7a8a;
@@ -112,6 +289,7 @@
     --accent-fill: #6a4ff0;
     --surface-raised: #ece8f4;
     --line: #d9d2e6;
+    --field-line: #857c9c;
     --accent-soft: rgba(106, 79, 240, 0.12);
     --accent-line: rgba(106, 79, 240, 0.4);
     --danger: #b3243a;
@@ -170,1465 +348,561 @@
     }
 }
 
-* {
-    box-sizing: border-box;
+/*
+ * Layers that stack (audit M4). Use the z-* utilities below (`z-sheet`), never a bare number.
+ * Durations: `duration-fast` for a press or an exit, `duration-base` for an entrance.
+ */
+:root {
+    --z-below: -1;
+    --z-raised: 1;
+    --z-sticky: 10;
+    --z-nav: 20;
+    --z-drawer: 20;
+    --z-popover: 30;
+    --z-sheet: 40;
+    --z-dialog: 50;
+    --z-toast: 60;
+    --duration-fast: 120ms;
+    --duration-base: 180ms;
+    --duration-slow: 300ms;
 }
 
-/* A folded card's body, and anything else marked hidden, stays hidden whatever its own display. */
-[hidden] {
-    display: none !important;
+@utility z-below {
+    z-index: var(--z-below);
+}
+@utility z-raised {
+    z-index: var(--z-raised);
+}
+@utility z-sticky {
+    z-index: var(--z-sticky);
+}
+@utility z-nav {
+    z-index: var(--z-nav);
+}
+@utility z-drawer {
+    z-index: var(--z-drawer);
+}
+@utility z-popover {
+    z-index: var(--z-popover);
+}
+@utility z-sheet {
+    z-index: var(--z-sheet);
+}
+@utility z-dialog {
+    z-index: var(--z-dialog);
+}
+@utility z-toast {
+    z-index: var(--z-toast);
+}
+@utility duration-fast {
+    --tw-duration: var(--duration-fast);
+    transition-duration: var(--duration-fast);
+}
+@utility duration-base {
+    --tw-duration: var(--duration-base);
+    transition-duration: var(--duration-base);
 }
 
-html,
-body {
-    margin: 0;
-    min-height: 100%;
-    background: var(--bg);
-    color: var(--text);
-    font-family:
-        system-ui,
-        -apple-system,
-        'Segoe UI',
-        Roboto,
-        sans-serif;
-    line-height: 1.5;
+/* The one focus ring (audit M2): 2px of accent, clear of the element. Base gives it to everything. */
+@utility focus-ring {
+    &:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+    }
 }
 
-.page {
-    max-width: 40rem;
-    margin: 0 auto;
-    padding: max(1.5rem, env(safe-area-inset-top)) 1rem 2rem;
+/* The same ring drawn inside the element, for things flush against an edge (a nav item, a segment). */
+@utility focus-ring-inset {
+    &:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: -2px;
+    }
 }
 
 /*
- * Desktop layout (spec: "Desktop layout"): beside the side rail, the page takes the width. A page
- * reads in a column of about 48rem; Home, the editor, the Dashboard and the Gallery (`wide`) use
- * up to 72rem.
+ * A target at least 44px tall and wide without changing how big it looks (audit H22): an
+ * invisible box around it takes the tap. Keep 8px between neighbours (gap-2).
  */
-@media (min-width: 1024px) {
-    .page {
-        max-width: none;
-        margin: 0 0 0 var(--rail-width);
-        padding: 2.25rem 2.5rem 3rem;
+@utility hit-area {
+    position: relative;
+    &::before {
+        content: '';
+        position: absolute;
+        inset: 50% auto auto 50%;
+        width: max(100%, 2.75rem);
+        height: max(100%, 2.75rem);
+        transform: translate(-50%, -50%);
+    }
+}
+
+/* Press feedback (audit M1): a darker fill under the finger, and on hover where there is one. */
+@utility press {
+    -webkit-tap-highlight-color: transparent;
+    @media (hover: hover) {
+        &:hover:not(:disabled, [aria-disabled='true']) {
+            filter: brightness(0.92);
+        }
+    }
+    &:active:not(:disabled, [aria-disabled='true']) {
+        filter: brightness(0.85);
+    }
+}
+
+@layer base {
+    * {
+        box-sizing: border-box;
     }
 
-    .page > main {
-        max-width: 48rem;
-        margin-inline: auto;
+    /* A folded card's body, and anything else marked hidden, stays hidden whatever its own display. */
+    [hidden] {
+        display: none !important;
     }
 
-    .page > main.wide {
-        max-width: 72rem;
+    html,
+    body {
+        margin: 0;
+        min-height: 100%;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+            system-ui,
+            -apple-system,
+            'Segoe UI',
+            Roboto,
+            sans-serif;
+        line-height: 1.5;
+    }
+
+    @media (min-width: 1024px) {
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 1.25rem;
+        }
     }
 
     h1 {
-        font-size: 2rem;
+        font-size: 1.75rem;
+        margin: 0 0 1rem;
+    }
+
+    a {
+        color: var(--accent);
+    }
+
+    /* Audit M2: one ring for everything that takes focus; a component may draw its own instead. */
+    :focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+    }
+
+    /* Audit H15: the browser's grey placeholder read 3.5–4.2:1; muted reads 4.5:1 or more on every field. */
+    ::placeholder {
+        color: var(--muted);
+        opacity: 1;
+    }
+}
+
+/*
+ * The shared classes, as layered components: a utility on the same element overrides them
+ * (`button button-quiet w-full`). Prefer utilities for anything new; these stay for the
+ * patterns every screen repeats.
+ */
+@layer components {
+    /*
+     * A <button> without the browser's look: no border, fill or padding, the text's font and colour.
+     * Preflight does this for every button once it is on; until then, put it on any button that is
+     * not a .button. It stays harmless after. A component, so any utility beside it wins.
+     */
+    .bare-button {
+        margin: 0;
+        padding: 0;
+        border: 0;
+        background: none;
+        color: inherit;
+        font: inherit;
+        text-align: inherit;
+        cursor: pointer;
+    }
+
+    .page {
+        max-width: 40rem;
+        margin: 0 auto;
+        padding: max(1.5rem, env(safe-area-inset-top)) 1rem 2rem;
+    }
+
+    /*
+     * Desktop layout (spec: "Desktop layout"): beside the side rail, the page takes the width. A page
+     * reads in a column of about 48rem; Home, the editor, the Dashboard and the Gallery (`wide`) use
+     * up to 72rem.
+     */
+    @media (min-width: 1024px) {
+        .page {
+            max-width: none;
+            margin: 0 0 0 var(--rail-width);
+            padding: 2.25rem 2.5rem 3rem;
+        }
+
+        .page > main {
+            max-width: 48rem;
+            margin-inline: auto;
+        }
+
+        .page > main.wide {
+            max-width: 72rem;
+        }
+    }
+
+    .muted {
+        color: var(--muted);
+    }
+
+    .small {
+        font-size: 0.8125rem;
+    }
+
+    /* Was clip: rect() without a margin or a border (audit L38); Tailwind's sr-only is the whole recipe. */
+    .visually-hidden {
+        @apply sr-only;
+    }
+
+    /*
+     * Buttons: at least 44px each way (audit H22, H23), a darker fill on hover and press (M1), the
+     * focus ring (M2), and a not-allowed cursor when disabled, a progress one only while busy (L4).
+     */
+    .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        min-height: 2.75rem;
+        min-width: 2.75rem;
+        font: inherit;
+        font-weight: 600;
+        line-height: 1.5;
+        text-align: center;
+        text-decoration: none;
+        background: var(--accent-fill);
+        color: var(--accent-text);
+        border: 0;
+        border-radius: 999px;
+        padding: 0.625rem 1.5rem;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+        .button {
+            transition:
+                filter var(--duration-fast),
+                background-color var(--duration-fast);
+        }
+    }
+
+    @media (hover: hover) {
+        .button:hover:not(:disabled, [aria-disabled='true']) {
+            filter: brightness(0.92);
+        }
+    }
+
+    .button:active:not(:disabled, [aria-disabled='true']) {
+        filter: brightness(0.85);
+    }
+
+    .button:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+    }
+
+    /* Disabled: a raised fill with muted text, not a fade, so its label still reads (ticket 12). */
+    .button:disabled,
+    .button[aria-disabled='true'] {
+        background: var(--surface-raised);
+        color: var(--muted);
+        cursor: not-allowed;
+    }
+
+    .button[aria-busy='true'] {
+        cursor: progress;
+    }
+
+    .button-quiet {
+        background: var(--quiet-fill);
+        color: var(--text);
+        padding: 0.375rem 0.875rem;
+        font-weight: 500;
+    }
+
+    /* Destructive actions: the danger fill, quieter than the accent button, and always asking first. */
+    .button-danger {
+        background: var(--danger-soft);
+        color: var(--danger-text);
+        font-weight: 500;
+    }
+
+    /*
+     * A compact button in a dense row: 32px to look at, with the 44px hit-area around it (H22).
+     * Its neighbours keep 8px away (.toolbar's gap).
+     */
+    .button-small {
+        position: relative;
+        min-height: 2rem;
+        min-width: 2rem;
+        padding: 0.25rem 0.75rem;
+        font-size: 0.8125rem;
+    }
+
+    .button-small::before {
+        content: '';
+        position: absolute;
+        inset: 50% auto auto 50%;
+        width: max(100%, 2.75rem);
+        height: max(100%, 2.75rem);
+        transform: translate(-50%, -50%);
+    }
+
+    .banner {
+        background: var(--banner-surface);
+        border: 1px solid var(--banner-line);
+        border-radius: 0.75rem;
+        padding: 0.75rem 1rem;
+        margin: 0 0 1.25rem;
+    }
+
+    .banner p {
+        margin: 0 0 0.25rem;
+    }
+
+    .banner a {
+        color: var(--text);
+    }
+
+    .page-header,
+    .section-header,
+    .card-header,
+    .breadcrumbs {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .page-header h1,
+    .section-header h2,
+    .card-header h3 {
+        margin: 0;
+    }
+
+    /* The page title row (title and its main button) keeps room above what follows. */
+    .page-header {
         margin-bottom: 1.25rem;
     }
-}
 
-h1 {
-    font-size: 1.75rem;
-    margin: 0 0 1rem;
-}
-
-.muted {
-    color: var(--muted);
-}
-
-.button {
-    font: inherit;
-    font-weight: 600;
-    background: var(--accent-fill);
-    color: var(--accent-text);
-    border: 0;
-    border-radius: 999px;
-    padding: 0.625rem 1.5rem;
-    cursor: pointer;
-}
-
-/* Disabled: a raised fill with muted text, not a fade, so its label still reads (ticket 12). */
-.button:disabled {
-    background: var(--surface-raised);
-    color: var(--muted);
-    cursor: progress;
-}
-
-.cant-connect .checklist {
-    background: var(--surface);
-    border-radius: 0.75rem;
-    padding: 1rem 1rem 1rem 2.25rem;
-    margin: 0 0 1.5rem;
-}
-
-.banner {
-    background: var(--banner-surface);
-    border: 1px solid var(--banner-line);
-    border-radius: 0.75rem;
-    padding: 0.75rem 1rem;
-    margin: 0 0 1.25rem;
-}
-
-.banner p {
-    margin: 0 0 0.25rem;
-}
-
-.banner a {
-    color: var(--text);
-}
-
-/* --- Story list and editor --- */
-.page-header,
-.section-header,
-.card-header,
-.breadcrumbs {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-}
-
-.page-header h1,
-.section-header h2,
-.card-header h3 {
-    margin: 0;
-}
-
-/* The page title row (title and its main button) keeps room above what follows. */
-.page-header {
-    margin-bottom: 1.25rem;
-}
-
-.section-header {
-    margin: 2rem 0 0.75rem;
-}
-
-.breadcrumbs {
-    margin-bottom: 1rem;
-}
-
-.breadcrumbs a {
-    color: var(--muted);
-    text-decoration: none;
-}
-
-a {
-    color: var(--accent);
-}
-
-.visually-hidden {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
-}
-
-.story-title {
-    font-weight: 600;
-}
-
-.pill {
-    display: inline-block;
-    margin: 0;
-    padding: 0.125rem 0.75rem;
-    border-radius: 999px;
-    font-size: 0.875rem;
-    background: var(--quiet-fill);
-    color: var(--muted);
-}
-
-.pill-ok {
-    background: var(--ok-surface);
-    color: var(--ok-text);
-}
-
-.save-state {
-    margin: 0;
-    font-size: 0.875rem;
-    color: var(--muted);
-}
-
-.card,
-.status-card {
-    background: var(--surface);
-    border-radius: 0.875rem;
-    padding: 1.125rem 1.25rem;
-    margin: 0 0 1rem;
-}
-
-.card h2 {
-    font-size: 1.125rem;
-    margin: 0 0 0.5rem;
-}
-
-.facts {
-    display: grid;
-    grid-template-columns: max-content 1fr;
-    gap: 0.375rem 1rem;
-    margin: 0;
-}
-
-.facts dt {
-    color: var(--muted);
-}
-
-.facts dd {
-    margin: 0;
-}
-
-.warning {
-    background: var(--banner-surface);
-    border: 1px solid var(--banner-line);
-    border-radius: 0.5rem;
-    padding: 0.625rem 0.75rem;
-    margin: 0 0 1rem;
-}
-
-.warning-text {
-    color: var(--caution-text);
-}
-
-.card h3 {
-    font-size: 1rem;
-}
-
-.status-card .muted {
-    margin: 0.5rem 0 0.25rem;
-}
-
-.missing-list {
-    margin: 0;
-    padding-left: 1.25rem;
-    color: var(--muted);
-}
-
-.field {
-    display: grid;
-    gap: 0.25rem;
-    margin: 0.75rem 0;
-    min-width: 0;
-}
-
-.field label,
-.subsection legend,
-.add-bond label {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--muted);
-}
-
-.field input,
-.field textarea,
-.field select,
-.line-list input,
-.add-bond select {
-    font: inherit;
-    width: 100%;
-    background: var(--bg);
-    color: var(--text);
-    border: 1px solid var(--line);
-    border-radius: 0.5rem;
-    padding: 0.5rem 0.625rem;
-    min-width: 0;
-}
-
-.field textarea {
-    resize: vertical;
-}
-
-.field-row {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
-    gap: 0.75rem;
-}
-
-.actions {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-}
-
-.hint {
-    margin: 0.25rem 0 0;
-    font-size: 0.8125rem;
-    color: var(--muted);
-}
-
-.subsection {
-    border: 1px solid var(--line);
-    border-radius: 0.5rem;
-    padding: 0.5rem 0.75rem 0.75rem;
-    margin: 0.75rem 0;
-}
-
-.subsection .hint {
-    margin: 0 0 0.5rem;
-}
-
-.line-list {
-    margin: 0 0 0.5rem;
-    padding-left: 1.25rem;
-    display: grid;
-    gap: 0.5rem;
-}
-
-.line-list li {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-}
-
-.bond {
-    border-top: 1px solid var(--line);
-    padding-top: 0.5rem;
-    margin-top: 0.5rem;
-}
-
-.add-bond {
-    display: flex;
-    gap: 0.5rem;
-    align-items: end;
-    flex-wrap: wrap;
-    margin-top: 0.75rem;
-}
-
-.add-bond label {
-    display: grid;
-    gap: 0.25rem;
-    flex: 1 1 10rem;
-}
-
-.toolbar,
-.confirm {
-    display: inline-flex;
-    gap: 0.5rem;
-    align-items: center;
-    flex-wrap: wrap;
-}
-
-.button-quiet {
-    background: var(--quiet-fill);
-    color: var(--text);
-    padding: 0.375rem 0.875rem;
-    font-weight: 500;
-}
-
-/* Destructive actions: the danger fill, quieter than the accent button, and always asking first. */
-.button-danger {
-    background: var(--danger-soft);
-    color: var(--danger-text);
-    font-weight: 500;
-}
-
-.danger-zone {
-    margin-top: 2rem;
-}
-
-/* --- Chats --- */
-.chat-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: grid;
-    gap: 0.875rem;
-}
-
-.chat-list li {
-    background: var(--surface);
-    border-radius: 0.875rem;
-    padding: 0.75rem 1.125rem 1rem;
-}
-
-.chat-link {
-    display: grid;
-    gap: 0.25rem;
-    padding: 0.375rem 0 0.75rem;
-    color: inherit;
-    text-decoration: none;
-}
-
-.chat-times {
-    font-size: 0.8125rem;
-}
-
-.rename {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-    flex-wrap: wrap;
-    padding: 0.375rem 0 0.5rem;
-}
-
-.rename input {
-    font: inherit;
-    flex: 1 1 10rem;
-    background: var(--bg);
-    color: var(--text);
-    border: 1px solid var(--line);
-    border-radius: 0.5rem;
-    padding: 0.5rem 0.625rem;
-    min-width: 0;
-}
-
-.notice {
-    background: var(--notice-surface);
-    border: 1px solid var(--notice-line);
-    border-radius: 0.5rem;
-    padding: 0.625rem 0.75rem;
-    margin: 0 0 0.75rem;
-    font-size: 0.9375rem;
-}
-
-/* Accent links read only 4.1:1 on the notice tint; text-coloured ones read 11.8:1 (ticket 12). */
-.notice a {
-    color: var(--text);
-}
-
-.notice .button {
-    margin-left: 0.5rem;
-}
-
-.chat h1 {
-    font-size: 1.25rem;
-}
-
-.message-text {
-    margin: 0;
-    white-space: pre-wrap;
-}
-
-.speaker {
-    margin: 0 0 0.125rem;
-    font-size: 0.8125rem;
-    font-weight: 700;
-    color: var(--accent);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
-
-.turn-error {
-    color: var(--error-text);
-}
-
-/* Edit a Message in place and reset the Chat (ticket 25) */
-.chat-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-    margin-bottom: 0.75rem;
-}
-
-.chat-head h1 {
-    margin: 0;
-}
-
-.message-edit {
-    display: grid;
-    gap: 0.5rem;
-}
-
-.message-edit textarea {
-    font: inherit;
-    width: 100%;
-    background: var(--bg);
-    color: var(--text);
-    border: 1px solid var(--line);
-    border-radius: 0.5rem;
-    padding: 0.5rem 0.625rem;
-    resize: vertical;
-    min-width: 0;
-}
-
-.edit-hint {
-    margin: 0;
-    font-size: 0.8125rem;
-}
-
-/* --- Story drafting (ticket 22): the New Story panel and the Rewrite button on text fields --- */
-.new-story {
-    margin-bottom: 1.25rem;
-}
-
-.new-story .actions {
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-top: 0.75rem;
-}
-
-.field-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-}
-
-.button-small {
-    padding: 0.125rem 0.625rem;
-    font-size: 0.8125rem;
-}
-
-.field-error {
-    margin: 0.25rem 0 0;
-    font-size: 0.875rem;
-    color: var(--error-text);
-}
-
-/* --- Reference images (ticket 30): the current image, the offer and the candidate grid --- */
-.reference-current {
-    margin: 0.5rem 0;
-}
-
-.reference-current img,
-.candidate-grid img {
-    display: block;
-    width: 100%;
-    height: auto;
-    aspect-ratio: 2 / 3;
-    object-fit: cover;
-    border-radius: 0.5rem;
-    background: var(--bg);
-}
-
-.reference-current img {
-    max-width: 12rem;
-}
-
-.reference-offer {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-}
-
-.candidate-grid {
-    list-style: none;
-    margin: 0 0 0.75rem;
-    padding: 0;
-    display: grid;
-    /* A round is 3 candidates: one row of 3, even on a phone. */
-    grid-template-columns: repeat(3, minmax(0, 10rem));
-    gap: 0.75rem;
-}
-
-.candidate-grid li {
-    display: grid;
-    gap: 0.375rem;
-}
-
-/* --- Story assistant (ticket 23): the mark on changed fields. The sheet is in story-assistant.module.css. --- */
-.field-changed input,
-.field-changed textarea,
-.field-changed select {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 2px var(--accent-line);
-}
-
-.changed-mark {
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--accent);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
-
-/* --- Bond, Arc and Scene dashboard (ticket 27): read-only, opened from the Chat --- */
-.message-target {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-}
-
-.rollback-notice {
-    background: var(--rollback-surface);
-    border-color: var(--rollback-line);
-}
-
-.dashboard h2 {
-    font-size: 1.125rem;
-    margin: 1.25rem 0 0.75rem;
-}
-
-.dashboard h3 {
-    font-size: 0.8125rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--muted);
-    margin: 0.75rem 0 0.375rem;
-}
-
-.dashboard-scene,
-.dashboard-character,
-.dashboard-background {
-    background: var(--surface);
-    border-radius: 1rem;
-    padding: 0.5rem 1.25rem 1.25rem;
-    margin-bottom: 1rem;
-}
-
-/* One Character on the Dashboard: their picture and name, then their Bonds or Arc. */
-.dashboard-person {
-    padding: 0.5rem 0;
-}
-
-.dashboard-person + .dashboard-person {
-    border-top: 1px solid var(--line);
-}
-
-.dashboard-person-head {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    min-height: 2.75rem;
-}
-
-.dashboard .dashboard-person-head h3 {
-    flex: 1;
-    min-width: 0;
-    margin: 0;
-    font-size: 1rem;
-    text-transform: none;
-    letter-spacing: 0;
-    color: var(--text);
-}
-
-.dashboard-portrait {
-    flex: none;
-    width: 2.5rem;
-    height: 2.5rem;
-    font-size: 1rem;
-}
-
-.dashboard-person-body {
-    padding: 0.25rem 0 0.25rem;
-}
-
-.dashboard-person > :not(.dashboard-person-head) {
-    margin-top: 0.5rem;
-}
-
-/* Desktop: the Characters sit two to a row. */
-@media (min-width: 1024px) {
-    .dashboard-character {
+    .section-header {
+        margin: 2rem 0 0.75rem;
+    }
+
+    .breadcrumbs {
+        margin-bottom: 1rem;
+    }
+
+    /* Often the page's only way back, so a full 44px to tap (audit H32). */
+    .breadcrumbs a {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.375rem;
+        min-height: 2.75rem;
+        color: var(--muted);
+        text-decoration: none;
+    }
+
+    .pill {
+        display: inline-block;
+        margin: 0;
+        padding: 0.125rem 0.75rem;
+        border-radius: 999px;
+        font-size: 0.875rem;
+        background: var(--quiet-fill);
+        color: var(--muted);
+    }
+
+    .pill-ok {
+        background: var(--ok-surface);
+        color: var(--ok-text);
+    }
+
+    .save-state {
+        margin: 0;
+        font-size: 0.875rem;
+        color: var(--muted);
+    }
+
+    .card {
+        background: var(--surface);
+        border-radius: 0.875rem;
+        padding: 1.125rem 1.25rem;
+        margin: 0 0 1rem;
+    }
+
+    .card h2 {
+        font-size: 1.125rem;
+        margin: 0 0 0.5rem;
+    }
+
+    .card h3 {
+        font-size: 1rem;
+    }
+
+    .warning {
+        background: var(--banner-surface);
+        border: 1px solid var(--banner-line);
+        border-radius: 0.5rem;
+        padding: 0.625rem 0.75rem;
+        margin: 0 0 1rem;
+    }
+
+    .field {
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        column-gap: 2.5rem;
-        align-items: start;
-        padding: 0.75rem 1.75rem 1.5rem;
+        gap: 0.25rem;
+        margin: 0.75rem 0;
+        min-width: 0;
     }
 
-    .dashboard-character > h2 {
-        grid-column: 1 / -1;
+    .field label {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--muted);
     }
 
-    .dashboard-character > .dashboard-person:nth-of-type(-n + 2) {
-        border-top: 0;
+    /* A field's edge reads 3:1 on the page and the card (audit H14), and it is 44px tall (M40). */
+    .field input,
+    .field textarea,
+    .field select {
+        font: inherit;
+        width: 100%;
+        min-height: 2.75rem;
+        background: var(--bg);
+        color: var(--text);
+        border: 1px solid var(--field-line);
+        border-radius: 0.5rem;
+        padding: 0.5rem 0.625rem;
+        min-width: 0;
     }
 
-    .dashboard-scene,
-    .dashboard-background {
-        padding: 0.75rem 1.75rem 1.5rem;
-    }
-}
-
-.dashboard section h2:first-child {
-    margin-top: 0.75rem;
-}
-
-.dashboard p {
-    margin: 0 0 0.375rem;
-}
-
-.small {
-    font-size: 0.8125rem;
-}
-
-.event {
-    margin: 0 0 0.25rem;
-    font-size: 0.9375rem;
-    color: var(--event);
-}
-
-.bond {
-    border-top: 1px solid var(--line);
-    padding: 0.75rem 0;
-}
-
-.bond summary {
-    cursor: pointer;
-    display: grid;
-    gap: 0.125rem;
-}
-
-.bond-toward {
-    font-size: 0.8125rem;
-    color: var(--muted);
-}
-
-.bond-label {
-    font-weight: 700;
-    color: var(--accent);
-    margin: 0;
-}
-
-.bond-history,
-.arc-changes,
-.background-list {
-    margin: 0.75rem 0 0;
-    padding-left: 1.25rem;
-    display: grid;
-    gap: 0.875rem;
-}
-
-.background-list .button {
-    margin-left: 0.5rem;
-}
-
-/* --- Memory drawer and the "Memory added" toast (ticket 28) --- */
-.toasts {
-    display: grid;
-    gap: 0.5rem;
-    margin: 0 0 0.75rem;
-}
-
-.toast {
-    display: grid;
-    gap: 0.125rem;
-    text-align: left;
-    background: var(--toast-surface);
-    border: 1px solid var(--toast-line);
-    border-radius: 0.75rem;
-    padding: 0.625rem 0.875rem;
-    color: var(--text);
-    cursor: pointer;
-    font: inherit;
-    /* Fades in, stays, then fades out just before the Chat removes it (TOAST_MS, 3 s). */
-    animation: toast-life 3s ease forwards;
-}
-
-@keyframes toast-life {
-    0% {
-        opacity: 0;
-        transform: translateY(-0.25rem);
-    }
-    8%,
-    85% {
-        opacity: 1;
-        transform: none;
-    }
-    100% {
-        opacity: 0;
-    }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .toast {
-        animation: none;
-    }
-}
-
-.toast span {
-    color: var(--muted);
-    font-size: 0.9375rem;
-}
-
-.memory-drawer {
-    position: fixed;
-    inset: 0;
-    z-index: 20;
-    overflow-y: auto;
-    background: var(--bg);
-    padding: 1rem;
-}
-
-@media (min-width: 720px) {
-    .memory-drawer {
-        left: auto;
-        width: 26rem;
-        padding: 1.25rem 1.25rem 2rem;
-        border-left: 1px solid var(--line);
-        box-shadow: -0.5rem 0 1.5rem var(--shadow);
-    }
-}
-
-/* Desktop: the drawer docks beside the Chat, which narrows to leave it room, instead of covering it. */
-@media (min-width: 1024px) {
-    .memory-drawer {
-        width: 28rem;
-        box-shadow: none;
-        background: color-mix(in srgb, var(--surface) 30%, var(--bg));
+    .field textarea {
+        resize: vertical;
     }
 
-    .page:has(.memory-drawer) {
-        margin-right: 28rem;
+    .field-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+        gap: 0.75rem;
     }
-}
 
-.memory-drawer-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    margin-bottom: 0.5rem;
-}
-
-.memory-drawer > .muted.small {
-    margin: 0 0 1rem;
-}
-
-.memory-drawer-head h2 {
-    margin: 0;
-}
-
-.memory-list {
-    list-style: none;
-    margin: 1rem 0 0;
-    padding: 0;
-    display: grid;
-    gap: 0.875rem;
-}
-
-.memory {
-    background: var(--surface);
-    border-radius: 0.875rem;
-    padding: 0.875rem 1rem;
-}
-
-.memory-highlight {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-}
-
-.memory p {
-    margin: 0 0 0.5rem;
-}
-
-.memory-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.375rem;
-}
-
-.chip {
-    display: inline-block;
-    background: var(--quiet-fill);
-    border-radius: 999px;
-    padding: 0.125rem 0.625rem;
-    font-size: 0.8125rem;
-}
-
-.chip-muted {
-    color: var(--muted);
-}
-
-.chip-pick {
-    cursor: pointer;
-}
-
-.memory-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-}
-
-.memory-lock {
-    color: var(--event);
-}
-
-/* The last turn sent this Memory (.scratch/memory-by-meaning/spec.md: "Used last turn"). */
-.memory-in-play {
-    color: var(--accent);
-    font-weight: 600;
-}
-
-/* Beliefs, under the Memories (.scratch/memory-by-meaning/spec.md, "In the Memory drawer"). */
-.memory-beliefs {
-    margin-top: 1.5rem;
-}
-
-.memory-beliefs h3 {
-    margin: 0 0 0.25rem;
-}
-
-.memory-beliefs > .button {
-    margin-top: 0.75rem;
-}
-
-.belief-holder {
-    font-weight: 600;
-}
-
-.belief-truth {
-    border-left: 3px solid var(--event);
-    padding-left: 0.5rem;
-}
-
-.memory-locked-warning {
-    margin: 0.5rem 0;
-    padding: 0.5rem 0.75rem;
-    border-radius: 0.5rem;
-    background: var(--quiet-fill);
-    border-left: 3px solid var(--event);
-}
-
-.memory-form {
-    display: grid;
-    gap: 0.5rem;
-    margin: 0.75rem 0;
-}
-
-.known-by-picker {
-    border: 0;
-    padding: 0;
-    margin: 0;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem;
-}
-
-.known-by-picker legend {
-    padding: 0;
-    margin-bottom: 0.25rem;
-}
-
-.memory-archived {
-    margin-top: 1rem;
-}
-
-.memory-archived summary {
-    cursor: pointer;
-    color: var(--muted);
-}
-
-/* The Memory graph: List or Graph, the picture, and what is picked under it. */
-
-.memory-view-switch {
-    display: flex;
-    margin: 0.75rem 0;
-    background: var(--bg);
-    border: 1px solid var(--line);
-    border-radius: 0.65rem;
-    padding: 3px;
-}
-
-.memory-view-switch button {
-    flex: 1;
-    min-height: 2.5rem;
-    background: transparent;
-    border: 0;
-    border-radius: 0.5rem;
-    font: inherit;
-    font-size: 0.875rem;
-    color: var(--muted);
-    cursor: pointer;
-}
-
-.memory-view-switch button[aria-checked='true'] {
-    background: var(--accent-fill);
-    color: var(--accent-text);
-    font-weight: 600;
-}
-
-.memory-view-switch button:focus-visible {
-    outline: 2px solid var(--text);
-    outline-offset: -2px;
-}
-
-.memory-graph {
-    display: block;
-    width: 100%;
-    height: auto;
-    margin: 0.5rem 0 0.75rem;
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: 0.75rem;
-    touch-action: manipulation;
-    -webkit-tap-highlight-color: transparent;
-    user-select: none;
-}
-
-.memory-graph-link {
-    stroke-width: 1.25;
-    stroke-opacity: 0.4;
-}
-
-.memory-graph-link[data-dim='true'] {
-    stroke-opacity: 0.08;
-}
-
-.memory-graph-link-lit {
-    stroke-width: 2;
-    stroke-opacity: 0.95;
-}
-
-.memory-graph-dot,
-.memory-graph-person {
-    cursor: pointer;
-    outline: none;
-}
-
-.memory-graph-hit {
-    fill: transparent;
-}
-
-.memory-graph-dot circle:not(.memory-graph-hit) {
-    fill: var(--muted);
-    stroke: var(--surface);
-    stroke-width: 1.5;
-}
-
-/* A Memory the user wrote or touched: hollow, like the lock in the list. */
-.memory-graph-dot circle.memory-graph-dot-own {
-    fill: var(--surface);
-    stroke: var(--muted);
-    stroke-width: 2;
-}
-
-.memory-graph-dot[data-state='about'] circle:not(.memory-graph-hit),
-.memory-graph-dot[data-state='selected'] circle:not(.memory-graph-hit) {
-    fill: var(--text);
-}
-
-.memory-graph-dot[data-state='selected'] circle:not(.memory-graph-hit) {
-    stroke: var(--accent);
-    stroke-width: 3;
-}
-
-.memory-graph-dot[data-state='other'] {
-    opacity: 0.35;
-}
-
-.memory-graph-dot[data-state='unknown'] {
-    opacity: 0.12;
-}
-
-.memory-graph-person-ring {
-    stroke-width: 2.5;
-}
-
-.memory-graph-person[data-lit='false'] {
-    opacity: 0.4;
-}
-
-.memory-graph-person[aria-pressed='true'] .memory-graph-person-ring {
-    stroke-width: 4;
-}
-
-.memory-graph-dot:focus-visible circle:not(.memory-graph-hit),
-.memory-graph-person:focus-visible .memory-graph-person-ring {
-    stroke: var(--text);
-    stroke-width: 3;
-}
-
-.memory-graph-initial {
-    font-size: 1.1rem;
-    font-weight: 700;
-    text-anchor: middle;
-    pointer-events: none;
-}
-
-.memory-graph-name {
-    fill: var(--text);
-    font-size: 0.75rem;
-    text-anchor: middle;
-    paint-order: stroke;
-    stroke: var(--surface);
-    stroke-width: 3px;
-    pointer-events: none;
-}
-
-.memory-graph-pick h3 {
-    margin: 0 0 0.25rem;
-    font-size: 1rem;
-}
-
-/* --- Personas and the identity swap (ticket 26) --- */
-
-.persona-list {
-    list-style: none;
-    padding: 0;
-    margin: 1rem 0 0;
-    display: grid;
-    gap: 1rem;
-}
-
-.persona-list .card {
-    margin: 0;
-}
-
-.persona-list h3 {
-    margin: 0 0 0.25rem;
-}
-
-.persona-description {
-    white-space: pre-wrap;
-    margin: 0 0 0.5rem;
-}
-
-.persona-form {
-    display: grid;
-    gap: 0.5rem;
-}
-
-.identity-swap {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-left: auto;
-}
-
-.identity-swap select {
-    font: inherit;
-    max-width: 14rem;
-    background: var(--bg);
-    color: var(--text);
-    border: 1px solid var(--line);
-    border-radius: 0.5rem;
-    padding: 0.375rem 0.5rem;
-}
-
-.confirm-warning {
-    flex-basis: 100%;
-    order: 1;
-    color: var(--confirm-warning-text);
-    font-size: 0.875rem;
-}
-
-/* --- Snapshots and the Gallery (ticket 31) --- */
-.snapshot-thumb {
-    display: block;
-    padding: 0;
-    border: 1px solid var(--line);
-    border-radius: 0.5rem;
-    background: var(--surface);
-    overflow: hidden;
-    cursor: pointer;
-}
-
-.snapshot-thumb img {
-    display: block;
-    width: 6rem;
-    aspect-ratio: 2 / 3;
-    object-fit: cover;
-}
-
-.snapshot-viewer {
-    position: fixed;
-    inset: 0;
-    z-index: 30;
-    overflow-y: auto;
-    background: var(--bg);
-    padding: max(1rem, env(safe-area-inset-top)) 1rem 2rem;
-}
-
-.snapshot-viewer-head {
-    margin-bottom: 0.75rem;
-}
-
-.snapshot-full {
-    display: block;
-    width: 100%;
-    max-width: 32rem;
-    max-height: 80vh;
-    object-fit: contain;
-    margin: 0 auto 0.5rem;
-    border-radius: 0.5rem;
-}
-
-.snapshot-prompt {
-    white-space: pre-wrap;
-    font: inherit;
-    font-size: 0.9375rem;
-    background: var(--surface);
-    border-radius: 0.5rem;
-    padding: 0.75rem;
-}
-
-.gallery-filter {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-    margin-bottom: 1rem;
-}
-
-.gallery-filter select {
-    font: inherit;
-    background: var(--bg);
-    color: var(--text);
-    border: 1px solid var(--line);
-    border-radius: 0.5rem;
-    padding: 0.375rem 0.5rem;
-}
-
-.gallery-grid {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
-    gap: 0.75rem;
-}
-
-.gallery-grid li {
-    display: grid;
-    gap: 0.25rem;
-}
-
-.gallery-grid .snapshot-thumb img {
-    width: 100%;
-}
-
-.gallery-earlier {
-    color: var(--earlier-text);
-}
-
-/* --- Character cards: a picked PNG card's picture in the New Story panel --- */
-.card-import-picture {
-    display: block;
-    width: 8rem;
-    max-width: 40%;
-    height: auto;
-    aspect-ratio: 2 / 3;
-    object-fit: cover;
-    border-radius: 0.75rem;
-    margin: 0 0 0.75rem;
-}
-
-.card-import-head {
-    display: flex;
-    gap: 0.875rem;
-    align-items: flex-start;
-}
-
-.card-import-head p {
-    margin: 0.125rem 0 0;
-}
-
-.card-import-name {
-    margin: 0;
-    overflow-wrap: anywhere;
-}
-
-.card-import-fold {
-    margin: 0.5rem 0;
-}
-
-.card-import-fold summary {
-    cursor: pointer;
-    font-weight: 600;
-}
-
-.card-import-fold ul {
-    margin: 0.5rem 0 0;
-    padding-left: 1.25rem;
-}
-
-.card-import-text {
-    display: block;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-    font-size: 0.875rem;
-}
-
-.card-import-greetings {
-    border: 0;
-    margin: 0.75rem 0;
-    padding: 0;
-    display: grid;
-    gap: 0.5rem;
-}
-
-.card-import-greetings legend {
-    font-weight: 600;
-    margin-bottom: 0.25rem;
-}
-
-.card-import-greeting {
-    display: flex;
-    gap: 0.5rem;
-    align-items: flex-start;
-    padding: 0.5rem 0.625rem;
-    border-radius: 0.75rem;
-    background: var(--surface-raised);
-}
-
-.card-import-greeting input {
-    margin-top: 0.25rem;
-    flex: none;
-}
-
-/* --- The Bond chart on the Dashboard (.scratch/bond-axes/spec.md, "The Dashboard") --- */
-.bond-chart {
-    margin: 0.75rem 0 0;
-}
-
-.bond-chart-figure {
-    position: relative;
-    margin: 0;
-    max-width: 30rem;
-}
-
-.bond-chart-pins {
-    position: relative;
-    height: 1.75rem;
-}
-
-.bond-chart-pin {
-    position: absolute;
-    top: 0;
-    transform: translateX(-50%);
-    /* A finger-sized target around a small mark. */
-    min-width: 1.75rem;
-    height: 1.75rem;
-    padding: 0;
-    border: 0;
-    border-radius: 50%;
-    background: transparent;
-    color: var(--event);
-    font: inherit;
-    font-size: 0.875rem;
-    line-height: 1;
-    cursor: pointer;
-}
-
-.bond-chart-pin[aria-pressed='true'] {
-    background: var(--accent-soft);
-}
-
-.bond-chart-svg {
-    display: block;
-    width: 100%;
-    height: auto;
-    overflow: visible;
-}
-
-.bond-chart-name {
-    font-size: 10px;
-    font-weight: 700;
-}
-
-.bond-chart-ends {
-    font-size: 9px;
-    fill: var(--muted);
-}
-
-.bond-chart-plot {
-    fill: var(--status-item-tint);
-    stroke: var(--line);
-    stroke-width: 0.5;
-}
-
-.bond-chart-pin-line {
-    stroke: var(--event);
-    stroke-width: 1;
-    stroke-dasharray: 2 3;
-}
-
-.bond-chart-event {
-    margin: 0.5rem 0 0;
-    padding: 0.5rem 0.75rem;
-    border: 1px solid var(--line);
-    border-radius: 0.75rem;
-    background: var(--surface-raised);
-}
-
-.bond-chart-event p {
-    margin: 0 0 0.25rem;
-}
-
-.bond-unmeasured {
-    margin: 0.75rem 0 0;
-}
-
-/* --- "Show Bonds" in the Memory graph (.scratch/bond-axes/spec.md, "The Memory graph") --- */
-.memory-view-row {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.memory-view-row .memory-view-switch {
-    flex: 1;
-    min-width: 0;
-}
-
-.memory-bonds-switch {
-    flex: none;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    min-height: 2.75rem;
-    padding: 0 0.25rem;
-    background: transparent;
-    border: 0;
-    font: inherit;
-    font-size: 0.875rem;
-    color: var(--text);
-    cursor: pointer;
-}
-
-.memory-bonds-switch-track {
-    position: relative;
-    width: 2.25rem;
-    height: 1.25rem;
-    border-radius: 1rem;
-    background: var(--quiet-fill);
-    border: 1px solid var(--line);
-    transition: background 0.2s;
-}
-
-.memory-bonds-switch-track::after {
-    content: '';
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    width: calc(1.25rem - 6px);
-    height: calc(1.25rem - 6px);
-    border-radius: 50%;
-    background: var(--text);
-    transition: transform 0.2s;
-}
-
-.memory-bonds-switch[aria-checked='true'] .memory-bonds-switch-track {
-    background: var(--accent-fill);
-}
-
-.memory-bonds-switch[aria-checked='true'] .memory-bonds-switch-track::after {
-    transform: translateX(1rem);
-    background: var(--accent-text);
-}
-
-.memory-bonds-switch:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-    border-radius: 0.5rem;
-}
-
-.memory-graph-bond {
-    cursor: pointer;
-}
-
-.memory-graph-bond-hit {
-    fill: none;
-    stroke: transparent;
-    stroke-width: 16;
-}
-
-.memory-graph-bond-line {
-    fill: none;
-    stroke-width: 2.5;
-    stroke-linecap: round;
-    opacity: 0.85;
-}
-
-.memory-graph-bond[aria-pressed='true'] .memory-graph-bond-line {
-    stroke-width: 4;
-    opacity: 1;
-}
-
-.memory-graph-bond:focus-visible .memory-graph-bond-line {
-    stroke-width: 4;
+    .actions {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .hint {
+        margin: 0.25rem 0 0;
+        font-size: 0.8125rem;
+        color: var(--muted);
+    }
+
+    .toolbar,
+    .confirm {
+        display: inline-flex;
+        gap: 0.5rem;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    .confirm-warning {
+        flex-basis: 100%;
+        order: 1;
+        color: var(--confirm-warning-text);
+        font-size: 0.875rem;
+    }
+
+    .notice {
+        background: var(--notice-surface);
+        border: 1px solid var(--notice-line);
+        border-radius: 0.5rem;
+        padding: 0.625rem 0.75rem;
+        margin: 0 0 0.75rem;
+        font-size: 0.9375rem;
+    }
+
+    /* Accent links read only 4.1:1 on the notice tint; text-coloured ones read 11.8:1 (ticket 12). */
+    .notice a {
+        color: var(--text);
+    }
+
+    .notice .button {
+        margin-left: 0.5rem;
+    }
+
+    .turn-error {
+        color: var(--error-text);
+    }
+
+    .field-error {
+        margin: 0.25rem 0 0;
+        font-size: 0.875rem;
+        color: var(--error-text);
+    }
+
+    /*
+     * A chip: a label, or a label holding a checkbox (.chip-pick). A pick is a 44px target with its
+     * own checked and focus looks (audit H31); keep 8px between chips (gap-2).
+     */
+    .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.375rem;
+        background: var(--quiet-fill);
+        border: 1px solid transparent;
+        border-radius: 999px;
+        padding: 0.125rem 0.625rem;
+        font-size: 0.8125rem;
+    }
+
+    .chip-muted {
+        color: var(--muted);
+    }
+
+    .chip-pick {
+        min-height: 2.75rem;
+        padding: 0.25rem 0.875rem;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .chip-pick input {
+        width: 1.125rem;
+        height: 1.125rem;
+        margin: 0;
+        accent-color: var(--accent-fill);
+    }
+
+    .chip-pick:has(:checked) {
+        background: var(--accent-soft);
+        border-color: var(--accent-line);
+    }
+
+    .chip-pick:has(:focus-visible) {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+    }
+
+    .chip-pick input:focus-visible {
+        outline: none;
+    }
+
+    .chip-pick:has(:disabled) {
+        color: var(--muted);
+        cursor: not-allowed;
+    }
 }

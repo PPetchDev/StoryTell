@@ -1,0 +1,115 @@
+/*
+ * The Chat screen: what was left in globals.css for it.
+ * Owner: the Chat screen session.
+ * Moved unchanged out of app/globals.css (docs/adr/0004-tailwind-css.md). Plain, unlayered CSS,
+ * so these rules still beat the layered shared classes and Tailwind utilities: convert them to
+ * utilities in the components and delete them from here.
+ */
+/* --- Chats --- */
+.chat h1 {
+    font-size: 1.25rem;
+}
+
+.speaker {
+    margin: 0 0 0.125rem;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+/* Edit a Message in place and reset the Chat (ticket 25) */
+.chat-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+}
+
+.chat-head h1 {
+    margin: 0;
+}
+
+.message-edit {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.message-edit textarea {
+    font: inherit;
+    width: 100%;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.625rem;
+    resize: vertical;
+    min-width: 0;
+}
+
+.edit-hint {
+    margin: 0;
+    font-size: 0.8125rem;
+}
+
+/* --- The Dashboard link target and the rollback notice (ticket 27) --- */
+.message-target {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.rollback-notice {
+    background: var(--rollback-surface);
+    border-color: var(--rollback-line);
+}
+
+/* --- The "Memory added" toast (ticket 28) --- */
+.toasts {
+    display: grid;
+    gap: 0.5rem;
+    margin: 0 0 0.75rem;
+}
+
+.toast {
+    display: grid;
+    gap: 0.125rem;
+    text-align: left;
+    background: var(--toast-surface);
+    border: 1px solid var(--toast-line);
+    border-radius: 0.75rem;
+    padding: 0.625rem 0.875rem;
+    color: var(--text);
+    cursor: pointer;
+    font: inherit;
+    /* Fades in, stays, then fades out just before the Chat removes it (TOAST_MS, 3 s). */
+    animation: toast-life 3s ease forwards;
+}
+
+@keyframes toast-life {
+    0% {
+        opacity: 0;
+        transform: translateY(-0.25rem);
+    }
+    8%,
+    85% {
+        opacity: 1;
+        transform: none;
+    }
+    100% {
+        opacity: 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .toast {
+        animation: none;
+    }
+}
+
+.toast span {
+    color: var(--muted);
+    font-size: 0.9375rem;
+}

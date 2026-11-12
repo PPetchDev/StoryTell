@@ -25,6 +25,7 @@ const DARK = {
     '--accent-fill': '#7357ec',
     '--surface-raised': '#2c2540',
     '--line': '#3a3150',
+    '--field-line': '#7a6f9b',
     '--accent-soft': 'rgba(143, 115, 255, 0.18)',
     '--accent-line': 'rgba(143, 115, 255, 0.35)',
     '--danger': '#ff7a8a',
@@ -89,6 +90,7 @@ const LIGHT_OVERRIDES = {
     '--accent-fill': '#6a4ff0',
     '--surface-raised': '#ece8f4',
     '--line': '#d9d2e6',
+    '--field-line': '#857c9c',
     '--accent-soft': 'rgba(106, 79, 240, 0.12)',
     '--accent-line': 'rgba(106, 79, 240, 0.4)',
     '--danger': '#b3243a',
@@ -285,6 +287,19 @@ pair('Disabled ⚡ icon (faint) on page', '--faint', BG, 3);
 pair('Writing dots accent on page (icon)', '--accent', BG, 3);
 pair('Needs-attention dot warning on page (icon)', '--warning', BG, 3);
 pair('Bottom nav current icon accent on page', '--accent', BG, 3);
+// Fields (audit H14, H15): the edge of a box against the page and the card, and the placeholder in it
+pair('Field edge on page', '--field-line', BG, 3);
+pair('Field edge on surface', '--field-line', SF, 3);
+pair('Field edge on raised surface', '--field-line', SR, 3);
+pair('Placeholder (muted) in a field on the page', '--muted', BG);
+pair('Placeholder (muted) in a field on the surface', '--muted', SF);
+// The focus ring (audit M2): 2px of accent beside the element, on whatever is under it
+pair('Focus ring accent on page', '--accent', BG, 3);
+pair('Focus ring accent on surface', '--accent', SF, 3);
+pair('Focus ring accent on raised surface', '--accent', SR, 3);
+// A checked chip (audit H31): its text on the accent tint, over the page and the card
+pair('Checked chip text on accent tint over page', '--text', ['--bg', '--accent-soft']);
+pair('Checked chip text on accent tint over surface', '--text', ['--surface', '--accent-soft']);
 // Disabled states
 pair('Disabled primary button on page', '--muted', SR);
 pair('Disabled quiet button on surface', '--muted', SR);

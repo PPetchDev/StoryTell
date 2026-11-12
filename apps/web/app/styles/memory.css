@@ -1,0 +1,391 @@
+/*
+ * The Memory drawer, its graph, and "Show Bonds".
+ * Owner: the Chats list / Dashboard / Memory session.
+ * Moved unchanged out of app/globals.css (docs/adr/0004-tailwind-css.md). Plain, unlayered CSS,
+ * so these rules still beat the layered shared classes and Tailwind utilities: convert them to
+ * utilities in the components and delete them from here.
+ */
+/* --- Memory drawer (ticket 28) --- */
+.memory-drawer {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    overflow-y: auto;
+    background: var(--bg);
+    padding: 1rem;
+}
+
+@media (min-width: 720px) {
+    .memory-drawer {
+        left: auto;
+        width: 26rem;
+        padding: 1.25rem 1.25rem 2rem;
+        border-left: 1px solid var(--line);
+        box-shadow: -0.5rem 0 1.5rem var(--shadow);
+    }
+}
+
+/* Desktop: the drawer docks beside the Chat, which narrows to leave it room, instead of covering it. */
+@media (min-width: 1024px) {
+    .memory-drawer {
+        width: 28rem;
+        box-shadow: none;
+        background: color-mix(in srgb, var(--surface) 30%, var(--bg));
+    }
+
+    .page:has(.memory-drawer) {
+        margin-right: 28rem;
+    }
+}
+
+.memory-drawer-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.memory-drawer > .muted.small {
+    margin: 0 0 1rem;
+}
+
+.memory-drawer-head h2 {
+    margin: 0;
+}
+
+.memory-list {
+    list-style: none;
+    margin: 1rem 0 0;
+    padding: 0;
+    display: grid;
+    gap: 0.875rem;
+}
+
+.memory {
+    background: var(--surface);
+    border-radius: 0.875rem;
+    padding: 0.875rem 1rem;
+}
+
+.memory-highlight {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.memory p {
+    margin: 0 0 0.5rem;
+}
+
+.memory-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+}
+
+.memory-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.memory-lock {
+    color: var(--event);
+}
+
+/* The last turn sent this Memory (.scratch/memory-by-meaning/spec.md: "Used last turn"). */
+.memory-in-play {
+    color: var(--accent);
+    font-weight: 600;
+}
+
+/* Beliefs, under the Memories (.scratch/memory-by-meaning/spec.md, "In the Memory drawer"). */
+.memory-beliefs {
+    margin-top: 1.5rem;
+}
+
+.memory-beliefs h3 {
+    margin: 0 0 0.25rem;
+}
+
+.memory-beliefs > .button {
+    margin-top: 0.75rem;
+}
+
+.belief-holder {
+    font-weight: 600;
+}
+
+.belief-truth {
+    border-left: 3px solid var(--event);
+    padding-left: 0.5rem;
+}
+
+.memory-locked-warning {
+    margin: 0.5rem 0;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    background: var(--quiet-fill);
+    border-left: 3px solid var(--event);
+}
+
+.memory-form {
+    display: grid;
+    gap: 0.5rem;
+    margin: 0.75rem 0;
+}
+
+.known-by-picker {
+    border: 0;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+
+.known-by-picker legend {
+    padding: 0;
+    margin-bottom: 0.25rem;
+}
+
+.memory-archived {
+    margin-top: 1rem;
+}
+
+.memory-archived summary {
+    cursor: pointer;
+    color: var(--muted);
+}
+
+/* The Memory graph: List or Graph, the picture, and what is picked under it. */
+
+.memory-view-switch {
+    display: flex;
+    margin: 0.75rem 0;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 0.65rem;
+    padding: 3px;
+}
+
+.memory-view-switch button {
+    flex: 1;
+    min-height: 2.5rem;
+    background: transparent;
+    border: 0;
+    border-radius: 0.5rem;
+    font: inherit;
+    font-size: 0.875rem;
+    color: var(--muted);
+    cursor: pointer;
+}
+
+.memory-view-switch button[aria-checked='true'] {
+    background: var(--accent-fill);
+    color: var(--accent-text);
+    font-weight: 600;
+}
+
+.memory-view-switch button:focus-visible {
+    outline: 2px solid var(--text);
+    outline-offset: -2px;
+}
+
+.memory-graph {
+    display: block;
+    width: 100%;
+    height: auto;
+    margin: 0.5rem 0 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+}
+
+.memory-graph-link {
+    stroke-width: 1.25;
+    stroke-opacity: 0.4;
+}
+
+.memory-graph-link[data-dim='true'] {
+    stroke-opacity: 0.08;
+}
+
+.memory-graph-link-lit {
+    stroke-width: 2;
+    stroke-opacity: 0.95;
+}
+
+.memory-graph-dot,
+.memory-graph-person {
+    cursor: pointer;
+    outline: none;
+}
+
+.memory-graph-hit {
+    fill: transparent;
+}
+
+.memory-graph-dot circle:not(.memory-graph-hit) {
+    fill: var(--muted);
+    stroke: var(--surface);
+    stroke-width: 1.5;
+}
+
+/* A Memory the user wrote or touched: hollow, like the lock in the list. */
+.memory-graph-dot circle.memory-graph-dot-own {
+    fill: var(--surface);
+    stroke: var(--muted);
+    stroke-width: 2;
+}
+
+.memory-graph-dot[data-state='about'] circle:not(.memory-graph-hit),
+.memory-graph-dot[data-state='selected'] circle:not(.memory-graph-hit) {
+    fill: var(--text);
+}
+
+.memory-graph-dot[data-state='selected'] circle:not(.memory-graph-hit) {
+    stroke: var(--accent);
+    stroke-width: 3;
+}
+
+.memory-graph-dot[data-state='other'] {
+    opacity: 0.35;
+}
+
+.memory-graph-dot[data-state='unknown'] {
+    opacity: 0.12;
+}
+
+.memory-graph-person-ring {
+    stroke-width: 2.5;
+}
+
+.memory-graph-person[data-lit='false'] {
+    opacity: 0.4;
+}
+
+.memory-graph-person[aria-pressed='true'] .memory-graph-person-ring {
+    stroke-width: 4;
+}
+
+.memory-graph-dot:focus-visible circle:not(.memory-graph-hit),
+.memory-graph-person:focus-visible .memory-graph-person-ring {
+    stroke: var(--text);
+    stroke-width: 3;
+}
+
+.memory-graph-initial {
+    font-size: 1.1rem;
+    font-weight: 700;
+    text-anchor: middle;
+    pointer-events: none;
+}
+
+.memory-graph-name {
+    fill: var(--text);
+    font-size: 0.75rem;
+    text-anchor: middle;
+    paint-order: stroke;
+    stroke: var(--surface);
+    stroke-width: 3px;
+    pointer-events: none;
+}
+
+.memory-graph-pick h3 {
+    margin: 0 0 0.25rem;
+    font-size: 1rem;
+}
+
+/* --- "Show Bonds" in the Memory graph (.scratch/bond-axes/spec.md, "The Memory graph") --- */
+.memory-view-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.memory-view-row .memory-view-switch {
+    flex: 1;
+    min-width: 0;
+}
+
+.memory-bonds-switch {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    padding: 0 0.25rem;
+    background: transparent;
+    border: 0;
+    font: inherit;
+    font-size: 0.875rem;
+    color: var(--text);
+    cursor: pointer;
+}
+
+.memory-bonds-switch-track {
+    position: relative;
+    width: 2.25rem;
+    height: 1.25rem;
+    border-radius: 1rem;
+    background: var(--quiet-fill);
+    border: 1px solid var(--line);
+    transition: background 0.2s;
+}
+
+.memory-bonds-switch-track::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: calc(1.25rem - 6px);
+    height: calc(1.25rem - 6px);
+    border-radius: 50%;
+    background: var(--text);
+    transition: transform 0.2s;
+}
+
+.memory-bonds-switch[aria-checked='true'] .memory-bonds-switch-track {
+    background: var(--accent-fill);
+}
+
+.memory-bonds-switch[aria-checked='true'] .memory-bonds-switch-track::after {
+    transform: translateX(1rem);
+    background: var(--accent-text);
+}
+
+.memory-bonds-switch:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 0.5rem;
+}
+
+.memory-graph-bond {
+    cursor: pointer;
+}
+
+.memory-graph-bond-hit {
+    fill: none;
+    stroke: transparent;
+    stroke-width: 16;
+}
+
+.memory-graph-bond-line {
+    fill: none;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    opacity: 0.85;
+}
+
+.memory-graph-bond[aria-pressed='true'] .memory-graph-bond-line {
+    stroke-width: 4;
+    opacity: 1;
+}
+
+.memory-graph-bond:focus-visible .memory-graph-bond-line {
+    stroke-width: 4;
+}
