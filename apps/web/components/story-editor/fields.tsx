@@ -9,11 +9,40 @@ import { focusChoice, movedIndex } from './arrow-keys';
 import { useFieldMarks } from './field-marks';
 import { RewriteState } from './rewrite';
 import { SparkleIcon } from './sparkle-icon';
-import styles from './fields.module.css';
 
-function classes(...names: Array<string | false | undefined>): string {
+function classes(...names: Array<string | false | null | undefined>): string {
     return names.filter(Boolean).join(' ');
 }
+
+/*
+ * The editor's field look (Friendly UI ticket 09), shared with the other fields in this folder:
+ * a label row (label, marks, ✨), the box, then a one-line hint. Exported for the selects and
+ * pickers beside TextField (VoiceField, BondLevelField, the gate pickers), so they all line up.
+ */
+/** A field: its label row, its box and its hint. A flash lights it for a moment and fades. */
+export const FIELD = 'mb-4 grid min-w-0 gap-1 rounded-md last:mb-0 motion-safe:transition-[box-shadow,background-color] motion-safe:duration-base';
+/** Lit for a moment after a jump to it or a rewrite of it. */
+export const FIELD_FLASH = 'bg-accent-soft ring-6 ring-accent-line';
+export const FIELD_HEAD = 'flex min-h-8 items-center gap-2';
+export const FIELD_LABEL = 'flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-md font-bold text-muted';
+export const FIELD_HINT = 'm-0 text-sm text-muted';
+export const FIELD_ERROR = 'm-0 text-md text-warning';
+/** An input, textarea or select without its width or edge colour: 44px tall (M40), the base focus ring (M2). */
+export const INPUT_BOX = 'min-h-11 min-w-0 rounded-sm border bg-bg px-3 py-2 font-[inherit] text-base text-text';
+
+/**
+ * The box's edge: a 3:1 field line (H14); an accent edge and a soft ring once the assistant changed
+ * it; dashed in the warning colour while it is empty and needed to play. One colour at a time, since
+ * two colour utilities on one element are settled by the stylesheet's order, not the class list's.
+ */
+export function inputEdge({ needed, highlighted }: { needed?: boolean; highlighted?: boolean } = {}): string {
+    if (highlighted) return 'border-accent ring-2 ring-accent-line';
+    if (needed) return 'border-dashed border-warning-line';
+    return 'border-field-line';
+}
+
+/** A full-width input, textarea or select, with its edge. */
+export const FIELD_INPUT = `${INPUT_BOX} w-full ${inputEdge()}`;
 
 /**
  * Keeps a textarea as tall as its text (spec: story 62), so nothing is clipped and the page,
@@ -54,24 +83,61 @@ function useAutoGrow(value: string) {
 
 /** The mark on a field the assistant changed. Text, so it reads without colour. */
 export function ChangedMark() {
-    return <span className={styles.changed}>changed by the assistant</span>;
+    return <span className="text-xs font-semibold tracking-wide text-accent uppercase">changed by the assistant</span>;
 }
 
-/** The ✨ in a field's label row: rewrites just this field, and spins while it runs. */
+/**
+ * The marks beside a label: "Needed to play" while a required field is empty and the Story can't
+ * be played without it; "Required" on a required field otherwise, so it shows before the first
+ * save too (audit M20).
+ */
+function RequiredMark({ id, needed, required }: { id: string; needed: boolean; required?: boolean }) {
+    if (needed) {
+        return (
+            <span id={id} className="rounded-full bg-warning-soft px-2 text-xs font-semibold text-warning">
+                Needed to play
+            </span>
+        );
+    }
+    if (!required) return null;
+    return <span className="text-xs font-medium text-muted">Required</span>;
+}
+
+/**
+ * The ✨ Rewrite in a field's label row: rewrites just this field, and spins while it runs. The
+ * word shows beside the icon, so a touch screen without tooltips says what it does (audit L40);
+ * it is hidden from assistive tech, which reads the title, "Rewrite Setting", so the field's own
+ * label stays the only one with its name. 44px to tap (H26). aria-disabled while it runs, so focus
+ * stays on it (H12).
+ */
 function RewriteButton({ label, busy, onRewrite }: { label: string; busy: boolean; onRewrite(): void }) {
     return (
-        // Named by `title`, not aria-label, so the field's own label stays unique.
         <button
             type="button"
-            className={classes(styles.rewrite, busy && styles.busy)}
+            className={classes(
+                'bare-button -mr-2 flex min-h-11 min-w-11 flex-none items-center justify-center gap-1 rounded-full px-2',
+                'text-sm font-semibold text-rewrite-text',
+                'press focus-ring hover:bg-accent-soft active:bg-accent-soft aria-disabled:cursor-progress',
+            )}
             title={`Rewrite ${label}`}
             aria-busy={busy}
-            disabled={busy}
-            onClick={onRewrite}
+            aria-disabled={busy || undefined}
+            onClick={busy ? undefined : onRewrite}
         >
-            <SparkleIcon size={18} />
+            <SparkleIcon size={18} className={busy ? 'motion-safe:animate-spin' : undefined} />
+            <span aria-hidden="true">{busy ? 'Rewriting…' : 'Rewrite'}</span>
         </button>
     );
+}
+
+/** Says a rewrite landed (audit H12): the field was lit, which a screen reader can't see. */
+function useRewriteDone(label: string, rewrite: RewriteState | undefined) {
+    const wasBusy = useRef(false);
+    useEffect(() => {
+        const busy = rewrite?.kind === 'busy';
+        if (wasBusy.current && !busy && rewrite === undefined) announce(`Rewrote ${label}.`);
+        wasBusy.current = busy;
+    }, [label, rewrite]);
 }
 
 interface TextFieldProps {
@@ -93,6 +159,8 @@ interface TextFieldProps {
     highlighted?: boolean;
     /** Why the API refused what is typed, shown under the field (a Lore pattern that doesn't compile). */
     error?: string | null;
+    /** Needed before the Story can be played (audit M20): aria-required, and a mark beside the label. */
+    required?: boolean;
     /**
      * What a one-line box holds, for the phone's keyboard (audit M39): 'url' for a link, 'search',
      * 'email'… Plain text when left out. A multiline box is always text.
@@ -120,6 +188,7 @@ export function TextField({
     rewrite,
     highlighted,
     error,
+    required,
     type = 'text',
     inputMode,
     spellCheck,
@@ -131,73 +200,64 @@ export function TextField({
     const hintId = `${id}-hint`;
     const neededId = `${id}-needed`;
     const errorId = `${id}-error`;
+    const rewriteErrorId = `${id}-rewrite-error`;
     const busy = rewrite?.kind === 'busy';
+    const rewriteFailed = rewrite?.kind === 'error';
     const { needed, flashed } = useFieldMarks(domId);
     const grow = useAutoGrow(value);
-    const describedBy = [needed && neededId, error && errorId, hint && hintId].filter(Boolean).join(' ');
+    useRewriteDone(label, rewrite);
+    const describedBy = [needed && neededId, error && errorId, rewriteFailed && rewriteErrorId, hint && hintId].filter(Boolean).join(' ');
     // While a rewrite runs, its answer replaces the field: typing then would be lost.
     const shared = {
         id,
         value,
         placeholder,
         readOnly: busy,
+        'aria-required': required || undefined,
         'aria-describedby': describedBy || undefined,
         'aria-invalid': error ? true : undefined,
         inputMode,
         spellCheck,
         autoCapitalize,
         autoComplete,
+        className: classes(INPUT_BOX, 'w-full', inputEdge({ needed, highlighted }), multiline && 'resize-none overflow-hidden', busy && 'opacity-60'),
     };
     return (
-        <div
-            className={classes(
-                styles.field,
-                highlighted && styles.marked,
-                needed && styles.needed,
-                flashed && styles.flash,
-            )}
-        >
-            <div className={styles.head}>
-                {/* The mark is beside the label, not in it, so the field's name stays its label. */}
-                <span className={styles.label}>
+        <div className={classes(FIELD, flashed && FIELD_FLASH)}>
+            <div className={FIELD_HEAD}>
+                {/* The marks are beside the label, not in it, so the field's name stays its label. */}
+                <span className={FIELD_LABEL}>
                     <label htmlFor={id}>{label}</label>
-                    {needed && (
-                        <span id={neededId} className={styles.neededMark}>
-                            Needed to play
-                        </span>
-                    )}
+                    <RequiredMark id={neededId} needed={needed} required={required} />
                 </span>
                 {highlighted && <ChangedMark />}
                 {onRewrite && <RewriteButton label={label} busy={busy} onRewrite={onRewrite} />}
             </div>
             {multiline ? (
-                <textarea
-                    {...shared}
-                    ref={grow}
-                    rows={rows ?? 2}
-                    className={styles.input}
-                    onChange={(event) => onChange(event.target.value)}
-                />
+                <textarea {...shared} ref={grow} rows={rows ?? 2} onChange={(event) => onChange(event.target.value)} />
             ) : (
-                <input {...shared} type={type} className={styles.input} onChange={(event) => onChange(event.target.value)} />
+                <input {...shared} type={type} onChange={(event) => onChange(event.target.value)} />
             )}
             {error && (
-                <p id={errorId} role="alert" className={styles.error}>
+                <p id={errorId} role="alert" className={FIELD_ERROR}>
                     {error}
                 </p>
             )}
             {hint && (
-                <p id={hintId} className={styles.hint}>
+                <p id={hintId} className={FIELD_HINT}>
                     {hint}
                 </p>
             )}
-            {rewrite?.kind === 'error' && (
-                <p role="alert" className={styles.error}>
-                    <span>Couldn&apos;t rewrite {label}: {rewrite.message}</span>{' '}
-                    <button type="button" className="button button-quiet button-small" onClick={onRewrite}>
+            {rewriteFailed && (
+                // Tied to the box (M43), with a full-size Retry, and what the author can do about it.
+                <div role="alert" className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <p id={rewriteErrorId} className={classes(FIELD_ERROR, 'min-w-0 flex-1 basis-48')}>
+                        Couldn&apos;t rewrite {label}: {rewrite.message} What you wrote is unchanged; try again, or edit it yourself.
+                    </p>
+                    <button type="button" className="button button-quiet" onClick={onRewrite}>
                         Retry
                     </button>
-                </p>
+                </div>
             )}
         </div>
     );
@@ -214,9 +274,16 @@ interface SegmentedFieldProps<T extends string> {
     domId?: string;
 }
 
+const SEGMENT = [
+    'bare-button min-h-11 flex-1 rounded-sm px-1 py-1.5',
+    'text-center text-md text-muted',
+    'press focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-text',
+    'aria-checked:bg-accent-fill aria-checked:font-semibold aria-checked:text-accent-text',
+].join(' ');
+
 /**
  * A choice of a few, as tap-to-pick segments (spec: story 64). It is a radio group, so the
- * arrow keys move the choice as in any radio group.
+ * arrow keys move the choice as in any radio group. Each segment is 44px tall (H26).
  */
 export function SegmentedField<T extends string>({
     label,
@@ -240,16 +307,16 @@ export function SegmentedField<T extends string>({
         focusChoice(group.current, '[role="radio"]', next);
     };
     return (
-        <div id={domId} className={classes(styles.field, highlighted && styles.marked, flashed && styles.flash)}>
-            <div className={styles.head}>
-                <span id={`${id}-label`} className={styles.label}>
+        <div id={domId} className={classes(FIELD, flashed && FIELD_FLASH)}>
+            <div className={FIELD_HEAD}>
+                <span id={`${id}-label`} className={FIELD_LABEL}>
                     {label}
                 </span>
                 {highlighted && <ChangedMark />}
             </div>
             <div
                 ref={group}
-                className={styles.segmented}
+                className={classes('flex gap-1 rounded-md border bg-bg p-1', inputEdge({ highlighted }))}
                 role="radiogroup"
                 aria-labelledby={`${id}-label`}
                 aria-describedby={hint ? `${id}-hint` : undefined}
@@ -260,6 +327,7 @@ export function SegmentedField<T extends string>({
                         key={key}
                         type="button"
                         role="radio"
+                        className={SEGMENT}
                         aria-checked={key === value}
                         // One stop in the Tab order: the chosen segment, or the first if none is.
                         tabIndex={index === Math.max(chosen, 0) ? 0 : -1}
@@ -270,7 +338,7 @@ export function SegmentedField<T extends string>({
                 ))}
             </div>
             {hint && (
-                <p id={`${id}-hint`} className={styles.hint}>
+                <p id={`${id}-hint`} className={FIELD_HINT}>
                     {hint}
                 </p>
             )}
@@ -299,6 +367,14 @@ interface ConfirmButtonProps {
      * focus comes back to this button if it is still on the page.
      */
     focusAfter?(): HTMLElement | null | undefined;
+    /**
+     * What the button says while the promise `onConfirm` returns is running, e.g. "Deleting…"
+     * (audit M49): it stays focused but can't be pressed again. Without it, the button comes back
+     * as it was at once.
+     */
+    busyLabel?: string;
+    /** Utilities for the button that asks, e.g. a quieter look at the foot of a page. */
+    className?: string;
 }
 
 /**
@@ -306,8 +382,21 @@ interface ConfirmButtonProps {
  * to Cancel, the safe choice, inside a group named by the question, so a screen reader reads the
  * question out; Escape or Cancel puts focus back on the button (audit H2).
  */
-export function ConfirmButton({ label, question, confirmLabel, onConfirm, danger, disabled, warning, ariaLabel, focusAfter }: ConfirmButtonProps) {
+export function ConfirmButton({
+    label,
+    question,
+    confirmLabel,
+    onConfirm,
+    danger,
+    disabled,
+    warning,
+    ariaLabel,
+    focusAfter,
+    busyLabel,
+    className,
+}: ConfirmButtonProps) {
     const [asking, setAsking] = useState(false);
+    const [working, setWorking] = useState(false);
     const trigger = useRef<HTMLButtonElement>(null);
     const cancel = useRef<HTMLButtonElement>(null);
     const backToTrigger = useRef(false);
@@ -327,12 +416,19 @@ export function ConfirmButton({ label, question, confirmLabel, onConfirm, danger
         setAsking(false);
     };
     const confirm = () => {
+        // While it runs, focus waits on the button, which says what is happening.
+        if (busyLabel) {
+            backToTrigger.current = true;
+            setWorking(true);
+        }
         setAsking(false);
-        const land = () =>
+        const land = () => {
+            setWorking(false);
             requestAnimationFrame(() => {
                 const next = focusAfter?.() ?? (trigger.current?.isConnected ? trigger.current : null);
                 next?.focus();
             });
+        };
         Promise.resolve(onConfirm()).then(land, land);
     };
 
@@ -341,12 +437,14 @@ export function ConfirmButton({ label, question, confirmLabel, onConfirm, danger
             <button
                 ref={trigger}
                 type="button"
-                className={danger ? 'button button-danger' : 'button button-quiet'}
-                onClick={() => setAsking(true)}
+                className={classes(danger ? 'button button-danger' : 'button button-quiet', className)}
+                onClick={working ? undefined : () => setAsking(true)}
                 disabled={disabled}
-                aria-label={ariaLabel}
+                aria-disabled={working || undefined}
+                aria-busy={working || undefined}
+                aria-label={working ? undefined : ariaLabel}
             >
-                {label}
+                {working ? busyLabel : label}
             </button>
         );
     }
@@ -442,6 +540,11 @@ interface NumberFieldProps {
     value: number;
     /** Sent only for a whole number in range; anything else stays as typed, with an error. */
     onChange(value: number): void;
+    /**
+     * What is typed can't be saved (out of range, not a whole number): drop the edit still waiting
+     * to be sent, so the one typed before it doesn't land and read as Saved (audit M21).
+     */
+    onInvalid?(): void;
     min: number;
     max: number;
     /** The unit after the box, e.g. "Messages" or "%". */
@@ -452,7 +555,7 @@ interface NumberFieldProps {
 }
 
 /** A whole number in a range, with its unit beside the box (a Lore entry's Stays for, Chance). */
-export function NumberField({ label, value, onChange, min, max, unit, hint, domId, highlighted }: NumberFieldProps) {
+export function NumberField({ label, value, onChange, onInvalid, min, max, unit, hint, domId, highlighted }: NumberFieldProps) {
     const ownId = useId();
     const id = domId ?? ownId;
     const errorId = `${id}-error`;
@@ -470,6 +573,7 @@ export function NumberField({ label, value, onChange, min, max, unit, hint, domI
         const number = Number(typed);
         if (typed.trim() === '' || !Number.isInteger(number) || number < min || number > max) {
             setError(`A whole number from ${min} to ${max}.`);
+            onInvalid?.();
             return;
         }
         setError(null);
@@ -477,14 +581,14 @@ export function NumberField({ label, value, onChange, min, max, unit, hint, domI
     };
     const describedBy = [error && errorId, hint && hintId].filter(Boolean).join(' ');
     return (
-        <div className={classes(styles.field, highlighted && styles.marked, flashed && styles.flash)}>
-            <div className={styles.head}>
-                <span className={styles.label}>
+        <div className={classes(FIELD, flashed && FIELD_FLASH)}>
+            <div className={FIELD_HEAD}>
+                <span className={FIELD_LABEL}>
                     <label htmlFor={id}>{label}</label>
                 </span>
                 {highlighted && <ChangedMark />}
             </div>
-            <div className={styles.numberRow}>
+            <div className="flex items-center gap-2">
                 <input
                     id={id}
                     type="number"
@@ -493,20 +597,22 @@ export function NumberField({ label, value, onChange, min, max, unit, hint, domI
                     max={max}
                     step={1}
                     value={text}
-                    className={classes(styles.input, styles.number)}
+                    className={classes(INPUT_BOX, 'w-22', inputEdge({ highlighted }))}
                     aria-invalid={error ? true : undefined}
                     aria-describedby={describedBy || undefined}
                     onChange={(event) => change(event.target.value)}
                 />
-                <span className={styles.unit}>{unit}</span>
+                <span className="text-note text-muted">{unit}</span>
             </div>
             {error && (
-                <p id={errorId} role="alert" className={styles.error}>
+                <p id={errorId} role="alert" className={FIELD_ERROR}>
                     {error}
                 </p>
             )}
+            {/* Said beside the reason, so the header's "Saved" isn't taken to mean this number (M21). */}
+            {error && <p className={FIELD_HINT}>Not saved until it is one.</p>}
             {hint && (
-                <p id={hintId} className={styles.hint}>
+                <p id={hintId} className={FIELD_HINT}>
                     {hint}
                 </p>
             )}
