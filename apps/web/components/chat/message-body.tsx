@@ -1,12 +1,12 @@
-import { CSSProperties, ReactNode, useId } from 'react';
+import { CSSProperties, ReactNode, useContext, useId } from 'react';
 
+import { MessageTabStop } from '@/components/chat/chat-classes';
 import { useCastCharacter, useCharacterProfile } from '@/components/chat/character-profile';
 import { CharacterPortrait } from '@/components/portrait/character-portrait';
 import { Cast, characterColour, Portrait, Portraits } from '@/lib/character-colour';
 import { Message, MessagePart } from '@/lib/chat';
 import { linePicture } from '@/lib/expressions';
 
-import styles from './message-body.module.css';
 import { useShownText } from './shown-text';
 
 /** `*…*` spans as italics, in the user's lines and in Characters' speech; the stored text is unchanged. */
@@ -16,23 +16,54 @@ export function withActions(text: string): ReactNode[] {
     );
 }
 
+/** Thai letters (U+0E00–U+0E7F). */
+const THAI = /[฀-๿]/g;
+
+/**
+ * The language of a line (audit M29): Thai when most of its letters are Thai, so a screen reader
+ * reads it with a Thai voice under the app's English `<html lang>`. Undefined leaves it English.
+ */
+export function langOf(text: string): 'th' | undefined {
+    const thai = text.match(THAI)?.length ?? 0;
+    if (thai === 0) return undefined;
+    const letters = text.match(/\p{L}/gu)?.length ?? 0;
+    return thai * 2 >= letters ? 'th' : undefined;
+}
+
+/** Story text's size: the text-size preference sets --story-size on an ancestor; M is the fallback. */
+const STORY_SIZE = 'text-[length:var(--story-size,1.0625rem)]';
+
+/** A bubble's text: wraps anywhere, keeps the line breaks it was written with. */
+const BUBBLE = 'm-0 px-3.5 py-2 leading-normal whitespace-pre-wrap [overflow-wrap:anywhere]';
+
+/** The name over a line: small and bold. */
+const LINE_NAME = 'mt-0.5 mb-1 text-sm font-semibold';
+
+/** Beside a line: the 36px round picture. */
+const AVATAR = 'size-9 shrink-0 rounded-full object-cover text-note';
+
 /** A round picture beside a line: the Character's Portrait, or their initial on their colour. */
 function Avatar({ name, colour, portrait, light = false }: { name: string; colour: string; portrait?: Portrait; light?: boolean }) {
-    return <CharacterPortrait name={name} colour={colour} portrait={portrait} light={light} className={styles.avatar} />;
+    return <CharacterPortrait name={name} colour={colour} portrait={portrait} light={light} className={AVATAR} />;
 }
 
 /** What the user wrote, under the identity they wore: a purple bubble on the right. */
 export function UserLine({ identityName, text }: { identityName: string; text: string }) {
     return (
-        <div className={styles.user}>
-            <div className={styles.column}>
-                <p className={styles.identity}>{identityName}</p>
-                <p className={styles.userBubble}>{withActions(text)}</p>
+        <div className={`flex items-start justify-end gap-2 ${STORY_SIZE}`}>
+            <div className="flex max-w-[calc(100%_-_2.75rem)] min-w-0 flex-col items-end">
+                <p className={`${LINE_NAME} text-accent`}>{identityName}</p>
+                <p className={`${BUBBLE} rounded-xl rounded-tr-[0.3rem] bg-accent-fill text-accent-text`} lang={langOf(text)}>
+                    {withActions(text)}
+                </p>
             </div>
             <Avatar name={identityName} colour="var(--accent-fill)" light />
         </div>
     );
 }
+
+/** Read aloud's highlight: an outline round the part being read, in the speaker's colour. */
+const READING_NOW = 'rounded-sm outline-2 outline-offset-3 outline-solid';
 
 /**
  * A Character's line: their picture, their name in their colour, and the line in a bubble. In a
@@ -51,6 +82,7 @@ function Speech({
     reading?: boolean;
 }) {
     const nameId = useId();
+    const tabStop = useContext(MessageTabStop);
     const colour = characterColour(part.characterId, cast);
     // In a Chat the cast is at hand, so the line shows its Expression (.scratch/expressions/spec.md); elsewhere
     // (the Opening preview, never judged) the Portrait.
@@ -67,24 +99,33 @@ function Speech({
     const avatar = <Avatar name={part.speakerName} colour={colour} portrait={portrait} />;
     return (
         <div
-            className={reading ? `${styles.speech} ${styles.readingNow}` : styles.speech}
+            className={`flex items-start gap-2 ${reading ? `${READING_NOW} outline-(color:--speaker-colour)` : ''}`}
             style={{ '--speaker-colour': colour } as CSSProperties}
             role="group"
             aria-labelledby={nameId}
             aria-current={reading ? 'true' : undefined}
         >
             {openProfile ? (
-                <button type="button" className={styles.avatarButton} aria-label={`Profile of ${part.speakerName}`} onClick={openProfile}>
+                // A 44px target round the 36px picture.
+                <button
+                    type="button"
+                    className="bare-button relative shrink-0 rounded-full press before:absolute before:-inset-1 before:rounded-full"
+                    aria-label={`Profile of ${part.speakerName}`}
+                    tabIndex={tabStop ? undefined : -1}
+                    onClick={openProfile}
+                >
                     {avatar}
                 </button>
             ) : (
                 avatar
             )}
-            <div className={styles.column}>
-                <p id={nameId} className={styles.speaker}>
+            <div className="flex max-w-[calc(100%_-_2.75rem)] min-w-0 flex-col">
+                <p id={nameId} className={`${LINE_NAME} text-(color:--speaker-colour)`}>
                     {part.speakerName}
                 </p>
-                <p className={styles.bubble}>{withActions(part.text)}</p>
+                <p className={`${BUBBLE} self-start rounded-xl rounded-tl-[0.3rem] bg-surface-raised text-text [&_em]:text-muted`} lang={langOf(part.text)}>
+                    {withActions(part.text)}
+                </p>
             </div>
         </div>
     );
@@ -93,11 +134,14 @@ function Speech({
 /** Narration: an italic line marked with ≡, outside any bubble. */
 function Narration({ text, reading = false }: { text: string; reading?: boolean }) {
     return (
-        <div className={reading ? `${styles.narration} ${styles.readingNow}` : styles.narration} aria-current={reading ? 'true' : undefined}>
-            <svg className={styles.mark} viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+        <div className={`flex items-start gap-2.5 px-1 ${reading ? `${READING_NOW} outline-accent` : ''}`} aria-current={reading ? 'true' : undefined}>
+            {/* Sits on the first line of text. */}
+            <svg className="mt-1 shrink-0 text-muted" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
                 <path d="M2 4h12M2 8h12M2 12h8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
             </svg>
-            <p className={styles.narrationText}>{text}</p>
+            <p className="m-0 leading-[1.55] whitespace-pre-wrap text-muted italic [overflow-wrap:anywhere]" lang={langOf(text)}>
+                {text}
+            </p>
         </div>
     );
 }
@@ -147,7 +191,7 @@ export function AiMessageParts({
 }) {
     const shown = useShownText();
     return (
-        <div className={styles.story}>
+        <div className={`flex flex-col gap-3.5 ${STORY_SIZE}`}>
             {parts.map((part, index) => {
                 const text = shown(part.text);
                 if (part.kind === 'narration') {

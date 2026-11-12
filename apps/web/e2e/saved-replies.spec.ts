@@ -255,7 +255,7 @@ test.describe('the Saved replies tray', () => {
             await request.post('/api/testing/fake-gateway/text', { data: { kind: 'write_for_me', replies: ['I step into the market.'] } });
             await composer.getByRole('button', { name: 'Write for me' }).tap();
             await expect(text).toHaveValue('I step into the market.');
-            const undo = composer.getByRole('button', { name: '↶ Undo' });
+            const undo = composer.getByRole('button', { name: 'Undo', exact: true });
             await expect(undo).toBeVisible();
             await trayButton.tap();
             await tray.getByRole('button', { name: 'I wave.' }).tap();

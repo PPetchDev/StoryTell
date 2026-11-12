@@ -14,7 +14,6 @@
 @import 'tailwindcss/theme.css' layer(theme);
 @import 'tailwindcss/utilities.css' layer(utilities) source('..');
 
-@import './styles/chat.css';
 @import './styles/memory.css';
 
 /* `light:` styles an element for the light theme, which the head script marks on <html>. */

@@ -26,10 +26,11 @@ import { setSceneStripHidden, useSceneStripHidden } from '@/lib/scene-strip';
 import { inThreadOrder, Snapshot, snapshotApi } from '@/lib/snapshot';
 import { Scene, Story } from '@/lib/story';
 
+import { announce } from '@/components/announcer';
+import { COLUMN } from '@/components/chat/chat-classes';
 import { applyReplaceRules, onMineRules } from '@/lib/replace-rules';
 import { ReadAloudProvider, useReadAloudPlayer } from './read-aloud';
 import { ShownTextProvider } from './shown-text';
-import styles from './chat-screen.module.css';
 
 /** A "Memory added" toast (spec: story 83): one per Memory the AI added in the latest turn. */
 interface Toast {
@@ -37,8 +38,39 @@ interface Toast {
     text: string;
 }
 
-/** How long the "Memory added" toasts stay before they go on their own; a tap before then opens the Memory. */
-const TOAST_MS = 3_000;
+/**
+ * How long the "Memory added" toasts stay before they go on their own; a tap before then opens the
+ * Memory. Five seconds, and never while the pointer or focus is on them (audit M13).
+ */
+const TOAST_MS = 5_000;
+
+/**
+ * What a screen reader hears when a reply lands (audit H7): that it came, and who speaks in it.
+ * Not its words: they are the newest Message, one arrow key away, and a second copy of them in
+ * the live region would be read twice and found twice by anything searching the page's text.
+ */
+function replyAnnouncement(message: Message | undefined): string | null {
+    if (message?.kind !== 'ai') return null;
+    const speakers = [...new Set(message.parts.flatMap((part) => (part.kind === 'speech' ? [part.speakerName] : [])))];
+    if (speakers.length === 0) return 'New reply.';
+    return `Reply from ${speakers.slice(0, -1).join(', ')}${speakers.length > 1 ? ' and ' : ''}${speakers.at(-1)}.`;
+}
+
+/**
+ * The Chat fills the screen below whatever the app shell shows above it, so the thread scrolls on
+ * its own between the top bar and the composer. The page around it is styled from here: each
+ * variant below that starts `.page:has(>&)` matches the layout's `.page` holding this screen (and
+ * its other children: the banners), so nothing outside the Chat screen changes for it.
+ */
+const SCREEN = [
+    'flex min-h-0 flex-1 flex-col',
+    '[.page:has(>&)]:flex [.page:has(>&)]:h-dvh [.page:has(>&)]:flex-col',
+    // The thin top bar sits at the very top, below only the phone's status bar.
+    '[.page:has(>&)]:pt-[env(safe-area-inset-top)] [.page:has(>&)]:pb-0',
+    '[.page:has(>&)>:not(&)]:flex-none',
+    // Desktop (spec: "Desktop layout"): the thread scrolls anywhere across the page beside the rail.
+    'lg:[.page:has(>&)]:px-0',
+].join(' ');
 
 /** How often the Chat is re-read while the last reply's background calls run. */
 const BACKGROUND_POLL_MS = 1_000;
@@ -172,11 +204,29 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
     }, [chat]);
 
     // The toasts announce, they don't wait to be dismissed: they go after TOAST_MS, and the drawer keeps the Memories.
+    // They stay while the pointer or focus is on them, and go a moment after it leaves (audit M13).
+    const toastsRef = useRef<HTMLDivElement>(null);
     useEffect(() => {
         if (toasts.length === 0) return;
-        const timer = setTimeout(() => setToasts([]), TOAST_MS);
+        let timer = 0;
+        const expire = () => {
+            const region = toastsRef.current;
+            const held = region !== null && (region.contains(document.activeElement) || region.matches(':hover'));
+            if (held) timer = window.setTimeout(expire, 1_000);
+            else setToasts([]);
+        };
+        timer = window.setTimeout(expire, TOAST_MS);
         return () => clearTimeout(timer);
     }, [toasts]);
+
+    /** Hands focus back to `target` once what held it has gone, unless the user is already elsewhere (audit L15). */
+    const refocus = (target: () => HTMLElement | null) =>
+        requestAnimationFrame(() => {
+            const active = document.activeElement;
+            if (!active || active === document.body) target()?.focus({ preventScroll: true });
+        });
+    const menuButtonRef = useRef<HTMLButtonElement>(null);
+    const novelToggleRef = useRef<HTMLButtonElement>(null);
 
     const blocked = !chat.playable || chat.textCreditOut;
     // A Character set sitting out can't stay nudged (.scratch/speaker-controls/spec.md).
@@ -238,13 +288,24 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
         setWriting(true);
         setError(null);
         setRollback(null);
+        // The reply so far is drawn at most once a frame, however fast its pieces come (audit M32).
+        let frame = 0;
+        const onParts = (parts: MessagePart[]) => {
+            cancelAnimationFrame(frame);
+            frame = requestAnimationFrame(() => setReplySoFar(parts));
+        };
         try {
-            const next = await turn({ signal: stop.signal, onParts: setReplySoFar });
+            const next = await turn({ signal: stop.signal, onParts });
+            cancelAnimationFrame(frame);
             setChat(next);
             // The nudge rode on this turn, which answered with its reply; a failed or stopped one keeps it for Retry.
             setNudge(null);
+            // Once, when the turn is over: never each streamed piece (audit H7).
+            const said = replyAnnouncement(next.messages.at(-1));
+            if (said) announce(said);
             readNewReply(next);
         } catch (caught) {
+            cancelAnimationFrame(frame);
             setReplySoFar(null);
             if (caught instanceof ApiUnreachableError) {
                 unsent?.();
@@ -309,7 +370,8 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
      * rules run"); a result with nothing left sends nothing and keeps the draft.
      */
     const send = () => {
-        if (draft.trim() === '' || writing || blocked) return;
+        // A write in flight (Reset, a swap, an edit) holds the send too (audit M28).
+        if (draft.trim() === '' || writing || busy || blocked) return;
         const typed = draft;
         const text = applyReplaceRules(typed, onMineRules(chat.replaceRules));
         if (text.trim() === '') {
@@ -441,7 +503,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
         });
 
     return (
-        <main className={`chat ${styles.screen}`}>
+        <main className={SCREEN}>
             <ChatBackdrop picture={backdrop} />
             <ChatTopBar
                 chat={chat}
@@ -471,7 +533,13 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                 }}
                 whoRequest={whoRequest}
                 novel={novel}
-                onToggleNovel={() => (novel ? showThreadAt(novelAtRef.current) : setChatView('novel'))}
+                onToggleNovel={() => {
+                    if (!novel) return setChatView('novel');
+                    showThreadAt(novelAtRef.current);
+                    refocus(() => novelToggleRef.current);
+                }}
+                menuButtonRef={menuButtonRef}
+                novelToggleRef={novelToggleRef}
             />
             {!stripHidden && (
                 <SceneStrip
@@ -479,20 +547,34 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                     timeOfDay={chat.timeOfDay}
                     scenes={scenes}
                     characters={characters}
-                    onHide={() => setSceneStripHidden(true)}
+                    onHide={() => {
+                        setSceneStripHidden(true);
+                        // The ⋯ menu is where it comes back from.
+                        refocus(() => menuButtonRef.current);
+                    }}
                 />
             )}
 
-            {toasts.length > 0 && (
-                <div className="toasts" aria-label="Memory added">
+            {/*
+             * The "Memory added" toasts lie over the top of the thread rather than pushing it down
+             * (audit M14). Their status region is there throughout, so what comes into it is read
+             * (M13); each toast inside is a real button, which opens the Memory.
+             */}
+            <div className={`relative z-sticky h-0 ${COLUMN}`}>
+                <div ref={toastsRef} role="status" className="absolute inset-x-0 top-2 grid gap-2">
                     {toasts.map((toast) => (
-                        <button key={toast.memoryId} type="button" className="toast" role="status" onClick={() => openMemory(toast.memoryId)}>
+                        <button
+                            key={toast.memoryId}
+                            type="button"
+                            className="bare-button grid w-full cursor-pointer gap-0.5 rounded-md border border-toast-line bg-toast-surface px-3.5 py-2.5 text-left text-text shadow-lg shadow-shadow-soft press focus-ring motion-safe:animate-fade-in"
+                            onClick={() => openMemory(toast.memoryId)}
+                        >
                             <strong>Memory added</strong>
-                            <span>{toast.text}</span>
+                            <span className="text-note text-muted">{toast.text}</span>
                         </button>
                     ))}
                 </div>
-            )}
+            </div>
 
             {drawer.open && (
                 <MemoryDrawer
