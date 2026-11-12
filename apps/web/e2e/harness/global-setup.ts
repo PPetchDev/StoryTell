@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { startDisposablePostgres } from '../../../api/test/harness/postgres';
-import { buildApi, currentApiPid, killApi, migrate, spawnApi, writeState } from './api-server';
+import { buildApi, migrate, runApi, writeState } from './api-server';
 import { E2E_API_PORT } from './ports';
 
 const RESULTS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../test-results');
@@ -33,10 +33,12 @@ export default async function globalSetup() {
         BACKGROUND_RETRY_MS: '0',
     };
     migrate(env);
-    writeState({ env, pid: await spawnApi(env) });
+    // Owned here, not by a test worker, so it lives through worker restarts (see runApi).
+    const api = await runApi(env);
+    writeState({ env, controlUrl: api.controlUrl });
 
     return async () => {
-        await killApi(currentApiPid());
+        await api.close();
         await postgres.stop();
         // Keep the API's output where the report lives, so a crash mid-run can be read.
         await mkdir(RESULTS_DIR, { recursive: true });
