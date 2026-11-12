@@ -1,4 +1,5 @@
 import { APIRequestContext, expect, Locator, Page, test } from '@playwright/test';
+import { takeSnapshot } from './harness/snapshot';
 
 // The viewer is used on a phone (spec: "Phone width"): 390px wide, with touch.
 test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
@@ -29,7 +30,7 @@ async function createChatWithTwoSnapshots(request: APIRequestContext): Promise<{
 
     const snapshots = `/api/stories/${storyId}/chats/${chatId}/snapshots`;
     for (const hint of ['wide', 'close-up']) {
-        expect((await request.post(snapshots, { data: { hint } })).ok()).toBe(true);
+        expect((await takeSnapshot(request, storyId, chatId, hint)).ok()).toBe(true);
         await expect
             .poll(async () => ((await (await request.get(snapshots)).json()) as { jobs: unknown[] }).jobs.length)
             .toBe(0);

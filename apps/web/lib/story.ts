@@ -269,6 +269,9 @@ export interface RewriteRequest {
     field: string;
 }
 
+/** How many candidates one round makes (the API's CANDIDATE_COUNT; 3 since 2026-11-12, to cut image cost). */
+export const REFERENCE_CANDIDATES = 3;
+
 export interface ReferenceCandidate {
     id: string;
 }
@@ -376,7 +379,7 @@ export const storyApi = {
     readDocument: (storyId: number, documentId: number) => apiFetch<DocumentText>(`/stories/${storyId}/documents/${documentId}`),
     removeDocument: (storyId: number, documentId: number) => apiSend<Story>('DELETE', `/stories/${storyId}/documents/${documentId}`),
 
-    /** Makes a round of 4 Reference image candidates; a new round discards the Character's old one (ticket 30). */
+    /** Makes a round of REFERENCE_CANDIDATES Reference image candidates; a new round discards the Character's old one (ticket 30). */
     generateReferenceCandidates: (storyId: number, characterId: number) =>
         apiSend<ReferenceCandidateRound>('POST', `/stories/${storyId}/characters/${characterId}/reference-image/candidates`),
     /** Stores the picked candidate as the Character's one Reference image, replacing the old one. */

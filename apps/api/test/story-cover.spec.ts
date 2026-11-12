@@ -2,6 +2,7 @@ import { readdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 
 import { startTestApp, TestApp } from './harness/test-app.js';
+import { takeSnapshot as writeAndDraw } from './harness/snapshot.js';
 
 interface Cover {
     source: 'snapshot' | 'reference_image' | 'upload';
@@ -96,7 +97,7 @@ describe('Story Cover', () => {
     async function pickReferenceImage(storyId: number, characterId: number, label: string): Promise<Story> {
         t.gateway.scriptImage(
             'reference_image',
-            ...[1, 2, 3, 4].map(() => ({ image: { bytes: jpeg(label), mimeType: 'image/jpeg' } })),
+            ...[1, 2, 3].map(() => ({ image: { bytes: jpeg(label), mimeType: 'image/jpeg' } })),
         );
         const round = await t.http.post(`/api/stories/${storyId}/characters/${characterId}/reference-image/candidates`).expect(201);
         const picked = await t.http
@@ -126,7 +127,7 @@ describe('Story Cover', () => {
             model: 'seedream-v5-pro-edit',
             costUsd: 0.05,
         });
-        await t.http.post(`/api/stories/${storyId}/chats/${chat.body.id}/snapshots`).send({}).expect(202);
+        await writeAndDraw(t.http, storyId, chat.body.id);
         const deadline = Date.now() + 5_000;
         for (;;) {
             const { body } = await t.http.get(`/api/stories/${storyId}/chats/${chat.body.id}/snapshots`).expect(200);

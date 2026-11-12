@@ -1,4 +1,5 @@
 import { APIRequestContext, expect, Locator, Page, test } from '@playwright/test';
+import { takeSnapshot } from './harness/snapshot';
 
 // The Visual novel view (.scratch/chat-looks/spec.md, "Visual novel view"), on a phone: 390px wide,
 // with touch. The desktop test widens to a PC.
@@ -72,7 +73,7 @@ async function storyWithReply(page: Page, request: APIRequestContext, rules: { f
         });
         ids[name] = ((await made.json()).characters as { id: number; name: string }[]).find((each) => each.name === name)!.id;
     }
-    await request.post(`${FAKE}/image`, { data: { kind: 'reference_image', replies: [{}, {}, {}, {}] } });
+    await request.post(`${FAKE}/image`, { data: { kind: 'reference_image', replies: [{}, {}, {}] } });
     const round = await (await request.post(`/api/stories/${storyId}/characters/${ids.Mira}/reference-image/candidates`)).json();
     const picked = await request.put(`/api/stories/${storyId}/characters/${ids.Mira}/reference-image`, { data: { candidateId: round.candidates[0].id } });
     expect(picked.ok()).toBe(true);
@@ -245,7 +246,7 @@ test.describe('stored Messages', () => {
             data: { kind: 'snapshot_prompt', replies: [JSON.stringify({ in_frame: ['Mira'], scene: 'Mira on the stairs.' })] },
         });
         await request.post(`${FAKE}/image`, { data: { kind: 'snapshot_image', replies: [{}] } });
-        expect((await request.post(`/api/stories/${storyId}/chats/${chatId}/snapshots`, { data: { hint: '' } })).status()).toBe(202);
+        expect((await takeSnapshot(request, storyId, chatId)).status()).toBe(202);
         await expect.poll(async () => (await (await request.get(`/api/stories/${storyId}/gallery`)).json()).snapshots.length).toBe(1);
 
         await page.goto(`/stories/${storyId}/chats/${chatId}`);
@@ -460,7 +461,9 @@ test.describe('while playing', () => {
         await expect(vn.speaker).toHaveText('Mira');
 
         await vn.root.getByRole('group', { name: 'Message actions' }).getByRole('button', { name: 'Snapshot' }).click();
-        await page.getByRole('dialog', { name: 'Take a Snapshot' }).getByRole('button', { name: 'Take Snapshot' }).click();
+        const sheet = page.getByRole('dialog', { name: 'Take a Snapshot' });
+        await sheet.getByRole('button', { name: 'Write the prompt' }).click();
+        await sheet.getByRole('button', { name: 'Draw Snapshot' }).click();
         const chip = vn.root.getByRole('status').filter({ hasText: 'Drawing a Snapshot' });
         await expect(chip).toBeVisible();
         await expect(vn.root.getByRole('img', { name: 'Snapshot with Mira' })).toBeVisible({ timeout: 15_000 });

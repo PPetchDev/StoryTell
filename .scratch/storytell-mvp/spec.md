@@ -72,7 +72,7 @@ A single-user personal web app (Next.js frontend, NestJS backend, PostgreSQL), i
 
 ### Reference images
 
-38. As the author, I want to generate a Reference image for a Character from its page, choosing one of 4 full-body, neutral-pose candidates on a plain background in the Story's Image style, so that the Character looks the same in every Snapshot.
+38. As the author, I want to generate a Reference image for a Character from its page, choosing one of 3 full-body, neutral-pose candidates on a plain background in the Story's Image style, so that the Character looks the same in every Snapshot.
 39. As the author, I want the Reference image never to appear beside Messages, in cast lists or anywhere in play, so that it never acts as an avatar.
 40. As the author, I want editing Appearance or Image style to offer, but not force, regenerating the Reference image, so that I decide when the look changes.
 41. As the author, I want a new Reference image to replace the old one, so that each Character has at most one.
@@ -478,7 +478,8 @@ Further gateway rules:
 
 - **The image model is checked** (ticket 18): on Venice, `seedream-v4-edit` returned explicit fictional-adult images and kept a Character's face from its Reference image in both photo and anime styles. The Snapshot prompt must restate the Appearance's key traits, such as eye colour, scars and hair. Without them, eye colour drifted in the anime style.
 - **Reference image:**
-  - Made from the Character page. One request returns 4 candidates of the Character, full-body, neutral pose, plain background, in the Story's Image style, drawn from Appearance. The author picks one, and the file is stored.
+  - Made from the Character page. One request returns 3 candidates of the Character, full-body, neutral pose, plain background, in the Story's Image style, drawn from Appearance. The author picks one, and the file is stored.
+  - _3 candidates, not 4, since 2026-11-12: the user's decision to cut image cost. The dev database showed 68 Reference image calls at $0.04 for 5 Characters; one candidate fewer saves $0.04 a round._
   - A new one replaces the old one, and the old file is deleted.
   - Editing Appearance or Image style shows an offer to regenerate it.
   - The Reference image fixes face and build only.
@@ -487,6 +488,8 @@ Further gateway rules:
   2. A V4 Flash call writes the image prompt and picks at most 3 Characters in frame, using the hint if it names them. Its input is the latest Messages, Appearance, Setting, Memory, Image style and the hint. The prompt is always first-person from the user's point of view, never draws the user beyond glimpses such as hands, and depicts only fictional adult Characters.
   3. The image call runs, with the in-frame Characters' Reference images as references.
   4. The Snapshot is stored.
+
+  _Since 2026-11-12 the user reads, and may edit, the Snapshot prompt between steps 2 and 3, and pays for the image only on Draw Snapshot: see [Spec: Read the Snapshot prompt before drawing](../snapshot-prompt-review/spec.md)._
 - **Pending and failed Snapshots.** A pending Snapshot is a transient job the timeline shows as a placeholder. Play continues meanwhile. Only a successful image becomes a Snapshot record; a failure shows an error with Retry.
 - **Snapshot record:**
   - image path (2:3, fixed size)

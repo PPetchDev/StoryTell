@@ -1,5 +1,5 @@
-/** How many candidates one round makes (spec: "One request returns 4 candidates"). */
-export const CANDIDATE_COUNT = 4;
+/** How many candidates one round makes (spec: "One request returns 3 candidates"; 4 until the user cut image cost, 2026-11-12). */
+export const CANDIDATE_COUNT = 3;
 
 /** Used when the Story's Image style is empty, so the candidates still share one look. */
 export const DEFAULT_IMAGE_STYLE = 'realistic, natural lighting';

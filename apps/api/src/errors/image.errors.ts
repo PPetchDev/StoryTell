@@ -73,3 +73,10 @@ export class SnapshotSizeNotOfferedError extends AppError {
         super('422.002.011', `${model} is not offered at ${size}.`);
     }
 }
+
+/** A written Snapshot prompt is held only until drawn, replaced by a newer one, an hour old, or the API restarted. */
+export class SnapshotPromptNotFoundError extends AppError {
+    constructor() {
+        super('404.002.012', 'That Snapshot prompt is gone. Write it again.');
+    }
+}

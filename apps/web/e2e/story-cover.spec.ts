@@ -1,4 +1,5 @@
 import { APIRequestContext, expect, Page, test } from '@playwright/test';
+import { takeSnapshot as drawSnapshot } from './harness/snapshot';
 
 // The Cover is set from the Story editor on a phone (spec: "Phone width"): 390px wide, with touch.
 test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
@@ -33,7 +34,7 @@ async function takeSnapshot(request: APIRequestContext, storyId: number, chatId:
     });
     await request.post(`${FAKE}/image`, { data: { kind: 'snapshot_image', replies: [{}] } });
     const before = (await (await request.get(`/api/stories/${storyId}/gallery`)).json()).snapshots.length as number;
-    expect((await request.post(`/api/stories/${storyId}/chats/${chatId}/snapshots`, { data: { hint: '' } })).status()).toBe(202);
+    expect((await drawSnapshot(request, storyId, chatId)).status()).toBe(202);
     let snapshots: Snapshot[] = [];
     await expect
         .poll(async () => {

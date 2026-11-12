@@ -4,6 +4,7 @@ import { ProviderOutageError } from '../src/errors/model-gateway.errors.js';
 import { FAKE_TEXT_MODEL } from '../src/service/model-gateway/fake-model-gateway.js';
 import { TextCompletionRequest } from '../src/service/model-gateway/model-gateway.js';
 import { startTestApp, TestApp } from './harness/test-app.js';
+import { takeSnapshot } from './harness/snapshot.js';
 
 /**
  * Branch (.scratch/branch/spec.md): "Branch from here" on a Message makes a new Chat holding
@@ -453,14 +454,14 @@ describe('Branch', () => {
         it('leaves the source\'s Snapshots under the source', async () => {
             const story = await createStory();
             const mira = story.characters[0];
-            t.gateway.scriptImage('reference_image', ...[1, 2, 3, 4].map(() => ({ image: { bytes: Buffer.from('mira'), mimeType: 'image/jpeg' } })));
+            t.gateway.scriptImage('reference_image', ...[1, 2, 3].map(() => ({ image: { bytes: Buffer.from('mira'), mimeType: 'image/jpeg' } })));
             const round = await t.http.post(`/api/stories/${story.id}/characters/${mira.id}/reference-image/candidates`).expect(201);
             await t.http.put(`/api/stories/${story.id}/characters/${mira.id}/reference-image`).send({ candidateId: round.body.candidates[0].id }).expect(200);
             const chat = await createChat(story.id);
             const played = await play(story.id, chat.id, 'Hello.', '@Mira: Took you long enough.');
             t.gateway.scriptText('snapshot_prompt', JSON.stringify({ in_frame: ['Mira'], scene: 'Mira at the window.' }));
             t.gateway.scriptImage('snapshot_image', { image: { bytes: Buffer.from('snap'), mimeType: 'image/jpeg' }, model: 'seedream-v4-edit', costUsd: 0.05 });
-            await t.http.post(`/api/stories/${story.id}/chats/${chat.id}/snapshots`).send({ messageId: played.messages[2].id }).expect(202);
+            await takeSnapshot(t.http, story.id, chat.id, { messageId: played.messages[2].id });
             const deadline = Date.now() + 5_000;
             while ((await t.http.get(`/api/stories/${story.id}/chats/${chat.id}/snapshots`)).body.snapshots.length === 0) {
                 if (Date.now() > deadline) throw new Error('The Snapshot did not land in time');

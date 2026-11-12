@@ -142,7 +142,9 @@ test('Newest Snapshot shows the Cover until a Snapshot is taken, then that Snaps
         // A new Snapshot takes its place as soon as it is made, without a reload.
         const opening = page.getByRole('article', { name: 'Opening' });
         await opening.getByRole('group', { name: 'Message actions' }).getByRole('button', { name: 'Snapshot' }).tap();
-        await page.getByRole('dialog', { name: 'Take a Snapshot' }).getByRole('button', { name: 'Take Snapshot' }).tap();
+        const sheet = page.getByRole('dialog', { name: 'Take a Snapshot' });
+        await sheet.getByRole('button', { name: 'Write the prompt' }).tap();
+        await sheet.getByRole('button', { name: 'Draw Snapshot' }).tap();
         const thumb = page.getByRole('region', { name: 'Messages' }).getByRole('img', { name: 'Snapshot with Mira' });
         await expect(thumb).toBeVisible({ timeout: 10_000 });
         const snapshotSrc = await thumb.getAttribute('src');

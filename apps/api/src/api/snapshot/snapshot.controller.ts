@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import {
     ApiAcceptedResponse,
+    ApiCreatedResponse,
     ApiNoContentResponse,
     ApiOkResponse,
     ApiParam,
@@ -24,19 +25,20 @@ import type { Response } from 'express';
 import { createReadStream } from 'node:fs';
 
 import { SnapshotManagerService } from '../../manager/snapshot/snapshot.service.js';
-import { TakeSnapshotRequestBodyDTO } from './dto/snapshot.request.dto.js';
+import { DrawSnapshotRequestBodyDTO, WriteSnapshotPromptRequestBodyDTO } from './dto/snapshot.request.dto.js';
 import {
     ChatSnapshotsResponseBodyDTO,
     GalleryResponseBodyDTO,
     SnapshotDTO,
     SnapshotJobDTO,
+    SnapshotPromptDTO,
 } from './dto/snapshot.response.dto.js';
 
 const Id = (name: string) => Param(name, ParseIntPipe);
 
 /**
- * Snapshots and the Gallery (spec: "API surface"): take one from a Chat's latest AI Message,
- * follow its job, retry or dismiss a failed one; list a Story's Gallery, view, delete and
+ * Snapshots and the Gallery (spec: "API surface"): write the Snapshot prompt of a Chat's latest
+ * AI Message for the user to read, draw it (.scratch/snapshot-prompt-review/spec.md), follow its job, retry or dismiss a failed one; list a Story's Gallery, view, delete and
  * download one. The image itself is served by `GET /api/images/{imagePath}`.
  */
 @ApiTags('Snapshots')
@@ -44,16 +46,31 @@ const Id = (name: string) => Param(name, ParseIntPipe);
 export class SnapshotApiController {
     constructor(private readonly snapshotManager: SnapshotManagerService) {}
 
-    /** Starts one Snapshot and answers at once; poll the Chat's Snapshots for the result. */
+    /** Writes the Snapshot prompt and answers once it is written; nothing is drawn until Draw. */
+    @Post('chats/:chatId/snapshot-prompts')
+    @HttpCode(201)
+    @ApiCreatedResponse({
+        type: SnapshotPromptDTO,
+        description: "The Chat's one held Snapshot prompt, replacing any other: drawn once, or gone after an hour or a restart.",
+    })
+    writePrompt(
+        @Id('storyId') storyId: number,
+        @Id('chatId') chatId: number,
+        @Body() body: WriteSnapshotPromptRequestBodyDTO,
+    ): Promise<SnapshotPromptDTO> {
+        return this.snapshotManager.writePrompt(storyId, chatId, body.hint ?? '', body.messageId);
+    }
+
+    /** Draw Snapshot: draws the held Snapshot prompt and answers at once; poll the Chat's Snapshots for the result. */
     @Post('chats/:chatId/snapshots')
     @HttpCode(202)
     @ApiAcceptedResponse({ type: SnapshotJobDTO, description: 'The job; it ends as a Snapshot or as a failed job.' })
-    take(
+    draw(
         @Id('storyId') storyId: number,
         @Id('chatId') chatId: number,
-        @Body() body: TakeSnapshotRequestBodyDTO,
+        @Body() body: DrawSnapshotRequestBodyDTO,
     ): Promise<SnapshotJobDTO> {
-        return this.snapshotManager.take(storyId, chatId, body.hint ?? '', body.messageId);
+        return this.snapshotManager.draw(storyId, chatId, body.promptId, body.text);
     }
 
     @Get('chats/:chatId/snapshots')
@@ -64,7 +81,7 @@ export class SnapshotApiController {
 
     @Post('chats/:chatId/snapshot-jobs/:jobId/retry')
     @HttpCode(202)
-    @ApiAcceptedResponse({ type: SnapshotJobDTO, description: 'The failed job runs again, with the same Message and hint.' })
+    @ApiAcceptedResponse({ type: SnapshotJobDTO, description: 'The failed job draws again: the same Message, hint and Snapshot prompt.' })
     retry(
         @Id('storyId') storyId: number,
         @Id('chatId') chatId: number,

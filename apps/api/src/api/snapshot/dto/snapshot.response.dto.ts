@@ -1,6 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-import { ChatSnapshots, GalleryItem, SnapshotJob } from '../../../manager/snapshot/snapshot.service.js';
+import {
+    ChatSnapshots,
+    GalleryItem,
+    SnapshotJob,
+    SnapshotPrompt,
+    SnapshotPromptCharacter,
+} from '../../../manager/snapshot/snapshot.service.js';
 import { SnapshotCharacterResponse } from '../../../model/snapshot/entities/snapshot-character.entity.js';
 import { SnapshotResponse } from '../../../model/snapshot/entities/snapshot.entity.js';
 
@@ -80,6 +86,37 @@ export class SnapshotJobDTO implements SnapshotJob {
 
     @ApiProperty()
     startedAt: string;
+}
+
+export class SnapshotPromptCharacterDTO implements SnapshotPromptCharacter {
+    @ApiProperty()
+    characterId: number;
+
+    @ApiProperty()
+    name: string;
+}
+
+export class SnapshotPromptDTO implements SnapshotPrompt {
+    @ApiProperty({ description: 'Send it back with Draw.' })
+    id: string;
+
+    @ApiProperty()
+    chatId: number;
+
+    @ApiProperty({ description: 'The AI Message it shows.' })
+    messageId: number;
+
+    @ApiProperty({ description: 'The hint it was written with; empty when none.' })
+    hint: string;
+
+    @ApiProperty({ description: 'What the writer wrote: the part the user may edit before drawing.' })
+    text: string;
+
+    @ApiProperty({ type: [SnapshotPromptCharacterDTO], description: 'Who is in frame, in frame order, at most 3.' })
+    inFrame: SnapshotPromptCharacterDTO[];
+
+    @ApiProperty({ description: 'The whole prompt the image model would be given: `text` with the fixed rules around it.' })
+    imagePrompt: string;
 }
 
 export class ChatSnapshotsResponseBodyDTO implements ChatSnapshots {

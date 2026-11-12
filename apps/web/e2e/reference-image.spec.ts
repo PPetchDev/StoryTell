@@ -27,14 +27,14 @@ async function createStoryWithMira(request: APIRequestContext): Promise<{ storyI
     return { storyId, characterId: (await added.json()).characters[0].id as number };
 }
 
-test('generates 4 candidates, picks one, and sees the Reference image on the Character page, and in play only as the Portrait', async ({
+test('generates 3 candidates, picks one, and sees the Reference image on the Character page, and in play only as the Portrait', async ({
     page,
     request,
 }) => {
     const { storyId, characterId } = await createStoryWithMira(request);
     await request.delete(FAKE);
-    // Four scripted images; the fake's default 1x1 PNG is enough to see them load.
-    const scripted = await request.post(`${FAKE}/image`, { data: { kind: 'reference_image', replies: [{}, {}, {}, {}] } });
+    // Three scripted images, one per candidate; the fake's default 1x1 PNG is enough to see them load.
+    const scripted = await request.post(`${FAKE}/image`, { data: { kind: 'reference_image', replies: [{}, {}, {}] } });
     expect(scripted.status()).toBe(204);
 
     try {
@@ -44,7 +44,7 @@ test('generates 4 candidates, picks one, and sees the Reference image on the Cha
 
         await mira.getByRole('button', { name: 'Generate Reference image' }).click();
         const candidates = mira.getByRole('group', { name: 'Reference image candidates for Mira' });
-        await expect(candidates.getByRole('img')).toHaveCount(4);
+        await expect(candidates.getByRole('img')).toHaveCount(3);
         for (const candidate of await candidates.getByRole('img').all()) {
             await expect.poll(() => candidate.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
         }
@@ -65,13 +65,13 @@ test('generates 4 candidates, picks one, and sees the Reference image on the Cha
         story = await (await request.get(`/api/stories/${storyId}`)).json();
         expect(story.characters[0].referenceImagePath).toMatch(/^reference-images\//);
 
-        // Four reference_image calls, drawn from the Appearance in the Story's Image style.
+        // Three reference_image calls, drawn from the Appearance in the Story's Image style.
         const calls = await (await request.get(`${FAKE}/calls`)).json();
         const made = calls.calls.filter(
             (call: { method: string; request?: { kind: string } }) =>
                 call.method === 'generateImage' && call.request?.kind === 'reference_image',
         );
-        expect(made).toHaveLength(4);
+        expect(made).toHaveLength(3);
         for (const call of made) {
             expect(call.request.prompt).toContain(APPEARANCE);
             expect(call.request.prompt).toContain('ink wash, muted');
@@ -87,7 +87,7 @@ test('generates 4 candidates, picks one, and sees the Reference image on the Cha
         await expect(offer).toHaveCount(0);
         await expect(image).toBeVisible();
         await expect(page.getByRole('status').filter({ hasText: /Saved|Saving/ })).toHaveText('Saved');
-        expect(made).toHaveLength(4);
+        expect(made).toHaveLength(3);
 
         // It survives a reload.
         await page.reload();
@@ -119,7 +119,7 @@ test('generates 4 candidates, picks one, and sees the Reference image on the Cha
 test('picks the face for the chat picture, which the Chat then shows, and Reset goes back to the guess', async ({ page, request }) => {
     const { storyId, characterId } = await createStoryWithMira(request);
     await request.delete(FAKE);
-    await request.post(`${FAKE}/image`, { data: { kind: 'reference_image', replies: [{}, {}, {}, {}] } });
+    await request.post(`${FAKE}/image`, { data: { kind: 'reference_image', replies: [{}, {}, {}] } });
     const round = await (await request.post(`/api/stories/${storyId}/characters/${characterId}/reference-image/candidates`)).json();
     await request.put(`/api/stories/${storyId}/characters/${characterId}/reference-image`, {
         data: { candidateId: round.candidates[0].id },

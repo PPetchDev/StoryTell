@@ -32,9 +32,9 @@ const mira = {
     voice: 'Short sentences. Never says please.',
 };
 
-/** Four tellable images, so a test can check that the picked one is the one stored. */
-function fourImages(prefix = 'candidate'): FakeImageReply[] {
-    return [1, 2, 3, 4].map((n) => ({
+/** Three tellable images, one per candidate, so a test can check that the picked one is the one stored. */
+function threeImages(prefix = 'candidate'): FakeImageReply[] {
+    return [1, 2, 3].map((n) => ({
         image: { bytes: Buffer.from(`${prefix}-${n}-jpeg-bytes`), mimeType: 'image/jpeg' },
     }));
 }
@@ -104,19 +104,19 @@ describe('Reference images', () => {
         return { body: response.body as Buffer, type: response.headers['content-type'] };
     }
 
-    it('makes 4 candidates from Appearance and Image style, serves them, and a pick stores exactly one file', async () => {
+    it('makes 3 candidates from Appearance and Image style, serves them, and a pick stores exactly one file', async () => {
         const story = await createStoryWithMira();
-        t.gateway.scriptImage('reference_image', ...fourImages());
+        t.gateway.scriptImage('reference_image', ...threeImages());
 
         const round = await generate(story);
 
-        expect(round.candidates).toHaveLength(4);
-        expect(new Set(round.candidates.map((c) => c.id)).size).toBe(4);
+        expect(round.candidates).toHaveLength(3);
+        expect(new Set(round.candidates.map((c) => c.id)).size).toBe(3);
         expect(round).toMatchObject({ failed: 0, failureMessage: null });
 
-        // Four reference_image calls, one prompt, each served for this Story.
+        // Three reference_image calls, one prompt, each served for this Story.
         const calls = t.gateway.imageCalls('reference_image');
-        expect(calls).toHaveLength(4);
+        expect(calls).toHaveLength(3);
         for (const call of calls) {
             expect(call.servedFor).toEqual({ storyId: story.id });
             expect(call.referenceImages ?? []).toEqual([]);
@@ -135,7 +135,7 @@ describe('Reference images', () => {
             round.candidates.map((candidate) => serve(`${candidatesPath(story)}/${candidate.id}`)),
         );
         expect(served.map((s) => s.body.toString()).sort()).toEqual(
-            ['candidate-1-jpeg-bytes', 'candidate-2-jpeg-bytes', 'candidate-3-jpeg-bytes', 'candidate-4-jpeg-bytes'],
+            ['candidate-1-jpeg-bytes', 'candidate-2-jpeg-bytes', 'candidate-3-jpeg-bytes'],
         );
         expect(served[0].type).toBe('image/jpeg');
 
@@ -167,21 +167,21 @@ describe('Reference images', () => {
 
     it('a new pick replaces the Reference image and deletes the old file', async () => {
         const story = await createStoryWithMira();
-        t.gateway.scriptImage('reference_image', ...fourImages('first'));
+        t.gateway.scriptImage('reference_image', ...threeImages('first'));
         const first = await pick(story, (await generate(story)).candidates[0].id);
         const firstPath = first.characters[0].referenceImagePath!;
         expect(await filesUnder(t.imageDir)).toEqual([firstPath]);
 
-        t.gateway.scriptImage('reference_image', ...fourImages('second'));
+        t.gateway.scriptImage('reference_image', ...threeImages('second'));
         const round = await generate(story);
         // The old image stays until the author picks.
         expect(await filesUnder(t.imageDir)).toEqual([firstPath]);
-        const second = await pick(story, round.candidates[3].id);
+        const second = await pick(story, round.candidates[2].id);
         const secondPath = second.characters[0].referenceImagePath!;
 
         expect(secondPath).not.toBe(firstPath);
         expect(await filesUnder(t.imageDir)).toEqual([secondPath]);
-        expect((await readFile(path.join(t.imageDir, secondPath))).toString()).toBe('second-4-jpeg-bytes');
+        expect((await readFile(path.join(t.imageDir, secondPath))).toString()).toBe('second-3-jpeg-bytes');
         await t.http.get(`/api/images/${firstPath}`).expect(404);
     });
 
@@ -192,7 +192,7 @@ describe('Reference images', () => {
 
         async function withImage(): Promise<Story> {
             const story = await createStoryWithMira();
-            t.gateway.scriptImage('reference_image', ...fourImages());
+            t.gateway.scriptImage('reference_image', ...threeImages());
             await pick(story, (await generate(story)).candidates[0].id);
             return story;
         }
@@ -216,7 +216,7 @@ describe('Reference images', () => {
             expect(read.body.characters[0].portraitCrop).toBeNull();
 
             await t.http.put(portraitPath(story)).send({ x: 0, y: 0, size: 1 }).expect(200);
-            t.gateway.scriptImage('reference_image', ...fourImages('second'));
+            t.gateway.scriptImage('reference_image', ...threeImages('second'));
             const replaced = await pick(story, (await generate(story)).candidates[1].id);
             expect(replaced.characters[0].portraitCrop).toBeNull();
 
@@ -250,7 +250,7 @@ describe('Reference images', () => {
             .body as Story;
         const tamId = other.characters[1].id;
 
-        t.gateway.scriptImage('reference_image', ...fourImages('old'), ...fourImages('new'));
+        t.gateway.scriptImage('reference_image', ...threeImages('old'), ...threeImages('new'));
         const old = await generate(story);
         const fresh = await generate(story);
 
@@ -280,7 +280,7 @@ describe('Reference images', () => {
 
     it('works without an Image style, with a default look', async () => {
         const story = await createStoryWithMira('');
-        t.gateway.scriptImage('reference_image', ...fourImages());
+        t.gateway.scriptImage('reference_image', ...threeImages());
 
         await generate(story);
 
@@ -290,7 +290,7 @@ describe('Reference images', () => {
     describe('deletes', () => {
         it('deleting the Character deletes its Reference image file', async () => {
             const story = await createStoryWithMira();
-            t.gateway.scriptImage('reference_image', ...fourImages());
+            t.gateway.scriptImage('reference_image', ...threeImages());
             const picked = await pick(story, (await generate(story)).candidates[0].id);
             const stored = picked.characters[0].referenceImagePath!;
             expect(await filesUnder(t.imageDir)).toEqual([stored]);
@@ -305,7 +305,7 @@ describe('Reference images', () => {
             const story = await createStoryWithMira();
             const withTam = (await t.http.post(`/api/stories/${story.id}/characters`).send({ ...mira, name: 'Tam' }).expect(201))
                 .body as Story;
-            t.gateway.scriptImage('reference_image', ...fourImages('mira'), ...fourImages('tam'));
+            t.gateway.scriptImage('reference_image', ...threeImages('mira'), ...threeImages('tam'));
             await pick(story, (await generate(story)).candidates[0].id);
             const tamId = withTam.characters[1].id;
             const tamRound = (await t.http.post(candidatesPath(story, tamId)).expect(201)).body as Round;
@@ -319,7 +319,7 @@ describe('Reference images', () => {
 
         it('removing the Reference image deletes the file and clears the path', async () => {
             const story = await createStoryWithMira();
-            t.gateway.scriptImage('reference_image', ...fourImages());
+            t.gateway.scriptImage('reference_image', ...threeImages());
             await pick(story, (await generate(story)).candidates[0].id);
 
             const removed = await t.http.delete(referenceImagePath(story)).expect(200);
@@ -346,7 +346,7 @@ describe('Reference images', () => {
             await t.http.patch(`/api/stories/${story.id}/role`).send({ name: 'Keeper', description: 'New.' }).expect(200);
             t.gateway.scriptImage(
                 'reference_image',
-                ...[1, 2, 3, 4].map(() => new OutOfCreditError('image', 'Venice: Insufficient USD or DIEM balance')),
+                ...[1, 2, 3].map(() => new OutOfCreditError('image', 'Venice: Insufficient USD or DIEM balance')),
             );
 
             const response = await t.http.post(candidatesPath(story)).expect(402);
@@ -365,12 +365,12 @@ describe('Reference images', () => {
 
         it('keeps the candidates that came back when some calls fail', async () => {
             const story = await createStoryWithMira();
-            const [one, two, three] = fourImages();
-            t.gateway.scriptImage('reference_image', one, new ProviderOutageError('Venice: at capacity'), two, three);
+            const [one, two] = threeImages();
+            t.gateway.scriptImage('reference_image', one, new ProviderOutageError('Venice: at capacity'), two);
 
             const round = await generate(story);
 
-            expect(round.candidates).toHaveLength(3);
+            expect(round.candidates).toHaveLength(2);
             expect(round.failed).toBe(1);
             expect(round.failureMessage).toBe('Venice: at capacity');
             await t.http.get(`${candidatesPath(story)}/${round.candidates[0].id}`).expect(200);
@@ -378,7 +378,7 @@ describe('Reference images', () => {
 
         it('answers with the typed error when every call fails', async () => {
             const story = await createStoryWithMira();
-            t.gateway.scriptImage('reference_image', ...[1, 2, 3, 4].map(() => new ProviderOutageError('Venice: down')));
+            t.gateway.scriptImage('reference_image', ...[1, 2, 3].map(() => new ProviderOutageError('Venice: down')));
 
             const response = await t.http.post(candidatesPath(story)).expect(502);
 
@@ -393,12 +393,11 @@ describe('Reference images through the real gateway', () => {
     beforeAll(async () => {
         // The real gateway against recorded Venice answers, so the UsageRecords are the real ones.
         const net = recordedFetch([
-            // The credit check before the round, then the prompt limits, then the four images.
+            // The credit check before the round, then the prompt limits, then the three images.
             { fixture: 'openrouter/credits.json' },
             { fixture: 'venice/balance.json' },
             { fixture: 'venice/models.json' },
             { fixture: 'venice/models.json' },
-            { fixture: 'venice/generate.json' },
             { fixture: 'venice/generate.json' },
             { fixture: 'venice/generate.json' },
             { fixture: 'venice/generate.json' },
@@ -417,7 +416,7 @@ describe('Reference images through the real gateway', () => {
         const round = (
             await t.http.post(`/api/stories/${story.id}/characters/${story.characters[0].id}/reference-image/candidates`).expect(201)
         ).body as Round;
-        expect(round.candidates).toHaveLength(4);
+        expect(round.candidates).toHaveLength(3);
 
         const client = new pg.Client({ connectionString: t.databaseUrl });
         await client.connect();
@@ -427,7 +426,7 @@ describe('Reference images through the real gateway', () => {
         );
         await client.end();
 
-        expect(rows).toHaveLength(4);
+        expect(rows).toHaveLength(3);
         for (const row of rows) {
             expect(row).toEqual({
                 kind: 'reference_image',
@@ -443,6 +442,6 @@ describe('Reference images through the real gateway', () => {
 
         const usage = await t.http.get('/api/usage');
         expect(usage.status).toBe(200);
-        expect(usage.body.pools.image).toMatchObject({ spentUsd: 0.16, calls: 4 });
+        expect(usage.body.pools.image).toMatchObject({ spentUsd: 0.12, calls: 3 });
     });
 });

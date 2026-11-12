@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useConnection } from '@/components/connection';
 import { SnapshotViewer, snapshotAlt } from '@/components/snapshot/snapshot-viewer';
 import { ApiError, apiFetch, ApiUnreachableError } from '@/lib/api';
-import { ChatSnapshots, chatSnapshotsPath, Snapshot, snapshotApi, snapshotImageUrl, SnapshotJob } from '@/lib/snapshot';
+import { ChatSnapshots, chatSnapshotsPath, Snapshot, snapshotApi, snapshotImageUrl, SnapshotJob, SnapshotPrompt } from '@/lib/snapshot';
 
 import styles from './message-snapshots.module.css';
 
@@ -57,11 +57,22 @@ export function useChatSnapshots(storyId: number, chatId: number) {
         await refresh();
     };
 
+    /** The Snapshot sheet's first step; its failures are the sheet's to show, so they are thrown. */
+    const writePrompt = async (hint: string, messageId?: number): Promise<SnapshotPrompt> => {
+        try {
+            return await snapshotApi.writePrompt(storyId, chatId, hint, messageId);
+        } catch (caught) {
+            if (caught instanceof ApiUnreachableError) reportUnreachable();
+            throw caught;
+        }
+    };
+
     return {
         state,
         error,
         refresh,
-        take: (hint: string, messageId?: number) => run(() => snapshotApi.take(storyId, chatId, hint, messageId)),
+        writePrompt,
+        draw: (prompt: SnapshotPrompt, text: string) => run(() => snapshotApi.draw(storyId, chatId, prompt.id, text)),
         dismiss: (job: SnapshotJob) => run(() => snapshotApi.dismiss(storyId, chatId, job.id)),
         remove: (snapshot: Snapshot) => run(() => snapshotApi.remove(storyId, snapshot.id)),
     };
