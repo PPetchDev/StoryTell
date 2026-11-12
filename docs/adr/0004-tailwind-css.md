@@ -125,6 +125,7 @@ Preflight (Tailwind's reset) is on. The screens were converted while it was off,
 - the colours, the font and `line-height: 1.5` on `html, body`;
 - bold headings (`h1`–`h6`), and the page title's size and margin (`h1`);
 - a paragraph's `1em` above and below (`p`);
+- bullets and numbers on `ul` and `ol` (a list without them says `list-none`);
 - code a little smaller than the text around it;
 - underlined links in the accent colour, so a link in running text is not told by colour alone;
 - one focus ring (`:focus-visible`), muted placeholders, and `[hidden]` staying hidden.

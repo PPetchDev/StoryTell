@@ -481,16 +481,9 @@
         line-height: 1.5;
     }
 
-    @media (min-width: 1024px) {
-        h1 {
-            font-size: 2rem;
-            margin-bottom: 1.25rem;
-        }
-    }
-
     /*
      * What the screens were converted against while preflight was off, kept on top of it: bold
-     * headings, a paragraph's 1em above and below, and code a little smaller than the text around
+     * headings, a paragraph's 1em above and below, list bullets and numbers, and code a little smaller than the text around
      * it. A utility on the element still wins (`mt-0`, `font-normal`).
      */
     h1,
@@ -506,6 +499,15 @@
         margin-block: 1em;
     }
 
+    /* Bullets and numbers back; a list without them says `list-none`, as every such list already does. */
+    ul {
+        list-style: disc;
+    }
+
+    ol {
+        list-style: decimal;
+    }
+
     code,
     kbd,
     samp,
@@ -519,6 +521,14 @@
         font-size: 1.75rem;
         font-weight: 700;
         margin: 0 0 1rem;
+    }
+
+    /* After the rule above, so it wins on a desktop (it came first before, and never applied). */
+    @media (min-width: 1024px) {
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 1.25rem;
+        }
     }
 
     /* Preflight takes the underline off; a link in running text keeps it, so it is not told by colour alone. */
