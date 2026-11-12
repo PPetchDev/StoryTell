@@ -66,6 +66,7 @@ test.describe('managing Saved replies', () => {
         expect((await appWide(request)).map((line) => line.text)).toEqual(['*nods slowly*', 'What now, {user}?']);
 
         await reloaded.getByRole('button', { name: 'Remove saved reply 2' }).tap();
+        await reloaded.getByRole('group', { name: /Remove saved reply 2/ }).getByRole('button', { name: 'Remove' }).tap();
         await saved(page);
         await page.reload();
         const after = page.getByRole('region', { name: 'Saved replies' });
@@ -94,6 +95,7 @@ test.describe('managing Saved replies', () => {
             await reloaded.getByRole('textbox', { name: 'Saved reply 2' }).fill('Where does the caravan go?');
             await saved(page);
             await reloaded.getByRole('button', { name: 'Remove saved reply 1' }).tap();
+            await reloaded.getByRole('group', { name: /Remove saved reply 1/ }).getByRole('button', { name: 'Remove' }).tap();
             await saved(page);
             expect(await storyLines()).toEqual(['Where does the caravan go?']);
 

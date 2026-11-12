@@ -3,10 +3,9 @@
 import { useEffect, useRef, useState } from 'react';
 
 import type { Autosave } from '@/components/story-editor/autosave';
-import { TextField } from '@/components/story-editor/fields';
-import editorStyles from '@/components/story-editor/story-editor.module.css';
+import { ConfirmButton, TextField } from '@/components/story-editor/fields';
 import { SavedReply, SavedReplyStore } from '@/lib/saved-replies';
-import styles from './saved-replies.module.css';
+import { ADD_BUTTON } from './list-parts';
 
 interface Card {
     /** Stable for the card's life, so a draft keeps its box when it gets its id. */
@@ -38,6 +37,7 @@ export function SavedReplyList({ initial, store, autosave, saveKey }: {
     const ids = useRef(new Map(initial.map((line) => [`line-${line.id}`, line.id])));
     const [focusKey, setFocusKey] = useState<string | null>(null);
     const list = useRef<HTMLDivElement>(null);
+    const addButton = useRef<HTMLButtonElement>(null);
 
     useEffect(() => {
         if (focusKey === null) return;
@@ -74,8 +74,8 @@ export function SavedReplyList({ initial, store, autosave, saveKey }: {
     };
 
     // After pending edits, so a draft whose first save is still on its way is removed once it has its id.
-    const remove = (key: string) => {
-        void autosave.commit<SavedReply[] | null>(
+    const remove = (key: string) =>
+        autosave.commit<SavedReply[] | null>(
             async () => {
                 const id = ids.current.get(key);
                 return id === undefined ? null : store.remove(id);
@@ -85,6 +85,13 @@ export function SavedReplyList({ initial, store, autosave, saveKey }: {
                 setCards((current) => current.filter((card) => card.key !== key));
             },
         );
+
+    /** Where focus goes once a line is removed: the next line's box, the one before it, or Add (audit M50). */
+    const focusAfterRemove = (index: number) => () => {
+        // Still there: the remove failed, and focus goes back to its button.
+        if (list.current?.querySelector(`[data-card="${cards[index].key}"]`)) return null;
+        const next = cards[index + 1] ?? cards[index - 1];
+        return (next && list.current?.querySelector<HTMLElement>(`[data-card="${next.key}"] textarea`)) || addButton.current;
     };
 
     const add = () => {
@@ -96,7 +103,7 @@ export function SavedReplyList({ initial, store, autosave, saveKey }: {
     return (
         <div ref={list}>
             {cards.map((card, index) => (
-                <div key={card.key} data-card={card.key} className={styles.line}>
+                <div key={card.key} data-card={card.key} className="mb-2 grid gap-1">
                     <TextField
                         label={`Saved reply ${index + 1}`}
                         value={card.text}
@@ -105,19 +112,21 @@ export function SavedReplyList({ initial, store, autosave, saveKey }: {
                         error={card.error}
                         onChange={(text) => change(card.key, text)}
                     />
-                    <div className={styles.lineTools}>
-                        <button
-                            type="button"
-                            className="button button-quiet button-small"
-                            aria-label={`Remove saved reply ${index + 1}`}
-                            onClick={() => remove(card.key)}
-                        >
-                            Remove
-                        </button>
+                    <div className="flex justify-end">
+                        {/* Asks first, as every other delete does (audit H3). */}
+                        <ConfirmButton
+                            label="Remove"
+                            ariaLabel={`Remove saved reply ${index + 1}`}
+                            question={`Remove saved reply ${index + 1}?`}
+                            confirmLabel="Remove"
+                            danger
+                            onConfirm={() => remove(card.key)}
+                            focusAfter={focusAfterRemove(index)}
+                        />
                     </div>
                 </div>
             ))}
-            <button type="button" className={editorStyles.add} onClick={add}>
+            <button ref={addButton} type="button" className={ADD_BUTTON} onClick={add}>
                 + Add saved reply
             </button>
         </div>
