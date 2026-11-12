@@ -152,8 +152,8 @@ test('the Scene strip shows the Scene and its goal, moves on after a turn the ju
         await expect(strip).toContainText('The lamp');
         await expect(strip).toContainText('Light the lamp before the ship passes.');
 
-        // A tap hides it, and it stays hidden on this device after a reload.
-        await strip.tap();
+        // Its own ✕ hides it (a tap on it opens it to read whole), and it stays hidden on this device after a reload.
+        await page.getByRole('button', { name: 'Hide Scene strip' }).tap();
         await expect(strip).toHaveCount(0);
         await page.reload();
         await expect(page.getByRole('heading', { name: 'Chat 1' })).toBeVisible();
