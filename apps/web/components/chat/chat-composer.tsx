@@ -318,8 +318,9 @@ const STOP_BUTTON = [
 /** The box: one row that grows to about five lines, then scrolls; 1rem text keeps a phone from zooming in. */
 const BOX = [
     'min-w-0 flex-1 resize-none overflow-y-auto',
-    'max-h-[calc(5*1.4em_+_1rem_+_2px)]',
-    'rounded-2xl border border-field-line bg-surface px-3.5 py-2',
+    // One line is 44px tall, a phone's smallest comfortable field; five lines at most.
+    'max-h-[calc(5*1.4em_+_1.25rem_+_2px)]',
+    'rounded-2xl border border-field-line bg-surface px-3.5 py-2.5',
     'font-[inherit] text-base leading-[1.4] text-text',
     'focus-ring',
 ].join(' ');
