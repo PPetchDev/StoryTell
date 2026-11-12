@@ -52,7 +52,7 @@ const BACKGROUND_POLL_MS = 1_000;
  * notice of what went; Reset starts the Chat over from the Opening. Bonds and Arcs never show here: the dashboard link
  * leads to them. Memory does: the drawer lists it, and a "Memory added" toast appears for each
  * Memory the AI adds once a turn's extraction is done. 📷 in the newest reply's action row
- * opens a sheet that takes a Snapshot of the latest AI Message while play goes on; Snapshots
+ * opens a sheet that writes the Snapshot prompt of the latest AI Message to read before drawing it; Snapshots
  * show under their Message, and a tap opens one full screen.
  */
 interface ChatScreenProps {
@@ -102,7 +102,8 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
     const [toasts, setToasts] = useState<Toast[]>([]);
     const snaps = useChatSnapshots(initial.storyId, initial.id);
     const [viewing, setViewing] = useState<Snapshot | null>(null);
-    const [snapshotSheet, setSnapshotSheet] = useState(false);
+    /** The open Snapshot sheet: from 📷 (no Message: the latest AI Message), or a retake's hint and Message. */
+    const [snapshotSheet, setSnapshotSheet] = useState<{ hint: string; messageId?: number } | null>(null);
     /** The reply ↺ Again is replacing, hidden from the thread while the new one is written. */
     const [replacing, setReplacing] = useState<number | null>(null);
     /** The reply whose finished extraction was already announced, so a re-read never toasts twice. */
@@ -524,7 +525,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                     request={novelRequest}
                     onAgain={again}
                     onVersion={chooseVersion}
-                    onSnapshot={() => setSnapshotSheet(true)}
+                    onSnapshot={() => setSnapshotSheet({ hint: '' })}
                     onEditInThread={(messageId) => {
                         showThreadAt(messageId);
                         startEdit(messageId);
@@ -551,7 +552,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                 onBranch={branchFrom}
                 onSave={saveEdit}
                 onCancelEdit={() => setEditing(null)}
-                onSnapshot={() => setSnapshotSheet(true)}
+                onSnapshot={() => setSnapshotSheet({ hint: '' })}
                 onOpenSnapshot={setViewing}
                 onDismissSnapshot={(job) => void snaps.dismiss(job)}
                 thaiReadings={thaiReadings}
@@ -597,8 +598,11 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
             {snapshotSheet && (
                 <SnapshotSheet
                     imageCreditOut={chat.imageCreditOut}
-                    onTake={(hint) => void snaps.take(hint)}
-                    onClose={() => setSnapshotSheet(false)}
+                    initialHint={snapshotSheet.hint}
+                    messageId={snapshotSheet.messageId}
+                    write={snaps.writePrompt}
+                    onDraw={(prompt, text) => void snaps.draw(prompt, text)}
+                    onClose={() => setSnapshotSheet(null)}
                 />
             )}
 
@@ -616,7 +620,8 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                             ? undefined
                             : (snapshot) => {
                                   setViewing(null);
-                                  void snaps.take(snapshot.hint, snapshot.messageId ?? undefined);
+                                  // A retake is read before it is drawn too.
+                                  setSnapshotSheet({ hint: snapshot.hint, messageId: snapshot.messageId ?? undefined });
                               }
                     }
                 />

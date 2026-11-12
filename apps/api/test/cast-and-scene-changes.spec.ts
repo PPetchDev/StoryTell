@@ -2,6 +2,7 @@ import pg from 'pg';
 
 import { TextCompletionRequest } from '../src/service/model-gateway/model-gateway.js';
 import { startTestApp, TestApp } from './harness/test-app.js';
+import { takeSnapshot } from './harness/snapshot.js';
 
 /**
  * Cast and Scene changes reaching existing Chats (ticket 29, spec: "Cast and Scene changes"):
@@ -208,7 +209,7 @@ describe('Cast and Scene changes reaching existing Chats', () => {
     async function snapshot(storyId: number, chatId: number, inFrame: string[]): Promise<void> {
         t.gateway.scriptText('snapshot_prompt', JSON.stringify({ in_frame: inFrame, scene: 'By the lamp.' }));
         t.gateway.scriptImage('snapshot_image', {});
-        await t.http.post(`/api/stories/${storyId}/chats/${chatId}/snapshots`).send({}).expect(202);
+        await takeSnapshot(t.http, storyId, chatId);
         const deadline = Date.now() + 5_000;
         for (;;) {
             const { body } = await t.http.get(`/api/stories/${storyId}/chats/${chatId}/snapshots`).expect(200);

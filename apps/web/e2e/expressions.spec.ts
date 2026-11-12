@@ -107,7 +107,7 @@ test("picks an Expression's own square, which Reset gives back to the Portrait's
 
 /** Gives Mira a Reference image through the API, with the fake's default picture. */
 async function giveReferenceImage(request: APIRequestContext, storyId: number, characterId: number): Promise<void> {
-    await request.post(`${FAKE}/image`, { data: { kind: 'reference_image', replies: [{}, {}, {}, {}] } });
+    await request.post(`${FAKE}/image`, { data: { kind: 'reference_image', replies: [{}, {}, {}] } });
     const round = await (await request.post(`/api/stories/${storyId}/characters/${characterId}/reference-image/candidates`)).json();
     const picked = await request.put(`/api/stories/${storyId}/characters/${characterId}/reference-image`, { data: { candidateId: round.candidates[0].id } });
     expect(picked.ok()).toBe(true);

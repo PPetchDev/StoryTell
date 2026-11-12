@@ -41,6 +41,28 @@ export interface SnapshotJob {
     startedAt: string;
 }
 
+/**
+ * A written Snapshot prompt, read and edited before it is drawn (.scratch/snapshot-prompt-review/spec.md).
+ * The API holds one per Chat until it is drawn, replaced, an hour old, or the API restarts.
+ */
+export interface SnapshotPrompt {
+    id: string;
+    chatId: number;
+    messageId: number;
+    hint: string;
+    /** What the writer wrote: the part the user may edit. */
+    text: string;
+    /** Who is in frame, in frame order. */
+    inFrame: { characterId: number; name: string }[];
+    /** The whole prompt the image model would be given: `text` with the fixed rules around it. */
+    imagePrompt: string;
+}
+
+/** The whole image prompt with the user's edit in place of what the writer wrote. */
+export function withEditedText(prompt: SnapshotPrompt, text: string): string {
+    return prompt.imagePrompt.replace(prompt.text, () => text.trim());
+}
+
 export interface ChatSnapshots {
     /** Under a Message of the Chat, oldest first. */
     snapshots: Snapshot[];
@@ -74,9 +96,12 @@ export function galleryPath(storyId: number, chatId: number | null): string {
 export const EARLIER_VERSION = 'From an earlier version of this Chat';
 
 export const snapshotApi = {
-    /** One Snapshot of the latest AI Message, or of `messageId` for a retake. Answers with its job at once. */
-    take: (storyId: number, chatId: number, hint: string, messageId?: number) =>
-        apiSend<SnapshotJob>('POST', chatSnapshotsPath(storyId, chatId), { hint, messageId }),
+    /** Writes the Snapshot prompt of the latest AI Message, or of `messageId` for a retake; nothing is drawn. */
+    writePrompt: (storyId: number, chatId: number, hint: string, messageId?: number) =>
+        apiSend<SnapshotPrompt>('POST', `/stories/${storyId}/chats/${chatId}/snapshot-prompts`, { hint, messageId }),
+    /** Draws a written Snapshot prompt with the user's text. Answers with its job at once. */
+    draw: (storyId: number, chatId: number, promptId: string, text: string) =>
+        apiSend<SnapshotJob>('POST', chatSnapshotsPath(storyId, chatId), { promptId, text }),
     retry: (storyId: number, chatId: number, jobId: string) =>
         apiSend<SnapshotJob>('POST', `/stories/${storyId}/chats/${chatId}/snapshot-jobs/${jobId}/retry`),
     dismiss: (storyId: number, chatId: number, jobId: string) =>

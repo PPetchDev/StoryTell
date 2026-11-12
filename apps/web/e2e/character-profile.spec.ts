@@ -42,7 +42,7 @@ async function createStoryAndChat(request: APIRequestContext): Promise<{ storyId
     });
 
     await request.delete(FAKE);
-    await request.post(`${FAKE}/image`, { data: { kind: 'reference_image', replies: [{}, {}, {}, {}] } });
+    await request.post(`${FAKE}/image`, { data: { kind: 'reference_image', replies: [{}, {}, {}] } });
     const round = await (await request.post(`/api/stories/${storyId}/characters/${miraId}/reference-image/candidates`)).json();
     const picked = await request.put(`/api/stories/${storyId}/characters/${miraId}/reference-image`, {
         data: { candidateId: round.candidates[0].id },

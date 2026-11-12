@@ -1,6 +1,7 @@
 import { ModelRefusalError, ProviderOutageError } from '../src/errors/model-gateway.errors.js';
 import { FakeTextReply } from '../src/service/model-gateway/fake-model-gateway.js';
 import { startTestApp, TestApp } from './harness/test-app.js';
+import { takeSnapshot } from './harness/snapshot.js';
 
 /**
  * Gentler background failures (.scratch/background-retry/spec.md): a failed judge, Memory
@@ -139,7 +140,7 @@ describe('Gentler background failures', () => {
             expect(blocked.body.error.message).toBe("Couldn't save the Memories, feelings and Scene from the last reply. Retry before sending.");
         });
 
-        it('a Snapshot that fails once is made on the second try; one that fails twice waits for Retry', async () => {
+        it('a Snapshot that fails once is drawn on the second try; one that fails twice waits for Retry; neither writes the Snapshot prompt again', async () => {
             const storyId = await createStory(t);
             const chatId = await createChat(t, storyId);
             const path = `/api/stories/${storyId}/chats/${chatId}/snapshots`;
@@ -155,24 +156,27 @@ describe('Gentler background failures', () => {
                 }
             }
 
-            t.gateway.scriptText('snapshot_prompt', written, written);
+            t.gateway.scriptText('snapshot_prompt', written);
             t.gateway.scriptImage('snapshot_image', new ModelRefusalError('Venice returned the image blurred.'), image);
-            await t.http.post(path).send({}).expect(202);
+            await takeSnapshot(t.http, storyId, chatId);
             const made = await jobsSettled();
             expect(made.jobs).toEqual([]);
             expect(made.snapshots).toHaveLength(1);
 
-            t.gateway.scriptText('snapshot_prompt', written, written);
+            t.gateway.scriptText('snapshot_prompt', written);
             t.gateway.scriptImage('snapshot_image', new ModelRefusalError('blurred'), new ModelRefusalError('Venice returned the image blurred.'));
-            await t.http.post(path).send({}).expect(202);
+            await takeSnapshot(t.http, storyId, chatId);
             const failed = await jobsSettled();
             expect(failed.jobs).toMatchObject([{ status: 'failed', error: { code: '422.001.002', message: 'Venice returned the image blurred.' } }]);
             expect(t.gateway.imageCalls('snapshot_image')).toHaveLength(4);
 
-            t.gateway.scriptText('snapshot_prompt', written);
             t.gateway.scriptImage('snapshot_image', image);
             await t.http.post(`/api/stories/${storyId}/chats/${chatId}/snapshot-jobs/${failed.jobs[0].id}/retry`).expect(202);
             expect((await jobsSettled()).snapshots).toHaveLength(2);
+            // The approved Snapshot prompt is drawn again as it was: one writer call per Snapshot.
+            expect(t.gateway.textCalls('snapshot_prompt')).toHaveLength(2);
+            const prompts = t.gateway.imageCalls('snapshot_image').map((call) => call.prompt);
+            expect(new Set(prompts.slice(2)).size).toBe(1);
         });
     });
 

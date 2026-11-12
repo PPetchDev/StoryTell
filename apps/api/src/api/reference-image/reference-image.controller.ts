@@ -27,7 +27,7 @@ export class ReferenceImageApiController {
     @Post('candidates')
     @ApiCreatedResponse({
         type: GenerateReferenceCandidatesResponseBodyDTO,
-        description: 'Up to 4 candidates, held until one is picked or a newer round replaces them.',
+        description: 'Up to 3 candidates, held until one is picked or a newer round replaces them.',
     })
     generateCandidates(
         @Id('storyId') storyId: number,

@@ -1,5 +1,6 @@
 import { ProviderOutageError } from '../src/errors/model-gateway.errors.js';
 import { startTestApp, TestApp } from './harness/test-app.js';
+import { takeSnapshot } from './harness/snapshot.js';
 
 /**
  * Reply versions (spec: .scratch/swipe/spec.md): ↺ Again keeps the reply it replaces as a
@@ -366,7 +367,7 @@ describe('Reply versions', () => {
         async function snap(storyId: number, chatId: number): Promise<void> {
             t.gateway.scriptText('snapshot_prompt', writtenScene);
             t.gateway.scriptImage('snapshot_image', { image: { bytes: Buffer.from('jpeg'), mimeType: 'image/jpeg' }, model: 'seedream-v4-edit', costUsd: 0.05 });
-            await t.http.post(`/api/stories/${storyId}/chats/${chatId}/snapshots`).send({}).expect(202);
+            await takeSnapshot(t.http, storyId, chatId);
             const deadline = Date.now() + 5_000;
             for (;;) {
                 const { body } = await t.http.get(`/api/stories/${storyId}/chats/${chatId}/snapshots`).expect(200);

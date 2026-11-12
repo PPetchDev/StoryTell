@@ -50,3 +50,72 @@
     width: 100%;
     min-height: 2.75rem;
 }
+
+/* Reading the Snapshot prompt before drawing (.scratch/snapshot-prompt-review/spec.md). */
+.field textarea {
+    font: inherit;
+    font-size: 1rem;
+    line-height: 1.45;
+    width: 100%;
+    min-width: 0;
+    resize: vertical;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+    padding: 0.625rem 0.75rem;
+}
+
+.field textarea:focus-visible {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.failed {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    font-size: 0.875rem;
+}
+
+.whole {
+    font-size: 0.8125rem;
+    color: var(--muted);
+}
+
+.whole summary {
+    cursor: pointer;
+    min-height: 2.75rem;
+    display: flex;
+    align-items: center;
+}
+
+.wholeNote {
+    margin: 0 0 0.5rem;
+}
+
+.whole pre {
+    margin: 0;
+    max-height: 14rem;
+    overflow: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font: inherit;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+    padding: 0.625rem 0.75rem;
+}
+
+.secondary {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+}
+
+.secondary :global(.button) {
+    min-height: 2.75rem;
+}

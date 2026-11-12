@@ -179,8 +179,12 @@ An unintended loss of a Character's established personality or voice, as opposed
 _Avoid_: Character development, inconsistency
 
 **Snapshot**:
-An AI-generated image of the moment of a Chat's latest Message, seen through the user's eyes and made only on the user's request; it is kept in the Story's Gallery even after editing or resetting the Chat takes its moment away.
+An AI-generated image of the moment of a Chat's latest Message, seen through the user's eyes and made only on the user's request, once they have read its Snapshot prompt; it is kept in the Story's Gallery even after editing or resetting the Chat takes its moment away.
 _Avoid_: Illustration, picture, render
+
+**Snapshot prompt**:
+What a Snapshot will show, written by the AI from the moment (and the user's hint, if any) for the user to read and edit before anything is drawn. Drawing it pays for the picture; closing the sheet throws it away. The picture's own rules are always added around it: the user's first-person view, each in-frame Character's Appearance, the art style and fictional adults only.
+_Avoid_: Scene (a Scene is a stage of a Story), caption, description
 
 **Snapshot size**:
 How large Snapshots are drawn, 1K or 2K, chosen in Settings next to the Snapshot model; 2K is offered only for a model Venice draws at 2K, and costs that model's 2K price.

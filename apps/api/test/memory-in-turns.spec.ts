@@ -5,6 +5,7 @@ import { ProviderOutageError } from '../src/errors/model-gateway.errors.js';
 import { ChatManagerService } from '../src/manager/chat/chat.service.js';
 import { DOCUMENTS_HEADING } from '../src/manager/document/document-search.js';
 import { startTestApp, TestApp } from './harness/test-app.js';
+import { takeSnapshot } from './harness/snapshot.js';
 
 /**
  * .scratch/memory-by-meaning/spec.md, "Choosing Memories for a turn" (ticket 02), through the
@@ -253,7 +254,7 @@ describe('Memory in turns', () => {
             t.gateway.scriptText('snapshot_prompt', JSON.stringify({ in_frame: ['Mira'], scene: 'Mira holds a compass.' }));
             t.gateway.scriptImage('snapshot_image', { image: { bytes: Buffer.from('jpeg'), mimeType: 'image/jpeg' }, model: 'seedream-v4-edit', costUsd: 0 });
 
-            await t.http.post(`/api/stories/${storyId}/chats/${chatId}/snapshots`).send({}).expect(202);
+            await takeSnapshot(t.http, storyId, chatId);
             const deadline = Date.now() + 5_000;
             while (t.gateway.textCalls('snapshot_prompt').length === 0 && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 20));
 

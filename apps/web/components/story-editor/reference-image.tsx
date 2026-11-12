@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { useConnection } from '@/components/connection';
 import { PortraitImage } from '@/components/portrait/portrait-image';
 import { ApiError, ApiUnreachableError } from '@/lib/api';
-import { candidateImageUrl, Character, PortraitCrop, referenceImageUrl, ReferenceCandidate, Story, storyApi } from '@/lib/story';
+import { candidateImageUrl, Character, PortraitCrop, REFERENCE_CANDIDATES, referenceImageUrl, ReferenceCandidate, Story, storyApi } from '@/lib/story';
 import { ConfirmButton } from './fields';
 import { PortraitCropper } from './portrait-cropper';
 import styles from './reference-image.module.css';
@@ -46,7 +46,7 @@ function errorMessage(error: unknown): { message: string; outOfCredit: boolean }
 
 /**
  * A Character's Reference image (spec: "Reference image"): the current one, if any, a button
- * that makes a round of 4 candidates to pick from, and an offer to make a new one once the
+ * that makes a round of 3 candidates to pick from, and an offer to make a new one once the
  * Appearance or the Image style has changed since. Shown on the Character page only.
  */
 export function ReferenceImage({ storyId, character, imageStyle, flush, commit }: ReferenceImageProps) {
@@ -212,7 +212,7 @@ export function ReferenceImage({ storyId, character, imageStyle, flush, commit }
                 <div className="candidates" role="group" aria-label={`Reference image candidates for ${heading}`}>
                     {round.kind === 'choosing' && round.failed > 0 && (
                         <p className="field-error" role="alert">
-                            {round.candidates.length} of 4 candidates came back. {round.failureMessage}
+                            {round.candidates.length} of {round.candidates.length + round.failed} candidates came back. {round.failureMessage}
                         </p>
                     )}
                     <p className="hint">Pick one. The others are discarded.</p>
@@ -275,7 +275,7 @@ export function ReferenceImage({ storyId, character, imageStyle, flush, commit }
                         onClick={() => void generate()}
                     >
                         {round.kind === 'generating'
-                            ? 'Generating 4 candidates…'
+                            ? `Generating ${REFERENCE_CANDIDATES} candidates…`
                             : hasImage
                               ? 'Generate a new Reference image'
                               : 'Generate Reference image'}

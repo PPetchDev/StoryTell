@@ -82,7 +82,7 @@ describe('Expressions on a Character', () => {
     }
 
     async function pickReferenceImage(storyId: number, characterId: number, label: string): Promise<Story> {
-        t.gateway.scriptImage('reference_image', ...[1, 2, 3, 4].map(() => ({ image: { bytes: jpeg(label), mimeType: 'image/jpeg' } })));
+        t.gateway.scriptImage('reference_image', ...[1, 2, 3].map(() => ({ image: { bytes: jpeg(label), mimeType: 'image/jpeg' } })));
         const round = await t.http.post(`/api/stories/${storyId}/characters/${characterId}/reference-image/candidates`).expect(201);
         const picked = await t.http
             .put(`/api/stories/${storyId}/characters/${characterId}/reference-image`)

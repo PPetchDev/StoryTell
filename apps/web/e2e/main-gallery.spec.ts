@@ -1,4 +1,5 @@
 import { APIRequestContext, expect, test } from '@playwright/test';
+import { takeSnapshot } from './harness/snapshot';
 
 // The Gallery grouped by Story and then by Chat (CONTEXT.md: "Gallery"), on a phone: 390px wide, with touch.
 test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
@@ -32,7 +33,7 @@ async function storyWithSnapshots(request: APIRequestContext, title: string, per
         chatIds.push(chatId);
         const snapshots = `/api/stories/${storyId}/chats/${chatId}/snapshots`;
         for (let i = 0; i < count; i++) {
-            expect((await request.post(snapshots, { data: { hint: `shot ${i}` } })).ok()).toBe(true);
+            expect((await takeSnapshot(request, storyId, chatId, `shot ${i}`)).ok()).toBe(true);
             await expect
                 .poll(async () => ((await (await request.get(snapshots)).json()) as { jobs: unknown[] }).jobs.length)
                 .toBe(0);

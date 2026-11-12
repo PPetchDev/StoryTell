@@ -16,6 +16,8 @@ export const MAX_IN_FRAME = MAX_REFERENCE_IMAGES;
 /** How many of the latest Messages, up to the one the camera acts on, the scene is written from. */
 export const SNAPSHOT_RECENT_MESSAGES = 6;
 export const SNAPSHOT_PROMPT_MAX_TOKENS = 600;
+/** The longest Snapshot prompt the user may leave before drawing (the writer's is at most ~120 words). */
+export const SNAPSHOT_PROMPT_TEXT_MAX = 2_000;
 
 export interface SnapshotCastMember {
     name: string;

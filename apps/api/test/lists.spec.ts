@@ -1,5 +1,6 @@
 import { ProviderOutageError } from '../src/errors/model-gateway.errors.js';
 import { startTestApp, TestApp } from './harness/test-app.js';
+import { takeSnapshot } from './harness/snapshot.js';
 
 interface StoryListItem {
     id: number;
@@ -103,7 +104,7 @@ describe('The Story and Chat lists', () => {
             costUsd: 0.05,
         });
         const path = `/api/stories/${storyId}/chats/${chatId}/snapshots`;
-        await t.http.post(path).send({}).expect(202);
+        await takeSnapshot(t.http, storyId, chatId);
         const deadline = Date.now() + 5_000;
         for (;;) {
             const { body } = await t.http.get(path).expect(200);

@@ -60,7 +60,7 @@ test('when the retry fails too, one plain notice names everything that failed, a
     await request.post(`${FAKE}/text`, { data: { kind: 'judge', replies: [OUTAGE, OUTAGE, NO_CHANGE, NO_CHANGE] } });
     await request.post(`${FAKE}/text`, { data: { kind: 'memory_extraction', replies: [OUTAGE, OUTAGE, NO_OPS, NO_OPS] } });
     await request.post(`${FAKE}/text`, {
-        data: { kind: 'snapshot_prompt', replies: Array(3).fill(JSON.stringify({ in_frame: ['Mira'], scene: 'Mira by the window.' })) },
+        data: { kind: 'snapshot_prompt', replies: [JSON.stringify({ in_frame: ['Mira'], scene: 'Mira by the window.' })] },
     });
     await request.post(`${FAKE}/image`, { data: { kind: 'snapshot_image', replies: [{ error: 'refusal', message: 'Venice returned the image blurred.' }, { error: 'refusal', message: 'Venice returned the image blurred.' }, {}] } });
 
@@ -73,7 +73,9 @@ test('when the retry fails too, one plain notice names everything that failed, a
         await expect(reply).toContainText('You took your time.');
 
         await reply.getByRole('group', { name: 'Message actions' }).getByRole('button', { name: 'Snapshot' }).tap();
-        await page.getByRole('dialog', { name: 'Take a Snapshot' }).getByRole('button', { name: 'Take Snapshot' }).tap();
+        const sheet = page.getByRole('dialog', { name: 'Take a Snapshot' });
+        await sheet.getByRole('button', { name: 'Write the prompt' }).tap();
+        await sheet.getByRole('button', { name: 'Draw Snapshot' }).tap();
 
         const notice = page.getByRole('status').filter({ hasText: "Couldn't" });
         await expect(notice).toHaveText(

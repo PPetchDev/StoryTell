@@ -9,6 +9,7 @@ import { parseReply } from '../src/manager/chat/turn/reply-parser.js';
 import { TextCompletionRequest } from '../src/service/model-gateway/model-gateway.js';
 import { Pov, ReplyLength, Tense } from '../src/model/story/entities/story.entity.js';
 import { startTestApp, TestApp } from './harness/test-app.js';
+import { takeSnapshot } from './harness/snapshot.js';
 
 /**
  * Speaker controls (.scratch/speaker-controls/spec.md), Sitting out: a Character kept out of one
@@ -676,7 +677,7 @@ describe('Sitting out: the API', () => {
             async function snap(chatId: number, hint: string, inFrame: string[]) {
                 t.gateway.scriptText('snapshot_prompt', written(inFrame));
                 t.gateway.scriptImage('snapshot_image', { image: { bytes: Buffer.from('jpeg'), mimeType: 'image/jpeg' }, model: 'seedream', costUsd: 0.05 });
-                await t.http.post(`/api/stories/${storyId}/chats/${chatId}/snapshots`).send({ hint }).expect(202);
+                await takeSnapshot(t.http, storyId, chatId, { hint });
                 const deadline = Date.now() + 5_000;
                 for (;;) {
                     const { body } = await t.http.get(`/api/stories/${storyId}/chats/${chatId}/snapshots`).expect(200);
