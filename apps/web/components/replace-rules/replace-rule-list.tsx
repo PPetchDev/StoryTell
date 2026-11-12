@@ -2,11 +2,11 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 
+import { ADD_BUTTON } from '@/components/saved-replies/list-parts';
 import type { Autosave } from '@/components/story-editor/autosave';
-import { OrderButtons, TextField } from '@/components/story-editor/fields';
-import editorStyles from '@/components/story-editor/story-editor.module.css';
+import { ConfirmButton, OrderButtons, TextField } from '@/components/story-editor/fields';
 import { regexCompileError, ReplaceRule, ReplaceRuleFields, ReplaceRuleStore } from '@/lib/replace-rules';
-import styles from './replace-rules.module.css';
+import { useSettled } from '@/lib/use-settled';
 import { useTryRule } from './use-try-rule';
 
 interface Card {
@@ -19,6 +19,8 @@ interface Card {
 
 const NEW_RULE: ReplaceRuleFields = { find: '', replace: '', regex: false, ignoreCase: false, onAi: true, onMine: false };
 const EMPTY_FIND = 'Find needs some text.';
+/** A Find's own problem waits this long after the last keystroke, so it is not read out per letter (audit M22). */
+const LOCAL_ERROR_DELAY_MS = 500;
 
 const SWITCHES = [
     { field: 'regex', label: 'Regex' },
@@ -41,13 +43,33 @@ function localError(fields: ReplaceRuleFields): string | null {
 function TryIt({ fields, runnable }: { fields: ReplaceRuleFields; runnable: boolean }) {
     const [sample, setSample] = useState('');
     const outputId = useId();
-    const result = useTryRule(runnable ? { find: fields.find, replace: fields.replace, regex: fields.regex, ignoreCase: fields.ignoreCase } : null, sample);
+    // Runs once the typing settles, so the result region speaks once, not per keystroke (audit L12).
+    const rule = runnable ? JSON.stringify([fields.find, fields.replace, fields.regex, fields.ignoreCase]) : null;
+    const settled = useSettled(JSON.stringify([rule, sample]), 250);
+    const [settledRule, settledSample] = JSON.parse(settled) as [string | null, string];
+    const typing = settledRule !== rule || settledSample !== sample;
+    const logic = settledRule === null ? null : (JSON.parse(settledRule) as [string, string, boolean, boolean]);
+    const result = useTryRule(logic && { find: logic[0], replace: logic[1], regex: logic[2], ignoreCase: logic[3] }, settledSample);
     return (
-        <div className={styles.tryIt}>
-            <TextField label="Try it" value={sample} multiline rows={1} placeholder="Type a sample sentence" onChange={setSample} />
-            <div className={styles.tryResult} role="status" aria-label="Try it result" id={outputId}>
-                {result.status === 'done' && <span className={styles.tryOutput}>{result.output}</span>}
-                {result.status === 'slow' && <span className={styles.trySlow}>This pattern is too slow</span>}
+        <div className="border-x-0 border-t border-b-0 border-dashed border-line pt-2">
+            <TextField
+                label="Try it"
+                value={sample}
+                multiline
+                rows={1}
+                placeholder="Type a sample sentence"
+                spellCheck={false}
+                onChange={setSample}
+            />
+            <div
+                className="max-h-40 min-h-[1.4em] overflow-y-auto text-note whitespace-pre-wrap [overflow-wrap:anywhere]"
+                role="status"
+                aria-label="Try it result"
+                aria-busy={typing || result.status === 'running' || undefined}
+                id={outputId}
+            >
+                {result.status === 'done' && <span className="text-text">{result.output}</span>}
+                {result.status === 'slow' && <span className="font-semibold text-warning">This pattern is too slow</span>}
                 {result.status === 'running' && <span className="muted">Trying…</span>}
             </div>
         </div>
@@ -72,6 +94,13 @@ export function ReplaceRuleList({ initial, store, autosave, saveKey }: {
     const ids = useRef(new Map(initial.map((rule) => [`rule-${rule.id}`, rule.id])));
     const [focusKey, setFocusKey] = useState<string | null>(null);
     const list = useRef<HTMLDivElement>(null);
+    const addButton = useRef<HTMLButtonElement>(null);
+    /** A Find's own problem, waiting to be shown until the typing stops. */
+    const errorTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+    useEffect(() => {
+        const timers = errorTimers.current;
+        return () => timers.forEach(clearTimeout);
+    }, []);
 
     useEffect(() => {
         if (focusKey === null) return;
@@ -86,10 +115,13 @@ export function ReplaceRuleList({ initial, store, autosave, saveKey }: {
         const fields = { ...card.fields, ...changed };
         const autosaveKey = `${saveKey}.${card.key}`;
         const problem = localError(fields);
+        clearTimeout(errorTimers.current.get(card.key));
         if (problem !== null) {
             autosave.cancel(autosaveKey);
+            patch(card.key, { fields });
             // A new card with nothing in Find yet has nothing to say.
-            patch(card.key, { fields, error: fields.find === '' && !ids.current.has(card.key) ? null : problem });
+            const shown = fields.find === '' && !ids.current.has(card.key) ? null : problem;
+            errorTimers.current.set(card.key, setTimeout(() => patch(card.key, { error: shown }), LOCAL_ERROR_DELAY_MS));
             return;
         }
         patch(card.key, { fields, error: null });
@@ -110,8 +142,8 @@ export function ReplaceRuleList({ initial, store, autosave, saveKey }: {
     };
 
     // After pending edits, so a draft whose first save is still on its way is removed once it has its id.
-    const remove = (key: string) => {
-        void autosave.commit<ReplaceRule[] | null>(
+    const remove = (key: string) =>
+        autosave.commit<ReplaceRule[] | null>(
             async () => {
                 const id = ids.current.get(key);
                 return id === undefined ? null : store.remove(id);
@@ -121,6 +153,13 @@ export function ReplaceRuleList({ initial, store, autosave, saveKey }: {
                 setCards((current) => current.filter((card) => card.key !== key));
             },
         );
+
+    /** Where focus goes once a rule is removed: the next rule's Find, the one before it, or Add (audit H2). */
+    const focusAfterRemove = (index: number) => () => {
+        // Still there: the remove failed, and focus goes back to its button.
+        if (list.current?.querySelector(`[data-card="${cards[index].key}"]`)) return null;
+        const next = cards[index + 1] ?? cards[index - 1];
+        return (next && list.current?.querySelector<HTMLElement>(`[data-card="${next.key}"] textarea`)) || addButton.current;
     };
 
     const move = (index: number, direction: -1 | 1) => {
@@ -144,14 +183,26 @@ export function ReplaceRuleList({ initial, store, autosave, saveKey }: {
             {cards.map((card, index) => {
                 const number = index + 1;
                 return (
-                    <section key={card.key} data-card={card.key} className={styles.rule} aria-label={`Replace rule ${number}`}>
-                        <div className={styles.ruleHeader}>
-                            <h3 className={styles.ruleTitle}>Rule {number}</h3>
+                    <section
+                        key={card.key}
+                        data-card={card.key}
+                        className="mb-3 rounded-lg border border-line px-3 pt-2.5 pb-3"
+                        aria-label={`Replace rule ${number}`}
+                    >
+                        <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                            <h3 className="m-0 text-note">Rule {number}</h3>
                             <div className="toolbar">
                                 <OrderButtons index={index} count={cards.length} what={`rule ${number}`} onMove={(direction) => move(index, direction)} />
-                                <button type="button" className="button button-quiet button-small" onClick={() => remove(card.key)}>
-                                    Remove
-                                </button>
+                                {/* Asks first, as every other delete does (audit H3), and says which rule (M11). */}
+                                <ConfirmButton
+                                    label="Remove"
+                                    ariaLabel={`Remove rule ${number}`}
+                                    question={`Remove rule ${number}?`}
+                                    confirmLabel="Remove"
+                                    danger
+                                    onConfirm={() => remove(card.key)}
+                                    focusAfter={focusAfterRemove(index)}
+                                />
                             </div>
                         </div>
                         <TextField
@@ -161,6 +212,9 @@ export function ReplaceRuleList({ initial, store, autosave, saveKey }: {
                             rows={1}
                             hint={card.fields.regex ? 'A regular expression; use ( ) to capture and $1 in Replace.' : 'Found exactly as typed, spaces included.'}
                             error={card.error}
+                            spellCheck={false}
+                            autoCapitalize="off"
+                            autoComplete="off"
                             onChange={(find) => change(card, { find })}
                         />
                         <TextField
@@ -169,9 +223,12 @@ export function ReplaceRuleList({ initial, store, autosave, saveKey }: {
                             multiline
                             rows={1}
                             hint="Leave empty to remove what was found."
+                            spellCheck={false}
+                            autoCapitalize="off"
+                            autoComplete="off"
                             onChange={(replace) => change(card, { replace })}
                         />
-                        <div className={styles.switches} role="group" aria-label="Rule switches">
+                        <div className="mt-1 mb-2 flex flex-wrap gap-2" role="group" aria-label="Rule switches">
                             {SWITCHES.map(({ field, label }) => (
                                 <label key={field} className="chip chip-pick">
                                     <input
@@ -187,7 +244,7 @@ export function ReplaceRuleList({ initial, store, autosave, saveKey }: {
                     </section>
                 );
             })}
-            <button type="button" className={editorStyles.add} onClick={add}>
+            <button ref={addButton} type="button" className={ADD_BUTTON} onClick={add}>
                 + Add replace rule
             </button>
         </div>

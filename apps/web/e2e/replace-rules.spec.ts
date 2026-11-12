@@ -135,6 +135,7 @@ test.describe('Replace rules', () => {
         await expect(rule(after, 1).find).toHaveValue('(\\w+) smirked');
         await expect(rule(after, 1).check('On my Messages')).toBeChecked();
         await rule(after, 1).card.getByRole('button', { name: 'Remove' }).tap();
+        await rule(after, 1).card.getByRole('group', { name: /Remove rule 1/ }).getByRole('button', { name: 'Remove' }).tap();
         await saved(page);
         await page.reload();
         const last = page.getByRole('region', { name: 'Replace rules', exact: true });
@@ -181,6 +182,7 @@ test.describe('Replace rules', () => {
             await expect(rule(after, 1).replace).toHaveValue('the trader');
             await expect(rule(after, 2).check('On AI Messages')).not.toBeChecked();
             await rule(after, 1).card.getByRole('button', { name: 'Remove' }).tap();
+            await rule(after, 1).card.getByRole('group', { name: /Remove rule 1/ }).getByRole('button', { name: 'Remove' }).tap();
             await saved(page);
             await page.reload();
             await expect(rule(page.getByRole('region', { name: 'Replace rules', exact: true }), 1).find).toHaveValue('colour');

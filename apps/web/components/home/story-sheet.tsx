@@ -5,18 +5,24 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import { useConnection } from '@/components/connection';
+import { PlayIcon } from '@/components/icons';
 import { Sheet } from '@/components/sheet/sheet';
 import { ApiError, ApiUnreachableError } from '@/lib/api';
 import { chatApi } from '@/lib/chat';
-import { coverBackground, stillToFillIn } from '@/lib/home';
-import { storyApi, StorySummary, storyTitle } from '@/lib/story';
+import { coverThumbBackground, stillToFillIn } from '@/lib/home';
+import { storyTitle, storyApi, StorySummary } from '@/lib/story';
 
-import styles from './story-sheet.module.css';
+/** The sheet's buttons: one full-width column, each 44px or taller. */
+const PRIMARY = 'button w-full';
+/** The second choice beside the primary one: an accent outline. */
+const SECONDARY = 'button w-full border border-accent bg-transparent text-text disabled:border-line disabled:text-muted';
+/** The rest: text only, muted until pressed. */
+const QUIET = 'button w-full bg-transparent font-semibold text-muted hover:text-text active:bg-quiet-fill';
 
 /**
  * What tapping a Story's card offers (spec story 53): Continue its newest Chat, start a new
  * Chat, edit it, or Duplicate it into a copy that opens in the editor. A Draft says how much
- * is missing instead of offering play.
+ * is missing instead of offering play, and Edit Story is its main button (audit M42).
  */
 export function StorySheet({ story, onClose }: { story: StorySummary; onClose(): void }) {
     const router = useRouter();
@@ -44,43 +50,50 @@ export function StorySheet({ story, onClose }: { story: StorySummary; onClose():
 
     return (
         <Sheet label={title} onClose={onClose}>
-            <div className={styles.body}>
-                <span className={styles.cover} style={{ background: coverBackground(story) }} aria-hidden="true" />
-                <h2 className={styles.title}>{title}</h2>
-                {story.hook && <p className={styles.hook}>{story.hook}</p>}
+            <div className="flex flex-col gap-2">
+                <span className="block h-40 rounded-lg" style={{ background: coverThumbBackground(story, true) }} aria-hidden="true" />
+                <h2 className="mt-1 mb-0 text-xl [overflow-wrap:anywhere]">{title}</h2>
+                {story.hook && <p className="mt-0 mb-1 text-md text-muted">{story.hook}</p>}
                 {story.playable ? (
                     <>
                         {story.latestChat && (
-                            <Link href={`/stories/${story.id}/chats/${story.latestChat.id}`} className={styles.primary}>
-                                <span aria-hidden="true">▶</span> Continue
+                            <Link href={`/stories/${story.id}/chats/${story.latestChat.id}`} className={PRIMARY}>
+                                <PlayIcon size={18} /> Continue
                                 {story.latestChat.sceneName ? ` · ${story.latestChat.sceneName}` : ''}
                             </Link>
                         )}
                         <button
                             type="button"
-                            className={story.latestChat ? styles.secondary : styles.primary}
+                            className={story.latestChat ? SECONDARY : PRIMARY}
                             onClick={() => void startChat()}
                             disabled={busy !== null}
+                            aria-busy={busy === 'starting' || undefined}
                         >
                             {busy === 'starting' ? 'Starting…' : 'New Chat'}
                         </button>
                     </>
                 ) : (
-                    <p className={styles.missing}>{stillToFillIn(story.missing.length)}</p>
+                    <p className="my-1 text-md text-warning">{stillToFillIn(story.missing.length)}</p>
                 )}
                 {story.latestChat && (
-                    <Link href={`/stories/${story.id}/chats`} className={styles.quiet}>
+                    <Link href={`/stories/${story.id}/chats`} className={QUIET}>
                         All Chats
                     </Link>
                 )}
-                <Link href={`/stories/${story.id}`} className={styles.quiet}>
+                <Link href={`/stories/${story.id}`} className={story.playable ? QUIET : PRIMARY}>
                     Edit Story
                 </Link>
-                <button type="button" className={styles.quiet} onClick={() => void duplicate()} disabled={busy !== null}>
+                <button
+                    type="button"
+                    className={QUIET}
+                    onClick={() => void duplicate()}
+                    disabled={busy !== null}
+                    aria-busy={busy === 'duplicating' || undefined}
+                >
                     {busy === 'duplicating' ? 'Duplicating…' : 'Duplicate'}
                 </button>
                 {error && (
-                    <p role="alert" className={styles.error}>
+                    <p role="alert" className="m-0 text-md text-error-text">
                         {error}
                     </p>
                 )}

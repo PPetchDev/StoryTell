@@ -4,14 +4,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useConnection } from '@/components/connection';
 import { FoldTitle } from '@/components/fold/fold-button';
+import { ErrorState, Loading } from '@/components/query-state';
 import { SnapshotViewer, snapshotAlt } from '@/components/snapshot/snapshot-viewer';
 import { ApiError, apiFetch, ApiUnreachableError } from '@/lib/api';
 import { setFolded, useFolded } from '@/lib/folds';
-import { EARLIER_VERSION, GalleryItem, galleryPath, snapshotApi, snapshotImageUrl } from '@/lib/snapshot';
-import { coverBackground } from '@/lib/home';
+import { coverThumbBackground } from '@/lib/home';
+import { EARLIER_VERSION, GalleryItem, galleryPath, snapshotApi, snapshotImageUrl, snapshotThumbUrl } from '@/lib/snapshot';
 import { StorySummary, storyTitle } from '@/lib/story';
-
-import styles from './gallery.module.css';
 
 export interface GalleryStory {
     id: number;
@@ -41,7 +40,7 @@ interface ChatGroup {
 interface StoryGroup {
     storyId: number;
     title: string;
-    /** The Cover's CSS background: the picture at its focus point, or the Story's gradient. */
+    /** The Cover's CSS background: a thumbnail at its focus point over the Story's gradient. */
     cover: string;
     count: number;
     chats: ChatGroup[];
@@ -60,7 +59,7 @@ function group(items: GalleryItem[], storyOf: (storyId: number) => GalleryStory)
             story = {
                 storyId: item.storyId,
                 title: storyTitle(known),
-                cover: coverBackground({ id: item.storyId, coverImagePath: known.coverImagePath ?? null, coverFocus: known.coverFocus ?? null }),
+                cover: coverThumbBackground({ id: item.storyId, coverImagePath: known.coverImagePath ?? null, coverFocus: known.coverFocus ?? null }),
                 count: 0,
                 chats: [],
             };
@@ -80,13 +79,16 @@ function group(items: GalleryItem[], storyOf: (storyId: number) => GalleryStory)
 
 const pictures = (count: number) => `${count} ${count === 1 ? 'picture' : 'pictures'}`;
 
+/** A tile's button, found again after the list is read anew. */
+const thumbSelector = (id: number) => `[data-snapshot-thumb="${id}"]`;
+
 /**
  * Snapshots grouped by Story, then by Chat, newest first, as grids of whole images (spec:
  * "Gallery"). On a Story's page it shows that Story's Chats; in the main menu every Story,
- * each folding, with its Chats folding inside it. A tap opens the shared full-screen viewer,
- * which swipes through that Chat's Snapshots and keeps the prompt, download and delete. An item
- * whose Message is gone is marked as from an earlier version of its Chat; one whose Message is
- * still there jumps to it.
+ * each folding, with its Chats folding inside it. A folded group draws no pictures until it is
+ * opened (audit H33). A tap opens the shared full-screen viewer, which swipes through that
+ * Chat's Snapshots and keeps the prompt, download and delete. An item whose Message is gone is
+ * marked as from an earlier version of its Chat; one whose Message is still there jumps to it.
  */
 export function Gallery({ stories, byStory = false, initialChatId = null }: GalleryProps) {
     const { reportUnreachable } = useConnection();
@@ -104,6 +106,7 @@ export function Gallery({ stories, byStory = false, initialChatId = null }: Gall
                 ids.map(async (id) => (await apiFetch<{ snapshots: GalleryItem[] }>(galleryPath(id, null))).snapshots),
             );
             setItems(lists.flat());
+            setError(null);
         } catch (caught) {
             if (caught instanceof ApiUnreachableError) reportUnreachable();
             else setError(caught instanceof ApiError ? caught.message : 'The Gallery could not be read.');
@@ -127,9 +130,22 @@ export function Gallery({ stories, byStory = false, initialChatId = null }: Gall
 
     const storyOf = (id: number): GalleryStory => stories.find((story) => story.id === id) ?? { id, title: '' };
 
+    if (items === null) {
+        if (error) return <ErrorState title="Couldn't load the Gallery." error={error} onRetry={() => void load()} />;
+        return <Loading label="Loading the Gallery…" />;
+    }
+    if (items.length === 0) return <p className="muted">No Snapshots yet. Take one in a Chat.</p>;
+
+    const groups = group(items, storyOf);
+    const chats = groups.flatMap((story) => story.chats);
+    const viewingList = viewing && chats.find((chat) => chat.key === viewing.chatKey)?.items;
+    const open = (chat: ChatGroup, item: GalleryItem) => setViewing({ chatKey: chat.key, id: item.id });
+
+    /**
+     * Deletes from the viewer, which stays open with the reason if it fails (audit L25). Once it
+     * is gone, focus goes to the next tile of its Chat, or the one before, or the Chat's title (M50).
+     */
     const remove = async (item: GalleryItem) => {
-        setViewing(null);
-        setError(null);
         try {
             await snapshotApi.remove(item.storyId, item.id);
         } catch (caught) {
@@ -137,23 +153,27 @@ export function Gallery({ stories, byStory = false, initialChatId = null }: Gall
                 reportUnreachable();
                 return;
             }
-            setError(caught instanceof ApiError ? caught.message : 'The Snapshot could not be deleted.');
+            throw new Error(caught instanceof ApiError ? caught.message : 'The Snapshot could not be deleted.');
         }
+        const chat = chats.find((each) => each.items.some((candidate) => candidate.id === item.id));
+        const at = chat?.items.findIndex((candidate) => candidate.id === item.id) ?? -1;
+        const neighbour = chat && (chat.items[at + 1] ?? chat.items[at - 1]);
+        setViewing(null);
         await load();
+        requestAnimationFrame(() => {
+            const target =
+                (neighbour && document.querySelector<HTMLElement>(thumbSelector(neighbour.id))) ||
+                (chat && document.querySelector<HTMLElement>(`#${chatSectionId(chat.key)} button[aria-expanded]`)) ||
+                document.querySelector<HTMLElement>('main h1');
+            if (target?.tagName === 'H1') target.tabIndex = -1;
+            target?.focus();
+        });
     };
-
-    if (error && items === null) return <p role="alert">{error}</p>;
-    if (items === null) return <p className="muted">Loading…</p>;
-    if (items.length === 0) return <p className="muted">No Snapshots yet. Take one in a Chat.</p>;
-
-    const groups = group(items, storyOf);
-    const viewingList = viewing && groups.flatMap((story) => story.chats).find((chat) => chat.key === viewing.chatKey)?.items;
-    const open = (chat: ChatGroup, item: GalleryItem) => setViewing({ chatKey: chat.key, id: item.id });
 
     return (
         <>
-            {error && <p role="alert">{error}</p>}
-            <div className={styles.groups}>
+            {error && <ErrorState title="Couldn't load the Gallery again." error={error} onRetry={() => void load()} className="mb-4" />}
+            <div className="grid gap-5">
                 {groups.map((story) =>
                     single ? (
                         story.chats.map((chat) => <ChatSection key={chat.key} chat={chat} level="h2" onOpen={open} />)
@@ -168,7 +188,7 @@ export function Gallery({ stories, byStory = false, initialChatId = null }: Gall
                     openId={viewing.id}
                     showLink
                     onClose={() => setViewing(null)}
-                    onDelete={(item) => void remove(item)}
+                    onDelete={(item) => remove(item)}
                 />
             )}
         </>
@@ -181,29 +201,36 @@ const chatSectionId = (chatKey: string) => `gallery-chat-${chatKey.replace(':', 
 
 type Open = (chat: ChatGroup, item: GalleryItem) => void;
 
+/** A group's count beside its title. */
+function Count({ count }: { count: number }) {
+    return <span className="flex-none text-sm font-normal text-muted">{pictures(count)}</span>;
+}
+
 /** One Story on the main Gallery: its title and count, folding, its Chats inside. */
 function StorySection({ story, onOpen }: { story: StoryGroup; onOpen: Open }) {
     const foldKey = storyFoldKey(story.storyId);
     const folded = useFolded(foldKey);
     const bodyId = `gallery-story-${story.storyId}`;
     return (
-        <section className={styles.story} aria-label={story.title}>
+        <section className="grid gap-2 rounded-lg border border-line bg-surface px-4 pt-3 pb-4 text-lg" aria-label={story.title}>
             <FoldTitle foldKey={foldKey} controls={bodyId} as="h2">
                 {/* The Cover as Home shows it; decorative, the title names the section. */}
-                <span className={styles.cover} style={{ background: story.cover }} aria-hidden="true" />
-                <span className={styles.storyText}>
-                    <span className={styles.groupTitle}>{story.title}</span>
-                    <span className={`${styles.count} muted small`}>{pictures(story.count)}</span>
+                <span className="block aspect-[3/4] w-18 flex-none rounded-md lg:w-24" style={{ background: story.cover }} aria-hidden="true" />
+                <span className="grid min-w-0 gap-0.5">
+                    <span className="min-w-0 [overflow-wrap:anywhere]">{story.title}</span>
+                    <Count count={story.count} />
                 </span>
             </FoldTitle>
-            <div id={bodyId} hidden={folded} className={styles.storyBody}>
-                {story.chats.map((chat) => (
-                    <ChatSection key={chat.key} chat={chat} level="h3" onOpen={onOpen} />
-                ))}
+            {/* Folded, it holds nothing: no picture is fetched for a group nobody opened. */}
+            <div id={bodyId} hidden={folded} className="grid gap-4 text-base">
+                {!folded && story.chats.map((chat) => <ChatSection key={chat.key} chat={chat} level="h3" onOpen={onOpen} />)}
             </div>
         </section>
     );
 }
+
+/** A tile: the whole image on the viewer's black, never cropped, every tile the same size. */
+const THUMB = 'bare-button block aspect-[2/3] w-full overflow-hidden rounded-sm border border-line bg-viewer-stage';
 
 /** One Chat's Snapshots: its title and count, folding, then the grid. */
 function ChatSection({ chat, level, onOpen }: { chat: ChatGroup; level: 'h2' | 'h3'; onOpen: Open }) {
@@ -212,21 +239,35 @@ function ChatSection({ chat, level, onOpen }: { chat: ChatGroup; level: 'h2' | '
     const sectionId = chatSectionId(chat.key);
     const bodyId = `${sectionId}-body`;
     return (
-        <section id={sectionId} className={styles.chat} aria-label={chat.title}>
+        <section id={sectionId} className="grid gap-2" aria-label={chat.title}>
             <FoldTitle foldKey={foldKey} controls={bodyId} as={level}>
-                <span className={styles.groupTitle}>{chat.title}</span>
-                <span className={`${styles.count} muted small`}>{pictures(chat.items.length)}</span>
+                <span className="min-w-0 [overflow-wrap:anywhere]">{chat.title}</span>
+                <Count count={chat.items.length} />
             </FoldTitle>
-            <ul id={bodyId} hidden={folded} className={styles.grid} aria-label={`Snapshots of ${chat.title}`}>
-                {chat.items.map((item) => (
-                    <li key={item.id}>
-                        <button type="button" className={styles.thumb} onClick={() => onOpen(chat, item)}>
-                            {/* eslint-disable-next-line @next/next/no-img-element -- served by the API from the image folder */}
-                            <img src={snapshotImageUrl(item)} alt={snapshotAlt(item)} />
-                        </button>
-                        {item.messageId === null && <span className={`${styles.earlier} small`}>{EARLIER_VERSION}</span>}
-                    </li>
-                ))}
+            <ul
+                id={bodyId}
+                hidden={folded}
+                className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-3 p-0 lg:grid-cols-[repeat(auto-fill,minmax(9rem,1fr))]"
+                aria-label={`Snapshots of ${chat.title}`}
+            >
+                {!folded &&
+                    chat.items.map((item) => (
+                        <li key={item.id} className="grid content-start gap-1">
+                            <button type="button" className={THUMB} data-snapshot-thumb={item.id} onClick={() => onOpen(chat, item)}>
+                                {/* eslint-disable-next-line @next/next/no-img-element -- a thumbnail the API makes; the full image is the fallback */}
+                                <img
+                                    src={snapshotImageUrl(item)}
+                                    srcSet={`${snapshotThumbUrl(item, 320)} 320w, ${snapshotThumbUrl(item, 640)} 640w`}
+                                    sizes="(min-width: 1024px) 12rem, 34vw"
+                                    alt={snapshotAlt(item)}
+                                    loading="lazy"
+                                    decoding="async"
+                                    className="block size-full object-contain"
+                                />
+                            </button>
+                            {item.messageId === null && <span className="text-sm text-earlier-text">{EARLIER_VERSION}</span>}
+                        </li>
+                    ))}
             </ul>
         </section>
     );

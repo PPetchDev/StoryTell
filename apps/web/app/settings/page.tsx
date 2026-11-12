@@ -4,6 +4,8 @@ import { useState } from 'react';
 
 import { BackupBanner } from '@/components/backup-banner';
 import { useApiQuery } from '@/components/connection';
+import { ErrorState, Loading } from '@/components/query-state';
+import { STICKY_HEADER } from '@/components/settings/sticky-header';
 import { Autosave, useAutosave } from '@/components/story-editor/autosave';
 import { SamplingFold } from '@/components/settings/sampling-fold';
 import { AppSavedRepliesCard } from '@/components/saved-replies/app-saved-replies-card';
@@ -13,6 +15,7 @@ import { TextSizeSetting } from '@/components/text-size-setting';
 import { ThemeSetting } from '@/components/theme-setting';
 import { apiSend } from '@/lib/api';
 import { ImageModelOption, ModelOption, PlayModelOption, Settings, SettingsResponse, SnapshotSize } from '@/lib/types';
+import { useLaterError } from '@/lib/use-settled';
 
 type ModelKey = 'playModel' | 'imageModel';
 
@@ -124,7 +127,7 @@ function NumberField({
     onInvalid(): void;
 }) {
     const [text, setText] = useState(String(initial));
-    const [error, setError] = useState<string | null>(null);
+    const [error, setError] = useLaterError();
     const errorId = `${id}-error`;
 
     const change = (next: string) => {
@@ -140,7 +143,7 @@ function NumberField({
     };
 
     return (
-        <div className="field">
+        <div className="field my-0">
             <label htmlFor={id}>{label}</label>
             <input
                 id={id}
@@ -262,11 +265,12 @@ function SettingsForm({ initial, autosave }: { initial: SettingsResponse; autosa
                     Warn when a pool&apos;s remaining credit is at or below this share of what it
                     holds when topped up.
                 </p>
-                <div className="field-row">
+                {/* The boxes of a row line up whatever their labels' lengths (audit L22). */}
+                <div className="field-row mb-3 items-end">
                     {numberField('textCreditCapUsd', 'text-cap', 'Text pool (USD)', 'usd')}
                     {numberField('textLowCreditPercent', 'text-threshold', 'Text warning (%)', 'percent')}
                 </div>
-                <div className="field-row">
+                <div className="field-row items-end">
                     {numberField('imageCreditCapUsd', 'image-cap', 'Images and audio (Venice) pool (USD)', 'usd')}
                     {numberField('imageLowCreditPercent', 'image-threshold', 'Images and audio (Venice) warning (%)', 'percent')}
                 </div>
@@ -281,16 +285,24 @@ export default function SettingsPage() {
 
     return (
         <main>
-            <div className="page-header">
+            <div className={STICKY_HEADER}>
                 <h1>Settings</h1>
-                {settings.status === 'ready' && <SaveStatus state={autosave.state} />}
+                {settings.status === 'ready' && (
+                    <div className="flex items-center gap-2">
+                        <SaveStatus state={autosave.state} />
+                    </div>
+                )}
             </div>
-            <BackupBanner />
-            {settings.status === 'loading' && <p className="muted">Loading…</p>}
-            {settings.status === 'error' && <p role="alert">{settings.error.message}</p>}
-            {settings.status === 'ready' && <SettingsForm initial={settings.data} autosave={autosave} />}
+            {/*
+             * This device's settings come first: they are there at once, so nothing that loads after
+             * them (the form, the backup banner) pushes them down under a finger (audit M38).
+             */}
             <ThemeSetting />
             <TextSizeSetting />
+            <BackupBanner />
+            {settings.status === 'loading' && <Loading label="Loading Settings…" className="card" />}
+            {settings.status === 'error' && <ErrorState title="Couldn't load Settings." error={settings.error} onRetry={settings.retry} />}
+            {settings.status === 'ready' && <SettingsForm initial={settings.data} autosave={autosave} />}
         </main>
     );
 }
