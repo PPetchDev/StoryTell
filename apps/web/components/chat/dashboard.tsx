@@ -1,14 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { useId, useState } from 'react';
+import { ReactNode, useEffect, useId, useState } from 'react';
 
 import { useConnection } from '@/components/connection';
 import { FoldTitle, useFoldedState } from '@/components/fold/fold-button';
+import { ArrowLeftIcon } from '@/components/icons';
 import { CharacterPortrait } from '@/components/portrait/character-portrait';
 import { BondChart } from './bond-chart';
+import { Summary } from './disclosure';
 import { Cast, characterColour, Portraits } from '@/lib/character-colour';
-import { ApiError, ApiUnreachableError } from '@/lib/api';
+import { ApiError, apiFetch, ApiUnreachableError } from '@/lib/api';
 import { afterCause } from '@/lib/arcs';
 import {
     BondChange,
@@ -22,23 +24,36 @@ import {
 } from '@/lib/chat';
 import { useFolded } from '@/lib/folds';
 
+/** A paragraph on the Dashboard: no top margin, a little under. */
+const P = 'mt-0 mb-1.5';
+/** What caused a change, in the event colour. */
+const EVENT = 'mt-0 mb-1 text-note text-event';
+/** When and where, under an item. */
+const WHEN = 'mt-0 mb-1.5 text-sm text-muted';
+/** A Bond's label. */
+const LABEL = 'm-0 font-bold text-accent';
+/** The numbered lists: a change's history, an Arc's changes, the Updates. */
+const LIST = 'mt-3 mb-0 grid gap-3.5 pl-5';
+/** A section's card: from 1024px roomier. */
+const SECTION = 'mb-4 rounded-xl bg-surface px-5 pt-2 pb-5 lg:px-7 lg:pt-3 lg:pb-6';
+/** A section's title. */
+const H2 = 'mt-3 mb-3 text-lg font-bold';
+
 /** "the Message" link to the causing Message, or the seed note when nothing caused it. */
 function Cause({ dashboard, messageId }: { dashboard: ChatDashboard; messageId: number | null }) {
-    if (messageId === null) return <span className="muted">Set by the author</span>;
+    if (messageId === null) return <span>Set by the author</span>;
     return <Link href={messageHref(dashboard.storyId, dashboard.chatId, messageId)}>Go to the Message</Link>;
 }
 
 function BondHistory({ dashboard, history }: { dashboard: ChatDashboard; history: BondChange[] }) {
     return (
-        <ol className="bond-history">
+        <ol className={LIST}>
             {history.map((change) => (
                 <li key={change.id}>
-                    <p className="bond-label">
-                        {change.before ? `${change.before.label} → ${change.label}` : change.label}
-                    </p>
-                    <p className="message-text">{change.description}</p>
-                    {change.event && <p className="event">Because: {change.event}</p>}
-                    <p className="muted small">
+                    <p className={LABEL}>{change.before ? `${change.before.label} → ${change.label}` : change.label}</p>
+                    <p className={`${P} whitespace-pre-wrap`}>{change.description}</p>
+                    {change.event && <p className={EVENT}>Because: {change.event}</p>}
+                    <p className={WHEN}>
                         {formatWhen(change.createdAt)} · <Cause dashboard={dashboard} messageId={change.messageId} />
                     </p>
                 </li>
@@ -47,15 +62,20 @@ function BondHistory({ dashboard, history }: { dashboard: ChatDashboard; history
     );
 }
 
+/** One Bond: its label and why on the summary, with a chevron that says it opens (audit H21), and its chart and history inside. */
 function BondView({ dashboard, bond, from }: { dashboard: ChatDashboard; bond: DashboardBond; from: string }) {
     const latest = bond.history[0];
     return (
-        <details className="bond" aria-label={`${from} toward ${bond.toward.name}`}>
-            <summary>
-                <span className="bond-toward">→ {bond.toward.name}</span> <span className="bond-label">{bond.label}</span>
-                <span className="message-text bond-description">{bond.description}</span>
-                {latest?.event && <span className="event">Because: {latest.event}</span>}
-            </summary>
+        <details className="group border-t border-line py-3" aria-label={`${from} toward ${bond.toward.name}`}>
+            <Summary top>
+                <span className="grid gap-0.5">
+                    <span>
+                        <span className="text-sm text-muted">→ {bond.toward.name}</span> <span className={LABEL}>{bond.label}</span>
+                    </span>
+                    <span className="whitespace-pre-wrap">{bond.description}</span>
+                    {latest?.event && <span className="text-note text-event">Because: {latest.event}</span>}
+                </span>
+            </Summary>
             <BondChart dashboard={dashboard} bond={bond} from={from} />
             <BondHistory dashboard={dashboard} history={bond.history} />
         </details>
@@ -74,30 +94,52 @@ function Portrait({ character, pictures }: { character: DashboardCharacter; pict
             name={character.name}
             colour={characterColour(character.id, pictures.cast)}
             portrait={pictures.portraits[character.id]}
-            className="dashboard-portrait"
+            className="size-10 flex-none text-base"
         />
     );
 }
 
 /**
+ * One Character in a section, with their picture. A line above all but the first; from 1024px they
+ * sit two to a row, so the first two have none.
+ */
+function personClass(index: number): string {
+    return ['py-2', index > 0 && 'border-t border-line', index === 1 && 'lg:border-t-0'].filter(Boolean).join(' ');
+}
+
+/** A Character's name and picture in a row 44px tall. */
+const PERSON_HEAD = 'flex min-h-11 items-center gap-3';
+
+/**
  * One Character's Bonds, under "How the Characters feel", with their picture. They fold, and
  * stay folded on this device in every Chat of the Story until unfolded.
  */
-function CharacterBonds({ dashboard, character, pictures }: { dashboard: ChatDashboard; character: DashboardCharacter; pictures: Pictures }) {
+function CharacterBonds({
+    dashboard,
+    character,
+    pictures,
+    index,
+}: {
+    dashboard: ChatDashboard;
+    character: DashboardCharacter;
+    pictures: Pictures;
+    index: number;
+}) {
     const bodyId = useId();
+    const titleId = useId();
     const foldKey = `feelings:${character.id}`;
     const folded = useFolded(foldKey);
     return (
-        <section className="dashboard-person" aria-label={character.name}>
-            <div className="dashboard-person-head">
-                <FoldTitle foldKey={foldKey} controls={bodyId}>
+        <section className={personClass(index)} aria-labelledby={titleId}>
+            <div className={PERSON_HEAD}>
+                <FoldTitle foldKey={foldKey} controls={bodyId} id={titleId}>
                     <Portrait character={character} pictures={pictures} />
                     {character.name}
                 </FoldTitle>
             </div>
-            <div id={bodyId} hidden={folded} className="dashboard-person-body">
+            <div id={bodyId} hidden={folded} className="mt-2 py-1">
                 {character.bonds.length === 0 ? (
-                    <p className="muted">A stranger to everyone so far.</p>
+                    <p className={`${P} text-muted`}>A stranger to everyone so far.</p>
                 ) : (
                     character.bonds.map((bond) => (
                         <BondView key={`${bond.toward.characterId ?? 'user'}`} dashboard={dashboard} bond={bond} from={character.name} />
@@ -113,35 +155,48 @@ function CharacterBonds({ dashboard, character, pictures }: { dashboard: ChatDas
  * changed and what caused it, never the author's direction or the step's own words. The list
  * starts folded and stays as the user leaves it on this device.
  */
-function CharacterArc({ dashboard, character, pictures }: { dashboard: ChatDashboard; character: DashboardCharacter; pictures: Pictures }) {
+function CharacterArc({
+    dashboard,
+    character,
+    pictures,
+    index,
+}: {
+    dashboard: ChatDashboard;
+    character: DashboardCharacter;
+    pictures: Pictures;
+    index: number;
+}) {
     const bodyId = useId();
+    const titleId = useId();
     const foldKey = `arcChanges:${character.id}`;
     const folded = useFoldedState(foldKey, true);
     const count = character.arcChanges.length;
     return (
-        <section className="dashboard-person" aria-label={character.name}>
-            <div className="dashboard-person-head">
+        <section className={personClass(index)} aria-labelledby={titleId}>
+            <div className={PERSON_HEAD}>
                 <Portrait character={character} pictures={pictures} />
-                <h3>{character.name}</h3>
+                <h3 id={titleId} className="m-0 min-w-0 flex-1 text-base font-bold">
+                    {character.name}
+                </h3>
             </div>
             {count === 0 ? (
-                <p className="muted">Hasn&apos;t changed yet</p>
+                <p className={`mt-2 mb-1.5 text-muted`}>Hasn&apos;t changed yet</p>
             ) : (
-                <>
+                <div className="mt-2">
                     <FoldTitle foldKey={foldKey} controls={bodyId} as="h4" startsFolded>
                         Changed {count} {count === 1 ? 'time' : 'times'}
                     </FoldTitle>
-                    <ol id={bodyId} hidden={folded} className="arc-changes">
-                        {character.arcChanges.map((change, index) => (
-                            <li key={`${change.messageId}:${index}`}>
-                                <p className="event">{afterCause(change.cause)}</p>
-                                <p className="muted small">
+                    <ol id={bodyId} hidden={folded} className={LIST}>
+                        {character.arcChanges.map((change, step) => (
+                            <li key={`${change.messageId}:${step}`}>
+                                <p className={EVENT}>{afterCause(change.cause)}</p>
+                                <p className={WHEN}>
                                     {formatWhen(change.createdAt)} · <Cause dashboard={dashboard} messageId={change.messageId} />
                                 </p>
                             </li>
                         ))}
                     </ol>
-                </>
+                </div>
             )}
         </section>
     );
@@ -162,6 +217,25 @@ function updateStatusOf(entry: DashboardBackground): UpdateStatus {
     return 'upToDate';
 }
 
+/** How often the Dashboard reads itself again while a reply is still updating (audit M55). */
+const UPDATING_POLL_MS = 3000;
+
+/** A section headed by its h2, which names it (audit L36). */
+function Section({ title, className = SECTION, children }: { title: string; className?: string; children: ReactNode }) {
+    const id = useId();
+    return (
+        <section className={className} aria-labelledby={id}>
+            <h2 id={id} className={`${H2} lg:col-span-full`}>
+                {title}
+            </h2>
+            {children}
+        </section>
+    );
+}
+
+/** The Characters' sections: from 1024px, two to a row under the title. */
+const PEOPLE_SECTION = `${SECTION} lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-10`;
+
 /**
  * The read-only dashboard (spec: "Dashboard"), in plain words: how the Characters feel (their
  * Bonds with history), how they've changed (the events that changed them, never the plan),
@@ -175,6 +249,23 @@ export function Dashboard({ initial, cast = [], portraits = {} }: { initial: Cha
     const [dashboard, setDashboard] = useState(initial);
     const [retrying, setRetrying] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const updating = dashboard.background.some((entry) => updateStatusOf(entry) === 'updating');
+
+    // "Updating…" turns into what happened without a reload: read again every few seconds until nothing is running.
+    useEffect(() => {
+        if (!updating) return;
+        let cancelled = false;
+        const timer = setTimeout(() => {
+            apiFetch<ChatDashboard>(`/stories/${dashboard.storyId}/chats/${dashboard.chatId}/dashboard`).then(
+                (next) => !cancelled && setDashboard(next),
+                () => {},
+            );
+        }, UPDATING_POLL_MS);
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
+        };
+    }, [updating, dashboard]);
 
     /** Runs each of the reply's failed calls again, the Bond, Arc and Scene update first. */
     const retry = async (entry: DashboardBackground) => {
@@ -197,68 +288,64 @@ export function Dashboard({ initial, cast = [], portraits = {} }: { initial: Cha
     };
 
     return (
-        <main className="dashboard wide">
-            <nav className="breadcrumbs">
-                <Link href={`/stories/${dashboard.storyId}/chats/${dashboard.chatId}`}>← {dashboard.title}</Link>
+        <main className="wide">
+            <nav className="breadcrumbs" aria-label="Breadcrumb">
+                <Link href={`/stories/${dashboard.storyId}/chats/${dashboard.chatId}`}>
+                    <ArrowLeftIcon size={18} />
+                    {dashboard.title}
+                </Link>
             </nav>
             <h1>Dashboard</h1>
-            <p className="muted">
+            <p className="mt-0 mb-4 text-muted">
                 How the Characters feel and how they have changed in this Chat. Nothing here can be edited: to undo a change,
                 edit the Message that caused it.
             </p>
 
-            <section className="dashboard-character" aria-label="How the Characters feel">
-                <h2>How the Characters feel</h2>
-                {dashboard.characters.map((character) => (
-                    <CharacterBonds key={character.id} dashboard={dashboard} character={character} pictures={pictures} />
+            <Section title="How the Characters feel" className={PEOPLE_SECTION}>
+                {dashboard.characters.map((character, index) => (
+                    <CharacterBonds key={character.id} dashboard={dashboard} character={character} pictures={pictures} index={index} />
                 ))}
-            </section>
+            </Section>
 
-            <section className="dashboard-character" aria-label="How they've changed">
-                <h2>How they&apos;ve changed</h2>
-                {dashboard.characters.map((character) => (
-                    <CharacterArc key={character.id} dashboard={dashboard} character={character} pictures={pictures} />
+            <Section title="How they've changed" className={PEOPLE_SECTION}>
+                {dashboard.characters.map((character, index) => (
+                    <CharacterArc key={character.id} dashboard={dashboard} character={character} pictures={pictures} index={index} />
                 ))}
-            </section>
+            </Section>
 
-            <section className="dashboard-scene" aria-label="Where the story is">
-                <h2>Where the story is</h2>
-                <p className="message-text">
-                    {dashboard.scene.current ? dashboard.scene.current.name : 'Free play'}
-                </p>
+            <Section title="Where the story is">
+                <p className={`${P} whitespace-pre-wrap`}>{dashboard.scene.current ? dashboard.scene.current.name : 'Free play'}</p>
                 {dashboard.scene.advance ? (
                     <>
-                        <p className="event">
+                        <p className={EVENT}>
                             Moved on from {dashboard.scene.advance.fromSceneName}
                             {dashboard.scene.advance.toSceneName ? ` to ${dashboard.scene.advance.toSceneName}` : ' into free play'}:{' '}
                             {dashboard.scene.advance.event}
                         </p>
-                        <p className="muted small">
+                        <p className={WHEN}>
                             {formatWhen(dashboard.scene.advance.createdAt)} ·{' '}
                             <Cause dashboard={dashboard} messageId={dashboard.scene.advance.messageId} />
                         </p>
                     </>
                 ) : (
-                    <p className="muted">{dashboard.scene.current ? 'The Chat is still on its first Scene.' : 'This Story has no Scenes.'}</p>
+                    <p className={`${P} text-muted`}>
+                        {dashboard.scene.current ? 'The Chat is still on its first Scene.' : 'This Story has no Scenes.'}
+                    </p>
                 )}
-            </section>
+            </Section>
 
-            <section className="dashboard-background" aria-label="Updates">
-                <h2>Updates</h2>
-                <p className="muted small">
-                    After each reply, the feelings, changes, Scene and Memories above are brought up to date.
-                </p>
+            <Section title="Updates">
+                <p className={`${P} text-sm text-muted`}>After each reply, the feelings, changes, Scene and Memories above are brought up to date.</p>
                 {dashboard.background.length === 0 ? (
-                    <p className="muted">No replies yet.</p>
+                    <p className={`${P} text-muted`}>No replies yet.</p>
                 ) : (
-                    <ul className="background-list">
+                    // Polite: when "Updating…" turns into the result, it is said.
+                    <ul className={LIST} aria-live="polite">
                         {dashboard.background.map((entry) => {
                             const status = updateStatusOf(entry);
                             return (
                                 <li key={entry.messageId}>
-                                    <Link href={messageHref(dashboard.storyId, dashboard.chatId, entry.messageId)}>
-                                        Reply {entry.position}
-                                    </Link>
+                                    <Link href={messageHref(dashboard.storyId, dashboard.chatId, entry.messageId)}>Reply {entry.position}</Link>
                                     {': '}
                                     {status !== 'failed' && UPDATE_WORDS[status]}
                                     {status === 'failed' && (
@@ -267,8 +354,9 @@ export function Dashboard({ initial, cast = [], portraits = {} }: { initial: Cha
                                             {' — '}
                                             <button
                                                 type="button"
-                                                className="button button-quiet button-small"
+                                                className="button button-quiet button-small ml-2"
                                                 disabled={retrying !== null}
+                                                aria-busy={retrying === entry.messageId || undefined}
                                                 onClick={() => void retry(entry)}
                                             >
                                                 {retrying === entry.messageId ? 'Retrying…' : 'Retry'}
@@ -281,11 +369,11 @@ export function Dashboard({ initial, cast = [], portraits = {} }: { initial: Cha
                     </ul>
                 )}
                 {error && (
-                    <p role="alert" className="turn-error">
+                    <p role="alert" className="turn-error mt-2 mb-0">
                         {error}
                     </p>
                 )}
-            </section>
+            </Section>
         </main>
     );
 }

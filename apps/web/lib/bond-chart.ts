@@ -121,3 +121,46 @@ export function bondChartLayout(trend: readonly BondTrendPoint[], lastPosition: 
         levelY,
     };
 }
+
+/**
+ * How far apart two turning-point pins must sit to share a row, in chart units: a 44px target
+ * at the narrowest chart (about 340px on a phone) is about 42 of the chart's 320 units (audit M56).
+ */
+export const PIN_GAP = 42;
+
+/**
+ * Which row each pin sits in, so no two 44px pins overlap (audit M56): pins go left to right into
+ * the first row whose last pin is at least `gap` units to their left. One row while they are apart.
+ */
+export function pinRows(pins: readonly Pick<BondChartPin, 'x'>[], gap = PIN_GAP): number[] {
+    const lastX: number[] = [];
+    const order = pins.map((pin, index) => ({ x: pin.x, index })).sort((a, b) => a.x - b.x);
+    const rows = new Array<number>(pins.length).fill(0);
+    for (const { x, index } of order) {
+        let row = lastX.findIndex((last) => x - last >= gap);
+        if (row === -1) row = lastX.length;
+        lastX[row] = x;
+        rows[index] = row;
+    }
+    return rows;
+}
+
+/** "Trust went from wary to unsure", or "Trust stayed wary": one axis over the Chat, in words. */
+export function bondAxisSummary(axis: BondAxis, first: number, last: number): string {
+    const name = BOND_AXIS_NAMES[axis];
+    const from = bondLevelWord(axis, first);
+    const to = bondLevelWord(axis, last);
+    return from === to ? `${name} stayed ${from}` : `${name} went from ${from} to ${to}`;
+}
+
+/**
+ * The chart in words (audit H17), for a screen reader and anyone who'd rather read: each axis from
+ * its first measure to now. No number, as everywhere a level shows. Empty with no measure yet.
+ */
+export function bondChartSummary(trend: readonly BondTrendPoint[]): string {
+    const measured = trend.filter((point) => point.levels !== null);
+    if (measured.length === 0) return '';
+    const first = measured[0].levels!;
+    const last = measured[measured.length - 1].levels!;
+    return `${BOND_AXES.map((axis) => bondAxisSummary(axis, first[axis], last[axis])).join('; ')}.`;
+}

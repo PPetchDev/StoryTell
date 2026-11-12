@@ -18,7 +18,6 @@
 @import './styles/editor.css';
 @import './styles/chats.css';
 @import './styles/chat.css';
-@import './styles/dashboard.css';
 @import './styles/memory.css';
 
 /* `light:` styles an element for the light theme, which the head script marks on <html>. */
