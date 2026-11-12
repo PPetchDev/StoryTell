@@ -66,7 +66,7 @@ function BondHistory({ dashboard, history }: { dashboard: ChatDashboard; history
 function BondView({ dashboard, bond, from }: { dashboard: ChatDashboard; bond: DashboardBond; from: string }) {
     const latest = bond.history[0];
     return (
-        <details className="group border-t border-line py-3" aria-label={`${from} toward ${bond.toward.name}`}>
+        <details className="group mt-2 border-t border-line py-3" aria-label={`${from} toward ${bond.toward.name}`}>
             <Summary top>
                 <span className="grid gap-0.5">
                     <span>

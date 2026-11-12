@@ -11,7 +11,7 @@ import { LoreInPlayCard } from '@/components/chat/lore-in-play-card';
 import { StorySoFarCard } from '@/components/chat/story-so-far-card';
 import { useDocked, useDrawerFocus } from '@/components/chat/use-drawer-focus';
 import { useConnection } from '@/components/connection';
-import { CloseIcon } from '@/components/icons';
+import { CloseIcon, LockIcon } from '@/components/icons';
 import { ErrorState, Loading } from '@/components/query-state';
 import { Autosave, useAutosave } from '@/components/story-editor/autosave';
 import { ConfirmButton } from '@/components/story-editor/fields';
@@ -43,16 +43,6 @@ const memoryGraphBonds = devicePreference<boolean>({
 
 /** A Memory list's look: no bullets, the cards 14px apart. */
 const MEMORY_LIST = 'mt-4 mb-0 grid list-none gap-3.5 p-0';
-
-/** A small lock beside "Locked", in the icon set's line style (components/icons has none yet). */
-function LockIcon() {
-    return (
-        <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
-            <rect x="5" y="11" width="14" height="9.5" rx="2" />
-            <path d="M8 11V8a4 4 0 0 1 8 0v3" />
-        </svg>
-    );
-}
 
 /** "Show Bonds", a switch beside the List / Graph choice: its track reads 3:1 when off (L34), and it slides only with motion on (M33). */
 function ShowBondsSwitch({ on, onChange }: { on: boolean; onChange(on: boolean): void }) {
@@ -349,7 +339,7 @@ function MemoryView({ list, memory, highlighted, inPlay, busy, autosave, sendEdi
                         <span>{memory.writtenBy === 'ai' ? 'Written by the AI' : 'Written by you'}</span>
                         {memory.locked && (
                             <span className="inline-flex items-center gap-1 text-event">
-                                <LockIcon />
+                                <LockIcon size={14} strokeWidth={2} />
                                 Locked
                             </span>
                         )}

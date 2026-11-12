@@ -169,3 +169,20 @@ export const EveningIcon = icon(
 );
 /** 🌙 Night: the moon. */
 export const NightIcon = icon('NightIcon', <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" />);
+
+/** 📷 Snapshot: a camera. */
+export const CameraIcon = icon(
+    'CameraIcon',
+    <>
+        <path d="M4 8h3l1.5-2.5h7L17 8h3v11H4z" />
+        <circle cx="12" cy="13" r="3.5" />
+    </>,
+);
+/** 🔒 Locked: a padlock. */
+export const LockIcon = icon(
+    'LockIcon',
+    <>
+        <rect x="5" y="11" width="14" height="9.5" rx="2" />
+        <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+    </>,
+);

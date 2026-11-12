@@ -25,11 +25,23 @@ export function Announcer() {
 
     useEffect(() => {
         let frame = 0;
+        // What was said since the last frame, per region: several things said at once are read
+        // together ("Rewrote Setting. The Story is playable now.") instead of the last one only.
+        const waiting: Record<Politeness, string[]> = { polite: [], assertive: [] };
         speak = (message, politeness) => {
+            waiting[politeness].push(message);
             // Cleared, then set on the next frame, so a repeat of the same words is a change too.
             setSaid((current) => ({ ...current, [politeness]: '' }));
             cancelAnimationFrame(frame);
-            frame = requestAnimationFrame(() => setSaid((current) => ({ ...current, [politeness]: message })));
+            frame = requestAnimationFrame(() => {
+                const next = { polite: waiting.polite.join(' '), assertive: waiting.assertive.join(' ') };
+                waiting.polite = [];
+                waiting.assertive = [];
+                setSaid((current) => ({
+                    polite: next.polite || current.polite,
+                    assertive: next.assertive || current.assertive,
+                }));
+            });
         };
         return () => {
             speak = null;

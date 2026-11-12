@@ -17,12 +17,12 @@ import {
     useState,
 } from 'react';
 
-import { ACTION, ACTION_ICON, CameraIcon, MessageTabStop } from '@/components/chat/chat-classes';
+import { ACTION, ACTION_ICON, MessageTabStop } from '@/components/chat/chat-classes';
 import { AiMessageParts, MessageBody, UserLine } from '@/components/chat/message-body';
 import { ReadAloudAction, ReadAloudControls, useReadAloud, useReadingNow } from '@/components/chat/read-aloud';
 import { MessageSnapshots } from '@/components/chat/snapshots';
 import { ThaiReadingAction, ThaiReadingBlock, ThaiReadings } from '@/components/chat/thai-reading';
-import { BranchIcon, ChevronLeftIcon, ChevronRightIcon, MoreIcon, PencilIcon, UndoIcon } from '@/components/icons';
+import { BranchIcon, CameraIcon, ChevronLeftIcon, ChevronRightIcon, MoreIcon, PencilIcon, UndoIcon } from '@/components/icons';
 import { ConfirmButton } from '@/components/story-editor/fields';
 import { Cast, Portraits } from '@/lib/character-colour';
 import { isOpening, Message, MessagePart, messageText, ReplyVersions } from '@/lib/chat';

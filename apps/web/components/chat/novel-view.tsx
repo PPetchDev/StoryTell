@@ -3,12 +3,12 @@
 import { CSSProperties, KeyboardEvent, MouseEvent, PointerEvent, ReactNode, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { useCastCharacter, useCharacterProfile } from '@/components/chat/character-profile';
-import { ACTION, ACTION_ICON, CameraIcon, COLUMN } from '@/components/chat/chat-classes';
+import { ACTION, ACTION_ICON, COLUMN } from '@/components/chat/chat-classes';
 import { VersionSwitch, WritingLine } from '@/components/chat/chat-thread';
 import { withActions } from '@/components/chat/message-body';
 import { ReadAloudControls, useReadAloud } from '@/components/chat/read-aloud';
 import { useShownText } from '@/components/chat/shown-text';
-import { ChevronLeftIcon, ChevronRightIcon, PencilIcon, PlayIcon, UndoIcon } from '@/components/icons';
+import { CameraIcon, ChevronLeftIcon, ChevronRightIcon, PencilIcon, PlayIcon, UndoIcon } from '@/components/icons';
 import { initialOf } from '@/components/portrait/character-portrait';
 import { snapshotAlt } from '@/components/snapshot/snapshot-viewer';
 import { Cast, characterColour } from '@/lib/character-colour';

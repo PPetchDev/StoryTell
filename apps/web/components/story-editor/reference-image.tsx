@@ -173,6 +173,8 @@ export function ReferenceImage({ storyId, character, imageStyle, flush, commit }
                 <figure className="mx-0 my-2">
                     <img
                         src={referenceImageUrl(character.referenceImagePath!)}
+                        // The API's WebP thumbnails (audit L29): the figure is at most 12rem wide.
+                        srcSet={`${referenceImageUrl(character.referenceImagePath!)}?w=320 1x, ${referenceImageUrl(character.referenceImagePath!)}?w=640 2x`}
                         alt={`Reference image of ${heading}`}
                         width={200}
                         height={300}

@@ -69,28 +69,6 @@ export const LABEL_CAPS = 'text-xs font-semibold tracking-wide text-muted upperc
 /** A quiet line under the box or in a panel: "Thinking up replies…", "Transcribing…". */
 export const PANEL_NOTE = 'mt-0 mb-1 text-md text-muted';
 
-/** 📷 Snapshot, in the icon set's line style (components/icons has no camera). Decorative. */
-export function CameraIcon({ size = 20, className }: { size?: number; className?: string }) {
-    return (
-        <svg
-            viewBox="0 0 24 24"
-            width={size}
-            height={size}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-            focusable="false"
-            className={className}
-        >
-            <path d="M4 8h3l1.5-2.5h7L17 8h3v11H4z" />
-            <circle cx="12" cy="13" r="3.5" />
-        </svg>
-    );
-}
-
 /** A small turning arc: busy, drawn still when motion is reduced (it still reads as "loading"). */
 export function Spinner({ size = 16 }: { size?: number }) {
     return (

@@ -103,7 +103,10 @@ export function useDrawerFocus(
         return () => {
             document.removeEventListener('focusin', onFocusIn);
             document.removeEventListener('keydown', onKey);
-            if ((isModal.current || inPanel) && opener?.isConnected) opener.focus();
+            if (!isModal.current && !inPanel) return;
+            // Opened from a toast, which has gone since: the Chat menu that also opens the drawer takes focus.
+            if (opener?.isConnected) opener.focus();
+            else document.querySelector<HTMLElement>('[aria-label="Chat menu"]')?.focus();
         };
     }, [panel, start]);
 }

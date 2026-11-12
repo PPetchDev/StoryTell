@@ -241,8 +241,20 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
         if (memoryId !== null) setToasts((current) => current.filter((toast) => toast.memoryId !== memoryId));
     };
 
-    /** Scrolls to a Message and outlines it, from a Memory's jump link. */
+    /**
+     * Scrolls to a Message and outlines it, from a Memory's jump link. Below 1024px the drawer is a
+     * dialog over the Chat and would hide the Message, so it closes first and the jump runs a frame later.
+     */
     const jumpTo = (messageId: number) => {
+        if (window.matchMedia('(min-width: 1024px)').matches) {
+            showMessage(messageId);
+            return;
+        }
+        setDrawer((current) => ({ ...current, open: false, focus: null }));
+        requestAnimationFrame(() => showMessage(messageId));
+    };
+
+    const showMessage = (messageId: number) => {
         if (novel) {
             showThreadAt(messageId, true);
             return;
