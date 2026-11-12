@@ -239,11 +239,13 @@ export function useReadAloud(): ReadAloudPlayer | null {
     return useContext(PlayerContext);
 }
 
-/** The part being read in this Message, for its highlight; null when it isn't being read. */
-export function useReadingNow(messageId: number): { partIndex: number; paragraph: number | null } | null {
-    const player = useReadAloud();
-    if (!player || player.messageId !== messageId || player.state === 'idle' || player.state === 'error' || !player.item) return null;
-    return { partIndex: player.item.partIndex, paragraph: player.item.paragraph };
+/**
+ * The Message being read and the part of it being read now, for its highlight; null while nothing
+ * is read out. The thread reads it once for all its Messages, so only the one being read redraws.
+ */
+export function readingNowOf(player: PlayerView | null): { messageId: number; partIndex: number; paragraph: number | null } | null {
+    if (!player || player.messageId === null || player.state === 'idle' || player.state === 'error' || !player.item) return null;
+    return { messageId: player.messageId, partIndex: player.item.partIndex, paragraph: player.item.paragraph };
 }
 
 /** ▶ Read aloud, in the action row and a tapped Message's tools. Hidden while this Message is the one being read. */

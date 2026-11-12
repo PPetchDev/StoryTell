@@ -579,6 +579,16 @@
     }
 
     /*
+     * The Chat screen makes .page a flex column (chat-screen.tsx, SCREEN); everything else in it
+     * (the banners, the nav) keeps its size, and the screen's own flex-1 wins. Elsewhere .page is no
+     * flex box and this does nothing. A plain rule on purpose (audit M32): written as
+     * `.page:has(>screen) > :not(screen)`, Chrome restyled every Message on each DOM change in the Chat.
+     */
+    .page > * {
+        flex: none;
+    }
+
+    /*
      * Desktop layout (spec: "Desktop layout"): beside the side rail, the page takes the width. A page
      * reads in a column of about 48rem; Home, the editor, the Dashboard and the Gallery (`wide`) use
      * up to 72rem.
