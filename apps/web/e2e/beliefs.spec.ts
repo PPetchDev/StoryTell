@@ -38,7 +38,7 @@ async function play(request: APIRequestContext, storyId: number, chatId: number,
 async function openMemory(page: Page): Promise<Locator> {
     await page.getByRole('button', { name: 'Chat menu' }).click();
     await page.getByRole('dialog', { name: 'Chat menu' }).getByRole('button', { name: /^Memory/ }).click();
-    const drawer = page.getByRole('complementary', { name: 'Memory' });
+    const drawer = page.getByRole('dialog', { name: 'Memory' });
     await expect(drawer).toBeVisible();
     return drawer;
 }

@@ -57,7 +57,7 @@ async function createStory(request: APIRequestContext): Promise<Fixture> {
 async function openMemory(page: Page): Promise<Locator> {
     await page.getByRole('button', { name: 'Chat menu' }).click();
     await page.getByRole('dialog', { name: 'Chat menu' }).getByRole('button', { name: /^Memory/ }).click();
-    const drawer = page.getByRole('complementary', { name: 'Memory' });
+    const drawer = page.getByRole('complementary', { name: 'Memory' }).or(page.getByRole('dialog', { name: 'Memory' }));
     await expect(drawer).toBeVisible();
     return drawer;
 }

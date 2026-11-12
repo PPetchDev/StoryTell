@@ -60,7 +60,7 @@ test('a "Memory added" toast follows a turn and opens the Memory; a hand-added M
         await expect(toast).toBeVisible();
         await expect(toast).toContainText('Ash climbed the cliff path in the storm to reach the lighthouse.');
         await toast.click();
-        const drawer = page.getByRole('complementary', { name: 'Memory' });
+        const drawer = page.getByRole('dialog', { name: 'Memory' });
         await expect(drawer).toBeVisible();
         await expect(toast).toHaveCount(0);
         const added = drawer.getByRole('listitem').filter({ hasText: 'Ash climbed the cliff path' });
@@ -119,7 +119,7 @@ test('the "Memory added" toast closes by itself after about 3 seconds, and the M
         // The Memory itself is kept.
         await page.getByRole('button', { name: 'Chat menu' }).click();
         await page.getByRole('dialog', { name: 'Chat menu' }).getByRole('button', { name: /^Memory/ }).click();
-        await expect(page.getByRole('complementary', { name: 'Memory' }).getByRole('listitem').filter({ hasText: 'Ash climbed the cliff path' })).toBeVisible();
+        await expect(page.getByRole('dialog', { name: 'Memory' }).getByRole('listitem').filter({ hasText: 'Ash climbed the cliff path' })).toBeVisible();
     } finally {
         await request.delete(`/api/stories/${storyId}`);
     }

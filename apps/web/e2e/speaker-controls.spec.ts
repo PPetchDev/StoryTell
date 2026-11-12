@@ -102,7 +102,7 @@ test("with a Character sitting out, the Memory drawer's add form starts with the
         await page.goto(`/stories/${storyId}/chats/${chatId}`);
         await page.getByRole('button', { name: 'Chat menu' }).tap();
         await page.getByRole('dialog', { name: 'Chat menu' }).getByRole('button', { name: /^Memory/ }).tap();
-        const drawer = page.getByRole('complementary', { name: 'Memory' });
+        const drawer = page.getByRole('dialog', { name: 'Memory' });
         await drawer.getByRole('button', { name: 'Add a Memory' }).click();
 
         // Both speak in the Opening, so both would be present; Mira sits out.

@@ -180,3 +180,68 @@ export function layoutMemoryGraph(
         memories: new Map([...memoryBodies].map(([id, body]) => [id, clamp(body, 2)])),
     };
 }
+
+/** A tap's nearest target needs its centre (or line) this close, in screen px: a 44px target (audit H19). */
+export const HIT_RADIUS_PX = 22;
+
+/**
+ * A Bond's line from one person to another: a quadratic curve bowed to the right of its direction,
+ * so the two Bonds between a pair bow apart rather than lying on each other. `control` is its bend.
+ */
+export function bondCurve(from: GraphPoint, to: GraphPoint): { from: GraphPoint; control: GraphPoint; to: GraphPoint } {
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const length = Math.hypot(dx, dy) || 1;
+    const bow = Math.min(22, length * 0.18);
+    return {
+        from,
+        control: { x: (from.x + to.x) / 2 - (dy / length) * bow, y: (from.y + to.y) / 2 + (dx / length) * bow },
+        to,
+    };
+}
+
+/** The curve as an SVG path. */
+export function bondCurvePath(from: GraphPoint, to: GraphPoint): string {
+    const curve = bondCurve(from, to);
+    return `M ${from.x} ${from.y} Q ${curve.control.x} ${curve.control.y} ${to.x} ${to.y}`;
+}
+
+/** Something a tap can land on: a round node (a person or a Memory dot), or a Bond's curve. */
+export type HitTarget<K> =
+    | { key: K; kind: 'circle'; at: GraphPoint; radius: number }
+    | { key: K; kind: 'curve'; from: GraphPoint; to: GraphPoint };
+
+/** How far `point` is from a target: from a circle's edge (0 inside it), or from the nearest point of a curve. */
+export function distanceTo<K>(target: HitTarget<K>, point: GraphPoint): number {
+    if (target.kind === 'circle') return Math.max(0, Math.hypot(point.x - target.at.x, point.y - target.at.y) - target.radius);
+    const { from, control, to } = bondCurve(target.from, target.to);
+    let nearest = Infinity;
+    const STEPS = 64;
+    for (let step = 0; step <= STEPS; step++) {
+        const t = step / STEPS;
+        const u = 1 - t;
+        const x = u * u * from.x + 2 * u * t * control.x + t * t * to.x;
+        const y = u * u * from.y + 2 * u * t * control.y + t * t * to.y;
+        nearest = Math.min(nearest, Math.hypot(point.x - x, point.y - y));
+    }
+    return nearest;
+}
+
+/**
+ * The target a tap at `point` means (audit H19): the nearest one whose centre, or line, is within
+ * `reach` (in graph units: 22px over the graph's scale), so every target takes a 44px tap however
+ * small it is drawn, and of two overlapping targets the one nearer the finger wins. A circle counts
+ * from its edge, so a person's large ring is reached as easily as a small dot's centre. None: null.
+ */
+export function nearestTarget<K>(targets: readonly HitTarget<K>[], point: GraphPoint, reach: number): K | null {
+    let best: { key: K; score: number } | null = null;
+    for (const target of targets) {
+        const edge = distanceTo(target, point);
+        // A dot is reached from its centre, a ring from its edge.
+        const centre = target.kind === 'circle' ? edge + target.radius : edge;
+        const limit = target.kind === 'circle' ? Math.max(reach, target.radius) : reach;
+        if (centre > limit && edge > 0) continue;
+        if (!best || edge < best.score) best = { key: target.key, score: edge };
+    }
+    return best?.key ?? null;
+}
