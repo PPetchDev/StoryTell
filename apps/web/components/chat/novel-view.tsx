@@ -1,12 +1,14 @@
 'use client';
 
-import { CSSProperties, KeyboardEvent, MouseEvent, PointerEvent, ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { CSSProperties, KeyboardEvent, MouseEvent, PointerEvent, ReactNode, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { useCastCharacter, useCharacterProfile } from '@/components/chat/character-profile';
-import { VersionSwitch } from '@/components/chat/chat-thread';
+import { ACTION, ACTION_ICON, CameraIcon, COLUMN } from '@/components/chat/chat-classes';
+import { VersionSwitch, WritingLine } from '@/components/chat/chat-thread';
 import { withActions } from '@/components/chat/message-body';
 import { ReadAloudControls, useReadAloud } from '@/components/chat/read-aloud';
 import { useShownText } from '@/components/chat/shown-text';
+import { ChevronLeftIcon, ChevronRightIcon, PencilIcon, PlayIcon, UndoIcon } from '@/components/icons';
 import { initialOf } from '@/components/portrait/character-portrait';
 import { snapshotAlt } from '@/components/snapshot/snapshot-viewer';
 import { Cast, characterColour } from '@/lib/character-colour';
@@ -17,8 +19,30 @@ import { ChatSnapshots, Snapshot, snapshotImageUrl } from '@/lib/snapshot';
 import type { SpeechItem } from '@/lib/read-aloud';
 import { STORY_TEXT_SIZE, useTextSize } from '@/lib/text-size';
 
-import threadStyles from './chat-thread.module.css';
-import styles from './novel-view.module.css';
+/*
+ * The view is a stage between the top bar and the composer, over the Backdrop (or the plain page).
+ * The speaker stands bottom-centred above the box; the box holds the words, at most 40% of the
+ * stage (30% on a PC, where the picture may stand taller), scrolling inside.
+ */
+const STAGE = [
+    'relative flex min-h-0 flex-1 flex-col pt-2',
+    'cursor-pointer select-none focus-ring-inset',
+    COLUMN,
+].join(' ');
+
+/** Back and Next, the view's own controls: 44px tall and 80px wide (audit H29). */
+const NAV_BUTTON = [
+    'bare-button inline-flex min-h-11 min-w-20 items-center justify-center gap-1 rounded-full px-3',
+    'text-md font-semibold text-muted',
+    'cursor-pointer press focus-ring',
+    'disabled:cursor-not-allowed disabled:text-faint',
+].join(' ');
+
+/** "Drawing a Snapshot…", "Snapshot failed": over the stage's corner. */
+const CHIP = 'm-0 rounded-full border px-2.5 py-0.5 text-sm font-semibold';
+
+/** The words in the box, in the story's size. */
+const STEP_TEXT = 'm-0 text-[length:var(--story-size,1.0625rem)] leading-[1.55] whitespace-pre-wrap';
 
 /** A move the Chat screen asks of the view: to the newest reply's first step (↺ Again, a version), or the Opening's (Reset). */
 export interface NovelRequest {
@@ -184,6 +208,7 @@ export function NovelView(props: NovelViewProps) {
         else if (index > 0) go(index - 1);
     };
 
+    const keysId = useId();
     const stageRef = useRef<HTMLDivElement>(null);
     useEffect(() => {
         stageRef.current?.focus({ preventScroll: true });
@@ -232,21 +257,30 @@ export function NovelView(props: NovelViewProps) {
     const failedJobs = snapshots.jobs.filter((job) => job.status === 'failed').length;
 
     const nav = (
-        <div className={styles.nav}>
-            <button type="button" className={styles.navButton} onClick={back} disabled={index <= 0 && !waiting}>
-                <span aria-hidden="true">‹ </span>Back
+        <div className={`flex justify-between gap-2 ${step?.kind === 'snapshot' ? 'mt-1.5' : ''}`}>
+            <button type="button" className={NAV_BUTTON} onClick={back} disabled={index <= 0 && !waiting}>
+                <ChevronLeftIcon size={18} />
+                Back
             </button>
-            <button type="button" className={styles.navButton} onClick={next} disabled={index >= steps.length - 1 && !writing}>
-                Next<span aria-hidden="true"> ›</span>
+            <button type="button" className={NAV_BUTTON} onClick={next} disabled={index >= steps.length - 1 && !writing}>
+                Next
+                <ChevronRightIcon size={18} />
             </button>
         </div>
     );
 
     return (
-        <section className={styles.view} style={storySize} aria-label="Visual novel view">
+        <section className="flex min-h-0 flex-1 flex-col" style={storySize} aria-label="Visual novel view">
+            <p id={keysId} hidden>
+                Next: Space, Enter or the right arrow, or a tap. Back: the left arrow.
+            </p>
             <div
                 ref={stageRef}
-                className={styles.stage}
+                className={STAGE}
+                // What it is and how it steps (audit M24): a group, named, with its keys.
+                role="group"
+                aria-label="Story stage"
+                aria-describedby={keysId}
                 data-stage=""
                 tabIndex={0}
                 onPointerDown={onPointerDown}
@@ -254,21 +288,21 @@ export function NovelView(props: NovelViewProps) {
                 onKeyDown={onKeyDown}
             >
                 {(pendingJobs > 0 || failedJobs > 0) && (
-                    <div className={styles.chips}>
+                    <div className="absolute top-2 right-0 z-raised flex flex-col items-end gap-1">
                         {pendingJobs > 0 && (
-                            <p className={styles.chip} role="status">
+                            <p className={`${CHIP} border-line bg-surface text-muted`} role="status">
                                 Drawing a Snapshot…
                             </p>
                         )}
-                        {failedJobs > 0 && <p className={`${styles.chip} ${styles.chipFailed}`}>Snapshot failed</p>}
+                        {failedJobs > 0 && <p className={`${CHIP} border-snapshot-failed-line bg-snapshot-failed-surface text-text`}>Snapshot failed</p>}
                     </div>
                 )}
                 {step?.kind === 'snapshot' ? (
                     <>
-                        <div className={styles.figure}>
+                        <div className="relative flex min-h-0 flex-1 items-end justify-center">
                             {/* eslint-disable-next-line @next/next/no-img-element -- served by the API from the image folder */}
-                            <img key={step.key} className={styles.snapshot} src={snapshotImageUrl(step.snapshot)} alt={snapshotAlt(step.snapshot)} />
-                            <button type="button" className={`button button-quiet ${styles.open}`} onClick={() => props.onOpenSnapshot(step.snapshot)}>
+                            <img key={step.key} className="block size-full object-contain motion-safe:animate-fade-in" src={snapshotImageUrl(step.snapshot)} alt={snapshotAlt(step.snapshot)} />
+                            <button type="button" className="button button-quiet absolute right-2 bottom-2" onClick={() => props.onOpenSnapshot(step.snapshot)}>
                                 Open
                             </button>
                         </div>
@@ -276,19 +310,13 @@ export function NovelView(props: NovelViewProps) {
                     </>
                 ) : (
                     <>
-                        <div className={styles.figure}>{step?.kind === 'speech' && <SpeakerPicture key={step.key} step={step} cast={props.cast} />}</div>
+                        <div className="relative flex min-h-0 flex-1 items-end justify-center">{step?.kind === 'speech' && <SpeakerPicture key={step.key} step={step} cast={props.cast} />}</div>
                         {step && (
-                            <div className={styles.boxFrame}>
-                                <section className={styles.box} aria-label="Shown line" aria-live="polite">
+                            <div className="mt-2 flex max-h-[40%] min-h-0 cursor-auto flex-col gap-1.5 rounded-xl border border-line bg-surface px-3.5 pt-3 pb-2 select-text lg:max-h-[30%]">
+                                {/* Quiet while the words on show are still streaming in, so a screen reader isn't read every piece (audit M24). */}
+                                <section className="min-h-0 overflow-y-auto overscroll-contain" aria-label="Shown line" aria-live={isLive(step) ? 'off' : 'polite'}>
                                     {waiting ? (
-                                        <p className={threadStyles.writing} role="status">
-                                            <span className={threadStyles.dots} aria-hidden="true">
-                                                <i />
-                                                <i />
-                                                <i />
-                                            </span>
-                                            Writing…
-                                        </p>
+                                        <WritingLine className="m-0" />
                                     ) : (
                                         <StepText step={step} cast={props.cast} />
                                     )}
@@ -324,15 +352,15 @@ function SpeakerPicture({ step, cast }: { step: Extract<NovelStep, { kind: 'spee
     const colour = characterColour(step.characterId, cast);
     const picture = whole ? (
         // eslint-disable-next-line @next/next/no-img-element -- served by the API from the image folder
-        <img className={styles.picture} src={whole} alt={step.speakerName} data-stage-picture="" draggable={false} />
+        <img className="block h-full max-w-full object-contain object-bottom motion-safe:animate-fade-in" src={whole} alt={step.speakerName} data-stage-picture="" draggable={false} />
     ) : (
-        <span className={styles.initial} style={{ background: colour }} role="img" aria-label={step.speakerName} data-stage-picture="">
+        <span className="grid aspect-2/3 h-[min(100%,15rem)] place-items-center rounded-xl text-[4.5rem] leading-none font-bold text-on-character motion-safe:animate-fade-in" style={{ background: colour }} role="img" aria-label={step.speakerName} data-stage-picture="">
             {initialOf(step.speakerName)}
         </span>
     );
     if (!openProfile) return picture;
     return (
-        <button type="button" className={styles.pictureButton} aria-label={`Profile of ${step.speakerName}`} onClick={openProfile}>
+        <button type="button" className="bare-button flex h-full max-w-full cursor-pointer items-end justify-center focus-ring" aria-label={`Profile of ${step.speakerName}`} onClick={openProfile}>
             {picture}
         </button>
     );
@@ -342,7 +370,7 @@ function SpeakerPicture({ step, cast }: { step: Extract<NovelStep, { kind: 'spee
 function StepText({ step, cast }: { step: Exclude<NovelStep, { kind: 'snapshot' }>; cast: Cast }) {
     if (step.kind === 'narration') {
         return (
-            <p className={`${styles.text} ${styles.narration}`} data-line="">
+            <p className={`${STEP_TEXT} italic`} data-line="">
                 {step.text}
             </p>
         );
@@ -351,10 +379,10 @@ function StepText({ step, cast }: { step: Exclude<NovelStep, { kind: 'snapshot' 
     const name = step.kind === 'user' ? step.identityName : step.speakerName;
     return (
         <>
-            <p className={styles.speaker} style={{ color: colour }} data-speaker="">
+            <p className="mt-0 mb-1 text-md font-bold" style={{ color: colour }} data-speaker="">
                 {name}
             </p>
-            <p className={styles.text} data-line="">
+            <p className={STEP_TEXT} data-line="">
                 {withActions(step.text)}
             </p>
         </>
@@ -393,7 +421,7 @@ function StepTools({ step, withRow, newestAi, isLast, blocked, onAgain, onVersio
             ) : (
                 <button
                     type="button"
-                    className={threadStyles.action}
+                    className={ACTION}
                     onClick={() => {
                         // From the item of the step on show (its part, and for narration its paragraph).
                         const from = (items: SpeechItem[]) =>
@@ -404,29 +432,33 @@ function StepTools({ step, withRow, newestAi, isLast, blocked, onAgain, onVersio
                         player.unlock();
                     }}
                 >
-                    <span aria-hidden="true">▶</span>Read aloud
+                    <PlayIcon size={16} className={ACTION_ICON} />
+                    Read aloud
                 </button>
             );
     }
     if (!withRow || !newestAi || newestAi.kind !== 'ai') {
-        return read ? <div className={styles.tools}>{read}</div> : null;
+        return read ? <div className="flex flex-wrap items-center gap-2">{read}</div> : null;
     }
     const versions = isLast ? newestAi.versions : null;
     const again = isLast && !isOpening(newestAi) && !blocked;
     return (
-        <div className={styles.tools} role="group" aria-label="Message actions">
+        <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Message actions">
             {versions && <VersionSwitch versions={versions} onVersion={(version) => onVersion(newestAi.id, version)} />}
             {again && (
-                <button type="button" className={threadStyles.action} onClick={() => onAgain(newestAi.id)}>
-                    <span aria-hidden="true">↺</span>Again
+                <button type="button" className={ACTION} onClick={() => onAgain(newestAi.id)}>
+                    <UndoIcon size={16} className={ACTION_ICON} />
+                    Again
                 </button>
             )}
-            <button type="button" className={threadStyles.action} onClick={onSnapshot}>
-                <span aria-hidden="true">📷</span>Snapshot
+            <button type="button" className={ACTION} onClick={onSnapshot}>
+                <CameraIcon size={16} className={ACTION_ICON} />
+                Snapshot
             </button>
             {read}
-            <button type="button" className={threadStyles.action} onClick={() => onEditInThread(newestAi.id)}>
-                <span aria-hidden="true">✎</span>Edit in thread
+            <button type="button" className={ACTION} onClick={() => onEditInThread(newestAi.id)}>
+                <PencilIcon size={16} className={ACTION_ICON} />
+                Edit in thread
             </button>
         </div>
     );
