@@ -156,7 +156,7 @@ async function send(page: Page, request: APIRequestContext, text: string, reply:
 async function openLoreInPlay(page: Page): Promise<Locator> {
     await page.getByRole('button', { name: 'Chat menu' }).click();
     await page.getByRole('dialog', { name: 'Chat menu' }).getByRole('button', { name: /^Memory/ }).click();
-    return page.getByRole('complementary', { name: 'Memory' }).getByRole('region', { name: 'Lore in play' });
+    return page.getByRole('dialog', { name: 'Memory' }).getByRole('region', { name: 'Lore in play' });
 }
 
 test('Stays for 4 autosaves and shows in the header; after a turn that mentions the entry and one that does not, the drawer says it stays', async ({ page, request }) => {

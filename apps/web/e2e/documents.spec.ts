@@ -163,7 +163,7 @@ async function scriptTurn(request: APIRequestContext) {
 async function openMemory(page: Page) {
     await page.getByRole('button', { name: 'Chat menu' }).click();
     await page.getByRole('dialog', { name: 'Chat menu' }).getByRole('button', { name: /^Memory/ }).click();
-    return page.getByRole('complementary', { name: 'Memory' });
+    return page.getByRole('dialog', { name: 'Memory' });
 }
 
 test('the Memory drawer lists the passages the last turn used, and says when its search failed', async ({ page, request }) => {

@@ -87,3 +87,23 @@ export function bondLine(levels: BondLevels | null): BondLineLook {
     }
     return { axis: strongest, colour: strongest === null ? BOND_NEUTRAL_COLOUR : BOND_AXIS_COLOURS[strongest], dashed: false };
 }
+
+/**
+ * Each axis's line pattern in the Memory graph, beside its colour, so the strongest feeling never
+ * rests on colour alone (audit M51: Desire and Tension differ by 1.1:1). Trust is solid.
+ */
+export const BOND_AXIS_DASHES: Record<BondAxis, string | undefined> = {
+    trust: undefined,
+    affection: '9 3 2 3',
+    desire: '1 5',
+    tension: '12 5',
+};
+
+/** A Bond with no levels yet: short even dashes, in grey. */
+export const UNMEASURED_DASH = '4 4';
+
+/** The dash pattern of a Bond's line: its strongest axis's, the unmeasured dashes, or none. */
+export function bondLineDash(look: BondLineLook): string | undefined {
+    if (look.dashed) return UNMEASURED_DASH;
+    return look.axis ? BOND_AXIS_DASHES[look.axis] : undefined;
+}

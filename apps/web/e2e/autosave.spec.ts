@@ -84,7 +84,7 @@ async function createChatWithMemory(request: APIRequestContext): Promise<{ story
 async function openMemory(page: Page): Promise<Locator> {
     await page.getByRole('button', { name: 'Chat menu' }).click();
     await page.getByRole('dialog', { name: 'Chat menu' }).getByRole('button', { name: /^Memory/ }).click();
-    const drawer = page.getByRole('complementary', { name: 'Memory' });
+    const drawer = page.getByRole('dialog', { name: 'Memory' });
     await expect(drawer).toBeVisible();
     return drawer;
 }
@@ -100,7 +100,7 @@ test('a Memory edit and a Memory add save as they are typed and are kept after a
         let drawer = await openMemory(page);
 
         // An edit.
-        const memory = drawer.getByRole('listitem', { name: `Memory ${memoryId}` });
+        const memory = drawer.locator(`li[data-memory-id="${memoryId}"]`);
         await memory.getByRole('button', { name: 'Edit' }).click();
         await memory.getByRole('textbox', { name: 'Memory text' }).fill('{user} left the grey horse at the ferry.');
         await expect(saveStatus(drawer)).toHaveText('Saved');
@@ -116,7 +116,7 @@ test('a Memory edit and a Memory add save as they are typed and are kept after a
 
         await page.reload();
         drawer = await openMemory(page);
-        await expect(drawer.getByRole('listitem', { name: `Memory ${memoryId}` })).toContainText('Ash left the grey horse at the ferry.');
+        await expect(drawer.locator(`li[data-memory-id="${memoryId}"]`)).toContainText('Ash left the grey horse at the ferry.');
         const added = drawer.getByRole('listitem').filter({ hasText: 'Ash lost the lantern on the stairs.' });
         await expect(added).toHaveCount(1);
         await expect(added).toContainText('Written by you');
@@ -137,7 +137,7 @@ test('a Memory edit that fails to save keeps its text and its editor open until 
         );
         await page.goto(`/stories/${storyId}/chats/${chatId}`);
         const drawer = await openMemory(page);
-        const memory = drawer.getByRole('listitem', { name: `Memory ${memoryId}` });
+        const memory = drawer.locator(`li[data-memory-id="${memoryId}"]`);
         await memory.getByRole('button', { name: 'Edit' }).click();
         const text = memory.getByRole('textbox', { name: 'Memory text' });
         await text.fill('{user} left the grey horse at the ferry.');

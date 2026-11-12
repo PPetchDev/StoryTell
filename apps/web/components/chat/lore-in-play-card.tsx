@@ -6,7 +6,8 @@ import { useConnection } from '@/components/connection';
 import { ApiError, ApiUnreachableError } from '@/lib/api';
 import { inPlayWords, leftOutWords, LoreInPlay, loreApi } from '@/lib/lore';
 
-import styles from './story-so-far-card.module.css';
+import { DRAWER_CARD, DRAWER_CARD_LIST, DRAWER_CARD_TITLE } from './card-look';
+import { Summary } from './disclosure';
 
 interface LoreInPlayCardProps {
     storyId: number;
@@ -47,27 +48,27 @@ export function LoreInPlayCard({ storyId, chatId, version }: LoreInPlayCardProps
     }, [storyId, chatId, version, reportUnreachable]);
 
     return (
-        <section className={styles.card} aria-labelledby={titleId}>
-            <h3 id={titleId} className={styles.title}>
+        <section className={DRAWER_CARD} aria-labelledby={titleId}>
+            <h3 id={titleId} className={DRAWER_CARD_TITLE}>
                 Lore in play
             </h3>
             {error && (
-                <p role="alert" className="turn-error">
+                <p role="alert" className="turn-error mt-0 mb-3">
                     {error}
                 </p>
             )}
             {!data ? (
-                !error && <p className="muted small">Loading…</p>
+                !error && <p className="mt-0 mb-3 text-sm text-muted">Loading…</p>
             ) : (
                 <>
                     {data.entries.length === 0 ? (
-                        <p className="muted small">None right now. An entry comes into play when its name or a keyword comes up.</p>
+                        <p className="mt-0 mb-3 text-sm text-muted">None right now. An entry comes into play when its name or a keyword comes up.</p>
                     ) : (
-                        <ul className={styles.list} aria-label="Lore entries in play">
+                        <ul className={DRAWER_CARD_LIST} aria-label="Lore entries in play">
                             {data.entries.map((entry) => (
                                 <li key={entry.id}>
                                     {entry.name.trim() || 'Untitled'}
-                                    <span className="muted small">
+                                    <span className="text-sm text-muted">
                                         {' '}
                                         · {inPlayWords(entry.why)}
                                         {entry.chance < 100 && ` · ${entry.chance}% chance`}
@@ -77,13 +78,13 @@ export function LoreInPlayCard({ storyId, chatId, version }: LoreInPlayCardProps
                         </ul>
                     )}
                     {data.leftOut.length > 0 && (
-                        <details className={styles.leftOut}>
-                            <summary>Came up but left out ({data.leftOut.length})</summary>
-                            <ul className={styles.list} aria-label="Lore entries left out">
+                        <details className="group mt-0 mb-3">
+                            <Summary className="text-md text-muted">Came up but left out ({data.leftOut.length})</Summary>
+                            <ul className="mt-1.5 mb-0 pl-5" aria-label="Lore entries left out">
                                 {data.leftOut.map((entry) => (
                                     <li key={entry.id}>
                                         {entry.name.trim() || 'Untitled'}
-                                        <span className="muted small"> · {leftOutWords(entry.why)}</span>
+                                        <span className="text-sm text-muted"> · {leftOutWords(entry.why)}</span>
                                     </li>
                                 ))}
                             </ul>

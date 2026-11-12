@@ -39,7 +39,7 @@ function speech(page: Page, name: string): { name: Locator; initial: Locator } {
 async function graphRing(page: Page, person: RegExp): Promise<Locator> {
     await page.getByRole('button', { name: 'Chat menu' }).click();
     await page.getByRole('dialog', { name: 'Chat menu' }).getByRole('button', { name: /^Memory/ }).click();
-    const drawer = page.getByRole('complementary', { name: 'Memory' });
+    const drawer = page.getByRole('dialog', { name: 'Memory' });
     await drawer.getByRole('radio', { name: 'Graph' }).tap();
     return drawer.getByRole('group', { name: 'Memory graph' }).getByRole('button', { name: person }).locator('circle').first();
 }

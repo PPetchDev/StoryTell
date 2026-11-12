@@ -54,7 +54,7 @@ async function createChatWithMemories(request: APIRequestContext): Promise<Fixtu
 async function openMemory(page: Page): Promise<Locator> {
     await page.getByRole('button', { name: 'Chat menu' }).click();
     await page.getByRole('dialog', { name: 'Chat menu' }).getByRole('button', { name: /^Memory/ }).click();
-    const drawer = page.getByRole('complementary', { name: 'Memory' });
+    const drawer = page.getByRole('dialog', { name: 'Memory' });
     await expect(drawer).toBeVisible();
     return drawer;
 }
@@ -91,7 +91,7 @@ test('the Memory graph links each Memory to the people it names; a tapped person
         const aboutMira = drawer.getByRole('region', { name: 'Memories about Mira' });
         await expect(aboutMira.getByRole('heading')).toHaveText('About Mira (1)');
         await expect(aboutMira.getByRole('listitem')).toHaveCount(1);
-        await expect(aboutMira.getByRole('listitem', { name: `Memory ${lamp}` })).toContainText('Ash gave Mira the lamp.');
+        await expect(aboutMira.locator(`li[data-memory-id="${lamp}"]`)).toContainText('Ash gave Mira the lamp.');
         await expect(aboutMira).toContainText('Faded dots are the Memory Mira doesn’t know.');
         await expect(dot(lamp)).toHaveAttribute('data-state', 'about');
         await expect(dot(boat)).toHaveAttribute('data-state', 'other');
@@ -121,7 +121,7 @@ test('a tapped Memory dot opens its card under the graph, where it is edited and
 
         await boatDot.tap();
         await expect(boatDot).toHaveAttribute('aria-pressed', 'true');
-        const card = drawer.getByRole('list', { name: 'Picked Memory' }).getByRole('listitem', { name: `Memory ${boat}` });
+        const card = drawer.getByRole('list', { name: 'Picked Memory' }).locator(`li[data-memory-id="${boat}"]`);
         await expect(card).toContainText('Jonah mended the boat.');
 
         // An edit that names Mira links the dot to her too, and locks the Memory.

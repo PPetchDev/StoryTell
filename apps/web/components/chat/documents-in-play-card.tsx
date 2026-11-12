@@ -6,7 +6,7 @@ import { useConnection } from '@/components/connection';
 import { ApiError, ApiUnreachableError } from '@/lib/api';
 import { DocumentsInPlay, documentsApi } from '@/lib/documents';
 
-import styles from './story-so-far-card.module.css';
+import { DRAWER_CARD, DRAWER_CARD_LIST, DRAWER_CARD_TITLE } from './card-look';
 
 interface DocumentsInPlayCardProps {
     storyId: number;
@@ -46,30 +46,32 @@ export function DocumentsInPlayCard({ storyId, chatId, version }: DocumentsInPla
         };
     }, [storyId, chatId, version, reportUnreachable]);
 
-    if (!error && !data?.hasDocuments) return null;
+    // While it loads it says so, like the Lore card, rather than appearing later and pushing the drawer down (audit L37).
+    if (data && !error && !data.hasDocuments) return null;
     return (
-        <section className={styles.card} aria-labelledby={titleId}>
-            <h3 id={titleId} className={styles.title}>
+        <section className={DRAWER_CARD} aria-labelledby={titleId}>
+            <h3 id={titleId} className={DRAWER_CARD_TITLE}>
                 Documents in play
             </h3>
             {error && (
-                <p role="alert" className="turn-error">
+                <p role="alert" className="turn-error mt-0 mb-3">
                     {error}
                 </p>
             )}
+            {!data && !error && <p className="mt-0 mb-3 text-sm text-muted">Loading…</p>}
             {data &&
                 (data.status === 'failed' ? (
-                    <p className="muted small">The last turn&apos;s search failed, so it used no Documents.</p>
+                    <p className="mt-0 mb-3 text-sm text-muted">The last turn&apos;s search failed, so it used no Documents.</p>
                 ) : data.status === 'none' ? (
-                    <p className="muted small">No turn has looked in the Documents yet.</p>
+                    <p className="mt-0 mb-3 text-sm text-muted">No turn has looked in the Documents yet.</p>
                 ) : data.passages.length === 0 ? (
-                    <p className="muted small">None close enough to the last turn.</p>
+                    <p className="mt-0 mb-3 text-sm text-muted">None close enough to the last turn.</p>
                 ) : (
-                    <ul className={styles.list} aria-label="Document passages in play">
+                    <ul className={DRAWER_CARD_LIST} aria-label="Document passages in play">
                         {data.passages.map((passage) => (
                             <li key={`${passage.documentId}:${passage.position}`}>
                                 <strong>{passage.documentTitle.trim() || 'Untitled'}</strong>
-                                <span className="muted small"> · {passage.excerpt}</span>
+                                <span className="text-sm text-muted"> · {passage.excerpt}</span>
                             </li>
                         ))}
                     </ul>
