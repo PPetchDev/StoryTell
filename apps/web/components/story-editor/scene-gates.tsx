@@ -1,12 +1,12 @@
 'use client';
 
-import { useId } from 'react';
+import { useId, useRef } from 'react';
 
 import { BOND_AXES, BOND_AXIS_NAMES, BOND_AXIS_RANGE, BondAxis } from '@/lib/bonds';
 import { Character, Role, SceneBondGate } from '@/lib/story';
 import { BondLevelField } from './bond-level-field';
-import fieldStyles from './fields.module.css';
-import styles from './story-editor.module.css';
+import { FIELD, FIELD_HEAD, FIELD_HINT, FIELD_INPUT, FIELD_LABEL } from './fields';
+import { UndoNotice, useUndo } from './undo-notice';
 
 interface SceneGatesProps {
     gates: SceneBondGate[];
@@ -29,13 +29,13 @@ function nameOf(cast: Character[], characterId: number): string {
 function SelectField({ label, value, options, onChange }: { label: string; value: string; options: Array<{ value: string; label: string }>; onChange(value: string): void }) {
     const id = useId();
     return (
-        <div className={fieldStyles.field}>
-            <div className={fieldStyles.head}>
-                <span className={fieldStyles.label}>
+        <div className={FIELD}>
+            <div className={FIELD_HEAD}>
+                <span className={FIELD_LABEL}>
                     <label htmlFor={id}>{label}</label>
                 </span>
             </div>
-            <select id={id} className={fieldStyles.input} value={value} onChange={(event) => onChange(event.target.value)}>
+            <select id={id} className={FIELD_INPUT} value={value} onChange={(event) => onChange(event.target.value)}>
                 {options.map((option) => (
                     <option key={option.value} value={option.value}>
                         {option.label}
@@ -68,11 +68,23 @@ export function SceneGates({ gates, cast, role, onChange }: SceneGatesProps) {
     const roleName = role.name.trim() === '' ? 'the Role' : `${role.name} (the Role)`;
     const replace = (index: number, gate: SceneBondGate) => onChange(gates.map((other, at) => (at === index ? gate : other)));
     const addable = nextGate(gates, cast);
+    const box = useRef<HTMLDivElement>(null);
+    const undo = useUndo();
+    // One tap removes a gate; Undo puts the list back as it was (audit H3).
+    const remove = (index: number) => {
+        const before = gates;
+        onChange(gates.filter((_, at) => at !== index));
+        undo.offer({
+            message: `Removed Bond gate ${index + 1}.`,
+            undo: () => onChange(before),
+            focusAfterUndo: () => box.current?.querySelector<HTMLElement>(`[aria-label="Remove gate ${index + 1}"]`),
+        });
+    };
 
     return (
-        <div className={styles.gates} role="group" aria-label="Bond gates">
-            <p className={styles.gatesTitle}>Bond gates</p>
-            <p className={fieldStyles.hint}>
+        <div ref={box} className="mt-1 border-t border-line pt-3" role="group" aria-label="Bond gates">
+            <h3 className="m-0 mb-1 text-md font-bold">Bond gates</h3>
+            <p className={FIELD_HINT}>
                 Optional. The Scene also waits until each of these feelings has grown this far, so it can move on when a relationship is ready.
             </p>
             {gates.map((gate, index) => {
@@ -81,8 +93,8 @@ export function SceneGates({ gates, cast, role, onChange }: SceneGatesProps) {
                     ...cast.filter((other) => other.id !== gate.fromCharacterId).map((other) => ({ value: String(other.id), label: nameOf(cast, other.id) })),
                 ];
                 return (
-                    <div key={index} className={styles.gate} role="group" aria-label={`Bond gate ${index + 1}`}>
-                        <div className={styles.gateFields}>
+                    <div key={index} className="my-3 rounded-md border border-line p-3" role="group" aria-label={`Bond gate ${index + 1}`}>
+                        <div className="grid grid-cols-[repeat(auto-fit,minmax(9rem,1fr))] items-start gap-x-3">
                             <SelectField
                                 label="Character"
                                 value={String(gate.fromCharacterId)}
@@ -113,18 +125,20 @@ export function SceneGates({ gates, cast, role, onChange }: SceneGatesProps) {
                         </div>
                         <button
                             type="button"
-                            className="button button-quiet button-small"
-                            onClick={() => onChange(gates.filter((_, at) => at !== index))}
+                            className="button button-quiet button-small mt-3"
+                            aria-label={`Remove gate ${index + 1}`}
+                            onClick={() => remove(index)}
                         >
                             Remove gate
                         </button>
                     </div>
                 );
             })}
+            <UndoNotice undo={undo} />
             {cast.length === 0 ? (
-                <p className={fieldStyles.hint}>Add a Character first, on the Characters tab.</p>
+                <p className={FIELD_HINT}>Add a Character first, on the Characters tab.</p>
             ) : (
-                <button type="button" className="button button-quiet" disabled={addable === null} onClick={() => addable && onChange([...gates, addable])}>
+                <button type="button" className="button button-quiet mt-2" disabled={addable === null} onClick={() => addable && onChange([...gates, addable])}>
                     Add Bond gate
                 </button>
             )}

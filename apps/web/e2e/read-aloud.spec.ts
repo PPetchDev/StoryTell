@@ -92,20 +92,20 @@ test.describe('voices in the Story editor', () => {
         const sample = page.getByRole('button', { name: 'Sample Narration voice' });
         await sample.click();
         await expect(page.getByRole('button', { name: 'Playing Narration voice: tap to stop' })).toHaveText('Playing…');
-        await expect(sample).toHaveText('▶ Sample');
+        await expect(sample).toHaveText('Sample');
         expect(await speechCalls(request)).toEqual([
             { kind: 'voice_preview', text: 'The lamp went out an hour ago, and the sea kept talking.', voice: 'am_adam' },
         ]);
 
         await sample.click();
         await expect(page.getByRole('button', { name: 'Playing Narration voice: tap to stop' })).toBeVisible();
-        await expect(sample).toHaveText('▶ Sample');
+        await expect(sample).toHaveText('Sample');
         expect(await speechCalls(request)).toHaveLength(1);
 
         // "Same as narration" samples the Narration voice: kept, so no call either.
         await page.getByRole('tab', { name: /^Characters/ }).click();
         await page.getByRole('button', { name: 'Sample Speaking voice' }).click();
-        await expect(page.getByRole('button', { name: 'Sample Speaking voice' })).toHaveText('▶ Sample');
+        await expect(page.getByRole('button', { name: 'Sample Speaking voice' })).toHaveText('Sample');
         expect(await speechCalls(request)).toHaveLength(1);
     });
 
@@ -300,7 +300,8 @@ test.describe('reading a Message aloud', () => {
         await expectNoOverflow(page, tools);
         // ✎ Edit · ▶ · ไทย · ⑂, in that order, some of them maybe behind ⋯.
         const names = await tools.getByRole('button').evaluateAll((buttons) => buttons.map((button) => button.textContent));
-        expect(names.filter((name) => name !== '⋯')).toEqual(['✎Edit', '▶Read aloud', 'ไทย', '⑂Branch'].slice(0, names.filter((name) => name !== '⋯').length));
+        // The glyphs are SVG icons now (audit M10), so the words alone, and ⋯ has no text.
+        expect(names.filter((name) => name !== '')).toEqual(['Edit', 'Read aloud', 'ไทย', 'Branch'].slice(0, names.filter((name) => name !== '').length));
         await tapAction(tools, 'Read aloud');
         await expect(opening.getByRole('group', { name: 'Reading aloud' })).toBeVisible();
         await expectNoOverflow(page, opening.getByRole('group', { name: 'Reading aloud' }));

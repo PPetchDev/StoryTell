@@ -4,10 +4,10 @@ import { useState } from 'react';
 
 import { FoldTitle, useFoldedState } from '@/components/fold/fold-button';
 import { Autosave } from '@/components/story-editor/autosave';
+import { ConfirmButton } from '@/components/story-editor/fields';
 import { apiSend } from '@/lib/api';
 import { PlayModelOption, SamplerOption, SamplerParam, SamplerValues, SettingsResponse } from '@/lib/types';
-
-import styles from './sampling-fold.module.css';
+import { useLaterError } from '@/lib/use-settled';
 
 const FOLD_KEY = 'settings.samplingOpen';
 
@@ -55,7 +55,7 @@ function SamplerField({
     onSaved(value: number | undefined): void;
 }) {
     const [text, setText] = useState(initial === undefined ? '' : String(initial));
-    const [error, setError] = useState<string | null>(null);
+    const [error, setError] = useLaterError();
     const { label, explanation } = SAMPLER_TEXT[option.param];
     const id = `sampler-${option.param}`;
     const key = samplerKey(model, option.param);
@@ -151,8 +151,9 @@ export function SamplingFold({
         void autosave.commit(() => apiSend<SettingsResponse>('PUT', `/settings/samplers/${model}`, ALL_DEFAULT), keepTyped);
     };
 
+    // Between the Play model and the Snapshot model: kept apart from the next field.
     return (
-        <div className={styles.sampling}>
+        <div className="mt-1 mb-5 border-b border-line pb-4">
             <FoldTitle foldKey={FOLD_KEY} controls="sampling-body" startsFolded>
                 Sampling
             </FoldTitle>
@@ -174,14 +175,16 @@ export function SamplingFold({
                         />
                     ))}
                 </div>
-                <button
-                    type="button"
-                    className="button button-quiet button-small"
+                {/* It clears all four at once, so it asks first (audit L23). */}
+                <ConfirmButton
+                    label="Reset to defaults"
+                    question={`Blank all four for ${option.label}?`}
+                    confirmLabel="Reset"
                     disabled={Object.keys(current).length === 0}
-                    onClick={reset}
-                >
-                    Reset to defaults
-                </button>
+                    onConfirm={reset}
+                    // The button is disabled once all four are blank: focus goes to the first field.
+                    focusAfter={() => document.getElementById(`sampler-${option.samplers[0]?.param}`)}
+                />
             </div>
         </div>
     );

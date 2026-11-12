@@ -1,5 +1,3 @@
-import { CSSProperties } from 'react';
-
 import type { Portrait } from '@/lib/character-colour';
 
 import { PortraitImage } from './portrait-image';
@@ -24,18 +22,10 @@ export function CharacterPortrait({ name, colour, portrait, light = false, class
     if (portrait) return <PortraitImage portrait={portrait} className={className} />;
     return (
         <span
-            className={className}
-            style={
-                {
-                    display: 'grid',
-                    placeItems: 'center',
-                    borderRadius: '999px',
-                    fontWeight: 700,
-                    lineHeight: 1,
-                    background: colour,
-                    color: light ? 'var(--accent-text)' : 'var(--on-character)',
-                } as CSSProperties
-            }
+            className={['grid place-items-center rounded-full leading-none font-bold', light ? 'text-accent-text' : 'text-on-character', className]
+                .filter(Boolean)
+                .join(' ')}
+            style={{ background: colour }}
             aria-hidden="true"
         >
             {initialOf(name)}

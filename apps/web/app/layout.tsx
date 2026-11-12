@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 
+import { Announcer } from '@/components/announcer';
 import { BottomNav } from '@/components/bottom-nav/bottom-nav';
 import { ConnectionBoundary } from '@/components/connection';
 import { LowCreditBanner } from '@/components/low-credit-banner';
@@ -18,8 +19,10 @@ export const metadata: Metadata = {
 };
 
 // The theme colour and colour scheme are not set here: the head script below makes the theme-color
-// meta for the theme in use before the first paint (Chat looks ticket 02).
-export const viewport: Viewport = {};
+// meta for the theme in use before the first paint (Chat looks ticket 02). viewport-fit=cover lets
+// env(safe-area-inset-*) answer the notch and the home bar on an iPhone, and the page shrinks above
+// an on-screen keyboard instead of being covered by it (audit M6).
+export const viewport: Viewport = { viewportFit: 'cover', interactiveWidget: 'resizes-content' };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
     return (
@@ -32,6 +35,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <body>
                 <ThemeSync />
                 <ServiceWorkerRegistration />
+                <Announcer />
                 <ConnectionBoundary>
                     <LowCreditBanner />
                     {children}

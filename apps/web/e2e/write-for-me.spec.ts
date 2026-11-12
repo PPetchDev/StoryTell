@@ -53,7 +53,7 @@ test('✍️ turns a Thai draft into the scripted English, Undo gives the Thai b
         const composer = page.getByRole('form', { name: 'Composer' });
         const box = composer.getByRole('textbox', { name: 'Write as Ash' });
         const pen = composer.getByRole('toolbar', { name: 'Composer tools' }).getByRole('button', { name: 'Write for me' });
-        const undo = composer.getByRole('button', { name: '↶ Undo' });
+        const undo = composer.getByRole('button', { name: 'Undo', exact: true });
 
         await box.fill(THAI);
         await expect(undo).toHaveCount(0);
@@ -109,7 +109,7 @@ test('✍️ on an empty box writes from nothing, and Undo empties the box again
         await expect(box).toHaveValue(FROM_NOTHING);
         await expect(composer.getByRole('button', { name: 'Send' })).toBeEnabled();
 
-        await composer.getByRole('button', { name: '↶ Undo' }).tap();
+        await composer.getByRole('button', { name: 'Undo', exact: true }).tap();
         await expect(box).toHaveValue('');
         await expect(composer.getByRole('button', { name: 'Continue' })).toBeVisible();
     } finally {
@@ -133,7 +133,7 @@ test('a failed ✍️ says so and leaves the draft; a second tap while it waits 
         await pen.tap();
         await expect(failed).toBeVisible();
         await expect(box).toHaveValue(THAI);
-        await expect(composer.getByRole('button', { name: '↶ Undo' })).toHaveCount(0);
+        await expect(composer.getByRole('button', { name: 'Undo', exact: true })).toHaveCount(0);
 
         // Cancelled: the answer comes, but the draft stays and the box is free again.
         const release = await holdWrites(page, storyId, chatId);
@@ -147,7 +147,7 @@ test('a failed ✍️ says so and leaves the draft; a second tap while it waits 
         release();
         expect((await answered).ok()).toBe(true);
         await expect(box).toHaveValue(THAI);
-        await expect(composer.getByRole('button', { name: '↶ Undo' })).toHaveCount(0);
+        await expect(composer.getByRole('button', { name: 'Undo', exact: true })).toHaveCount(0);
     } finally {
         await request.delete(`/api/stories/${storyId}`);
     }
@@ -163,7 +163,7 @@ test('✍️ on a result hides Undo while it writes again, and the new Undo give
         const composer = page.getByRole('form', { name: 'Composer' });
         const box = composer.getByRole('textbox', { name: 'Write as Ash' });
         const pen = composer.getByRole('button', { name: 'Write for me' });
-        const undo = composer.getByRole('button', { name: '↶ Undo' });
+        const undo = composer.getByRole('button', { name: 'Undo', exact: true });
 
         await box.fill(THAI);
         await pen.tap();

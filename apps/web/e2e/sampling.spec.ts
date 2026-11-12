@@ -115,6 +115,7 @@ test('min-p and top-p save and survive a reload; Reset blanks every field and sa
     expect(stored.settings.samplers).toEqual({ 'glm-5.3': { minP: 0.05, topP: 0.9 } });
 
     await page.getByRole('button', { name: 'Reset to defaults' }).click();
+    await page.getByRole('group', { name: /Blank all four/ }).getByRole('button', { name: 'Reset' }).click();
     for (const label of ['Temperature', 'Min-p', 'Top-p', 'Repetition penalty']) {
         await expect(page.getByLabel(label, { exact: true })).toHaveValue('');
     }
@@ -134,6 +135,7 @@ test('Reset also drops an edit still waiting to be sent', async ({ page, request
 
     await page.getByLabel('Temperature').fill('1.1');
     await page.getByRole('button', { name: 'Reset to defaults' }).click();
+    await page.getByRole('group', { name: /Blank all four/ }).getByRole('button', { name: 'Reset' }).click();
 
     await saved(page);
     await page.waitForTimeout(1000);

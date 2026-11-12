@@ -1,13 +1,18 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
+import { announce } from '@/components/announcer';
 import { bondDirection, GraphBond, GraphSelection, MemoryGraph, memoriesAbout, personName } from '@/components/chat/memory-graph';
 import { BeliefsSection } from '@/components/chat/beliefs-section';
+import { Summary } from '@/components/chat/disclosure';
 import { DocumentsInPlayCard } from '@/components/chat/documents-in-play-card';
 import { LoreInPlayCard } from '@/components/chat/lore-in-play-card';
 import { StorySoFarCard } from '@/components/chat/story-so-far-card';
+import { useDocked, useDrawerFocus } from '@/components/chat/use-drawer-focus';
 import { useConnection } from '@/components/connection';
+import { CloseIcon, LockIcon } from '@/components/icons';
+import { ErrorState, Loading } from '@/components/query-state';
 import { Autosave, useAutosave } from '@/components/story-editor/autosave';
 import { ConfirmButton } from '@/components/story-editor/fields';
 import { SaveStatus } from '@/components/story-editor/save-status';
@@ -36,11 +41,25 @@ const memoryGraphBonds = devicePreference<boolean>({
     serialise: (on) => (on ? 'on' : null),
 });
 
-/** "Show Bonds", a switch beside the List / Graph choice. */
+/** A Memory list's look: no bullets, the cards 14px apart. */
+const MEMORY_LIST = 'mt-4 mb-0 grid list-none gap-3.5 p-0';
+
+/** "Show Bonds", a switch beside the List / Graph choice: its track reads 3:1 when off (L34), and it slides only with motion on (M33). */
 function ShowBondsSwitch({ on, onChange }: { on: boolean; onChange(on: boolean): void }) {
     return (
-        <button type="button" role="switch" aria-checked={on} className="memory-bonds-switch" onClick={() => onChange(!on)}>
-            <span className="memory-bonds-switch-track" aria-hidden="true" />
+        <button
+            type="button"
+            role="switch"
+            aria-checked={on}
+            className="group bare-button inline-flex min-h-11 flex-none items-center gap-2 rounded-sm px-1 text-md text-text"
+            onClick={() => onChange(!on)}
+        >
+            <span
+                aria-hidden="true"
+                className="relative h-5 w-9 rounded-full border border-field-line bg-quiet-fill group-aria-checked:border-accent-fill group-aria-checked:bg-accent-fill motion-safe:transition-colors motion-safe:duration-base"
+            >
+                <span className="absolute top-0.5 left-0.5 size-3.5 rounded-full bg-text group-aria-checked:translate-x-4 group-aria-checked:bg-accent-text motion-safe:transition-transform motion-safe:duration-base" />
+            </span>
             Show Bonds
         </button>
     );
@@ -51,11 +70,11 @@ const VIEW_KINDS: readonly { kind: MemoryViewKind; label: string }[] = [
     { kind: 'graph', label: 'Graph' },
 ];
 
-/** List or Graph, as a two-choice radio group; arrow keys move between them. */
+/** List or Graph, as a two-choice radio group; arrow keys move between them. Each half is 44px tall (H30). */
 function MemoryViewSwitch({ value, onChange }: { value: MemoryViewKind; onChange(kind: MemoryViewKind): void }) {
     return (
         <div
-            className="memory-view-switch"
+            className="my-3 flex min-w-0 flex-1 rounded-md border border-field-line bg-bg p-0.5"
             role="radiogroup"
             aria-label="Show Memories as"
             onKeyDown={(event) => {
@@ -75,6 +94,7 @@ function MemoryViewSwitch({ value, onChange }: { value: MemoryViewKind; onChange
                     aria-checked={kind === value}
                     tabIndex={kind === value ? 0 : -1}
                     onClick={() => onChange(kind)}
+                    className="bare-button min-h-11 flex-1 rounded-sm text-center text-md text-muted press aria-checked:bg-accent-fill aria-checked:font-semibold aria-checked:text-accent-text"
                 >
                     {label}
                 </button>
@@ -92,8 +112,8 @@ interface KnownByPickerProps {
 /** One checkbox per Character, for who knows the Memory. */
 function KnownByPicker({ cast, value, onChange }: KnownByPickerProps) {
     return (
-        <fieldset className="known-by-picker">
-            <legend className="muted small">Known by</legend>
+        <fieldset className="m-0 flex flex-wrap gap-2 border-0 p-0">
+            <legend className="mb-1 p-0 text-sm text-muted">Known by</legend>
             {cast.map((character) => (
                 <label key={character.id} className="chip chip-pick">
                     <input
@@ -137,6 +157,7 @@ function MemoryEditor({ label, cast, initialText, initialKnownBy, autosave, save
     const [text, setText] = useState(initialText);
     const [knownBy, setKnownBy] = useState(initialKnownBy);
     const [closing, setClosing] = useState(false);
+    const textId = useId();
     const errorId = useId();
     // A new Memory starts empty; only clearing an existing one's text is an error.
     const emptied = text.trim() === '' && initialText !== '';
@@ -165,22 +186,26 @@ function MemoryEditor({ label, cast, initialText, initialKnownBy, autosave, save
     };
 
     return (
-        <div className="memory-form" role="group" aria-label={label}>
-            <textarea
-                aria-label="Memory text"
-                placeholder="What happened, or what was learned. Write {user} for yourself."
-                value={text}
-                rows={3}
-                autoFocus
-                aria-invalid={emptied}
-                aria-describedby={emptied ? errorId : undefined}
-                onChange={(event) => change(event.target.value, knownBy)}
-            />
-            {emptied && (
-                <p id={errorId} role="alert" className="field-error">
-                    A Memory needs some text. Use Delete to forget it.
-                </p>
-            )}
+        <div className="my-3 grid gap-2" role="group" aria-label={label}>
+            {/* A label you can see, over the box (audit M55). */}
+            <div className="field my-0">
+                <label htmlFor={textId}>Memory text</label>
+                <textarea
+                    id={textId}
+                    placeholder="What happened, or what was learned. Write {user} for yourself."
+                    value={text}
+                    rows={3}
+                    autoFocus
+                    aria-invalid={emptied}
+                    aria-describedby={emptied ? errorId : undefined}
+                    onChange={(event) => change(event.target.value, knownBy)}
+                />
+                {emptied && (
+                    <p id={errorId} role="alert" className="field-error">
+                        A Memory needs some text. Use Delete to forget it.
+                    </p>
+                )}
+            </div>
             <KnownByPicker cast={cast} value={knownBy} onChange={(next) => change(text, next)} />
             <div className="toolbar">
                 <button type="button" className="button button-small" disabled={closing} onClick={done}>
@@ -240,6 +265,11 @@ function NewMemory({ list, storyId, chatId, autosave, onAdded, onSaved, onDone }
     );
 }
 
+/** The opening words of a Memory, to tell its buttons apart from the next one's (audit M11). */
+function memoryGist(text: string): string {
+    return text.length <= 40 ? text : `${text.slice(0, 40).trimEnd()}…`;
+}
+
 interface MemoryViewProps {
     list: MemoryList;
     memory: Memory;
@@ -250,29 +280,38 @@ interface MemoryViewProps {
     autosave: Autosave;
     sendEdit(text: string, knownBy: number[]): Promise<Memory>;
     onSaved(memory: Memory): void;
-    onDelete(): void;
+    onDelete(): Promise<unknown>;
     onRestore(): void;
     onUnlock(): void;
     onJump(messageId: number): void;
+    /** Where focus goes once this Memory is deleted: the next one, or the drawer's heading. */
+    focusAfter(): HTMLElement | null | undefined;
 }
 
 /**
  * One Memory (spec: "Memory drawer"): its text with `{user}` rendered, Known-by chips, who
  * wrote it, a lock when locked, and a jump to the causing Message. Edit locks it.
  */
-function MemoryView({ list, memory, highlighted, inPlay, busy, autosave, sendEdit, onSaved, onDelete, onRestore, onUnlock, onJump }: MemoryViewProps) {
+function MemoryView({ list, memory, highlighted, inPlay, busy, autosave, sendEdit, onSaved, onDelete, onRestore, onUnlock, onJump, focusAfter }: MemoryViewProps) {
     const [editing, setEditing] = useState(false);
     const nameOf = (id: number) => list.cast.find((character) => character.id === id)?.name ?? 'a removed Character';
-    const label = `Memory ${memory.id}`;
+    const text = renderUser(memory.text, list.identityName);
+    const gist = memoryGist(text);
     return (
         <li
             id={`memory-${memory.id}`}
-            className={highlighted ? 'memory memory-highlight' : 'memory'}
-            aria-label={label}
+            data-memory-id={memory.id}
+            className={[
+                'rounded-lg bg-surface px-4 py-3.5',
+                // The Memory a "Memory added" toast opened on.
+                highlighted && 'memory-highlight outline-2 outline-offset-2 outline-accent',
+            ]
+                .filter(Boolean)
+                .join(' ')}
         >
             {editing ? (
                 <MemoryEditor
-                    label={`Edit ${label}`}
+                    label="Edit Memory"
                     cast={list.cast}
                     initialText={memory.text}
                     initialKnownBy={memory.knownBy}
@@ -284,8 +323,8 @@ function MemoryView({ list, memory, highlighted, inPlay, busy, autosave, sendEdi
                 />
             ) : (
                 <>
-                    <p className="message-text">{renderUser(memory.text, list.identityName)}</p>
-                    <p className="memory-chips">
+                    <p className="mt-0 mb-2 whitespace-pre-wrap">{text}</p>
+                    <p className="mt-0 mb-2 flex flex-wrap gap-2">
                         {memory.knownBy.length === 0 ? (
                             <span className="chip chip-muted">Known by no one</span>
                         ) : (
@@ -296,13 +335,19 @@ function MemoryView({ list, memory, highlighted, inPlay, busy, autosave, sendEdi
                             ))
                         )}
                     </p>
-                    <p className="muted small memory-meta">
+                    <p className="mt-0 mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
                         <span>{memory.writtenBy === 'ai' ? 'Written by the AI' : 'Written by you'}</span>
-                        {memory.locked && <span className="memory-lock">🔒 Locked</span>}
-                        {inPlay && <span className="memory-in-play">In play</span>}
+                        {memory.locked && (
+                            <span className="inline-flex items-center gap-1 text-event">
+                                <LockIcon size={14} strokeWidth={2} />
+                                Locked
+                            </span>
+                        )}
+                        {inPlay && <span className="font-semibold text-accent">In play</span>}
                         {memory.messageId !== null && (
                             <a
                                 href={`#message-${memory.messageId}`}
+                                className="inline-flex min-h-11 items-center"
                                 onClick={(event) => {
                                     event.preventDefault();
                                     onJump(memory.messageId!);
@@ -314,25 +359,33 @@ function MemoryView({ list, memory, highlighted, inPlay, busy, autosave, sendEdi
                     </p>
                     <div className="toolbar">
                         {memory.archived ? (
-                            <button type="button" className="button button-quiet button-small" disabled={busy} onClick={onRestore}>
+                            <button type="button" className="button button-quiet button-small" disabled={busy} onClick={onRestore} aria-label={`Restore ${gist}`}>
                                 Restore
                             </button>
                         ) : (
-                            <button type="button" className="button button-quiet button-small" disabled={busy} onClick={() => setEditing(true)}>
+                            <button
+                                type="button"
+                                className="button button-quiet button-small"
+                                disabled={busy}
+                                onClick={() => setEditing(true)}
+                                aria-label={`Edit ${gist}`}
+                            >
                                 Edit
                             </button>
                         )}
                         {memory.locked && !memory.archived && (
-                            <button type="button" className="button button-quiet button-small" disabled={busy} onClick={onUnlock}>
+                            <button type="button" className="button button-quiet button-small" disabled={busy} onClick={onUnlock} aria-label={`Unlock ${gist}`}>
                                 Unlock
                             </button>
                         )}
                         <ConfirmButton
                             label="Delete"
+                            ariaLabel={`Delete ${gist}`}
                             danger
                             question="Delete this Memory? The Characters forget it for good."
                             confirmLabel="Delete"
                             onConfirm={onDelete}
+                            focusAfter={focusAfter}
                             disabled={busy}
                         />
                     </div>
@@ -360,16 +413,41 @@ export interface MemoryDrawerProps {
 }
 
 /**
+ * The panel: below 768px it covers the screen, clear of the notch and the home bar (audit H5);
+ * from 768px a 26rem panel over a scrim; from 1024px it docks beside the Chat, which makes room
+ * (memory.css). `memory-drawer` is the hook that rule finds.
+ */
+const PANEL = [
+    'memory-drawer fixed inset-0 z-drawer overflow-y-auto overscroll-contain bg-bg',
+    'px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))]',
+    'md:left-auto md:w-[26rem] md:border-l md:border-line md:px-5 md:pt-[max(1.25rem,env(safe-area-inset-top))] md:shadow-[-0.5rem_0_1.5rem_var(--shadow)]',
+    'lg:w-[28rem] lg:bg-[color-mix(in_srgb,var(--surface)_30%,var(--bg))] lg:shadow-none',
+].join(' ');
+
+/**
  * The Memory drawer on the Chat screen (spec: "Memory drawer"): every Memory with its text,
  * Known-by chips, author, lock and jump-to-Message link; Archived in a collapsed section;
  * add, edit (which locks), delete, restore (which locks), unlock. Adds and edits save as they are
  * typed, with the status in the drawer's header (spec: "Saving"). Opens from the Chat head and
  * from a "Memory added" toast, which lands on that Memory.
+ *
+ * Below 1024px it is a dialog over the Chat (audit H4, M54): focus moves in, Escape and Close
+ * leave, the Chat behind is inert, and focus goes back to what opened it. From 1024px it docks
+ * beside the Chat as a complementary panel, and the Chat stays in use.
  */
 export function MemoryDrawer({ storyId, chatId, focusMemoryId, version, onClose, onJump, portraits, bonds = [], sittingOut = [] }: MemoryDrawerProps) {
     const { reportUnreachable } = useConnection();
     const autosave = useAutosave();
+    const docked = useDocked();
+    const root = useRef<HTMLDivElement>(null);
+    const panel = useRef<HTMLDivElement>(null);
+    const heading = useRef<HTMLHeadingElement>(null);
+    const addButton = useRef<HTMLButtonElement>(null);
+    const pickRef = useRef<HTMLDivElement>(null);
+    const headingId = useId();
     const [list, setList] = useState<MemoryList | null>(null);
+    const [loadError, setLoadError] = useState<Error | null>(null);
+    const [reloads, setReloads] = useState(0);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [adding, setAdding] = useState(false);
@@ -384,28 +462,47 @@ export function MemoryDrawer({ storyId, chatId, focusMemoryId, version, onClose,
      * that person is picked, so editing a name out of a Memory does not close it mid-edit.
      */
     const [pickedAbout, setPickedAbout] = useState<ReadonlySet<number>>(new Set());
+
+    useDrawerFocus(root, panel, heading, onClose, !docked);
+
+    /**
+     * A pick in the graph. What it opens under the graph comes into view and is said (audit M52),
+     * so a tap or Enter on a node that opens something out of sight is never silent.
+     */
     const select = (next: GraphSelection) => {
         setSelection(next);
-        if (next?.kind === 'person' && list) {
-            const active = list.memories.filter((memory) => !memory.archived);
-            setPickedAbout(new Set(memoriesAbout(active, list, next.person).map((memory) => memory.id)));
+        if (!list) return;
+        const active = list.memories.filter((memory) => !memory.archived);
+        if (next?.kind === 'person') {
+            const about = memoriesAbout(active, list, next.person);
+            setPickedAbout(new Set(about.map((memory) => memory.id)));
+            const name = personName(list, next.person);
+            announce(`${name}: ${about.length === 1 ? 'one Memory' : `${about.length} Memories`} about them, below the graph.`);
+        } else if (next?.kind === 'memory') announce('The Memory is open below the graph.');
+        else if (next?.kind === 'bond') announce(`${bondDirection(list, next)} is shown below the graph.`);
+        if (next) {
+            requestAnimationFrame(() => {
+                const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                pickRef.current?.scrollIntoView({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
+            });
         }
     };
 
     useEffect(() => {
         let cancelled = false;
+        setLoadError(null);
         memoryApi.list(storyId, chatId).then(
             (data) => !cancelled && setList(data),
             (caught: unknown) => {
                 if (cancelled) return;
                 if (caught instanceof ApiUnreachableError) reportUnreachable();
-                else setError(caught instanceof ApiError ? caught.message : 'Could not load the Memory.');
+                else setLoadError(caught instanceof ApiError ? caught : new Error('Could not load the Memory.'));
             },
         );
         return () => {
             cancelled = true;
         };
-    }, [storyId, chatId, version, reportUnreachable]);
+    }, [storyId, chatId, version, reloads, reportUnreachable]);
 
     useEffect(() => {
         if (!list || focusMemoryId === null || focusedRef.current === focusMemoryId) return;
@@ -427,7 +524,6 @@ export function MemoryDrawer({ storyId, chatId, focusMemoryId, version, onClose,
                     : [...current.memories, memory],
             };
         });
-
 
     /** Delete or restore, after any edits still waiting, then the list re-read as the API has it. */
     const write = async (work: () => Promise<unknown>) => {
@@ -454,16 +550,24 @@ export function MemoryDrawer({ storyId, chatId, focusMemoryId, version, onClose,
         return saved;
     };
 
-    const closeNew = () => {
+    const closeNew = useCallback(() => {
         setAdding(false);
         setAddedId(null);
-    };
+    }, []);
 
     const shown = list?.memories.filter((memory) => memory.id !== addedId) ?? [];
     const active = shown.filter((memory) => !memory.archived);
     const archived = shown.filter((memory) => memory.archived);
 
-    const view = (shownList: MemoryList) => (memory: Memory) => (
+    /** After a delete, focus goes to the Memory that took its place in the same list, or the drawer's heading (audit H2). */
+    const focusAfterDelete = (siblings: readonly Memory[], memory: Memory) => {
+        const at = siblings.findIndex((each) => each.id === memory.id);
+        const next = siblings[at + 1] ?? siblings[at - 1];
+        return () =>
+            (next && panel.current?.querySelector<HTMLElement>(`[data-memory-id="${next.id}"] button`)) || addButton.current || heading.current;
+    };
+
+    const view = (shownList: MemoryList, siblings: readonly Memory[]) => (memory: Memory) => (
         <MemoryView
             key={memory.id}
             list={shownList}
@@ -474,10 +578,11 @@ export function MemoryDrawer({ storyId, chatId, focusMemoryId, version, onClose,
             autosave={autosave}
             sendEdit={(text, knownBy) => memoryApi.edit(storyId, chatId, memory.id, { text, knownBy })}
             onSaved={saved}
-            onDelete={() => void write(() => memoryApi.remove(storyId, chatId, memory.id))}
+            onDelete={() => write(() => memoryApi.remove(storyId, chatId, memory.id))}
             onRestore={() => void write(() => memoryApi.restore(storyId, chatId, memory.id))}
             onUnlock={() => void write(() => memoryApi.unlock(storyId, chatId, memory.id))}
             onJump={onJump}
+            focusAfter={focusAfterDelete(siblings, memory)}
         />
     );
 
@@ -501,10 +606,10 @@ export function MemoryDrawer({ storyId, chatId, focusMemoryId, version, onClose,
             if (bond) {
                 const direction = bondDirection(shownList, bond);
                 return (
-                    <section className="memory-graph-pick" aria-label={direction}>
-                        <h3>{direction}</h3>
-                        <p className="bond-label">{bond.label}</p>
-                        <p className="muted small">{bond.levels ? bondLevelsInWords(bond.levels) : 'Not measured yet'}</p>
+                    <section aria-label={direction}>
+                        <h3 className="mt-0 mb-1 text-base">{direction}</h3>
+                        <p className="m-0 font-bold text-accent">{bond.label}</p>
+                        <p className="mt-1 mb-0 text-sm text-muted">{bond.levels ? bondLevelsInWords(bond.levels) : 'Not measured yet'}</p>
                     </section>
                 );
             }
@@ -512,8 +617,8 @@ export function MemoryDrawer({ storyId, chatId, focusMemoryId, version, onClose,
         const picked = selection?.kind === 'memory' ? active.find((memory) => memory.id === selection.id) : undefined;
         if (picked) {
             return (
-                <ul className="memory-list" aria-label="Picked Memory">
-                    {view(shownList)(picked)}
+                <ul className={MEMORY_LIST} aria-label="Picked Memory">
+                    {view(shownList, [picked])(picked)}
                 </ul>
             );
         }
@@ -524,117 +629,136 @@ export function MemoryDrawer({ storyId, chatId, focusMemoryId, version, onClose,
             const unknown =
                 selection.person === 'user' ? 0 : active.filter((memory) => !memory.knownBy.includes(selection.person as number)).length;
             return (
-                <section className="memory-graph-pick" aria-label={`Memories about ${name}`}>
-                    <h3>
+                <section aria-label={`Memories about ${name}`}>
+                    <h3 className="mt-0 mb-1 text-base">
                         About {name} ({about.length})
                     </h3>
                     {unknown > 0 && (
-                        <p className="muted small">
+                        <p className="m-0 text-sm text-muted">
                             Faded dots are the {unknown === 1 ? 'Memory' : `${unknown} Memories`} {name} doesn’t know.
                         </p>
                     )}
                     {about.length === 0 ? (
-                        <p className="muted">No Memory names {name} yet.</p>
+                        <p className="mt-2 mb-0 text-muted">No Memory names {name} yet.</p>
                     ) : (
-                        <ul className="memory-list">{about.map(view(shownList))}</ul>
+                        <ul className={MEMORY_LIST}>{about.map(view(shownList, about))}</ul>
                     )}
                 </section>
             );
         }
-        return <p className="muted small">Tap a person to see the Memories about them, or a dot to open one Memory.</p>;
+        return <p className="m-0 text-sm text-muted">Tap a person to see the Memories about them, or a dot to open one Memory.</p>;
     };
 
     return (
-        <aside className="memory-drawer" aria-label="Memory">
-            <div className="memory-drawer-head">
-                <h2>Memory</h2>
-                {list && <SaveStatus state={autosave.state} />}
-                <button type="button" className="button button-quiet button-small" onClick={onClose}>
-                    Close
-                </button>
-            </div>
-            <p className="muted small">
-                What the Characters remember of this Chat. Each one knows only the Memories it is tagged on. Editing a Memory
-                locks it from AI changes.
-            </p>
-            {error && (
-                <p role="alert" className="turn-error">
-                    {error}
+        <div ref={root} className="contents">
+            {/* From 768px the panel leaves the Chat in sight: a scrim says it is out of reach until the drawer closes. */}
+            {!docked && <div aria-hidden="true" className="fixed inset-0 z-drawer hidden bg-scrim md:block" onClick={onClose} />}
+            <div
+                ref={panel}
+                className={PANEL}
+                role={docked ? 'complementary' : 'dialog'}
+                aria-modal={docked ? undefined : true}
+                aria-labelledby={headingId}
+            >
+                <div className="mb-2 flex items-center justify-between gap-2">
+                    <h2 ref={heading} id={headingId} tabIndex={-1} className="m-0 text-xl font-bold">
+                        Memory
+                    </h2>
+                    {list && <SaveStatus state={autosave.state} />}
+                    <button type="button" className="button button-quiet gap-1.5 px-3" onClick={onClose}>
+                        <CloseIcon size={18} />
+                        Close
+                    </button>
+                </div>
+                <p className="mt-0 mb-4 text-sm text-muted">
+                    What the Characters remember of this Chat. Each one knows only the Memories it is tagged on. Editing a Memory
+                    locks it from AI changes.
                 </p>
-            )}
-            {list?.lockedWarning && (
-                <p role="note" className="memory-locked-warning">
-                    {LOCKED_WARNING}
-                </p>
-            )}
-            {!list ? (
-                <p className="muted">Loading…</p>
-            ) : (
-                <>
-                    {adding ? (
-                        <NewMemory
-                            list={list}
-                            storyId={storyId}
-                            chatId={chatId}
-                            autosave={autosave}
-                            onAdded={setAddedId}
-                            onSaved={saved}
-                            onDone={closeNew}
-                        />
+                {error && (
+                    <p role="alert" className="turn-error mt-0">
+                        {error}
+                    </p>
+                )}
+                {list?.lockedWarning && (
+                    <p role="note" className="my-2 rounded-sm border-l-3 border-event bg-quiet-fill px-3 py-2">
+                        {LOCKED_WARNING}
+                    </p>
+                )}
+                {!list ? (
+                    loadError ? (
+                        <ErrorState error={loadError} title="Couldn't load the Memory." onRetry={() => setReloads((count) => count + 1)} />
                     ) : (
-                        <button type="button" className="button button-small" disabled={busy} onClick={() => setAdding(true)}>
-                            Add a Memory
-                        </button>
-                    )}
-                    <StorySoFarCard storyId={storyId} chatId={chatId} version={version} />
-                    <LoreInPlayCard storyId={storyId} chatId={chatId} version={version} />
-                    <DocumentsInPlayCard storyId={storyId} chatId={chatId} version={version} />
-                    <div className="memory-view-row">
-                        <MemoryViewSwitch value={viewKind} onChange={memoryViewKind.set} />
-                        {viewKind === 'graph' && <ShowBondsSwitch on={showBonds} onChange={memoryGraphBonds.set} />}
-                    </div>
-                    {active.length === 0 ? (
-                        <p className="muted">Nothing remembered yet.</p>
-                    ) : viewKind === 'graph' ? (
-                        <>
-                            <MemoryGraph
+                        <Loading label="Loading the Memory…" />
+                    )
+                ) : (
+                    <>
+                        {adding ? (
+                            <NewMemory
                                 list={list}
-                                memories={active}
-                                selected={selection}
-                                onSelect={select}
-                                portraits={portraits}
-                                bonds={graphBonds(list)}
+                                storyId={storyId}
+                                chatId={chatId}
+                                autosave={autosave}
+                                onAdded={setAddedId}
+                                onSaved={saved}
+                                onDone={closeNew}
                             />
-                            {graphPick(list)}
-                        </>
-                    ) : (
-                        <ul className="memory-list" aria-label="Memories">
-                            {active.map(view(list))}
-                        </ul>
-                    )}
-                    {viewKind === 'graph' && archived.length > 0 && (
-                        <p className="muted small">
-                            Archived Memories ({archived.length}) are left out of the graph. List shows them.
-                        </p>
-                    )}
-                    {viewKind === 'list' && archived.length > 0 && (
-                        <details className="memory-archived">
-                            <summary>Archived ({archived.length})</summary>
-                            <ul className="memory-list" aria-label="Archived Memories">
-                                {archived.map(view(list))}
+                        ) : (
+                            <button ref={addButton} type="button" className="button button-small" disabled={busy} onClick={() => setAdding(true)}>
+                                Add a Memory
+                            </button>
+                        )}
+                        <StorySoFarCard storyId={storyId} chatId={chatId} version={version} />
+                        <LoreInPlayCard storyId={storyId} chatId={chatId} version={version} />
+                        <DocumentsInPlayCard storyId={storyId} chatId={chatId} version={version} />
+                        <div className="flex items-center gap-3">
+                            <MemoryViewSwitch value={viewKind} onChange={memoryViewKind.set} />
+                            {viewKind === 'graph' && <ShowBondsSwitch on={showBonds} onChange={memoryGraphBonds.set} />}
+                        </div>
+                        {active.length === 0 ? (
+                            <p className="mt-0 text-muted">Nothing remembered yet.</p>
+                        ) : viewKind === 'graph' ? (
+                            <>
+                                <MemoryGraph
+                                    list={list}
+                                    memories={active}
+                                    selected={selection}
+                                    onSelect={select}
+                                    portraits={portraits}
+                                    bonds={graphBonds(list)}
+                                />
+                                <div ref={pickRef} className="scroll-mb-4">
+                                    {graphPick(list)}
+                                </div>
+                            </>
+                        ) : (
+                            <ul className={MEMORY_LIST} aria-label="Memories">
+                                {active.map(view(list, active))}
                             </ul>
-                        </details>
-                    )}
-                    <BeliefsSection
-                        list={list}
-                        busy={busy}
-                        onAdd={(fields) => writeBelief(() => beliefApi.add(storyId, chatId, fields))}
-                        onEdit={(beliefId, fields) => writeBelief(() => beliefApi.edit(storyId, chatId, beliefId, fields))}
-                        onDelete={(beliefId) => void writeBelief(() => beliefApi.remove(storyId, chatId, beliefId))}
-                        onJump={onJump}
-                    />
-                </>
-            )}
-        </aside>
+                        )}
+                        {viewKind === 'graph' && archived.length > 0 && (
+                            <p className="mt-3 mb-0 text-sm text-muted">
+                                Archived Memories ({archived.length}) are left out of the graph. List shows them.
+                            </p>
+                        )}
+                        {viewKind === 'list' && archived.length > 0 && (
+                            <details className="group mt-4">
+                                <Summary className="text-muted">Archived ({archived.length})</Summary>
+                                <ul className={MEMORY_LIST} aria-label="Archived Memories">
+                                    {archived.map(view(list, archived))}
+                                </ul>
+                            </details>
+                        )}
+                        <BeliefsSection
+                            list={list}
+                            busy={busy}
+                            onAdd={(fields) => writeBelief(() => beliefApi.add(storyId, chatId, fields))}
+                            onEdit={(beliefId, fields) => writeBelief(() => beliefApi.edit(storyId, chatId, beliefId, fields))}
+                            onDelete={(beliefId) => writeBelief(() => beliefApi.remove(storyId, chatId, beliefId))}
+                            onJump={onJump}
+                        />
+                    </>
+                )}
+            </div>
+        </div>
     );
 }

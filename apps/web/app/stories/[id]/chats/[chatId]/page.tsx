@@ -6,6 +6,7 @@ import { use } from 'react';
 import { CharacterProfiles } from '@/components/chat/character-profile';
 import { ChatScreen } from '@/components/chat/chat-screen';
 import { useApiQuery } from '@/components/connection';
+import { ErrorState, Loading } from '@/components/query-state';
 import { portraitsOf } from '@/lib/character-colour';
 import { Chat } from '@/lib/chat';
 import { Story } from '@/lib/story';
@@ -16,18 +17,21 @@ export default function ChatPage({ params }: { params: Promise<{ id: string; cha
     // The cast's order picks each Character's colour; it loads alongside, so colours never flicker.
     const story = useApiQuery<Story>(`/stories/${id}`);
 
+    // A skeleton while the Chat and its Story load, and the reason with Try again if the Chat can't be (audit M9).
     if (chat.status === 'loading' || story.status === 'loading') {
         return (
             <main>
-                <p className="muted">Loading…</p>
+                <Loading label="Loading the Chat…" lines={4} />
             </main>
         );
     }
     if (chat.status === 'error') {
         return (
             <main>
-                <p role="alert">{chat.error.message}</p>
-                <Link href={`/stories/${id}/chats`}>Back to Chats</Link>
+                <ErrorState error={chat.error} title="Couldn't open this Chat." onRetry={chat.retry} />
+                <Link href={`/stories/${id}/chats`} className="inline-flex min-h-11 items-center">
+                    Back to Chats
+                </Link>
             </main>
         );
     }

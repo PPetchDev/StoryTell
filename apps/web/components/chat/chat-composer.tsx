@@ -1,16 +1,29 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent, ReactNode, RefObject, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { FormEvent, ReactNode, RefObject, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 
+import { COLUMN, ICON_BUTTON, LABEL_CAPS, PANEL_NOTE, SEND_BUTTON } from '@/components/chat/chat-classes';
 import { useConnection } from '@/components/connection';
+import { PencilIcon, PlayIcon, StopIcon, UndoIcon } from '@/components/icons';
 import { ApiUnreachableError } from '@/lib/api';
 import { backgroundNotice, Chat, chatApi, SuggestedReply } from '@/lib/chat';
 import { insertSavedReply, SavedReply, TraySavedReply } from '@/lib/saved-replies';
-import { DictateButton, DictationStatus, hasDictationStatus, RecordingBar, useDictation } from './dictation';
+import { DictateButton, dictationNote, hasDictationStatus, RecordingBar, useDictation } from './dictation';
 import { SavedRepliesTray } from './saved-replies-tray';
 
-import styles from './chat-composer.module.css';
+/**
+ * A status region that is there from the first paint and fills when it has something to say
+ * (audit L12): a region mounted already holding its words is often never read. Empty, it takes
+ * no room.
+ */
+function Status({ children, className }: { children: ReactNode; className?: string }) {
+    return (
+        <div role="status" className={className}>
+            {children}
+        </div>
+    );
+}
 
 interface NoticesProps {
     chat: Chat;
@@ -21,38 +34,45 @@ interface NoticesProps {
     retrying: boolean;
 }
 
-/** What stands between the user and the next turn, if anything. */
+/** What stands between the user and the next turn, if anything: each in a region of its own, mounted throughout. */
 function Notices({ chat, failedSnapshots, onRetryBackground, retrying }: NoticesProps) {
     // One notice, in plain words, for everything that didn't save; one Retry reruns all of it.
     const failed = backgroundNotice(chat, failedSnapshots);
     return (
         <>
-            {failed && (
-                <p className="notice" role="status">
-                    {failed}{' '}
-                    <button type="button" className="button button-quiet" disabled={retrying} onClick={onRetryBackground}>
-                        {retrying ? 'Retrying…' : 'Retry'}
-                    </button>
-                </p>
-            )}
-            {!chat.playable && (
-                <p className="notice" role="status">
-                    Sending is blocked: the Story has empty fields. Still to fill in:{' '}
-                    {chat.missing.map((field) => field.label).join(', ')}.{' '}
-                    <Link href={`/stories/${chat.storyId}`}>Edit Story</Link>
-                </p>
-            )}
-            {chat.textCreditOut && (
-                <p className="notice" role="status">
-                    Sending is blocked: text credit is used up. <Link href="/usage">See usage</Link>
-                </p>
-            )}
-            {chat.drift && (
-                <p className="notice" role="status">
-                    Drift notice: the last reply came from {chat.drift.lastModelLabel}; the play model is now{' '}
-                    {chat.drift.playModelLabel}. Characters may sound different from here on.
-                </p>
-            )}
+            <Status>
+                {failed && (
+                    <p className="notice">
+                        {failed}{' '}
+                        <button type="button" className="button button-quiet" disabled={retrying} onClick={onRetryBackground}>
+                            {retrying ? 'Retrying…' : 'Retry'}
+                        </button>
+                    </p>
+                )}
+            </Status>
+            <Status>
+                {!chat.playable && (
+                    <p className="notice">
+                        Sending is blocked: the Story has empty fields. Still to fill in: {chat.missing.map((field) => field.label).join(', ')}.{' '}
+                        <Link href={`/stories/${chat.storyId}`}>Edit Story</Link>
+                    </p>
+                )}
+            </Status>
+            <Status>
+                {chat.textCreditOut && (
+                    <p className="notice">
+                        Sending is blocked: text credit is used up. <Link href="/usage">See usage</Link>
+                    </p>
+                )}
+            </Status>
+            <Status>
+                {chat.drift && (
+                    <p className="notice">
+                        Drift notice: the last reply came from {chat.drift.lastModelLabel}; the play model is now {chat.drift.playModelLabel}. Characters
+                        may sound different from here on.
+                    </p>
+                )}
+            </Status>
         </>
     );
 }
@@ -187,54 +207,28 @@ function useWriteForMe(
     return { status, toggle, cancel, dismiss, offered, restore };
 }
 
-/** The panel's Write for me line: the wait, or the failure. */
-function WriteForMeStatus({ status }: { status: Writing }) {
-    if (status === 'writing') {
-        return (
-            <p className={styles.suggesting} role="status">
-                Writing for you…
-            </p>
-        );
-    }
-    if (status === 'failed') {
-        return (
-            <p role="alert" className="turn-error">
-                Couldn&apos;t write it, try again
-            </p>
-        );
-    }
-    return null;
-}
-
 const SUGGESTION_KIND_LABEL: Record<SuggestedReply['kind'], string> = {
     action: 'Do',
     speech: 'Say',
     move: 'Bold move',
 };
 
-/** Above the box: the wait, the error, or the three cards. A tap on a card only fills the box. */
+const SUGGESTION_CARD = [
+    'bare-button flex w-full flex-col gap-0.5',
+    'rounded-lg border border-field-line bg-surface px-3 py-2',
+    'text-left text-note leading-snug text-text',
+    'cursor-pointer press focus-ring active:bg-surface-raised',
+].join(' ');
+
+/** Above the box: the three cards. A tap on a card only fills the box. The wait and a failure are the panel's lines. */
 function SuggestionCards({ suggestions, onPick }: { suggestions: Suggestions; onPick(text: string): void }) {
-    if (suggestions.status === 'loading') {
-        return (
-            <p className={styles.suggesting} role="status">
-                Thinking up replies…
-            </p>
-        );
-    }
-    if (suggestions.status === 'failed') {
-        return (
-            <p role="alert" className="turn-error">
-                Couldn&apos;t suggest replies, try again
-            </p>
-        );
-    }
     if (suggestions.status !== 'ready') return null;
     return (
-        <ul className={styles.suggestions} aria-label="Suggested replies">
+        <ul className="m-0 mb-1 flex list-none flex-col gap-2 p-0" aria-label="Suggested replies">
             {suggestions.replies.map((reply) => (
                 <li key={reply.kind}>
-                    <button type="button" className={styles.card} onClick={() => onPick(reply.text)}>
-                        <span className={styles.cardKind}>{SUGGESTION_KIND_LABEL[reply.kind]}</span>
+                    <button type="button" className={SUGGESTION_CARD} onClick={() => onPick(reply.text)}>
+                        <span className={LABEL_CAPS}>{SUGGESTION_KIND_LABEL[reply.kind]}</span>
                         <span>{reply.text}</span>
                     </button>
                 </li>
@@ -310,6 +304,26 @@ function enterSends(): boolean {
     return window.matchMedia('(any-pointer: fine)').matches;
 }
 
+/** A pointer press that leaves focus where it was: the box keeps it, and a phone keeps its keyboard up. */
+const keepFocus = (event: { preventDefault(): void }) => event.preventDefault();
+
+/** ■ Stop, in the send button's place while a reply is written: quieter, so it reads as "end", not "go". */
+const STOP_BUTTON = [
+    'bare-button grid shrink-0 place-items-center',
+    'size-11 rounded-full bg-surface-raised inset-ring inset-ring-muted',
+    'text-text',
+    'cursor-pointer press focus-ring',
+].join(' ');
+
+/** The box: one row that grows to about five lines, then scrolls; 1rem text keeps a phone from zooming in. */
+const BOX = [
+    'min-w-0 flex-1 resize-none overflow-y-auto',
+    'max-h-[calc(5*1.4em_+_1rem_+_2px)]',
+    'rounded-2xl border border-field-line bg-surface px-3.5 py-2',
+    'font-[inherit] text-base leading-[1.4] text-text',
+    'focus-ring',
+].join(' ');
+
 interface ChatComposerProps {
     chat: Chat;
     draft: string;
@@ -337,7 +351,11 @@ interface ChatComposerProps {
     characterRow?: (writingForMe: boolean) => ReactNode;
 }
 
-/** Under the thread: what blocks or failed, and the box the user writes in. */
+/**
+ * Under the thread: what blocks or failed, and the box the user writes in. The box stays
+ * writable while a reply is written (audit H8): the next line can be drafted, only sending
+ * waits, and focus never leaves it for Send or comes back to nothing after a turn.
+ */
 export function ChatComposer({
     chat,
     draft,
@@ -357,6 +375,7 @@ export function ChatComposer({
     characterRow,
 }: ChatComposerProps) {
     const box = useAutoGrow(draft);
+    const boxId = useId();
     const suggestions = useSuggestedReplies(chat);
     const tray = useSavedRepliesTray(chat);
     /** Whether the box has been focused since the Chat opened: until then a Saved reply goes at the end. */
@@ -367,6 +386,7 @@ export function ChatComposer({
     const dictation = useDictation(chat.storyId, chat.id, draft, onDraft);
     /** A recording or its transcription is under way: ⚡ and ✍️ wait, and the box takes nothing new. */
     const dictating = dictation.active;
+    const micRef = useRef<HTMLButtonElement>(null);
     // .scratch/dictation/spec.md: 🎤 waits like the box does, and says why when the Venice pool is out.
     const micDisabledReason = chat.imageCreditOut
         ? 'Venice credit is used up'
@@ -374,10 +394,12 @@ export function ChatComposer({
           ? 'Wait for the current write to finish'
           : null;
     const empty = draft.trim() === '';
+    /** Sending waits on every write in flight (audit M28), not only on a turn. */
+    const cantSend = writing || busy || blocked || writingForMe || dictating;
     const send = (event: FormEvent) => {
         event.preventDefault();
         // Enter on an empty box does nothing; only a tap on ▶ lets the story go on.
-        if (empty || writingForMe || dictating) return;
+        if (empty || cantSend) return;
         suggestions.close();
         tray.setOpen(false);
         onSend();
@@ -394,40 +416,113 @@ export function ChatComposer({
             el.setSelectionRange(caret, caret);
         });
     };
+
+    // Whether the user was last in the composer: a tap anywhere else, or focus elsewhere, says not.
+    const footerRef = useRef<HTMLElement>(null);
+    const ownsFocus = useRef(false);
+    useEffect(() => {
+        const onDown = (event: Event) => {
+            if (!footerRef.current?.contains(event.target as Node)) ownsFocus.current = false;
+        };
+        document.addEventListener('pointerdown', onDown, true);
+        document.addEventListener('focusin', onDown, true);
+        return () => {
+            document.removeEventListener('pointerdown', onDown, true);
+            document.removeEventListener('focusin', onDown, true);
+        };
+    }, []);
+
+    // A turn that ends with focus nowhere (■ Stop or ▶ went with it) gives it back to the box (audit H8).
+    const wasWriting = useRef(writing);
+    useEffect(() => {
+        const ended = wasWriting.current && !writing;
+        wasWriting.current = writing;
+        if (!ended || !ownsFocus.current) return;
+        const active = document.activeElement;
+        if (!active || active === document.body) box.current?.focus({ preventScroll: true });
+    }, [writing, box]);
+
+    // The recording bar going (Done, Cancel) hands focus back to 🎤 (audit H9), not the box, which would raise a phone's keyboard.
+    const wasRecording = useRef(dictation.recording);
+    useEffect(() => {
+        const ended = wasRecording.current && !dictation.recording;
+        wasRecording.current = dictation.recording;
+        if (!ended) return;
+        requestAnimationFrame(() => {
+            const active = document.activeElement;
+            if (!active || active === document.body) micRef.current?.focus({ preventScroll: true });
+        });
+    }, [dictation.recording]);
+
+    // The panel holds one thing at a time: dictation's line, then Write for me's, then the tray, then ⚡'s cards.
+    const panel = hasDictationStatus(dictation) ? 'dictation' : writer.status !== 'idle' ? 'writer' : tray.open ? 'tray' : 'suggestions';
+    const panelStatus =
+        panel === 'dictation'
+            ? dictationNote(dictation)
+            : panel === 'writer'
+              ? writer.status === 'writing'
+                  ? 'Writing for you…'
+                  : null
+              : panel === 'suggestions' && suggestions.shown.status === 'loading'
+                ? 'Thinking up replies…'
+                : null;
+    const panelAlert =
+        panel === 'dictation' && dictation.phase.kind === 'failed' ? (
+            <p role="alert" className="turn-error">
+                {dictation.phase.message}{' '}
+                <button type="button" className="button button-quiet" onClick={dictation.retry}>
+                    Retry
+                </button>{' '}
+                <button type="button" className="button button-quiet" onClick={dictation.discard}>
+                    Discard
+                </button>
+            </p>
+        ) : panel === 'writer' && writer.status === 'failed' ? (
+            <p role="alert" className="turn-error">
+                Couldn&apos;t write it, try again
+            </p>
+        ) : panel === 'suggestions' && suggestions.shown.status === 'failed' ? (
+            <p role="alert" className="turn-error">
+                Couldn&apos;t suggest replies, try again
+            </p>
+        ) : null;
+
     return (
-        <footer className={styles.composer}>
-            {rollback && (
-                <p className="notice rollback-notice" role="status">
-                    {rollback}
-                </p>
-            )}
+        <footer
+            ref={footerRef}
+            className={`shrink-0 border-t border-line bg-bg pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] ${COLUMN}`}
+            onFocus={(event) => {
+                ownsFocus.current = footerRef.current?.contains(event.target as Node) ?? false;
+            }}
+        >
+            <Status>{rollback && <p className="notice border-rollback-line bg-rollback-surface">{rollback}</p>}</Status>
             <Notices chat={chat} failedSnapshots={failedSnapshots} onRetryBackground={onRetryBackground} retrying={busy} />
             {error && (
                 <p role="alert" className="turn-error">
                     {error}
                 </p>
             )}
-            {chat.awaitingReply && !writing && (
-                <p className="notice" role="status">
-                    The last turn failed. Your message is kept.{' '}
-                    <button type="button" className="button button-quiet" disabled={blocked} onClick={onRetry}>
-                        Retry
-                    </button>
-                </p>
-            )}
+            <Status>
+                {chat.awaitingReply && !writing && (
+                    <p className="notice">
+                        The last turn failed. Your message is kept.{' '}
+                        <button type="button" className="button button-quiet" disabled={blocked} onClick={onRetry}>
+                            Retry
+                        </button>
+                    </p>
+                )}
+            </Status>
             {snapshotError && (
                 <p role="alert" className="turn-error">
                     {snapshotError}
                 </p>
             )}
             {/* Integration, "The composer, top to bottom": panel · Character row · tool row · box row. */}
-            <form className={styles.form} onSubmit={send} aria-label="Composer">
-                {/* Band 1, the panel: one thing at a time. */}
-                {hasDictationStatus(dictation) ? (
-                    <DictationStatus dictation={dictation} />
-                ) : writer.status !== 'idle' ? (
-                    <WriteForMeStatus status={writer.status} />
-                ) : tray.open ? (
+            <form className="flex flex-col gap-1" onSubmit={send} aria-label="Composer">
+                {/* Band 1, the panel: one thing at a time. Its status line is a region of its own, there throughout. */}
+                <Status>{panelStatus && <p className={PANEL_NOTE}>{panelStatus}</p>}</Status>
+                {panelAlert}
+                {panel === 'tray' && (
                     <SavedRepliesTray
                         storyId={chat.storyId}
                         lines={tray.lines}
@@ -436,19 +531,18 @@ export function ChatComposer({
                         onPick={pickSavedReply}
                         onSaved={tray.saved}
                     />
-                ) : (
-                    <SuggestionCards suggestions={suggestions.shown} onPick={onDraft} />
                 )}
+                {panel === 'suggestions' && <SuggestionCards suggestions={suggestions.shown} onPick={onDraft} />}
                 {/* Band 2: the Nudge Portraits plug in here; it takes no height while empty. */}
-                <div className={styles.characters} data-band="characters">
+                <div className="empty:hidden" data-band="characters">
                     {characterRow?.(writingForMe || dictating)}
                 </div>
-                {/* Band 3: small round tools, left-aligned, and a quiet text button at the right end. */}
-                <div className={styles.tools} role="toolbar" aria-label="Composer tools">
+                {/* Band 3: round tools, 44px and 8px apart (audit H28), and at the right end who the box writes as (L14). */}
+                <div className="flex min-w-0 items-center gap-2" role="toolbar" aria-label="Composer tools">
                     {/* Spec: "Suggested replies". Asks only when tapped, so they never spend credit unasked. */}
                     <button
                         type="button"
-                        className={styles.tool}
+                        className={ICON_BUTTON}
                         aria-label="Suggest replies"
                         title="Suggest replies"
                         aria-pressed={suggestions.shown.status !== 'closed'}
@@ -467,7 +561,7 @@ export function ChatComposer({
                     {/* .scratch/write-for-me/spec.md: the draft, Thai or notes or nothing, becomes the worn identity's next Message. A second tap cancels. */}
                     <button
                         type="button"
-                        className={styles.tool}
+                        className={ICON_BUTTON}
                         aria-label="Write for me"
                         title="Write for me"
                         aria-pressed={writingForMe}
@@ -478,21 +572,18 @@ export function ChatComposer({
                             void writer.toggle();
                         }}
                     >
-                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                            <path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17v3z" />
-                            <path d="M14.5 7.5l3 3" />
-                        </svg>
+                        <PencilIcon size={20} />
                     </button>
                     {/* .scratch/saved-replies-and-replace-rules/spec.md: lines kept for this Story or all; opening it closes ⚡'s cards. */}
                     <button
                         type="button"
-                        className={styles.tool}
+                        className={ICON_BUTTON}
                         aria-label="Saved replies"
                         title="Saved replies"
                         aria-pressed={tray.open}
                         disabled={dictation.recording}
                         // Keep the box's caret, where a Saved reply goes in.
-                        onPointerDown={(event) => event.preventDefault()}
+                        onPointerDown={keepFocus}
                         onClick={() => {
                             writer.dismiss();
                             suggestions.close();
@@ -506,12 +597,12 @@ export function ChatComposer({
                     {/* Wraps the selection in *…* (an action, shown in italics), or opens an empty pair at the caret. */}
                     <button
                         type="button"
-                        className={styles.tool}
+                        className={ICON_BUTTON}
                         aria-label="Write an action"
                         title="Action: *like this*"
                         disabled={writing || blocked || writingForMe || dictating}
                         // Keep the box's focus and selection: a tap on a button would otherwise take them.
-                        onPointerDown={(event) => event.preventDefault()}
+                        onPointerDown={keepFocus}
                         onClick={() => {
                             const el = box.current;
                             if (!el) return;
@@ -527,12 +618,22 @@ export function ChatComposer({
                             <path d="M12 4v16M5.1 8l13.8 8M5.1 16l13.8-8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                         </svg>
                     </button>
-                    <span className={styles.toolsEnd} data-slot="tools-end">
+                    <span className="ml-auto flex min-w-0 items-center gap-2" data-slot="tools-end">
                         {/* Only while the box holds exactly what ✍️ wrote; puts the draft back, empty included. */}
                         {writer.offered && (
-                            <button type="button" className={styles.undo} onClick={writer.restore}>
-                                ↶ Undo
+                            <button
+                                type="button"
+                                className="bare-button inline-flex min-h-11 shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-2.5 text-md text-muted press focus-ring"
+                                onClick={writer.restore}
+                            >
+                                <UndoIcon size={16} />
+                                Undo
                             </button>
+                        )}
+                        {!dictation.recording && (
+                            <label htmlFor={boxId} className="truncate text-xs text-muted">
+                                Write as {chat.identityName}
+                            </label>
                         )}
                     </span>
                 </div>
@@ -540,61 +641,67 @@ export function ChatComposer({
                 {dictation.recording ? (
                     <RecordingBar dictation={dictation} />
                 ) : (
-                <div className={styles.boxRow}>
-                    <textarea
-                        ref={box}
-                        aria-label={`Write as ${chat.identityName}`}
-                        placeholder={`Write as ${chat.identityName}…`}
-                        value={draft}
-                        rows={1}
-                        disabled={writing || blocked}
-                        readOnly={writingForMe || dictating}
-                        onChange={(event) => onDraft(event.target.value)}
-                        onFocus={() => {
-                            boxFocused.current = true;
-                        }}
-                        onKeyDown={(event) => {
-                            if (event.key !== 'Enter' || event.shiftKey || !enterSends()) return;
-                            // An Enter that confirms an input method's word (Thai, say) only confirms it; Safari reports it as 229.
-                            if (event.nativeEvent.isComposing || event.keyCode === 229) return;
-                            event.preventDefault();
-                            event.currentTarget.form?.requestSubmit();
-                        }}
-                    />
-                    {/* .scratch/dictation/spec.md: only where the browser can record. */}
-                    {dictation.supported && <DictateButton dictation={dictation} disabledReason={micDisabledReason} />}
-                    {writing ? (
-                        // Spec: streaming replies. Ends the reply; the API keeps nothing of it.
-                        <button type="button" className={`${styles.send} ${styles.stop}`} aria-label="Stop" title="Stop the reply" onClick={onStop}>
-                            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
-                                <rect x="5" y="5" width="14" height="14" rx="2.5" />
-                            </svg>
-                        </button>
-                    ) : empty ? (
-                        // Spec: "Continue". Refused while a User Message awaits its reply: Retry is the way on.
-                        <button
-                            type="button"
-                            className={styles.send}
-                            aria-label="Continue"
-                            title="Let the story go on"
-                            disabled={writing || busy || blocked || chat.awaitingReply || writingForMe || dictating}
-                            onClick={() => {
-                                suggestions.close();
-                                onContinue();
+                    <div className="flex items-end gap-2">
+                        <textarea
+                            ref={box}
+                            id={boxId}
+                            className={BOX}
+                            aria-label={`Write as ${chat.identityName}`}
+                            placeholder={`Write as ${chat.identityName}…`}
+                            value={draft}
+                            rows={1}
+                            disabled={blocked}
+                            readOnly={writingForMe || dictating}
+                            onChange={(event) => onDraft(event.target.value)}
+                            onFocus={() => {
+                                boxFocused.current = true;
                             }}
-                        >
-                            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
-                                <path d="M8 5.1v13.8c0 .8.9 1.3 1.6.8l10.4-6.9c.6-.4.6-1.2 0-1.6L9.6 4.3C8.9 3.8 8 4.3 8 5.1z" />
-                            </svg>
-                        </button>
-                    ) : (
-                        <button type="submit" className={styles.send} aria-label="Send" disabled={writing || blocked || writingForMe || dictating}>
-                            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
-                                <path d="M3.4 20.4l17.4-7.5c.8-.4.8-1.5 0-1.8L3.4 3.6c-.7-.3-1.4.3-1.3 1l1.5 6.1c.1.4.5.7.9.8L12 12l-7.5.5c-.4 0-.8.4-.9.8l-1.5 6.1c-.1.7.6 1.3 1.3 1z" />
-                            </svg>
-                        </button>
-                    )}
-                </div>
+                            onKeyDown={(event) => {
+                                if (event.key !== 'Enter' || event.shiftKey || !enterSends()) return;
+                                // An Enter that confirms an input method's word (Thai, say) only confirms it; Safari reports it as 229.
+                                if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+                                event.preventDefault();
+                                event.currentTarget.form?.requestSubmit();
+                            }}
+                        />
+                        {/* .scratch/dictation/spec.md: only where the browser can record. */}
+                        {dictation.supported && <DictateButton ref={micRef} dictation={dictation} disabledReason={micDisabledReason} />}
+                        {writing ? (
+                            // Spec: streaming replies. Ends the reply; the API keeps nothing of it.
+                            <button
+                                type="button"
+                                className={STOP_BUTTON}
+                                aria-label="Stop"
+                                title="Stop the reply"
+                                onPointerDown={keepFocus}
+                                onClick={onStop}
+                            >
+                                <StopIcon size={18} />
+                            </button>
+                        ) : empty ? (
+                            // Spec: "Continue". Refused while a User Message awaits its reply: Retry is the way on.
+                            <button
+                                type="button"
+                                className={SEND_BUTTON}
+                                aria-label="Continue"
+                                title="Let the story go on"
+                                disabled={writing || busy || blocked || chat.awaitingReply || writingForMe || dictating}
+                                onPointerDown={keepFocus}
+                                onClick={() => {
+                                    suggestions.close();
+                                    onContinue();
+                                }}
+                            >
+                                <PlayIcon size={20} />
+                            </button>
+                        ) : (
+                            <button type="submit" className={SEND_BUTTON} aria-label="Send" disabled={cantSend} onPointerDown={keepFocus}>
+                                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+                                    <path d="M3.4 20.4l17.4-7.5c.8-.4.8-1.5 0-1.8L3.4 3.6c-.7-.3-1.4.3-1.3 1l1.5 6.1c.1.4.5.7.9.8L12 12l-7.5.5c-.4 0-.8.4-.9.8l-1.5 6.1c-.1.7.6 1.3 1.3 1z" />
+                                </svg>
+                            </button>
+                        )}
+                    </div>
                 )}
             </form>
         </footer>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useApiQuery } from '@/components/connection';
+import { ErrorState, Loading } from '@/components/query-state';
 import { Gallery } from '@/components/snapshot/gallery';
 import { StorySummary } from '@/lib/story';
 
@@ -11,8 +12,8 @@ export default function GalleryPage() {
     return (
         <main className="wide">
             <h1>Gallery</h1>
-            {stories.status === 'loading' && <p className="muted">Loading…</p>}
-            {stories.status === 'error' && <p role="alert">{stories.error.message}</p>}
+            {stories.status === 'loading' && <Loading label="Loading the Gallery…" />}
+            {stories.status === 'error' && <ErrorState title="Couldn't load the Gallery." error={stories.error} onRetry={stories.retry} />}
             {stories.status === 'ready' &&
                 (stories.data.stories.length === 0 ? (
                     <p className="muted">No Stories yet. Snapshots you take in a Chat show up here.</p>

@@ -12,9 +12,9 @@ export const TEXT_SIZES: readonly { value: TextSize; label: string }[] = [
     { value: 'L', label: 'Large' },
 ];
 
-/** The story text's font size for each choice; applied through the --story-size property. */
+/** The story text's font size for each choice; applied through the --story-size property. S is 16px, no smaller (audit L6). */
 export const STORY_TEXT_SIZE: Record<TextSize, string> = {
-    S: '0.9375rem',
+    S: '1rem',
     M: '1.0625rem',
     L: '1.1875rem',
 };

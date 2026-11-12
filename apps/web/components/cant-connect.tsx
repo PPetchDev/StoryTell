@@ -22,18 +22,21 @@ export function CantConnect({ onRecovered }: { onRecovered: () => void }) {
     };
 
     return (
-        <main className="page cant-connect">
+        <main className="page">
             <h1>Can&apos;t connect</h1>
             <p>Storytell AI runs on your home PC. Check that:</p>
-            <ul className="checklist">
+            <ul className="m-0 mb-6 rounded-md bg-surface py-4 pr-4 pl-9">
                 <li>this device is connected to the internet</li>
                 <li>the PC is on</li>
                 <li>Tailscale is connected on this device</li>
             </ul>
-            <button type="button" className="button" onClick={retry} disabled={checking}>
+            <button type="button" className="button" onClick={retry} disabled={checking} aria-busy={checking}>
                 {checking ? 'Retrying…' : 'Retry'}
             </button>
-            {stillDown && !checking && <p className="muted">Still can&apos;t connect.</p>}
+            {/* There from the start and empty, so the result of a retry is read out (audit L7). */}
+            <p className="muted" role="status">
+                {stillDown && !checking ? "Still can't connect." : ''}
+            </p>
         </main>
     );
 }

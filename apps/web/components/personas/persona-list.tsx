@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { Autosave } from '@/components/story-editor/autosave';
 import { ConfirmButton } from '@/components/story-editor/fields';
@@ -12,14 +12,16 @@ interface PersonaCardProps {
     /** A Persona just made with "New Persona": its name is focused and selected. */
     justCreated: boolean;
     onSaved(persona: Persona): void;
-    onDelete(): void;
+    onDelete(): Promise<unknown>;
+    /** Where focus goes once this Persona is deleted (audit M50). */
+    focusAfterDelete(): HTMLElement | null;
 }
 
 /**
  * One Persona, its Name and Description saved as they are typed (spec: "Saving"). What was
  * typed stays in the fields whatever the API answers, so a failed save loses nothing.
  */
-function PersonaCard({ persona, autosave, justCreated, onSaved, onDelete }: PersonaCardProps) {
+function PersonaCard({ persona, autosave, justCreated, onSaved, onDelete, focusAfterDelete }: PersonaCardProps) {
     const [name, setName] = useState(persona.name);
     const [description, setDescription] = useState(persona.description);
     const idPrefix = `persona-${persona.id}`;
@@ -39,7 +41,7 @@ function PersonaCard({ persona, autosave, justCreated, onSaved, onDelete }: Pers
     };
 
     return (
-        <li className="card persona-form" aria-label={persona.name}>
+        <li id={idPrefix} className="card m-0 grid gap-2" aria-label={persona.name}>
             <div className="field">
                 <label htmlFor={`${idPrefix}-name`}>Name</label>
                 <input
@@ -64,17 +66,23 @@ function PersonaCard({ persona, autosave, justCreated, onSaved, onDelete }: Pers
                     id={`${idPrefix}-description`}
                     rows={3}
                     value={description}
-                    placeholder="Who you are while wearing it: what Characters can see and know about you."
+                    aria-describedby={`${idPrefix}-description-hint`}
                     onChange={(event) => changeDescription(event.target.value)}
                 />
+                {/* What to write, kept in view while writing it (audit L21). */}
+                <p id={`${idPrefix}-description-hint`} className="hint">
+                    Who you are while wearing it: what Characters can see and know about you.
+                </p>
             </div>
             <div className="toolbar">
                 <ConfirmButton
                     label="Delete"
                     danger
+                    ariaLabel={`Delete ${persona.name}`}
                     question={`Delete "${persona.name}"? Chats wearing it go back to their Role; Messages keep the name.`}
                     confirmLabel="Delete"
                     onConfirm={onDelete}
+                    focusAfter={focusAfterDelete}
                 />
             </div>
         </li>
@@ -92,6 +100,7 @@ export function PersonaList({ initial, autosave }: { initial: Persona[]; autosav
     const [justCreated, setJustCreated] = useState<number | null>(null);
     const [creating, setCreating] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const newButton = useRef<HTMLButtonElement>(null);
 
     const saved = (persona: Persona) =>
         setPersonas((current) => current.map((each) => (each.id === persona.id ? persona : each)));
@@ -113,7 +122,7 @@ export function PersonaList({ initial, autosave }: { initial: Persona[]; autosav
 
     const remove = (personaId: number) => {
         setError(null);
-        void autosave.commit(
+        return autosave.commit(
             () => personaApi.remove(personaId),
             () => setPersonas((current) => current.filter((persona) => persona.id !== personaId)),
             setError,
@@ -122,17 +131,21 @@ export function PersonaList({ initial, autosave }: { initial: Persona[]; autosav
 
     return (
         <>
-            <button type="button" className="button" disabled={creating} onClick={() => void create()}>
+            <button ref={newButton} type="button" className="button" disabled={creating} aria-busy={creating || undefined} onClick={() => void create()}>
                 New Persona
             </button>
 
-            {error && <p role="alert">{error}</p>}
+            {error && (
+                <p role="alert" className="field-error">
+                    {error}
+                </p>
+            )}
 
             {personas.length === 0 ? (
                 <p className="muted">No Personas yet. Until you make one, every Chat is played as its Story&apos;s Role.</p>
             ) : (
-                <ul className="persona-list" aria-label="Personas">
-                    {personas.map((persona) => (
+                <ul className="mt-4 mb-0 grid list-none gap-4 p-0" aria-label="Personas">
+                    {personas.map((persona, index) => (
                         <PersonaCard
                             key={persona.id}
                             persona={persona}
@@ -140,6 +153,12 @@ export function PersonaList({ initial, autosave }: { initial: Persona[]; autosav
                             justCreated={persona.id === justCreated}
                             onSaved={saved}
                             onDelete={() => remove(persona.id)}
+                            focusAfterDelete={() => {
+                                // Still there: the delete failed, and focus goes back to its button.
+                                if (document.getElementById(`persona-${persona.id}`)) return null;
+                                const next = personas[index + 1] ?? personas[index - 1];
+                                return (next && document.getElementById(`persona-${next.id}-name`)) || newButton.current;
+                            }}
                         />
                     ))}
                 </ul>

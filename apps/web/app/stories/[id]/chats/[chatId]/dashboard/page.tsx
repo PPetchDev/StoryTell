@@ -5,6 +5,7 @@ import { use } from 'react';
 
 import { Dashboard } from '@/components/chat/dashboard';
 import { useApiQuery } from '@/components/connection';
+import { ErrorState, Loading } from '@/components/query-state';
 import { portraitsOf } from '@/lib/character-colour';
 import { ChatDashboard } from '@/lib/chat';
 import { Story } from '@/lib/story';
@@ -17,15 +18,15 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
 
     if (dashboard.status === 'loading' || story.status === 'loading') {
         return (
-            <main>
-                <p className="muted">Loading…</p>
+            <main className="wide">
+                <Loading label="Loading the Dashboard…" lines={5} />
             </main>
         );
     }
     if (dashboard.status === 'error') {
         return (
-            <main>
-                <p role="alert">{dashboard.error.message}</p>
+            <main className="wide">
+                <ErrorState error={dashboard.error} title="Couldn't load the Dashboard." onRetry={dashboard.retry} />
                 <Link href={`/stories/${id}/chats/${chatId}`}>Back to the Chat</Link>
             </main>
         );

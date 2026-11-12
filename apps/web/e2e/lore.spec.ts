@@ -59,7 +59,7 @@ test('an entry added in the Lore tab autosaves and survives a reload', async ({ 
 async function openLoreInPlay(page: Page) {
     await page.getByRole('button', { name: 'Chat menu' }).click();
     await page.getByRole('dialog', { name: 'Chat menu' }).getByRole('button', { name: /^Memory/ }).click();
-    return page.getByRole('complementary', { name: 'Memory' }).getByRole('region', { name: 'Lore in play' });
+    return page.getByRole('dialog', { name: 'Memory' }).getByRole('region', { name: 'Lore in play' });
 }
 
 async function scriptTurn(request: APIRequestContext, reply: string) {
@@ -97,7 +97,7 @@ test('after a turn that mentions an entry, the Memory drawer says it came up wit
         await page.goto(`/stories/${storyId}/chats/${chatId}`);
         let card = await openLoreInPlay(page);
         await expect(card.getByRole('list', { name: 'Lore entries in play' }).getByRole('listitem')).toHaveText(['Sky law · always']);
-        await page.getByRole('complementary', { name: 'Memory' }).getByRole('button', { name: 'Close' }).first().click();
+        await page.getByRole('dialog', { name: 'Memory' }).getByRole('button', { name: 'Close' }).first().click();
 
         await scriptTurn(request, '@Nara: My yurt is the blue one.');
         await page.getByLabel('Write as Petch').fill('Where do you sleep?');

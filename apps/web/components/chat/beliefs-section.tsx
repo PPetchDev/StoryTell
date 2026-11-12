@@ -1,9 +1,14 @@
 'use client';
 
-import { useId, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 
+import { Summary } from '@/components/chat/disclosure';
 import { ConfirmButton } from '@/components/story-editor/fields';
 import { Belief, BeliefFields, MemoryList, renderUser } from '@/lib/memory';
+
+/** A list of Beliefs: no bullets, the cards 14px apart. */
+const BELIEF_LIST = 'mt-4 mb-0 grid list-none gap-3.5 p-0';
+const BELIEF_CARD = 'rounded-lg bg-surface px-4 py-3.5';
 
 interface BeliefFormProps {
     label: string;
@@ -15,7 +20,7 @@ interface BeliefFormProps {
     onCancel(): void;
 }
 
-/** Who believes it, what they believe, and the Memory it doesn't match, if any. Saved with Save. */
+/** Who believes it, what they believe, and the Memory it doesn't match, if any. Saved with Save; Escape cancels. */
 function BeliefForm({ label, list, initial, busy, onSave, onCancel }: BeliefFormProps) {
     const [characterId, setCharacterId] = useState(initial.characterId);
     const [text, setText] = useState(initial.text);
@@ -25,49 +30,54 @@ function BeliefForm({ label, list, initial, busy, onSave, onCancel }: BeliefForm
     const blank = text.trim() === '';
     return (
         <form
-            className="memory-form"
+            className="my-3 grid gap-2"
             aria-label={label}
             onSubmit={(event) => {
                 event.preventDefault();
                 if (!blank) void onSave({ characterId, text: text.trim(), contradictsMemoryId: contradicts });
             }}
+            onKeyDown={(event) => {
+                if (event.key !== 'Escape') return;
+                event.stopPropagation();
+                onCancel();
+            }}
         >
-            <label htmlFor={`${id}-who`} className="muted small">
-                Who believes it
-            </label>
-            <select id={`${id}-who`} value={characterId} onChange={(event) => setCharacterId(Number(event.target.value))}>
-                {list.cast.map((character) => (
-                    <option key={character.id} value={character.id}>
-                        {character.name}
-                    </option>
-                ))}
-            </select>
-            <label htmlFor={`${id}-text`} className="muted small">
-                What they believe
-            </label>
-            <textarea
-                id={`${id}-text`}
-                placeholder="What they hold to be true, even if it isn't. Write {user} for yourself."
-                value={text}
-                rows={2}
-                autoFocus
-                onChange={(event) => setText(event.target.value)}
-            />
-            <label htmlFor={`${id}-truth`} className="muted small">
-                Doesn’t match (optional)
-            </label>
-            <select
-                id={`${id}-truth`}
-                value={contradicts ?? ''}
-                onChange={(event) => setContradicts(event.target.value === '' ? null : Number(event.target.value))}
-            >
-                <option value="">No Memory</option>
-                {memories.map((memory) => (
-                    <option key={memory.id} value={memory.id}>
-                        {renderUser(memory.text, list.identityName)}
-                    </option>
-                ))}
-            </select>
+            <div className="field my-0">
+                <label htmlFor={`${id}-who`}>Who believes it</label>
+                <select id={`${id}-who`} value={characterId} onChange={(event) => setCharacterId(Number(event.target.value))}>
+                    {list.cast.map((character) => (
+                        <option key={character.id} value={character.id}>
+                            {character.name}
+                        </option>
+                    ))}
+                </select>
+            </div>
+            <div className="field my-0">
+                <label htmlFor={`${id}-text`}>What they believe</label>
+                <textarea
+                    id={`${id}-text`}
+                    placeholder="What they hold to be true, even if it isn't. Write {user} for yourself."
+                    value={text}
+                    rows={2}
+                    autoFocus
+                    onChange={(event) => setText(event.target.value)}
+                />
+            </div>
+            <div className="field my-0">
+                <label htmlFor={`${id}-truth`}>Doesn’t match (optional)</label>
+                <select
+                    id={`${id}-truth`}
+                    value={contradicts ?? ''}
+                    onChange={(event) => setContradicts(event.target.value === '' ? null : Number(event.target.value))}
+                >
+                    <option value="">No Memory</option>
+                    {memories.map((memory) => (
+                        <option key={memory.id} value={memory.id}>
+                            {renderUser(memory.text, list.identityName)}
+                        </option>
+                    ))}
+                </select>
+            </div>
             <div className="toolbar">
                 <button type="submit" className="button button-small" disabled={busy || blank}>
                     Save
@@ -85,46 +95,54 @@ interface BeliefViewProps {
     belief: Belief;
     busy: boolean;
     onEdit(fields: BeliefFields): Promise<boolean>;
-    onDelete(): void;
+    onDelete(): Promise<unknown>;
     onJump(messageId: number): void;
+    /** Where focus goes once this Belief is deleted. */
+    focusAfter(): HTMLElement | null | undefined;
 }
 
 /** One Belief: "Nara believes …", the Memory it doesn't match, and, once given up, the line that showed the truth. */
-function BeliefView({ list, belief, busy, onEdit, onDelete, onJump }: BeliefViewProps) {
+function BeliefView({ list, belief, busy, onEdit, onDelete, onJump, focusAfter }: BeliefViewProps) {
     const [editing, setEditing] = useState(false);
+    const editButton = useRef<HTMLButtonElement>(null);
     const name = list.cast.find((character) => character.id === belief.characterId)?.name ?? 'A removed Character';
     const truth = belief.contradictsMemoryId === null ? undefined : list.memories.find((memory) => memory.id === belief.contradictsMemoryId);
     const inPlay = list.inPlay.beliefIds.includes(belief.id);
+    const text = renderUser(belief.text, list.identityName);
+    // Names the buttons down the list (audit M11): "Edit Nara's Belief: the river…".
+    const whose = `${name}’s Belief: ${text.length <= 32 ? text : `${text.slice(0, 32).trimEnd()}…`}`;
+    const stopEditing = () => {
+        setEditing(false);
+        requestAnimationFrame(() => editButton.current?.focus());
+    };
     if (editing) {
         return (
-            <li className="memory belief" aria-label={`Belief ${belief.id}`}>
+            <li className={BELIEF_CARD} data-belief-id={belief.id}>
                 <BeliefForm
-                    label={`Edit Belief ${belief.id}`}
+                    label={`Edit Belief of ${name}`}
                     list={list}
                     initial={{ characterId: belief.characterId, text: belief.text, contradictsMemoryId: belief.contradictsMemoryId }}
                     busy={busy}
                     onSave={async (fields) => {
                         const saved = await onEdit(fields);
-                        if (saved) setEditing(false);
+                        if (saved) stopEditing();
                         return saved;
                     }}
-                    onCancel={() => setEditing(false)}
+                    onCancel={stopEditing}
                 />
             </li>
         );
     }
     return (
-        <li className="memory belief" aria-label={`Belief ${belief.id}`}>
-            <p className="message-text">
-                <span className="belief-holder">{name}</span> {belief.givenUp ? 'believed' : 'believes'} {renderUser(belief.text, list.identityName)}
+        <li className={BELIEF_CARD} data-belief-id={belief.id}>
+            <p className="mt-0 mb-2 whitespace-pre-wrap">
+                <span className="font-semibold">{name}</span> {belief.givenUp ? 'believed' : 'believes'} {text}
             </p>
             {truth && (
-                <p className="muted small belief-truth">
-                    Doesn’t match: {renderUser(truth.text, list.identityName)}
-                </p>
+                <p className="mt-0 mb-2 border-l-3 border-event pl-2 text-sm text-muted">Doesn’t match: {renderUser(truth.text, list.identityName)}</p>
             )}
             {belief.givenUp && (
-                <p className="muted small">
+                <p className="mt-0 mb-2 text-sm text-muted">
                     Gave this up:{' '}
                     <a
                         href={`#message-${belief.givenUp.messageId}`}
@@ -137,20 +155,29 @@ function BeliefView({ list, belief, busy, onEdit, onDelete, onJump }: BeliefView
                     </a>
                 </p>
             )}
-            <p className="muted small memory-meta">
+            <p className="mt-0 mb-2 flex flex-wrap gap-x-3 gap-y-1 text-sm text-muted">
                 <span>{belief.writtenBy === 'ai' ? 'Written by the AI' : 'Written by you'}</span>
-                {inPlay && <span className="memory-in-play">In play</span>}
+                {inPlay && <span className="font-semibold text-accent">In play</span>}
             </p>
             <div className="toolbar">
-                <button type="button" className="button button-quiet button-small" disabled={busy} onClick={() => setEditing(true)}>
+                <button
+                    ref={editButton}
+                    type="button"
+                    className="button button-quiet button-small"
+                    disabled={busy}
+                    onClick={() => setEditing(true)}
+                    aria-label={`Edit ${whose}`}
+                >
                     Edit
                 </button>
                 <ConfirmButton
                     label="Delete"
+                    ariaLabel={`Delete ${whose}`}
                     danger
                     question="Delete this Belief?"
                     confirmLabel="Delete"
                     onConfirm={onDelete}
+                    focusAfter={focusAfter}
                     disabled={busy}
                 />
             </div>
@@ -163,7 +190,7 @@ export interface BeliefsSectionProps {
     busy: boolean;
     onAdd(fields: BeliefFields): Promise<boolean>;
     onEdit(beliefId: number, fields: BeliefFields): Promise<boolean>;
-    onDelete(beliefId: number): void;
+    onDelete(beliefId: number): Promise<unknown>;
     onJump(messageId: number): void;
 }
 
@@ -175,10 +202,22 @@ export interface BeliefsSectionProps {
  */
 export function BeliefsSection({ list, busy, onAdd, onEdit, onDelete, onJump }: BeliefsSectionProps) {
     const [adding, setAdding] = useState(false);
+    const headingId = useId();
+    const section = useRef<HTMLElement>(null);
+    const heading = useRef<HTMLHeadingElement>(null);
+    const addButton = useRef<HTMLButtonElement>(null);
     const held = list.beliefs.filter((belief) => belief.givenUp === null);
     const givenUp = list.beliefs.filter((belief) => belief.givenUp !== null);
     const holders = list.cast.filter((character) => held.some((belief) => belief.characterId === character.id));
-    const view = (belief: Belief) => (
+
+    /** After a delete, focus goes to the next Belief in the same list, else Add a Belief, else the heading (audit H2). */
+    const focusAfter = (siblings: readonly Belief[], belief: Belief) => {
+        const at = siblings.findIndex((each) => each.id === belief.id);
+        const next = siblings[at + 1] ?? siblings[at - 1];
+        return () =>
+            (next && section.current?.querySelector<HTMLElement>(`[data-belief-id="${next.id}"] button`)) || addButton.current || heading.current;
+    };
+    const view = (siblings: readonly Belief[]) => (belief: Belief) => (
         <BeliefView
             key={belief.id}
             list={list}
@@ -187,20 +226,32 @@ export function BeliefsSection({ list, busy, onAdd, onEdit, onDelete, onJump }: 
             onEdit={(fields) => onEdit(belief.id, fields)}
             onDelete={() => onDelete(belief.id)}
             onJump={onJump}
+            focusAfter={focusAfter(siblings, belief)}
         />
     );
+    const closeForm = () => {
+        setAdding(false);
+        requestAnimationFrame(() => addButton.current?.focus());
+    };
     return (
-        <section className="memory-beliefs" aria-label="Beliefs">
-            <h3>Beliefs</h3>
-            <p className="muted small">What a Character holds to be true, which may be false. They act on it until the story shows them the truth.</p>
+        <section ref={section} className="mt-6" aria-labelledby={headingId}>
+            <h3 ref={heading} id={headingId} tabIndex={-1} className="mt-0 mb-1 text-lg">
+                Beliefs
+            </h3>
+            <p className="mt-0 mb-3 text-sm text-muted">
+                What a Character holds to be true, which may be false. They act on it until the story shows them the truth.
+            </p>
             {held.length === 0 ? (
-                <p className="muted">No one holds a Belief yet.</p>
+                <p className="mt-0 text-muted">No one holds a Belief yet.</p>
             ) : (
-                holders.map((character) => (
-                    <ul key={character.id} className="memory-list" aria-label={`${character.name}’s Beliefs`}>
-                        {held.filter((belief) => belief.characterId === character.id).map(view)}
-                    </ul>
-                ))
+                holders.map((character) => {
+                    const theirs = held.filter((belief) => belief.characterId === character.id);
+                    return (
+                        <ul key={character.id} className={BELIEF_LIST} aria-label={`${character.name}’s Beliefs`}>
+                            {theirs.map(view(theirs))}
+                        </ul>
+                    );
+                })
             )}
             {adding ? (
                 <BeliefForm
@@ -210,23 +261,23 @@ export function BeliefsSection({ list, busy, onAdd, onEdit, onDelete, onJump }: 
                     busy={busy}
                     onSave={async (fields) => {
                         const saved = await onAdd(fields);
-                        if (saved) setAdding(false);
+                        if (saved) closeForm();
                         return saved;
                     }}
-                    onCancel={() => setAdding(false)}
+                    onCancel={closeForm}
                 />
             ) : (
                 list.cast.length > 0 && (
-                    <button type="button" className="button button-small" disabled={busy} onClick={() => setAdding(true)}>
+                    <button ref={addButton} type="button" className="button button-small mt-3" disabled={busy} onClick={() => setAdding(true)}>
                         Add a Belief
                     </button>
                 )
             )}
             {givenUp.length > 0 && (
-                <details className="memory-archived">
-                    <summary>Given up ({givenUp.length})</summary>
-                    <ul className="memory-list" aria-label="Given-up Beliefs">
-                        {givenUp.map(view)}
+                <details className="group mt-4">
+                    <Summary className="text-muted">Given up ({givenUp.length})</Summary>
+                    <ul className={BELIEF_LIST} aria-label="Given-up Beliefs">
+                        {givenUp.map(view(givenUp))}
                     </ul>
                 </details>
             )}

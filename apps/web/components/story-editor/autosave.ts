@@ -10,7 +10,8 @@ export type SaveState =
     | { kind: 'saved' }
     | { kind: 'dirty' }
     | { kind: 'saving' }
-    | { kind: 'error'; message: string };
+    /** `retry` sends the edits that failed again; they are kept until they land or are typed over. */
+    | { kind: 'error'; message: string; retry(): void };
 
 export const SAVE_LABELS: Record<SaveState['kind'], string> = {
     saved: 'Saved',
@@ -21,11 +22,14 @@ export const SAVE_LABELS: Record<SaveState['kind'], string> = {
 
 type OnError = (message: string) => void;
 
-interface Pending {
-    timer: ReturnType<typeof setTimeout>;
+interface Send {
     run: () => Promise<unknown>;
     apply: (value: unknown) => void;
     onError?: OnError;
+}
+
+interface Pending extends Send {
+    timer: ReturnType<typeof setTimeout>;
 }
 
 /** How long typing may pause before a field is sent (spec: "Autosave"). */
@@ -35,11 +39,20 @@ const DEBOUNCE_MS = 600;
  * Sends edits to the API one after another, so nothing lands out of order, and reports one
  * save state for the whole editor. Field edits are debounced per field; structural changes
  * (add, remove, reorder) go at once, after any pending field edits.
+ *
+ * Nothing typed is lost (audit H1): an edit that fails is kept, and the error state's `retry`
+ * (SaveStatus's Try again) sends it again, until it lands or a newer edit of the same field
+ * replaces it. When the tab is hidden or the page is left, every waiting edit is sent at once,
+ * as a keepalive request that outlives the page (lib/api.ts).
  */
 export function useAutosave() {
     const { reportUnreachable } = useConnection();
     const [state, setState] = useState<SaveState>({ kind: 'saved' });
     const pending = useRef(new Map<string, Pending>());
+    // Edits whose save failed, by key, in the order they were made; a structural change gets a key of its own.
+    const failed = useRef(new Map<string, Send>());
+    const lastError = useRef('');
+    const structural = useRef(0);
     const chain = useRef<Promise<void>>(Promise.resolve());
     const inFlight = useRef(0);
     const unmounted = useRef(false);
@@ -51,21 +64,26 @@ export function useAutosave() {
         };
     }, []);
 
-    const settle = useCallback((next: SaveState | null) => {
+    // Set below, once enqueue exists; the error state's retry calls it through this ref.
+    const retryRef = useRef<() => void>(() => {});
+    const retry = useCallback(() => retryRef.current(), []);
+
+    /** The error while a failed edit is kept, else Saved once nothing is waiting or in flight. */
+    const settle = useCallback(() => {
         if (unmounted.current) return;
-        if (next) setState(next);
+        if (failed.current.size > 0) setState({ kind: 'error', message: lastError.current, retry });
         else if (inFlight.current === 0 && pending.current.size === 0) setState({ kind: 'saved' });
-    }, []);
+    }, [retry]);
 
     const enqueue = useCallback(
-        <T,>(run: () => Promise<T>, apply: (value: T) => void, onError?: OnError): Promise<T | undefined> => {
+        <T,>(key: string, run: () => Promise<T>, apply: (value: T) => void, onError?: OnError): Promise<T | undefined> => {
             inFlight.current += 1;
             setState({ kind: 'saving' });
             const result = chain.current.then(run).then(
                 (value) => {
                     inFlight.current -= 1;
                     if (!unmounted.current) apply(value);
-                    settle(null);
+                    settle();
                     return value;
                 },
                 (error: unknown) => {
@@ -76,11 +94,14 @@ export function useAutosave() {
                     }
                     const message = error instanceof ApiError ? error.message : 'Something went wrong.';
                     if (onError && !unmounted.current) {
+                        // Refused for what was typed, and shown at the field: sending it again would not help.
                         onError(message);
-                        settle(null);
-                    } else {
-                        settle({ kind: 'error', message });
+                    } else if (!pending.current.has(key)) {
+                        // Kept for Try again, unless a newer edit of the same field is already waiting.
+                        failed.current.set(key, { run, apply: apply as (value: unknown) => void, onError });
+                        lastError.current = message;
                     }
+                    settle();
                     return undefined;
                 },
             );
@@ -89,6 +110,14 @@ export function useAutosave() {
         },
         [reportUnreachable, settle],
     );
+
+    useEffect(() => {
+        retryRef.current = () => {
+            const again = [...failed.current];
+            failed.current.clear();
+            for (const [key, item] of again) void enqueue(key, item.run, item.apply, item.onError);
+        };
+    }, [enqueue]);
 
     /**
      * Debounced: a later call with the same key replaces the earlier one. The answer is usually
@@ -99,10 +128,12 @@ export function useAutosave() {
         <T = Story,>(key: string, run: () => Promise<T>, apply: (value: T) => void, onError?: OnError) => {
             const earlier = pending.current.get(key);
             if (earlier) clearTimeout(earlier.timer);
+            // This edit replaces one of the same field that failed.
+            failed.current.delete(key);
             setState((current) => (current.kind === 'saving' ? current : { kind: 'dirty' }));
             const timer = setTimeout(() => {
                 pending.current.delete(key);
-                void enqueue(run, apply, onError);
+                void enqueue(key, run, apply, onError);
             }, DEBOUNCE_MS);
             pending.current.set(key, { timer, run, apply: apply as (value: unknown) => void, onError });
         },
@@ -116,14 +147,17 @@ export function useAutosave() {
     const cancel = useCallback(
         (key: string) => {
             const earlier = pending.current.get(key);
-            if (!earlier) return;
-            clearTimeout(earlier.timer);
-            pending.current.delete(key);
-            // Nothing left to send: "Unsaved changes" settles; a failed save keeps its message.
-            if (unmounted.current || inFlight.current > 0 || pending.current.size > 0) return;
-            setState((current) => (current.kind === 'dirty' ? { kind: 'saved' } : current));
+            const hadFailed = failed.current.delete(key);
+            if (!earlier && !hadFailed) return;
+            if (earlier) {
+                clearTimeout(earlier.timer);
+                pending.current.delete(key);
+            }
+            // Nothing left to send: "Unsaved changes" settles; another field's failed save keeps its message.
+            if (inFlight.current > 0 || pending.current.size > 0) return;
+            settle();
         },
-        [],
+        [settle],
     );
 
     /** Sends every pending field edit now and waits for all of them. */
@@ -131,10 +165,28 @@ export function useAutosave() {
         for (const [key, item] of pending.current) {
             clearTimeout(item.timer);
             pending.current.delete(key);
-            void enqueue(item.run, item.apply, item.onError);
+            void enqueue(key, item.run, item.apply, item.onError);
         }
         await chain.current;
     }, [enqueue]);
+
+    // Hiding the tab or leaving the page sends what is waiting, failed edits too, at once: lib/api.ts
+    // makes a write sent while the page is hidden a keepalive request, which outlives the page.
+    useEffect(() => {
+        const sendAll = () => {
+            if (failed.current.size > 0) retryRef.current();
+            void flush();
+        };
+        const onVisibility = () => {
+            if (document.visibilityState === 'hidden') sendAll();
+        };
+        document.addEventListener('visibilitychange', onVisibility);
+        window.addEventListener('pagehide', sendAll);
+        return () => {
+            document.removeEventListener('visibilitychange', onVisibility);
+            window.removeEventListener('pagehide', sendAll);
+        };
+    }, [flush]);
 
     /**
      * A structural change: runs after pending field edits, and applies its answer whole. With
@@ -144,7 +196,8 @@ export function useAutosave() {
     const commit = useCallback(
         async <T = Story,>(run: () => Promise<T>, apply: (value: T) => void, onError?: OnError): Promise<T | undefined> => {
             await flush();
-            return enqueue(run, apply, onError);
+            structural.current += 1;
+            return enqueue(`structural:${structural.current}`, run, apply, onError);
         },
         [enqueue, flush],
     );

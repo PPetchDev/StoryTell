@@ -1,14 +1,25 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
+import { announce } from '@/components/announcer';
 import { useConnection } from '@/components/connection';
 import { PortraitImage } from '@/components/portrait/portrait-image';
 import { ApiError, ApiUnreachableError } from '@/lib/api';
 import { candidateImageUrl, Character, PortraitCrop, REFERENCE_CANDIDATES, referenceImageUrl, ReferenceCandidate, Story, storyApi } from '@/lib/story';
 import { ConfirmButton } from './fields';
+import { FIELD_HINT } from './fields';
+import { SUBSECTION, SUBSECTION_LEGEND } from './folding-card';
 import { PortraitCropper } from './portrait-cropper';
-import styles from './reference-image.module.css';
+import { UndoNotice, useUndo } from './undo-notice';
+
+/**
+ * On a desktop the Reference image is the Character card's left column: it spans every row and
+ * stays in view under the sticky header as the fields scroll by.
+ */
+const DESKTOP_COLUMN = 'lg:sticky lg:top-[calc(var(--editor-top,0px)+--spacing(4))] lg:col-start-1 lg:row-span-full lg:m-0';
+/** A picture of the Character: 2:3, rounded, on the page colour while it loads; lazy, so a folded card loads none (M31). */
+const PICTURE = 'block aspect-[2/3] h-auto w-full rounded-sm bg-bg object-cover';
 
 /** The error code of an image pool that is used up (docs/error-codes.md). */
 const OUT_OF_IMAGE_CREDIT = '402.001.004';
@@ -61,6 +72,18 @@ export function ReferenceImage({ storyId, character, imageStyle, flush, commit }
     const [cropError, setCropError] = useState<string | null>(null);
 
     const heading = character.name.trim() === '' ? 'this Character' : character.name;
+    const box = useRef<HTMLFieldSetElement>(null);
+    const undo = useUndo();
+
+    // A round lands out of sight of a screen reader, and the Generate button that had focus is gone:
+    // say how many came back, and put focus on the first (audit H12).
+    const roundKind = round.kind;
+    const candidateCount = round.kind === 'choosing' ? round.candidates.length : 0;
+    useEffect(() => {
+        if (roundKind !== 'choosing') return;
+        announce(`${candidateCount} ${candidateCount === 1 ? 'candidate' : 'candidates'} ready. Pick one.`);
+        box.current?.querySelector<HTMLElement>('[data-candidate]')?.focus();
+    }, [roundKind, candidateCount]);
     const hasImage = character.referenceImagePath !== null;
     const lookChanged =
         hasImage &&
@@ -116,11 +139,19 @@ export function ReferenceImage({ storyId, character, imageStyle, flush, commit }
     };
 
     const clearCrop = () => {
+        const before = character.portraitCrop;
         setCropError(null);
         void commit(
             () => storyApi.clearPortraitCrop(storyId, character.id),
             (message) => setCropError(message),
-        );
+        ).then((saved) => {
+            if (!saved || !before) return;
+            undo.offer({
+                message: `Reset the chat picture of ${heading} to a guess.`,
+                undo: () => void commit(() => storyApi.setPortraitCrop(storyId, character.id, before), (message) => setCropError(message)),
+                focusAfterUndo: () => box.current?.querySelector<HTMLElement>('[data-reset-face]'),
+            });
+        });
     };
 
     const remove = () => {
@@ -131,46 +162,62 @@ export function ReferenceImage({ storyId, character, imageStyle, flush, commit }
     };
 
     return (
-        <fieldset className="subsection reference-image">
-            <legend>Reference image</legend>
-            <p className="hint">
+        <fieldset ref={box} className={`${SUBSECTION} ${DESKTOP_COLUMN}`}>
+            <legend className={SUBSECTION_LEGEND}>Reference image</legend>
+            <p className={`${FIELD_HINT} mb-2`}>
                 Keeps {heading} looking the same in every Snapshot. In a Chat, the face you pick shows beside their
                 lines. Drawn from Appearance in the Story&apos;s Image style.
             </p>
 
             {hasImage && (
-                <figure className="reference-current">
+                <figure className="mx-0 my-2">
                     <img
                         src={referenceImageUrl(character.referenceImagePath!)}
+                        // The API's WebP thumbnails (audit L29): the figure is at most 12rem wide.
+                        srcSet={`${referenceImageUrl(character.referenceImagePath!)}?w=320 1x, ${referenceImageUrl(character.referenceImagePath!)}?w=640 2x`}
                         alt={`Reference image of ${heading}`}
                         width={200}
                         height={300}
+                        loading="lazy"
+                        decoding="async"
+                        className={`${PICTURE} max-w-48`}
                     />
                 </figure>
             )}
 
             {hasImage && (
-                <div className={styles.portraitRow} role="group" aria-label={`Chat picture of ${heading}`}>
+                <div className="mt-2 mb-3 flex flex-wrap items-center gap-2.5" role="group" aria-label={`Chat picture of ${heading}`}>
                     <PortraitImage
                         portrait={{ src: referenceImageUrl(character.referenceImagePath!), crop: character.portraitCrop }}
-                        className={styles.portraitThumb}
+                        className="size-12 flex-none"
                     />
-                    <div className={styles.portraitText}>
-                        <span className={styles.portraitLabel}>Chat picture</span>
-                        <span className="hint">
+                    <div className="flex min-w-32 flex-1 flex-col gap-0.5">
+                        <span className="font-semibold">Chat picture</span>
+                        <span className="hint mt-0">
                             {character.portraitCrop ? 'The face you picked.' : 'A guess at the face, until you pick it.'}
                         </span>
                     </div>
-                    <button type="button" className="button button-small" disabled={busy} onClick={() => setCropping(true)}>
-                        {character.portraitCrop ? 'Change' : 'Pick the face'}
-                    </button>
-                    {character.portraitCrop && (
-                        <button type="button" className="button button-quiet button-small" disabled={busy} onClick={clearCrop}>
-                            Reset
+                    {/* Full-size buttons, 8px apart (audit H25). */}
+                    <div className="flex flex-wrap gap-2">
+                        <button type="button" className="button" disabled={busy} onClick={() => setCropping(true)}>
+                            {character.portraitCrop ? 'Change' : 'Pick the face'}
                         </button>
-                    )}
+                        {character.portraitCrop && (
+                            <button
+                                type="button"
+                                className="button button-quiet"
+                                data-reset-face=""
+                                aria-label={`Reset the chat picture of ${heading}`}
+                                disabled={busy}
+                                onClick={clearCrop}
+                            >
+                                Reset
+                            </button>
+                        )}
+                    </div>
                 </div>
             )}
+            <UndoNotice undo={undo} />
             {cropError && !cropping && (
                 <p className="field-error" role="alert">
                     Couldn&apos;t save the chat picture: {cropError}
@@ -192,7 +239,7 @@ export function ReferenceImage({ storyId, character, imageStyle, flush, commit }
             )}
 
             {offerRegenerate && (
-                <div className="notice reference-offer" role="status">
+                <div className="notice flex flex-wrap items-center gap-2" role="status">
                     <span>
                         {madeFrom.imageStyle.trim() !== imageStyle.trim() && madeFrom.appearance.trim() === character.appearance.trim()
                             ? 'The Image style changed.'
@@ -209,27 +256,31 @@ export function ReferenceImage({ storyId, character, imageStyle, flush, commit }
             )}
 
             {(round.kind === 'choosing' || round.kind === 'picking') && (
-                <div className="candidates" role="group" aria-label={`Reference image candidates for ${heading}`}>
+                <div role="group" aria-label={`Reference image candidates for ${heading}`}>
                     {round.kind === 'choosing' && round.failed > 0 && (
                         <p className="field-error" role="alert">
                             {round.candidates.length} of {round.candidates.length + round.failed} candidates came back. {round.failureMessage}
                         </p>
                     )}
-                    <p className="hint">Pick one. The others are discarded.</p>
-                    <ul className="candidate-grid">
+                    <p className={`${FIELD_HINT} mb-2`}>Pick one. The others are discarded.</p>
+                    {/* Two to a row on a phone, each with a full-size button under it (audit H25). */}
+                    <ul className="m-0 mb-3 grid list-none grid-cols-[repeat(auto-fill,minmax(8rem,1fr))] gap-3 p-0">
                         {round.candidates.map((candidate, index) => (
-                            <li key={candidate.id}>
+                            <li key={candidate.id} className="grid gap-2">
                                 <img
                                     src={candidateImageUrl(storyId, character.id, candidate.id)}
                                     alt={`Candidate ${index + 1}`}
                                     width={200}
                                     height={300}
+                                    decoding="async"
+                                    className={PICTURE}
                                 />
                                 <button
                                     type="button"
-                                    className="button button-small"
-                                    disabled={round.kind === 'picking'}
-                                    onClick={() => pick(round.candidates, candidate.id)}
+                                    className="button px-3"
+                                    data-candidate=""
+                                    aria-disabled={round.kind === 'picking' || undefined}
+                                    onClick={round.kind === 'picking' ? undefined : () => pick(round.candidates, candidate.id)}
                                 >
                                     {round.kind === 'picking' ? 'Saving…' : `Use candidate ${index + 1}`}
                                 </button>
@@ -238,12 +289,12 @@ export function ReferenceImage({ storyId, character, imageStyle, flush, commit }
                     </ul>
                     {round.kind === 'choosing' && (
                         <div className="toolbar">
-                            <button type="button" className="button button-quiet button-small" onClick={() => void generate()}>
+                            <button type="button" className="button button-quiet" onClick={() => void generate()}>
                                 Generate again
                             </button>
                             <button
                                 type="button"
-                                className="button button-quiet button-small"
+                                className="button button-quiet"
                                 onClick={() => setRound({ kind: 'idle' })}
                             >
                                 Discard candidates
@@ -254,13 +305,13 @@ export function ReferenceImage({ storyId, character, imageStyle, flush, commit }
             )}
 
             {round.kind === 'error' && (
-                <p className="field-error" role="alert">
-                    <span>
+                <p className="field-error flex flex-wrap items-center gap-x-3 gap-y-2" role="alert">
+                    <span className="min-w-0 flex-1 basis-48">
                         {round.outOfCredit
                             ? 'Out of image credit, so no Reference image can be made until it is topped up. Play is unaffected.'
                             : `Couldn't make a Reference image: ${round.message}`}
                     </span>{' '}
-                    <button type="button" className="button button-quiet button-small" onClick={() => void generate()}>
+                    <button type="button" className="button button-quiet" onClick={() => void generate()}>
                         Retry
                     </button>
                 </p>
@@ -271,8 +322,10 @@ export function ReferenceImage({ storyId, character, imageStyle, flush, commit }
                     <button
                         type="button"
                         className={hasImage ? 'button button-quiet' : 'button'}
-                        disabled={busy || character.appearance.trim() === ''}
-                        onClick={() => void generate()}
+                        disabled={character.appearance.trim() === ''}
+                        aria-disabled={busy || undefined}
+                        aria-busy={round.kind === 'generating' || undefined}
+                        onClick={busy ? undefined : () => void generate()}
                     >
                         {round.kind === 'generating'
                             ? `Generating ${REFERENCE_CANDIDATES} candidates…`
@@ -292,7 +345,7 @@ export function ReferenceImage({ storyId, character, imageStyle, flush, commit }
                 </div>
             )}
             {character.appearance.trim() === '' && !hasImage && (
-                <p className="hint">Write the Appearance first; the candidates are drawn from it.</p>
+                <p className={`${FIELD_HINT} mt-2`}>Write the Appearance first; the candidates are drawn from it.</p>
             )}
         </fieldset>
     );

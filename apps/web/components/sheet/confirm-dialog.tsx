@@ -2,7 +2,6 @@
 
 import { useId, useRef } from 'react';
 
-import styles from './confirm-dialog.module.css';
 import { useModalFocus } from './sheet';
 
 interface ConfirmDialogProps {
@@ -26,24 +25,24 @@ export function ConfirmDialog({ question, confirmLabel, onCancel, onConfirm }: C
     useModalFocus(panel, onCancel, cancel);
 
     return (
-        <div className={styles.backdrop} onClick={onCancel}>
+        <div className="fixed inset-0 z-dialog flex items-center justify-center bg-scrim p-6 motion-safe:animate-fade-in" onClick={onCancel}>
             <div
                 ref={panel}
-                className={styles.dialog}
+                className="w-full max-w-[24rem] rounded-xl border border-line bg-surface p-5 focus:outline-none"
                 role="alertdialog"
                 aria-modal="true"
                 aria-labelledby={titleId}
                 tabIndex={-1}
                 onClick={(event) => event.stopPropagation()}
             >
-                <h2 id={titleId} className={styles.question}>
+                <h2 id={titleId} className="m-0 mb-4 text-lg leading-[1.4] font-semibold">
                     {question}
                 </h2>
-                <div className={styles.actions}>
-                    <button ref={cancel} type="button" className={styles.cancel} onClick={onCancel}>
+                <div className="flex justify-end gap-2">
+                    <button ref={cancel} type="button" className="bare-button press min-h-11 rounded-full border border-field-line px-[1.1rem] font-semibold text-text" onClick={onCancel}>
                         Cancel
                     </button>
-                    <button type="button" className={styles.confirm} onClick={onConfirm}>
+                    <button type="button" className="bare-button press min-h-11 rounded-full border border-danger bg-danger-soft px-[1.1rem] font-semibold text-danger-text" onClick={onConfirm}>
                         {confirmLabel}
                     </button>
                 </div>

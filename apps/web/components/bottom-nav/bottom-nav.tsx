@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ReactNode } from 'react';
 
-import styles from './bottom-nav.module.css';
 
 const icon = (children: ReactNode, fill = false) => (
     <svg
@@ -62,11 +61,33 @@ const LINKS = [
     },
 ];
 
+/** The bar's height on a phone; the spacer at the end of the page matches it. */
+const BAR = 'min-h-14';
+
+const NAV =
+    'fixed inset-x-0 bottom-0 z-nav border-t border-line bg-bg pb-[env(safe-area-inset-bottom)] lg:top-0 lg:right-auto lg:w-(--rail-width) lg:border-t-0 lg:border-r lg:px-2.5 lg:pt-[max(1.25rem,env(safe-area-inset-top))] lg:pb-5';
+
+/**
+ * Each tab: an icon over its label. Pressed, it darkens at once (audit M1); the current one is in
+ * the text colour with an accent icon, and on the rail it sits on the accent tint.
+ */
+const LINK = [
+    `flex flex-1 ${BAR} flex-col items-center justify-center gap-0.5 text-xs font-semibold text-muted no-underline`,
+    '[-webkit-tap-highlight-color:transparent] focus-ring-inset rounded-md active:bg-surface-raised',
+    'aria-[current=page]:text-text [&[aria-current=page]_svg]:text-accent',
+    'lg:min-h-[4.25rem] lg:flex-none lg:gap-1 lg:rounded-xl lg:hover:bg-surface lg:hover:text-text lg:aria-[current=page]:bg-accent-soft',
+].join(' ');
+
 /**
  * The Chat screen is the one route without the bar on a phone: it gives the story the whole
  * screen. On a wide screen the side rail stays, since it takes no height from the story.
  */
 const CHAT_SCREEN = /^\/stories\/[^/]+\/chats\/[^/]+\/?$/;
+
+/** Whether `pathname` is a Chat screen, the route that gives the story the whole phone screen. */
+export function isChatScreen(pathname: string): boolean {
+    return CHAT_SCREEN.test(pathname);
+}
 
 /** A Story's own Gallery counts as the Gallery in the menu, not as Stories. */
 const STORY_GALLERY = /^\/stories\/[^/]+\/gallery\/?$/;
@@ -89,14 +110,14 @@ export function BottomNav() {
 
     return (
         <>
-            {!onChat && <div className={styles.spacer} aria-hidden="true" />}
-            <nav className={onChat ? `${styles.bar} ${styles.railOnly}` : styles.bar} aria-label="Main">
-                <div className={styles.links}>
+            {!onChat && <div className="h-[calc(3.5rem+1px+env(safe-area-inset-bottom))] lg:hidden" aria-hidden="true" />}
+            <nav className={onChat ? `${NAV} max-lg:hidden` : NAV} aria-label="Main">
+                <div className="mx-auto flex max-w-[40rem] lg:max-w-none lg:flex-col lg:gap-1.5">
                     {LINKS.map((link) => (
                         <Link
                             key={link.href}
                             href={link.href}
-                            className={styles.link}
+                            className={LINK}
                             aria-current={isCurrent(link.href, pathname) ? 'page' : undefined}
                         >
                             {link.icon}

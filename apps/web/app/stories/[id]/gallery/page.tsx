@@ -5,34 +5,41 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense, use } from 'react';
 
 import { useApiQuery } from '@/components/connection';
+import { ArrowLeftIcon } from '@/components/icons';
+import { ErrorState, Loading } from '@/components/query-state';
 import { Gallery } from '@/components/snapshot/gallery';
 import { Story, storyTitle } from '@/lib/story';
+
+/** The way back to the Story's Chats, the same while loading and after (audit L9). */
+function Breadcrumbs({ storyId }: { storyId: number }) {
+    return (
+        <nav className="breadcrumbs" aria-label="Breadcrumb">
+            <Link href={`/stories/${storyId}/chats`}>
+                <ArrowLeftIcon size={18} /> Chats
+            </Link>
+        </nav>
+    );
+}
 
 /** A Story's Gallery (spec: stories 119–123), grouped by Chat. `?chat=` opens it on that Chat. */
 function GalleryPage({ storyId }: { storyId: number }) {
     const chatParam = useSearchParams().get('chat');
     const story = useApiQuery<Story>(`/stories/${storyId}`);
 
-    if (story.status === 'loading') {
-        return (
-            <main>
-                <p className="muted">Loading…</p>
-            </main>
-        );
-    }
+    if (story.status === 'loading') return <GalleryLoading storyId={storyId} />;
     if (story.status === 'error') {
         return (
-            <main>
-                <p role="alert">{story.error.message}</p>
+            <main className="wide">
+                <Breadcrumbs storyId={storyId} />
+                <h1>Gallery</h1>
+                <ErrorState title="Couldn't load this Story." error={story.error} onRetry={story.retry} />
                 <Link href="/">Back to Stories</Link>
             </main>
         );
     }
     return (
         <main className="wide">
-            <nav className="breadcrumbs">
-                <Link href={`/stories/${storyId}/chats`}>← Chats</Link>
-            </nav>
+            <Breadcrumbs storyId={storyId} />
             <h1>Gallery · {storyTitle(story.data)}</h1>
             <Gallery
                 stories={[{ id: storyId, title: story.data.title }]}
@@ -42,10 +49,21 @@ function GalleryPage({ storyId }: { storyId: number }) {
     );
 }
 
+/** The page's own width from the first paint, so nothing jumps when the Story arrives (audit L27). */
+function GalleryLoading({ storyId }: { storyId: number }) {
+    return (
+        <main className="wide">
+            <Breadcrumbs storyId={storyId} />
+            <h1>Gallery</h1>
+            <Loading label="Loading the Gallery…" />
+        </main>
+    );
+}
+
 export default function Page({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
     return (
-        <Suspense>
+        <Suspense fallback={<GalleryLoading storyId={Number(id)} />}>
             <GalleryPage storyId={Number(id)} />
         </Suspense>
     );

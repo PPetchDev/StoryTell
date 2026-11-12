@@ -215,7 +215,7 @@ test.describe('stored Messages', () => {
 
         await page.getByRole('button', { name: 'Chat menu' }).click();
         await page.getByRole('dialog', { name: 'Chat menu' }).getByRole('button', { name: /^Memory/ }).click();
-        await expect(page.getByRole('complementary', { name: 'Memory' })).toBeVisible();
+        await expect(page.getByRole('dialog', { name: 'Memory' })).toBeVisible();
     });
 
     test("an On AI Messages Replace rule shows its words in the box, and one that removes a narration paragraph removes that step", async ({

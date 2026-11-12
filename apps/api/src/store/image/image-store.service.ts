@@ -1,6 +1,8 @@
-import { Injectable } from '@nestjs/common';
-import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { Injectable, Logger } from '@nestjs/common';
+import { randomBytes } from 'node:crypto';
+import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import sharp from 'sharp';
 
 import { AppConfig } from '../../config/app-config.js';
 import { ImageNotFoundError, InvalidImagePathError } from '../../errors/image.errors.js';
@@ -20,6 +22,13 @@ const MIME_TYPES: Record<string, string> = {
     '.webp': 'image/webp',
 };
 
+/**
+ * The widths a thumbnail is made at (audit H33): a Gallery tile or a Home cover is at most about
+ * 12rem wide, so 320 covers a phone's 2x screen and 640 a 3x one or the Story sheet's banner.
+ */
+export const THUMBNAIL_WIDTHS = [320, 640] as const;
+export type ThumbnailWidth = (typeof THUMBNAIL_WIDTHS)[number];
+
 export interface StoredImage {
     absolutePath: string;
     mimeType: string;
@@ -32,7 +41,19 @@ export interface StoredImage {
  */
 @Injectable()
 export class ImageStoreService {
+    private readonly logger = new Logger(ImageStoreService.name);
+    /** Thumbnails being made, so two requests for the same one make it once. */
+    private readonly making = new Map<string, Promise<void>>();
+
     constructor(private readonly config: AppConfig) {}
+
+    /**
+     * Thumbnails live beside the image folder, never in it: they can be made again from the
+     * images at any time, so the backup (which copies the image folder) leaves them out.
+     */
+    get thumbnailDir(): string {
+        return `${this.config.imageDir}-thumbnails`;
+    }
 
     /** `relativePath` uses `/` separators, as stored in the database. */
     async open(relativePath: string): Promise<StoredImage> {
@@ -44,6 +65,47 @@ export class ImageStoreService {
         if (!stats?.isFile()) throw new ImageNotFoundError();
 
         return { absolutePath, mimeType, size: stats.size };
+    }
+
+    /**
+     * A smaller WebP copy of the image, `width` pixels wide at most, made the first time it is
+     * asked for and kept on disk. Every stored image has a name of its own (a replaced picture
+     * gets a new one), so a thumbnail never goes stale. A picture the encoder can't read is
+     * answered as it is, so the page still shows something.
+     */
+    async thumbnail(relativePath: string, width: ThumbnailWidth): Promise<StoredImage> {
+        const original = await this.open(relativePath);
+        const absolutePath = this.thumbnailPath(relativePath, width);
+        const existing = await stat(absolutePath).catch(() => undefined);
+        if (existing?.isFile()) return { absolutePath, mimeType: 'image/webp', size: existing.size };
+
+        let pending = this.making.get(absolutePath);
+        if (!pending) {
+            pending = this.makeThumbnail(original.absolutePath, absolutePath, width).finally(() => this.making.delete(absolutePath));
+            this.making.set(absolutePath, pending);
+        }
+        try {
+            await pending;
+        } catch (error) {
+            this.logger.warn(`No thumbnail for ${relativePath}: ${error instanceof Error ? error.message : String(error)}`);
+            return original;
+        }
+        const made = await stat(absolutePath);
+        return { absolutePath, mimeType: 'image/webp', size: made.size };
+    }
+
+    private async makeThumbnail(from: string, to: string, width: ThumbnailWidth): Promise<void> {
+        const bytes = await sharp(from).rotate().resize({ width, withoutEnlargement: true }).webp({ quality: 78 }).toBuffer();
+        await mkdir(path.dirname(to), { recursive: true });
+        // Written whole under another name first, so a reader never gets half a file.
+        const partial = `${to}.${randomBytes(4).toString('hex')}.part`;
+        await writeFile(partial, bytes);
+        await rename(partial, to);
+    }
+
+    /** Where a thumbnail is kept; `relativePath` has been checked by `resolve` already. */
+    private thumbnailPath(relativePath: string, width: ThumbnailWidth): string {
+        return path.join(this.thumbnailDir, String(width), ...relativePath.split('/')) + '.webp';
     }
 
     /** The file's bytes, e.g. a Reference image to send along with a Snapshot. */
@@ -75,9 +137,10 @@ export class ImageStoreService {
         await writeFile(absolutePath, bytes);
     }
 
-    /** Deletes the file if it is there; a file already gone is not an error. */
+    /** Deletes the file and its thumbnails if they are there; a file already gone is not an error. */
     async remove(relativePath: string): Promise<void> {
         await rm(this.resolve(relativePath), { force: true });
+        for (const width of THUMBNAIL_WIDTHS) await rm(this.thumbnailPath(relativePath, width), { force: true });
     }
 
     private resolve(relativePath: string): string {

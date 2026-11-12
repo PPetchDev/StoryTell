@@ -2,10 +2,9 @@
 
 import { Character, Role, Scene, SceneBondGate, SCENE_REMOVAL_WARNING } from '@/lib/story';
 import { ConfirmButton, OrderButtons, TextField, Toolbar } from './fields';
-import { FoldingCard } from './folding-card';
+import { cardToggle, FoldingCard } from './folding-card';
 import { FieldRewrites, rewritableField } from './rewrite';
 import { SceneGates } from './scene-gates';
-import styles from './story-editor.module.css';
 
 type TextKey = 'name' | 'situation' | 'moveOnCondition';
 
@@ -20,7 +19,8 @@ interface SceneCardProps {
     onText(field: TextKey, value: string): void;
     onGates(gates: SceneBondGate[]): void;
     onMove(direction: -1 | 1): void;
-    onRemove(): void;
+    /** Removes the Scene; focus moves to the next card once the promise it returns settles. */
+    onRemove(): void | Promise<unknown>;
 }
 
 export function SceneCard({ scene, index, count, rewrites, cast, role, onText, onGates, onMove, onRemove }: SceneCardProps) {
@@ -46,13 +46,16 @@ export function SceneCard({ scene, index, count, rewrites, cast, role, onText, o
                         question={`Remove ${heading}?`}
                         warning={SCENE_REMOVAL_WARNING}
                         confirmLabel="Remove"
+                        ariaLabel={`Remove Scene ${index + 1}`}
                         onConfirm={onRemove}
+                        focusAfter={() => cardToggle(`Scene ${index + 1}`) ?? cardToggle(`Scene ${index}`)}
                     />
                 </Toolbar>
             }
         >
             <TextField
                 label="Name"
+                required
                 value={scene.name}
                 hint="A short name, shown at the top of the Chat."
                 onChange={(v) => onText('name', v)}
@@ -60,6 +63,7 @@ export function SceneCard({ scene, index, count, rewrites, cast, role, onText, o
             />
             <TextField
                 label="Situation / goal"
+                required
                 value={scene.situation}
                 multiline
                 hint="What is going on, and what the story is working toward here."
@@ -68,6 +72,7 @@ export function SceneCard({ scene, index, count, rewrites, cast, role, onText, o
             />
             <TextField
                 label="Move-on condition"
+                required={!last && (scene.gates ?? []).length === 0}
                 value={scene.moveOnCondition}
                 multiline
                 hint={

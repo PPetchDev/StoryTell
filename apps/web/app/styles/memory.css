@@ -1,0 +1,161 @@
+/*
+ * The Memory graph's SVG, and the Chat making room for the docked Memory drawer.
+ * Owner: the Chats list / Dashboard / Memory session.
+ * The rest of the drawer is utilities in components/chat/memory-drawer.tsx. What stays here is
+ * what utilities can't say (docs/adr/0004-tailwind-css.md, "What may stay plain CSS"): SVG
+ * fill, stroke and paint-order, states on <g>, and a :has() across components.
+ */
+@layer components {
+    /* Desktop: the drawer docks beside the Chat, which narrows to leave it room, instead of covering it. */
+    .page:has(.memory-drawer) {
+        @variant lg {
+            margin-right: 28rem;
+        }
+    }
+
+    /* A Memory's link to a person it is about: .75, so every colour reads 3:1 on the graph in both themes (audit L33). */
+    .memory-graph-link {
+        stroke-width: 1.25;
+        stroke-opacity: 0.75;
+    }
+
+    .memory-graph-link[data-dim='true'] {
+        stroke-opacity: 0.08;
+    }
+
+    .memory-graph-link-lit {
+        stroke-width: 2;
+        stroke-opacity: 0.95;
+    }
+
+    .memory-graph-dot,
+    .memory-graph-person,
+    .memory-graph-bond {
+        outline: none;
+    }
+
+    .memory-graph-hit {
+        fill: transparent;
+    }
+
+    .memory-graph-dot circle:not(.memory-graph-hit, .memory-graph-focus circle) {
+        fill: var(--muted);
+        stroke: var(--surface);
+        stroke-width: 1.5;
+    }
+
+    /* A Memory the user wrote or touched: hollow, like the lock in the list. */
+    .memory-graph-dot circle.memory-graph-dot-own {
+        fill: var(--surface);
+        stroke: var(--muted);
+        stroke-width: 2;
+    }
+
+    .memory-graph-dot:is([data-state='about'], [data-state='selected']) circle:not(.memory-graph-hit, .memory-graph-focus circle) {
+        fill: var(--text);
+    }
+
+    .memory-graph-dot[data-state='selected'] circle:not(.memory-graph-hit, .memory-graph-focus circle) {
+        stroke: var(--accent);
+        stroke-width: 3;
+    }
+
+    .memory-graph-dot[data-state='other'] {
+        opacity: 0.35;
+    }
+
+    .memory-graph-dot[data-state='unknown'] {
+        opacity: 0.12;
+    }
+
+    .memory-graph-person-ring {
+        stroke-width: 2.5;
+    }
+
+    .memory-graph-person[data-lit='false'] {
+        opacity: 0.4;
+    }
+
+    .memory-graph-person[aria-pressed='true'] .memory-graph-person-ring {
+        stroke-width: 4;
+    }
+
+    /*
+     * Focus (audit H20): a ring of its own around the node, accent over a band of the graph's
+     * surface so it reads on any Character colour, and the node at full strength while focused.
+     */
+    .memory-graph-focus {
+        display: none;
+        fill: none;
+        pointer-events: none;
+    }
+
+    .memory-graph-focus-under {
+        stroke: var(--surface);
+        stroke-width: 5;
+    }
+
+    .memory-graph-focus-ring {
+        stroke: var(--accent);
+        stroke-width: 2.5;
+    }
+
+    :is(.memory-graph-dot, .memory-graph-person, .memory-graph-bond):focus-visible {
+        opacity: 1;
+    }
+
+    :is(.memory-graph-dot, .memory-graph-person):focus-visible .memory-graph-focus {
+        display: inline;
+    }
+
+    .memory-graph-initial {
+        font-size: 1.1rem;
+        font-weight: 700;
+        text-anchor: middle;
+        pointer-events: none;
+    }
+
+    /* A person's name, 13px as drawn whatever the graph's scale (audit M53); --graph-unit is 1 / scale. */
+    .memory-graph-name {
+        fill: var(--text);
+        font-size: calc(0.8125rem * var(--graph-unit, 1));
+        text-anchor: middle;
+        paint-order: stroke;
+        stroke: var(--surface);
+        stroke-width: calc(3px * var(--graph-unit, 1));
+        pointer-events: none;
+    }
+
+    /* A Bond's line (.scratch/bond-axes/spec.md, "The Memory graph"). */
+    .memory-graph-bond-hit {
+        fill: none;
+        stroke: transparent;
+        stroke-width: 16;
+    }
+
+    .memory-graph-bond-line {
+        fill: none;
+        stroke-width: 2.5;
+        stroke-linecap: round;
+        opacity: 0.85;
+    }
+
+    .memory-graph-bond[aria-pressed='true'] .memory-graph-bond-line {
+        stroke-width: 4;
+        opacity: 1;
+    }
+
+    /* Focus on a Bond: an accent halo under the line, unlike its pressed look, a thicker line (audit H20). */
+    .memory-graph-bond-focus {
+        display: none;
+        fill: none;
+        stroke: var(--accent);
+        stroke-width: 9;
+        stroke-linecap: round;
+        stroke-opacity: 0.55;
+    }
+
+    .memory-graph-bond:focus-visible .memory-graph-bond-focus {
+        display: inline;
+    }
+}

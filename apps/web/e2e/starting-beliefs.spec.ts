@@ -42,7 +42,7 @@ test('a Starting Belief added in the Story editor beside the Starting Bonds is i
         await page.goto(`/stories/${storyId}/chats/${chatId}`);
         await page.getByRole('button', { name: 'Chat menu' }).click();
         await page.getByRole('dialog', { name: 'Chat menu' }).getByRole('button', { name: /^Memory/ }).click();
-        const drawer = page.getByRole('complementary', { name: 'Memory' });
+        const drawer = page.getByRole('dialog', { name: 'Memory' });
         const nara = drawer.getByRole('region', { name: 'Beliefs' }).getByRole('list', { name: 'Nara’s Beliefs' }).getByRole('listitem');
         await expect(nara).toHaveCount(1);
         await expect(nara).toContainText('Nara believes Petch is a wandering herder.');

@@ -44,6 +44,19 @@ export function coverBackground(story: Pick<StorySummary, 'id' | 'coverImagePath
         : coverGradient(story.id);
 }
 
+/**
+ * A card's Cover (audit H34): a WebP thumbnail of the chosen picture, at its focus point, laid over
+ * the Story's gradient, so the card has its colours at once and keeps them if the picture fails.
+ * 320px wide, 640 on a dense screen; `large` (the Story sheet's banner) takes 640 always.
+ */
+export function coverThumbBackground(story: Pick<StorySummary, 'id' | 'coverImagePath' | 'coverFocus'>, large = false): string {
+    const gradient = coverGradient(story.id);
+    if (!story.coverImagePath) return gradient;
+    const base = `/api/images/${story.coverImagePath}`;
+    const picture = large ? `url("${base}?w=640")` : `image-set(url("${base}?w=320") 1x, url("${base}?w=640") 2x)`;
+    return `${picture} ${coverPosition(story.coverFocus)} / cover no-repeat, ${gradient}`;
+}
+
 const UNITS: Array<[Intl.RelativeTimeFormatUnit, number]> = [
     ['year', 365 * 24 * 60 * 60],
     ['month', 30 * 24 * 60 * 60],

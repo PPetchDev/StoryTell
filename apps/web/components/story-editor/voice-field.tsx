@@ -4,7 +4,8 @@ import { useEffect, useId, useRef, useState } from 'react';
 
 import { ApiError } from '@/lib/api';
 import { VOICE_GROUPS, voiceName, voiceSample, VoiceList } from '@/lib/voices';
-import styles from './fields.module.css';
+import { PlayIcon } from '@/components/icons';
+import { FIELD, FIELD_ERROR, FIELD_HEAD, FIELD_HINT, FIELD_INPUT, FIELD_LABEL } from './fields';
 
 const OUT_OF_VENICE_CREDIT = '402.001.004';
 
@@ -81,16 +82,16 @@ export function VoiceField({ label, value, noneLabel, voices, sampleVoice, onCha
     const unlisted = value !== null && voices !== null && !listed.some((voice) => voice.id === value);
 
     return (
-        <div className={styles.field}>
-            <div className={styles.head}>
-                <span className={styles.label}>
+        <div className={FIELD}>
+            <div className={FIELD_HEAD}>
+                <span className={FIELD_LABEL}>
                     <label htmlFor={id}>{label}</label>
                 </span>
             </div>
-            <div className={styles.voiceRow}>
+            <div className="flex items-center gap-2">
                 <select
                     id={id}
-                    className={styles.input}
+                    className={`${FIELD_INPUT} flex-1`}
                     value={value ?? NONE}
                     disabled={voices === null}
                     aria-describedby={hint ? `${id}-hint` : undefined}
@@ -114,21 +115,32 @@ export function VoiceField({ label, value, noneLabel, voices, sampleVoice, onCha
                 </select>
                 <button
                     type="button"
-                    className="button button-quiet"
+                    className="button button-quiet flex-none"
                     aria-label={state === 'playing' ? `Playing ${label}: tap to stop` : `Sample ${label}`}
-                    disabled={state === 'loading'}
-                    onClick={() => (state === 'playing' ? (stop(), setState('idle')) : void playSample())}
+                    aria-busy={state === 'loading' || undefined}
+                    // aria-disabled, not disabled, so focus stays on the button while the sample loads (H12).
+                    aria-disabled={state === 'loading' || undefined}
+                    onClick={() => (state === 'loading' ? undefined : state === 'playing' ? (stop(), setState('idle')) : void playSample())}
                 >
-                    {state === 'playing' ? 'Playing…' : state === 'loading' ? 'Loading…' : '▶ Sample'}
+                    {state === 'playing' ? (
+                        'Playing…'
+                    ) : state === 'loading' ? (
+                        'Loading…'
+                    ) : (
+                        <>
+                            <PlayIcon size={16} />
+                            Sample
+                        </>
+                    )}
                 </button>
             </div>
             {error && (
-                <p role="alert" className={styles.error}>
+                <p role="alert" className={FIELD_ERROR}>
                     {error}
                 </p>
             )}
             {hint && (
-                <p id={`${id}-hint`} className={styles.hint}>
+                <p id={`${id}-hint`} className={FIELD_HINT}>
                     {hint}
                 </p>
             )}

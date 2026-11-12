@@ -5,10 +5,9 @@ import { useEffect, useState } from 'react';
 import { setFolded } from '@/lib/folds';
 import { LoreEntry, LoreSecondaryMode } from '@/lib/story';
 import { ConfirmButton, NumberField, SegmentedField, TextField, Toolbar } from './fields';
-import { FoldingCard } from './folding-card';
+import { cardToggle, FoldingCard } from './folding-card';
 import { loreMoreKey, LoreMoreTriggers } from './lore-more-triggers';
 import { FieldRewrites, fieldDomId, rewriteKey } from './rewrite';
-import styles from './story-editor.module.css';
 
 type TextKey = 'name' | 'text';
 type Include = 'mentioned' | 'always';
@@ -69,14 +68,17 @@ interface LoreCardProps {
     onTrigger<K extends LoreTriggerKey>(field: K, value: LoreEntry[K]): void;
     /** Saves the patterns; the API may refuse one that doesn't compile. */
     onPatterns(patterns: string[], onSaved: () => void, onError: (message: string) => void): void;
-    onRemove(): void;
+    /** Removes the entry; focus moves to the next card once the promise it returns settles. */
+    onRemove(): void | Promise<unknown>;
+    /** A number typed out of range: drop the edit of that setting still waiting to be saved (audit M21). */
+    onInvalidNumber?(field: LoreTriggerKey): void;
 }
 
 /**
  * One Lore entry (spec: "Lore"). Lore has no ✨ Rewrite; the field ids and highlights still
  * follow the Rewrite naming, so the assistant's changes light up here and links land here.
  */
-export function LoreCard({ entry, index, rewrites, onText, onKeywords, onAlwaysOn, onTrigger, onPatterns, onRemove }: LoreCardProps) {
+export function LoreCard({ entry, index, rewrites, onText, onKeywords, onAlwaysOn, onTrigger, onPatterns, onRemove, onInvalidNumber }: LoreCardProps) {
     const heading = entry.name.trim() === '' ? `Lore ${index + 1}` : entry.name;
     const marks = (field: string) => {
         const request = { target: 'lore' as const, id: entry.id, field };
@@ -119,7 +121,9 @@ export function LoreCard({ entry, index, rewrites, onText, onKeywords, onAlwaysO
                         question={`Remove ${heading}?`}
                         warning="Chats stop getting this note from their next turn."
                         confirmLabel="Remove"
+                        ariaLabel={`Remove Lore ${index + 1}`}
                         onConfirm={onRemove}
+                        focusAfter={() => cardToggle(`Lore ${index + 1}`) ?? cardToggle(`Lore ${index}`)}
                     />
                 </Toolbar>
             }
@@ -192,7 +196,7 @@ export function LoreCard({ entry, index, rewrites, onText, onKeywords, onAlwaysO
                     onChange={changePatterns}
                     {...marks('patterns')}
                 />
-                <div className={styles.timedFields}>
+                <div className="grid grid-cols-[repeat(auto-fit,minmax(9.5rem,1fr))] gap-x-4">
                     {/* Stays for has no effect on an entry sent on every turn. */}
                     {!entry.alwaysOn && (
                         <NumberField
@@ -202,6 +206,7 @@ export function LoreCard({ entry, index, rewrites, onText, onKeywords, onAlwaysO
                             max={LORE_TIMED_MAX}
                             unit="Messages"
                             onChange={(value) => onTrigger('sticky', value)}
+                        onInvalid={() => onInvalidNumber?.('sticky')}
                             {...marks('sticky')}
                         />
                     )}
@@ -212,6 +217,7 @@ export function LoreCard({ entry, index, rewrites, onText, onKeywords, onAlwaysO
                         max={LORE_TIMED_MAX}
                         unit="Messages"
                         onChange={(value) => onTrigger('cooldown', value)}
+                        onInvalid={() => onInvalidNumber?.('cooldown')}
                         {...marks('cooldown')}
                     />
                     <NumberField
@@ -221,10 +227,11 @@ export function LoreCard({ entry, index, rewrites, onText, onKeywords, onAlwaysO
                         max={LORE_TIMED_MAX}
                         unit="Messages"
                         onChange={(value) => onTrigger('delay', value)}
+                        onInvalid={() => onInvalidNumber?.('delay')}
                         {...marks('delay')}
                     />
                 </div>
-                <p className={styles.timedHint}>
+                <p className="-mt-2 mb-4 text-sm text-muted">
                     Stays for: it stays in after it went in, mentioned or not. Rests for: then it stays out. Waits until: it stays out early in a
                     Chat. 0 is off; each of your lines and each reply counts one Message.
                 </p>
@@ -236,6 +243,7 @@ export function LoreCard({ entry, index, rewrites, onText, onKeywords, onAlwaysO
                     unit="%"
                     hint="How often it goes in when it would. Below 100, it is rolled once for each new Message and kept, so Regenerate never flips it."
                     onChange={(value) => onTrigger('chance', value)}
+                        onInvalid={() => onInvalidNumber?.('chance')}
                     {...marks('chance')}
                 />
                 <TextField

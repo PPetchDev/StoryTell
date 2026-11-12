@@ -1,52 +1,89 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef } from 'react';
 
+import { announce } from '@/components/announcer';
+import { ChevronDownIcon, ChevronRightIcon } from '@/components/icons';
+import { setFolded, useFolded } from '@/lib/folds';
 import { MissingField } from '@/lib/story';
-import styles from './status-box.module.css';
 
 interface StatusBoxProps {
     playable: boolean;
     missing: MissingField[];
     /** Takes the author to a missing item's field: its tab, scrolled to, focused, lit. */
     onGo(item: MissingField): void;
+    /**
+     * Where the list's folded state is kept, per device (lib/folds.ts), e.g. `status:12`: folded
+     * once, it stays folded on this Story (audit M47).
+     */
+    foldKey: string;
 }
 
-function Chevron() {
-    return (
-        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M9 5l7 7-7 7" />
-        </svg>
-    );
+/** A focus ring in the warning colour, inside the button, which reads on the warning box. */
+const WARNING_RING = 'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-warning';
+
+/**
+ * A moment after what caused it is said ("Rewrote Setting."): the announcer says the last thing
+ * it was given in a frame, so the two would otherwise cut each other off.
+ */
+const SAY_AFTER_MS = 1500;
+
+/** Says when the Story becomes playable, or stops being (audit H12): the box changes out of sight. */
+function useSayPlayable(playable: boolean) {
+    const was = useRef(playable);
+    useEffect(() => {
+        if (was.current === playable) return;
+        was.current = playable;
+        const timer = setTimeout(
+            () => announce(playable ? 'The Story is playable now.' : 'The Story needs filling in before it can be played.'),
+            SAY_AFTER_MS,
+        );
+        return () => clearTimeout(timer);
+    }, [playable]);
 }
 
-/** The playable status (spec: "Story editor", Status box): Playable, or what is still missing. */
-export function StatusBox({ playable, missing, onGo }: StatusBoxProps) {
-    const [open, setOpen] = useState(true);
+/**
+ * The playable status (spec: "Story editor", Status box): Playable, or what is still missing.
+ * The missing items flow side by side, so eight of them take a few short rows rather than most
+ * of a phone's screen (M47), and the list can be folded away.
+ */
+export function StatusBox({ playable, missing, onGo, foldKey }: StatusBoxProps) {
+    const open = !useFolded(foldKey);
+    useSayPlayable(playable);
     if (playable) {
         return (
-            <section className={`${styles.box} ${styles.ok}`} aria-label="Playable status">
-                <p>Playable. Tap Play to start a Chat.</p>
+            <section className="mb-3 rounded-lg border border-status-ok-line bg-status-ok-surface text-status-ok-text" aria-label="Playable status">
+                <p className="m-0 px-3.5 py-2.5 text-md">Playable. Tap Play to start a Chat.</p>
             </section>
         );
     }
     return (
-        <section className={styles.box} aria-label="Playable status">
-            <button type="button" className={styles.toggle} aria-expanded={open} onClick={() => setOpen((shown) => !shown)}>
+        <section className="mb-3 rounded-lg border border-warning-line bg-warning-surface" aria-label="Playable status">
+            <button
+                type="button"
+                className={`bare-button flex min-h-11 w-full items-center justify-between gap-2 px-3.5 py-2 text-left text-md text-status-toggle-text ${WARNING_RING}`}
+                aria-expanded={open}
+                onClick={() => setFolded(foldKey, open)}
+            >
                 <span>
                     <strong>{missing.length} to fill in</strong> before you can play
                 </span>
-                <span className={open ? styles.turned : undefined}>
-                    <Chevron />
-                </span>
+                <ChevronDownIcon
+                    size={18}
+                    className={`flex-none motion-safe:transition-transform motion-safe:duration-fast ${open ? 'rotate-180' : ''}`}
+                />
             </button>
             {open && (
-                <ul className={styles.list}>
+                <ul className="m-0 flex list-none flex-wrap gap-2 px-2 pb-2">
                     {missing.map((item) => (
-                        <li key={item.field}>
-                            <button type="button" onClick={() => onGo(item)}>
-                                <span>{item.label}</span>
-                                <Chevron />
+                        <li key={item.field} className="max-w-full">
+                            <button
+                                type="button"
+                                className={`bare-button press flex min-h-11 max-w-full items-center gap-1.5 rounded-md bg-status-item-tint py-2 pr-2 pl-3 text-left text-md text-text ${WARNING_RING}`}
+                                onClick={() => onGo(item)}
+                            >
+                                <span className="min-w-0 [overflow-wrap:anywhere]">{item.label}</span>
+                                <ChevronRightIcon size={16} className="flex-none" />
                             </button>
                         </li>
                     ))}

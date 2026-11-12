@@ -2,9 +2,9 @@
 
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
+import { ACTION, ACTION_ICON, Spinner } from '@/components/chat/chat-classes';
+import { PauseIcon, PlayIcon, StopIcon } from '@/components/icons';
 import { readAloudApi, readAloudError, SpeechItem } from '@/lib/read-aloud';
-
-import styles from './chat-thread.module.css';
 
 export type PlayerState = 'idle' | 'loading' | 'playing' | 'paused' | 'error';
 
@@ -253,47 +253,54 @@ export function ReadAloudAction({ messageId }: { messageId: number }) {
     return (
         <button
             type="button"
-            className={styles.action}
+            className={ACTION}
             onClick={() => {
                 // Unlocked after play() has stopped any reading, so the stop doesn't cut the silent clip off.
                 player.play(messageId);
                 player.unlock();
             }}
         >
-            <span aria-hidden="true">▶</span>Read aloud
+            <PlayIcon size={16} className={ACTION_ICON} />
+            Read aloud
         </button>
     );
 }
 
-/** Under the Message being read: ❚❚ Pause or ▶ Resume, ■ Stop, and why it stopped when it failed. */
+/**
+ * Under the Message being read: ❚❚ Pause or ▶ Resume, ■ Stop, and why it stopped when it failed.
+ * While the audio loads, Pause waits with a turning arc (audit M25), not only a pulse.
+ */
 export function ReadAloudControls({ messageId }: { messageId: number }) {
     const player = useReadAloud();
     if (!player || player.messageId !== messageId || player.state === 'idle') return null;
     const { state } = player;
     return (
-        <div className={styles.reading} role="group" aria-label="Reading aloud">
+        <div className="mt-2 grid gap-1.5" role="group" aria-label="Reading aloud">
             {state === 'error' && player.error && (
-                <p role="alert" className={styles.readingError}>
+                <p role="alert" className="m-0 text-md text-warning">
                     {player.error}
                 </p>
             )}
-            <div className={styles.readingButtons}>
+            <div className="flex flex-wrap gap-2">
                 {state === 'error' ? (
-                    <button type="button" className={styles.action} onClick={player.resume}>
-                        <span aria-hidden="true">▶</span>
+                    <button type="button" className={ACTION} onClick={player.resume}>
+                        <PlayIcon size={16} className={ACTION_ICON} />
                         {player.needsTap ? 'Tap to play' : 'Try again'}
                     </button>
                 ) : state === 'paused' ? (
-                    <button type="button" className={styles.action} onClick={player.resume}>
-                        <span aria-hidden="true">▶</span>Resume
+                    <button type="button" className={ACTION} onClick={player.resume}>
+                        <PlayIcon size={16} className={ACTION_ICON} />
+                        Resume
                     </button>
                 ) : (
-                    <button type="button" className={styles.action} onClick={player.pause} disabled={state !== 'playing'} aria-busy={state === 'loading'}>
-                        <span aria-hidden="true">❚❚</span>Pause
+                    <button type="button" className={ACTION} onClick={player.pause} disabled={state !== 'playing'} aria-busy={state === 'loading'}>
+                        {state === 'loading' ? <Spinner /> : <PauseIcon size={16} className={ACTION_ICON} />}
+                        Pause
                     </button>
                 )}
-                <button type="button" className={styles.action} onClick={player.stop}>
-                    <span aria-hidden="true">■</span>Stop
+                <button type="button" className={ACTION} onClick={player.stop}>
+                    <StopIcon size={16} className={ACTION_ICON} />
+                    Stop
                 </button>
             </div>
         </div>

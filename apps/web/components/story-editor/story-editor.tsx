@@ -5,6 +5,7 @@ import { KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from
 import { flushSync } from 'react-dom';
 
 import { useConnection } from '@/components/connection';
+import { PlayIcon } from '@/components/icons';
 import { StoryAssistantSheet } from '@/components/story-assistant/story-assistant-sheet';
 import { fieldOf, useStoryAssistant } from '@/components/story-assistant/use-story-assistant';
 import { ApiUnreachableError } from '@/lib/api';
@@ -30,6 +31,7 @@ import {
     storyTitle,
     TENSE_LABELS,
 } from '@/lib/story';
+import { ADD_BUTTON, ADD_BUTTON_IN_CARD } from './add-button';
 import { focusChoice, movedIndex } from './arrow-keys';
 import { useAutosave } from './autosave';
 import { CharacterCard } from './character-card';
@@ -40,20 +42,20 @@ import { VoiceField } from './voice-field';
 import {
     ADD_CHARACTER_ID,
     FieldPlace,
+    missingByTab,
     neededIds,
     placeOf,
     placeOfField,
     TabKey,
     tabFrom,
     TABS,
-    tabsWithMissing,
 } from './editor-tabs';
 import { FieldMarksContext } from './field-marks';
 import { ConfirmButton, SegmentedField, TextField } from './fields';
 import { OpeningPreview } from './opening-preview';
 import { fieldDomId, FieldRewrites, rewritableField, rewriteKey, RewriteStates } from './rewrite';
 import { LoreCard } from './lore-card';
-import { FoldingCard } from './folding-card';
+import { EDITOR_CARD, FoldingCard, NOTE } from './folding-card';
 import { SavedReplyList } from '@/components/saved-replies/saved-reply-list';
 import { storySavedReplies } from '@/lib/saved-replies';
 import { ReplaceRuleList } from '@/components/replace-rules/replace-rule-list';
@@ -62,7 +64,6 @@ import { SceneCard } from './scene-card';
 import { StartingBeliefsCard } from './starting-beliefs-card';
 import { StartingBondsCard } from './starting-bonds-card';
 import { StatusBox } from './status-box';
-import styles from './story-editor.module.css';
 
 type StoryText = 'title' | 'setting' | 'opening';
 type StyleKey = keyof Story['style'];
@@ -101,8 +102,57 @@ function fitsInView(target: HTMLElement): boolean {
     return target.offsetHeight <= window.innerHeight - padding;
 }
 
-/** Under the first ▶ Sample on a page (.scratch/read-aloud/spec.md, "Story editor"). */
+/** The tab bar runs down the side from this width (the desktop layout), and across the top below it. */
+const SIDE_TABS = '(min-width: 1024px)';
+
+/** Whether the tab bar runs down the side now, kept up to date as the window changes (audit L28). */
+function useSideTabs(): boolean {
+    const [side, setSide] = useState(false);
+    useEffect(() => {
+        const query = window.matchMedia(SIDE_TABS);
+        const update = () => setSide(query.matches);
+        update();
+        query.addEventListener('change', update);
+        return () => query.removeEventListener('change', update);
+    }, []);
+    return side;
+}
+
+/** Under the first Sample on a page (.scratch/read-aloud/spec.md, "Story editor"). */
 const SAMPLE_COST_HINT = 'A sample costs a fraction of a cent, once per voice; after that it plays for free.';
+
+/** A screen this short (a phone on its side) keeps the header and tabs in the page instead of stuck on top (M48). */
+const SHORT_SCREEN = '(max-height: 500px)';
+
+/*
+ * The layout. On a phone the header and the tab bar stick together under the top edge. On a
+ * desktop (lg) the header row sticks across the top, the tabs are a list down the left that
+ * sticks under it, and everything else is one column beside them. On a short screen nothing
+ * sticks (M48).
+ */
+const EDITOR = 'lg:grid lg:grid-cols-[11rem_minmax(0,1fr)] lg:items-start lg:gap-x-10';
+const TOP = [
+    'sticky top-0 z-sticky -mx-4 mb-3 border-b border-line bg-bg px-2 pt-[max(--spacing(1),env(safe-area-inset-top))]',
+    '[@media(max-height:500px)]:static lg:contents',
+].join(' ');
+const HEADER_ROW = [
+    'lg:sticky lg:top-0 lg:z-sticky lg:col-span-full lg:-mx-10 lg:-mt-9 lg:mb-6 lg:border-b lg:border-line lg:bg-bg lg:px-10 lg:py-3',
+    'lg:[@media(max-height:500px)]:static',
+].join(' ');
+const TAB_LIST = [
+    'flex gap-1 overflow-x-auto px-1 pt-1 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+    'lg:sticky lg:top-[calc(var(--editor-top,0px)+--spacing(6))] lg:col-start-1 lg:flex-col lg:overflow-visible lg:p-0',
+].join(' ');
+/** A tab: 44px tall (H26), a pill across the top, a row in the side list. */
+const TAB = [
+    'bare-button flex min-h-11 flex-none items-center gap-2 rounded-full px-3.5 py-2',
+    'text-md font-semibold whitespace-nowrap text-muted',
+    'press focus-ring-inset aria-selected:bg-accent-soft aria-selected:text-text',
+    'lg:justify-between lg:rounded-md lg:px-4 lg:text-left lg:not-aria-selected:hover:bg-surface lg:not-aria-selected:hover:text-text',
+].join(' ');
+/** How many fields on the tab are needed to play: a number, so it doesn't rest on colour (L30). */
+const TAB_COUNT =
+    'grid h-5 min-w-5 place-items-center rounded-full border border-warning-line bg-warning-surface px-1 text-xs leading-none font-bold text-status-toggle-text';
 
 /**
  * The Story editor (spec: "Story authoring module", and Friendly UI's "Story editor"). The
@@ -117,7 +167,7 @@ export function StoryEditor({ initial }: { initial: Story }) {
     const { reportUnreachable } = useConnection();
     const [story, setStory] = useState<Story>(initial);
     const autosave = useAutosave();
-    const { state, queue, commit, flush } = autosave;
+    const { state, queue, cancel, commit, flush } = autosave;
     const voices = useVoices();
     const defaultNarration = voices?.defaultNarrationVoice ?? DEFAULT_NARRATION_VOICE;
     /** The voice narration reads in now: the Story's, else the default. */
@@ -135,6 +185,7 @@ export function StoryEditor({ initial }: { initial: Story }) {
     const header = useRef<HTMLDivElement>(null);
     const headerRow = useRef<HTMLDivElement>(null);
     const storyId = initial.id;
+    const sideTabs = useSideTabs();
 
     useEffect(() => () => clearTimeout(flashTimer.current), []);
 
@@ -242,33 +293,40 @@ export function StoryEditor({ initial }: { initial: Story }) {
         const row = headerRow.current;
         if (!node || !row) return;
         const root = document.documentElement;
+        // On a short screen (a phone on its side) nothing sticks (audit M48), so nothing is under it.
         const measure = () => {
             const sticky = getComputedStyle(node).display === 'contents' ? row : node;
-            root.style.setProperty('--editor-top', `${sticky.offsetHeight}px`);
+            const sticks = getComputedStyle(sticky).position === 'sticky';
+            root.style.setProperty('--editor-top', sticks ? `${sticky.offsetHeight}px` : '0px');
         };
         measure();
         const observer = new ResizeObserver(measure);
         observer.observe(node);
         observer.observe(row);
-        root.classList.add(styles.underHeaderRoot);
+        const short = window.matchMedia(SHORT_SCREEN);
+        short.addEventListener('change', measure);
+        root.style.scrollPaddingTop = 'var(--editor-top, 0px)';
         return () => {
             observer.disconnect();
-            root.classList.remove(styles.underHeaderRoot);
+            short.removeEventListener('change', measure);
+            root.style.scrollPaddingTop = '';
             root.style.removeProperty('--editor-top');
         };
     }, []);
     useEffect(() => {
         if (!assistant.open) return;
         const root = document.documentElement;
-        root.classList.add(styles.underSheetRoot);
-        return () => root.classList.remove(styles.underSheetRoot);
+        root.style.scrollPaddingBottom = 'var(--sheet-half)';
+        return () => {
+            root.style.scrollPaddingBottom = '';
+        };
     }, [assistant.open]);
 
     const marks = useMemo(() => ({ needed: neededIds(story.missing, story), flashed }), [story, flashed]);
     // Each Character's colour and picture, for the headers of their cards.
     const castIds = story.characters.map((character) => character.id);
     const portraits = portraitsOf(story.characters);
-    const tabsMissing = useMemo(() => tabsWithMissing(story.missing, story), [story]);
+    const tabsMissing = useMemo(() => missingByTab(story.missing, story), [story]);
 
     const setStoryText = (field: StoryText, value: string) => {
         setStory((current) => ({ ...current, [field]: value }));
@@ -421,7 +479,7 @@ export function StoryEditor({ initial }: { initial: Story }) {
 
     /** The arrow keys, Home and End move along the tab bar, as in any tab list. */
     const onTabKey = (event: KeyboardEvent<HTMLDivElement>) => {
-        const index = movedIndex(event, TABS.findIndex((t) => t.key === tab), TABS.length);
+        const index = movedIndex(event, TABS.findIndex((t) => t.key === tab), TABS.length, sideTabs ? 'vertical' : 'horizontal');
         if (index === null) return;
         event.preventDefault();
         selectTab(TABS[index].key);
@@ -429,9 +487,9 @@ export function StoryEditor({ initial }: { initial: Story }) {
     };
 
     return (
-        <main className={assistant.open ? `wide ${styles.editor} ${styles.underSheet}` : `wide ${styles.editor}`}>
-            <div ref={header} className={styles.top}>
-                <div ref={headerRow} className={styles.headerRow}>
+        <main className={['wide', EDITOR, assistant.open && 'pb-(--sheet-half)'].filter(Boolean).join(' ')}>
+            <div ref={header} className={TOP}>
+                <div ref={headerRow} className={HEADER_ROW}>
                     <EditorHeader
                         title={storyTitle(story)}
                         save={state}
@@ -441,361 +499,368 @@ export function StoryEditor({ initial }: { initial: Story }) {
                         onPlay={play}
                     />
                 </div>
-                <div ref={tabList} className={styles.tabs} role="tablist" aria-label="Story sections" onKeyDown={onTabKey}>
-                    {TABS.map((t) => (
-                        <button
-                            key={t.key}
-                            type="button"
-                            role="tab"
-                            id={`tab-${t.key}`}
-                            aria-selected={tab === t.key}
-                            aria-controls="editor-panel"
-                            tabIndex={tab === t.key ? 0 : -1}
-                            // The dot is said in words too, for a screen reader.
-                            aria-label={tabsMissing.has(t.key) ? `${t.label}, has missing fields` : undefined}
-                            className={styles.tab}
-                            onClick={() => selectTab(t.key)}
-                        >
-                            {t.label}
-                            {tabsMissing.has(t.key) && <span className={styles.dot} aria-hidden="true" />}
-                        </button>
-                    ))}
+                <div
+                    ref={tabList}
+                    className={TAB_LIST}
+                    role="tablist"
+                    aria-label="Story sections"
+                    aria-orientation={sideTabs ? 'vertical' : 'horizontal'}
+                    onKeyDown={onTabKey}
+                >
+                    {TABS.map((t) => {
+                        const missingHere = tabsMissing.get(t.key) ?? 0;
+                        return (
+                            <button
+                                key={t.key}
+                                type="button"
+                                role="tab"
+                                id={`tab-${t.key}`}
+                                aria-selected={tab === t.key}
+                                aria-controls="editor-panel"
+                                tabIndex={tab === t.key ? 0 : -1}
+                                // The count is said in words too, for a screen reader.
+                                aria-label={missingHere > 0 ? `${t.label}, has missing fields (${missingHere})` : undefined}
+                                className={TAB}
+                                onClick={() => selectTab(t.key)}
+                            >
+                                {t.label}
+                                {missingHere > 0 && (
+                                    <span className={TAB_COUNT} aria-hidden="true">
+                                        {missingHere}
+                                    </span>
+                                )}
+                            </button>
+                        );
+                    })}
                 </div>
             </div>
-            <CoverBanner story={story} onOpen={() => setCoverOpen(true)} />
-            {coverOpen && (
-                <CoverSheet
-                    story={story}
-                    commit={(run, onError) => commit(run, applyWhole, onError)}
-                    onClose={() => setCoverOpen(false)}
-                />
-            )}
-            {fromCard && (
-                <section className={`${styles.card} ${styles.cardNotice}`} aria-label="Made from a Character card">
-                    <p>Made from a Character card. Fill in what&apos;s marked, or ask the Story assistant to tidy it.</p>
-                    <div className={styles.cardNoticeActions}>
-                        <button
-                            type="button"
-                            className="button button-small"
-                            onClick={() => assistant.openSheet(tidyMessage(story.characters[0]?.name || 'the Character'))}
-                        >
-                            Tidy with the Story assistant
-                        </button>
-                        <button type="button" className="button button-quiet button-small" onClick={() => setFromCard(false)}>
-                            Dismiss
-                        </button>
-                    </div>
-                </section>
-            )}
-            <StatusBox playable={story.playable} missing={story.missing} onGo={goTo} />
+            <div className="min-w-0 lg:col-start-2">
+                <CoverBanner story={story} onOpen={() => setCoverOpen(true)} />
+                {fromCard && (
+                    <section className={`${EDITOR_CARD} border border-accent-line`} aria-label="Made from a Character card">
+                        <p className="mt-0 mb-3">Made from a Character card. Fill in what&apos;s marked, or ask the Story assistant to tidy it.</p>
+                        <div className="flex flex-wrap gap-2">
+                            <button
+                                type="button"
+                                className="button button-small"
+                                onClick={() => assistant.openSheet(tidyMessage(story.characters[0]?.name || 'the Character'))}
+                            >
+                                Tidy with the Story assistant
+                            </button>
+                            <button type="button" className="button button-quiet button-small" onClick={() => setFromCard(false)}>
+                                Dismiss
+                            </button>
+                        </div>
+                    </section>
+                )}
+                <StatusBox playable={story.playable} missing={story.missing} onGo={goTo} foldKey={`status:${storyId}`} />
 
-            <FieldMarksContext.Provider value={marks}>
-                <div id="editor-panel" role="tabpanel" aria-labelledby={`tab-${tab}`} className={styles.panel}>
-                    {tab === 'story' && (
-                        <>
-                            <section className={styles.card} aria-label="Story">
+                <FieldMarksContext.Provider value={marks}>
+                    <div id="editor-panel" role="tabpanel" aria-labelledby={`tab-${tab}`}>
+                        {tab === 'story' && (
+                            <>
+                                <section className={EDITOR_CARD} aria-label="Story">
+                                    <TextField
+                                        label="Title"
+                                        value={story.title}
+                                        required
+                                        hint="The name on the Story's card."
+                                        onChange={(v) => setStoryText('title', v)}
+                                        {...rewritable({ target: 'story', field: 'title' })}
+                                    />
+                                    <TextField
+                                        label="Setting"
+                                        value={story.setting}
+                                        multiline
+                                        rows={4}
+                                        required
+                                        hint="Place, situation, premise and tone, in plain language."
+                                        onChange={(v) => setStoryText('setting', v)}
+                                        {...rewritable({ target: 'story', field: 'setting' })}
+                                    />
+                                    <TextField
+                                        label="Opening"
+                                        value={story.opening}
+                                        multiline
+                                        rows={4}
+                                        required
+                                        hint="The passage that begins every Chat. Start a line with @Name: for a Character's speech."
+                                        onChange={(v) => setStoryText('opening', v)}
+                                        {...rewritable({ target: 'story', field: 'opening' })}
+                                    />
+                                    <button type="button" className={ADD_BUTTON_IN_CARD} onClick={() => setPreviewOpen(true)}>
+                                        <PlayIcon size={16} />
+                                        Preview the Opening
+                                    </button>
+                                </section>
+                                {/* Delete Story: quiet, at the very foot of the Story tab, and it asks first. */}
+                                <div className="mt-6 mb-2 text-center [&_.confirm]:justify-center [&_.confirm]:text-left">
+                                    <ConfirmButton
+                                        label="Delete Story"
+                                        question="Delete this Story and everything under it?"
+                                        warning="Its Role, Characters, Scenes, starting Bonds and Lore go too. There is no undo."
+                                        confirmLabel="Delete"
+                                        busyLabel="Deleting…"
+                                        danger
+                                        className="bg-transparent px-4 text-md text-danger underline"
+                                        onConfirm={deleteStory}
+                                    />
+                                    {deleteError && <p role="alert">{deleteError}</p>}
+                                </div>
+                            </>
+                        )}
+
+                        {tab === 'style' && (
+                            <>
+                                <section className={EDITOR_CARD} aria-label="Style">
+                                    <SegmentedField
+                                        label="Point of view"
+                                        value={story.style.pov}
+                                        options={POV_LABELS}
+                                        hint='Who tells the story: "I", "you" or "they".'
+                                        onChange={(v) => setStyle('pov', v)}
+                                        highlighted={styleHighlighted('pov')}
+                                        domId={fieldDomId({ target: 'story', field: 'pov' })}
+                                    />
+                                    <SegmentedField
+                                        label="Tense"
+                                        value={story.style.tense}
+                                        options={TENSE_LABELS}
+                                        hint="Told as it happens, or looking back."
+                                        onChange={(v) => setStyle('tense', v)}
+                                        highlighted={styleHighlighted('tense')}
+                                        domId={fieldDomId({ target: 'story', field: 'tense' })}
+                                    />
+                                    <SegmentedField
+                                        label="Reply length"
+                                        value={story.style.replyLength}
+                                        options={REPLY_LENGTH_LABELS}
+                                        hint="How much the AI writes each turn."
+                                        onChange={(v) => setStyle('replyLength', v)}
+                                        highlighted={styleHighlighted('replyLength')}
+                                        domId={fieldDomId({ target: 'story', field: 'replyLength' })}
+                                    />
+                                    <TextField
+                                        label="Image style"
+                                        value={story.style.imageStyle}
+                                        placeholder='e.g. "anime, soft colours"'
+                                        hint="Optional. One look for every Snapshot and Reference image."
+                                        onChange={(v) => setStyle('imageStyle', v)}
+                                        {...rewritable({ target: 'story', field: 'imageStyle' })}
+                                    />
+                                    <VoiceField
+                                        label="Narration voice"
+                                        value={story.narrationVoice}
+                                        noneLabel={`Default (${voiceName(defaultNarration, voices?.voices)})`}
+                                        voices={voices}
+                                        sampleVoice={narrationVoice}
+                                        onChange={setNarrationVoice}
+                                        hint={SAMPLE_COST_HINT}
+                                    />
+                                    <SegmentedField
+                                        label="Chat backdrop"
+                                        value={story.backdrop}
+                                        options={BACKDROP_LABELS}
+                                        hint="Dimmed behind the Messages. Without a Snapshot yet, the Cover shows."
+                                        onChange={setBackdrop}
+                                    />
+                                </section>
+                                <FoldingCard foldKey={`saved-replies:${storyId}`} label="Saved replies" title="Saved replies" fieldPrefixes={[]}>
+                                    <p className={NOTE}>
+                                        Lines for this Story only, listed first in the composer&apos;s Saved replies tray. {'{user}'} becomes the
+                                        name you wear in that Chat.
+                                    </p>
+                                    <SavedReplyList
+                                        initial={story.savedReplies}
+                                        store={storySavedReplies(storyId, applyStatus)}
+                                        autosave={autosave}
+                                        saveKey="savedReplies.story"
+                                    />
+                                </FoldingCard>
+                                <FoldingCard foldKey={`replace-rules:${storyId}`} label="Replace rules" title="Replace rules" fieldPrefixes={[]}>
+                                    <p className={NOTE}>
+                                        Find and replace for this Story only, run after the app-wide rules in Settings. On AI Messages
+                                        changes how replies read, never what is stored; On my Messages fixes what you send.
+                                    </p>
+                                    <ReplaceRuleList
+                                        initial={story.replaceRules}
+                                        store={storyReplaceRules(storyId, applyStatus)}
+                                        autosave={autosave}
+                                        saveKey="replaceRules.story"
+                                    />
+                                </FoldingCard>
+                            </>
+                        )}
+
+                        {tab === 'role' && (
+                            <section className={EDITOR_CARD} aria-label="Role">
                                 <TextField
-                                    label="Title"
-                                    value={story.title}
-                                    hint="The name on the Story's card."
-                                    onChange={(v) => setStoryText('title', v)}
-                                    {...rewritable({ target: 'story', field: 'title' })}
+                                    label="Name"
+                                    value={story.role.name}
+                                    required
+                                    hint="Who you are in this Story."
+                                    onChange={(v) => setRoleText('name', v)}
+                                    {...rewritable({ target: 'role', field: 'name' })}
                                 />
                                 <TextField
-                                    label="Setting"
-                                    value={story.setting}
+                                    label="Description"
+                                    value={story.role.description}
                                     multiline
-                                    rows={4}
-                                    hint="Place, situation, premise and tone, in plain language."
-                                    onChange={(v) => setStoryText('setting', v)}
-                                    {...rewritable({ target: 'story', field: 'setting' })}
+                                    required
+                                    hint="The part you play. The Characters always know who they are talking to."
+                                    onChange={(v) => setRoleText('description', v)}
+                                    {...rewritable({ target: 'role', field: 'description' })}
                                 />
-                                <TextField
-                                    label="Opening"
-                                    value={story.opening}
-                                    multiline
-                                    rows={4}
-                                    hint="The passage that begins every Chat. Start a line with @Name: for a Character's speech."
-                                    onChange={(v) => setStoryText('opening', v)}
-                                    {...rewritable({ target: 'story', field: 'opening' })}
-                                />
-                                <button type="button" className={styles.add} onClick={() => setPreviewOpen(true)}>
-                                    ▶ Preview the Opening
+                            </section>
+                        )}
+
+                        {tab === 'characters' && (
+                            <section aria-label="Characters">
+                                {story.characters.length === 0 && <p className={NOTE}>No Characters yet. A Story needs at least one.</p>}
+                                {story.characters.map((character, index) => (
+                                    <CharacterCard
+                                        key={character.id}
+                                        storyId={storyId}
+                                        character={character}
+                                        imageStyle={story.style.imageStyle}
+                                        flush={flush}
+                                        commit={(run, onError) => commit(run, applyWhole, onError)}
+                                        onExpressionDrawn={applyExpressions}
+                                        index={index}
+                                        count={story.characters.length}
+                                        colour={characterColour(character.id, castIds)}
+                                        portrait={portraits[character.id]}
+                                        rewrites={fieldRewrites}
+                                        onText={(field, value) => setCharacterField(character.id, field, value)}
+                                        onExampleLines={(lines) => setCharacterField(character.id, 'exampleLines', lines)}
+                                        voices={voices}
+                                        narrationVoice={narrationVoice}
+                                        onSpeakingVoice={(voice) => setCharacterField(character.id, 'speakingVoice', voice)}
+                                        sampleHint={index === 0 ? SAMPLE_COST_HINT : undefined}
+                                        onMove={(direction) =>
+                                            void commit(
+                                                () => storyApi.reorderCharacters(storyId, moved(story.characters, character.id, direction)),
+                                                applyWhole,
+                                            )
+                                        }
+                                        onRemove={() => commit(() => storyApi.removeCharacter(storyId, character.id), applyWhole)}
+                                    />
+                                ))}
+                                <button
+                                    type="button"
+                                    id={ADD_CHARACTER_ID}
+                                    className={ADD_BUTTON}
+                                    data-flash={flashed === ADD_CHARACTER_ID || undefined}
+                                    disabled={story.characters.length >= MAX_CHARACTERS}
+                                    onClick={() => void commit(() => storyApi.addCharacter(storyId), applyWhole)}
+                                >
+                                    + Add Character
+                                </button>
+                                {story.characters.length >= MAX_CHARACTERS && (
+                                    <p className={NOTE}>A Story holds at most {MAX_CHARACTERS} Characters.</p>
+                                )}
+                            </section>
+                        )}
+
+                        {tab === 'bonds' && (
+                            <section aria-label="Bonds">
+                                <p className={NOTE}>Where the Characters stand with each other, and with you, when a Chat starts.</p>
+                                {story.characters.length === 0 && <p className={NOTE}>Add a Character first, on the Characters tab.</p>}
+                                {story.characters.map((character, index) => (
+                                    <StartingBondsCard
+                                        key={character.id}
+                                        character={character}
+                                        index={index}
+                                        colour={characterColour(character.id, castIds)}
+                                        portrait={portraits[character.id]}
+                                        cast={story.characters}
+                                        role={story.role}
+                                        bonds={story.startingBonds.filter((bond) => bond.fromCharacterId === character.id)}
+                                        rewrites={fieldRewrites}
+                                        onAdd={(toCharacterId) =>
+                                            void commit(
+                                                () => storyApi.addStartingBond(storyId, { fromCharacterId: character.id, toCharacterId }),
+                                                applyWhole,
+                                            )
+                                        }
+                                        onText={setBondText}
+                                        onLevel={setBondLevel}
+                                        onRemove={(bondId) => commit(() => storyApi.removeStartingBond(storyId, bondId), applyWhole)}
+                                    />
+                                ))}
+                                <StartingBeliefsCard cast={story.characters} beliefs={story.startingBeliefs ?? []} onChange={setStartingBeliefs} />
+                            </section>
+                        )}
+
+                        {tab === 'scenes' && (
+                            <section aria-label="Scenes">
+                                {story.scenes.length === 0 && <p className={NOTE}>Optional. Without Scenes the story unfolds freely.</p>}
+                                {story.scenes.map((scene, index) => (
+                                    <SceneCard
+                                        key={scene.id}
+                                        scene={scene}
+                                        index={index}
+                                        count={story.scenes.length}
+                                        rewrites={fieldRewrites}
+                                        cast={story.characters}
+                                        role={story.role}
+                                        onText={(field, value) => setSceneText(scene.id, field, value)}
+                                        onGates={(gates) => setSceneGates(scene.id, gates)}
+                                        onMove={(direction) =>
+                                            void commit(() => storyApi.reorderScenes(storyId, moved(story.scenes, scene.id, direction)), applyWhole)
+                                        }
+                                        onRemove={() => commit(() => storyApi.removeScene(storyId, scene.id), applyWhole)}
+                                    />
+                                ))}
+                                <button type="button" className={ADD_BUTTON} onClick={() => void commit(() => storyApi.addScene(storyId), applyWhole)}>
+                                    + Add Scene
                                 </button>
                             </section>
-                            <div className={styles.deleteZone}>
-                                <ConfirmButton
-                                    label="Delete Story"
-                                    question="Delete this Story and everything under it?"
-                                    warning="Its Role, Characters, Scenes, starting Bonds and Lore go too. There is no undo."
-                                    confirmLabel="Delete"
-                                    danger
-                                    onConfirm={() => void deleteStory()}
-                                />
-                                {deleteError && <p role="alert">{deleteError}</p>}
-                            </div>
-                        </>
-                    )}
+                        )}
 
-                    {tab === 'style' && (
-                        <>
-                            <section className={styles.card} aria-label="Style">
-                                <SegmentedField
-                                    label="Point of view"
-                                    value={story.style.pov}
-                                    options={POV_LABELS}
-                                    hint='Who tells the story: "I", "you" or "they".'
-                                    onChange={(v) => setStyle('pov', v)}
-                                    highlighted={styleHighlighted('pov')}
-                                    domId={fieldDomId({ target: 'story', field: 'pov' })}
-                                />
-                                <SegmentedField
-                                    label="Tense"
-                                    value={story.style.tense}
-                                    options={TENSE_LABELS}
-                                    hint="Told as it happens, or looking back."
-                                    onChange={(v) => setStyle('tense', v)}
-                                    highlighted={styleHighlighted('tense')}
-                                    domId={fieldDomId({ target: 'story', field: 'tense' })}
-                                />
-                                <SegmentedField
-                                    label="Reply length"
-                                    value={story.style.replyLength}
-                                    options={REPLY_LENGTH_LABELS}
-                                    hint="How much the AI writes each turn."
-                                    onChange={(v) => setStyle('replyLength', v)}
-                                    highlighted={styleHighlighted('replyLength')}
-                                    domId={fieldDomId({ target: 'story', field: 'replyLength' })}
-                                />
-                                <TextField
-                                    label="Image style"
-                                    value={story.style.imageStyle}
-                                    placeholder='e.g. "anime, soft colours"'
-                                    hint="Optional. One look for every Snapshot and Reference image."
-                                    onChange={(v) => setStyle('imageStyle', v)}
-                                    {...rewritable({ target: 'story', field: 'imageStyle' })}
-                                />
-                                <VoiceField
-                                    label="Narration voice"
-                                    value={story.narrationVoice}
-                                    noneLabel={`Default (${voiceName(defaultNarration, voices?.voices)})`}
-                                    voices={voices}
-                                    sampleVoice={narrationVoice}
-                                    onChange={setNarrationVoice}
-                                    hint={SAMPLE_COST_HINT}
-                                />
-                                <SegmentedField
-                                    label="Chat backdrop"
-                                    value={story.backdrop}
-                                    options={BACKDROP_LABELS}
-                                    hint="Dimmed behind the Messages. Without a Snapshot yet, the Cover shows."
-                                    onChange={setBackdrop}
+                        {tab === 'lore' && (
+                            <section aria-label="Lore">
+                                {story.lore.length === 0 && (
+                                    <p className={NOTE}>
+                                        Optional. Notes about your world: places, peoples, customs, things. Each reaches the story only when
+                                        its name or a keyword comes up, so the Setting can stay short.
+                                    </p>
+                                )}
+                                {story.lore.map((entry, index) => (
+                                    <LoreCard
+                                        key={entry.id}
+                                        entry={entry}
+                                        index={index}
+                                        rewrites={fieldRewrites}
+                                        onText={(field, value) => setLore(entry.id, field, value)}
+                                        onKeywords={(keywords) => setLore(entry.id, 'keywords', keywords)}
+                                        onAlwaysOn={(alwaysOn) => setLore(entry.id, 'alwaysOn', alwaysOn)}
+                                        onTrigger={(field, value) => setLore(entry.id, field, value)}
+                                        onInvalidNumber={(field) => cancel(`lore.${entry.id}.${field}`)}
+                                        onPatterns={(patterns, onSaved, onError) => setLorePatterns(entry.id, patterns, onSaved, onError)}
+                                        onRemove={() => commit(() => storyApi.removeLoreEntry(storyId, entry.id), applyWhole)}
+                                    />
+                                ))}
+                                <button type="button" className={ADD_BUTTON} onClick={() => void commit(() => storyApi.addLoreEntry(storyId), applyWhole)}>
+                                    + Add Lore entry
+                                </button>
+                                <DocumentsSection
+                                    storyId={storyId}
+                                    documents={story.documents}
+                                    commit={commit}
+                                    applyWhole={applyWhole}
+                                    onTitle={setDocumentTitle}
                                 />
                             </section>
-                            <FoldingCard foldKey={`saved-replies:${storyId}`} label="Saved replies" title="Saved replies" fieldPrefixes={[]}>
-                                <p className={styles.note}>
-                                    Lines for this Story only, listed first in the composer&apos;s Saved replies tray. {'{user}'} becomes the
-                                    name you wear in that Chat.
-                                </p>
-                                <SavedReplyList
-                                    initial={story.savedReplies}
-                                    store={storySavedReplies(storyId, applyStatus)}
-                                    autosave={autosave}
-                                    saveKey="savedReplies.story"
-                                />
-                            </FoldingCard>
-                            <FoldingCard foldKey={`replace-rules:${storyId}`} label="Replace rules" title="Replace rules" fieldPrefixes={[]}>
-                                <p className={styles.note}>
-                                    Find and replace for this Story only, run after the app-wide rules in Settings. On AI Messages
-                                    changes how replies read, never what is stored; On my Messages fixes what you send.
-                                </p>
-                                <ReplaceRuleList
-                                    initial={story.replaceRules}
-                                    store={storyReplaceRules(storyId, applyStatus)}
-                                    autosave={autosave}
-                                    saveKey="replaceRules.story"
-                                />
-                            </FoldingCard>
-                        </>
-                    )}
+                        )}
+                    </div>
+                </FieldMarksContext.Provider>
+            </div>
 
-                    {tab === 'role' && (
-                        <section className={styles.card} aria-label="Role">
-                            <TextField
-                                label="Name"
-                                value={story.role.name}
-                                hint="Who you are in this Story."
-                                onChange={(v) => setRoleText('name', v)}
-                                {...rewritable({ target: 'role', field: 'name' })}
-                            />
-                            <TextField
-                                label="Description"
-                                value={story.role.description}
-                                multiline
-                                hint="The part you play. The Characters always know who they are talking to."
-                                onChange={(v) => setRoleText('description', v)}
-                                {...rewritable({ target: 'role', field: 'description' })}
-                            />
-                        </section>
-                    )}
-
-                    {tab === 'characters' && (
-                        <section aria-label="Characters">
-                            {story.characters.length === 0 && (
-                                <p className={styles.note}>No Characters yet. A Story needs at least one.</p>
-                            )}
-                            {story.characters.map((character, index) => (
-                                <CharacterCard
-                                    key={character.id}
-                                    storyId={storyId}
-                                    character={character}
-                                    imageStyle={story.style.imageStyle}
-                                    flush={flush}
-                                    commit={(run, onError) => commit(run, applyWhole, onError)}
-                                    onExpressionDrawn={applyExpressions}
-                                    index={index}
-                                    count={story.characters.length}
-                                    colour={characterColour(character.id, castIds)}
-                                    portrait={portraits[character.id]}
-                                    rewrites={fieldRewrites}
-                                    onText={(field, value) => setCharacterField(character.id, field, value)}
-                                    onExampleLines={(lines) => setCharacterField(character.id, 'exampleLines', lines)}
-                                    voices={voices}
-                                    narrationVoice={narrationVoice}
-                                    onSpeakingVoice={(voice) => setCharacterField(character.id, 'speakingVoice', voice)}
-                                    sampleHint={index === 0 ? SAMPLE_COST_HINT : undefined}
-                                    onMove={(direction) =>
-                                        void commit(
-                                            () => storyApi.reorderCharacters(storyId, moved(story.characters, character.id, direction)),
-                                            applyWhole,
-                                        )
-                                    }
-                                    onRemove={() => void commit(() => storyApi.removeCharacter(storyId, character.id), applyWhole)}
-                                />
-                            ))}
-                            <button
-                                type="button"
-                                id={ADD_CHARACTER_ID}
-                                className={flashed === ADD_CHARACTER_ID ? `${styles.add} ${styles.flash}` : styles.add}
-                                disabled={story.characters.length >= MAX_CHARACTERS}
-                                onClick={() => void commit(() => storyApi.addCharacter(storyId), applyWhole)}
-                            >
-                                + Add Character
-                            </button>
-                            {story.characters.length >= MAX_CHARACTERS && (
-                                <p className={styles.note}>A Story holds at most {MAX_CHARACTERS} Characters.</p>
-                            )}
-                        </section>
-                    )}
-
-                    {tab === 'bonds' && (
-                        <section aria-label="Bonds">
-                            <p className={styles.note}>Where the Characters stand with each other, and with you, when a Chat starts.</p>
-                            {story.characters.length === 0 && (
-                                <p className={styles.note}>Add a Character first, on the Characters tab.</p>
-                            )}
-                            {story.characters.map((character, index) => (
-                                <StartingBondsCard
-                                    key={character.id}
-                                    character={character}
-                                    index={index}
-                                    colour={characterColour(character.id, castIds)}
-                                    portrait={portraits[character.id]}
-                                    cast={story.characters}
-                                    role={story.role}
-                                    bonds={story.startingBonds.filter((bond) => bond.fromCharacterId === character.id)}
-                                    rewrites={fieldRewrites}
-                                    onAdd={(toCharacterId) =>
-                                        void commit(
-                                            () => storyApi.addStartingBond(storyId, { fromCharacterId: character.id, toCharacterId }),
-                                            applyWhole,
-                                        )
-                                    }
-                                    onText={setBondText}
-                                    onLevel={setBondLevel}
-                                    onRemove={(bondId) => void commit(() => storyApi.removeStartingBond(storyId, bondId), applyWhole)}
-                                />
-                            ))}
-                            <StartingBeliefsCard cast={story.characters} beliefs={story.startingBeliefs ?? []} onChange={setStartingBeliefs} />
-                        </section>
-                    )}
-
-                    {tab === 'scenes' && (
-                        <section aria-label="Scenes">
-                            {story.scenes.length === 0 && (
-                                <p className={styles.note}>Optional. Without Scenes the story unfolds freely.</p>
-                            )}
-                            {story.scenes.map((scene, index) => (
-                                <SceneCard
-                                    key={scene.id}
-                                    scene={scene}
-                                    index={index}
-                                    count={story.scenes.length}
-                                    rewrites={fieldRewrites}
-                                    cast={story.characters}
-                                    role={story.role}
-                                    onText={(field, value) => setSceneText(scene.id, field, value)}
-                                    onGates={(gates) => setSceneGates(scene.id, gates)}
-                                    onMove={(direction) =>
-                                        void commit(() => storyApi.reorderScenes(storyId, moved(story.scenes, scene.id, direction)), applyWhole)
-                                    }
-                                    onRemove={() => void commit(() => storyApi.removeScene(storyId, scene.id), applyWhole)}
-                                />
-                            ))}
-                            <button
-                                type="button"
-                                className={styles.add}
-                                onClick={() => void commit(() => storyApi.addScene(storyId), applyWhole)}
-                            >
-                                + Add Scene
-                            </button>
-                        </section>
-                    )}
-
-                    {tab === 'lore' && (
-                        <section aria-label="Lore">
-                            {story.lore.length === 0 && (
-                                <p className={styles.note}>
-                                    Optional. Notes about your world: places, peoples, customs, things. Each reaches the story only when
-                                    its name or a keyword comes up, so the Setting can stay short.
-                                </p>
-                            )}
-                            {story.lore.map((entry, index) => (
-                                <LoreCard
-                                    key={entry.id}
-                                    entry={entry}
-                                    index={index}
-                                    rewrites={fieldRewrites}
-                                    onText={(field, value) => setLore(entry.id, field, value)}
-                                    onKeywords={(keywords) => setLore(entry.id, 'keywords', keywords)}
-                                    onAlwaysOn={(alwaysOn) => setLore(entry.id, 'alwaysOn', alwaysOn)}
-                                    onTrigger={(field, value) => setLore(entry.id, field, value)}
-                                    onPatterns={(patterns, onSaved, onError) => setLorePatterns(entry.id, patterns, onSaved, onError)}
-                                    onRemove={() => void commit(() => storyApi.removeLoreEntry(storyId, entry.id), applyWhole)}
-                                />
-                            ))}
-                            <button
-                                type="button"
-                                className={styles.add}
-                                onClick={() => void commit(() => storyApi.addLoreEntry(storyId), applyWhole)}
-                            >
-                                + Add Lore entry
-                            </button>
-                            <DocumentsSection
-                                storyId={storyId}
-                                documents={story.documents}
-                                commit={commit}
-                                applyWhole={applyWhole}
-                                onTitle={setDocumentTitle}
-                            />
-                        </section>
-                    )}
-                </div>
-            </FieldMarksContext.Provider>
-
-            {assistant.open && (
-                <StoryAssistantSheet assistant={assistant} onShow={(field) => showField(field, { focus: true })} />
+            {coverOpen && (
+                <CoverSheet story={story} commit={(run, onError) => commit(run, applyWhole, onError)} onClose={() => setCoverOpen(false)} />
             )}
+            {assistant.open && <StoryAssistantSheet assistant={assistant} onShow={(field) => showField(field, { focus: true })} />}
             {previewOpen && (
                 <OpeningPreview
                     storyId={storyId}

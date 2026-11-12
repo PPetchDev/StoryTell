@@ -8,7 +8,6 @@ import { characterColour } from '@/lib/character-colour';
 import { EMOTION_LABEL } from '@/lib/expressions';
 import { Character, referenceImageUrl } from '@/lib/story';
 
-import styles from './character-profile.module.css';
 
 /** Opens the profile of a Character in the cast; null where no profiles are on offer. */
 type OpenProfile = (characterId: number) => void;
@@ -75,38 +74,38 @@ function CharacterProfileSheet({ character, colour, onClose }: { character: Char
     const sections = SECTIONS.filter(([, field]) => character[field].trim() !== '');
     return (
         <Sheet label={name} onClose={onClose}>
-            <div className={styles.profile} style={{ '--speaker-colour': colour } as CSSProperties}>
+            <div className="flex flex-col gap-3.5 pb-2" style={{ '--speaker-colour': colour } as CSSProperties}>
                 {character.referenceImagePath ? (
                     // eslint-disable-next-line @next/next/no-img-element -- served by the API from the image folder
                     <img
-                        className={styles.reference}
+                        className="block h-auto max-h-[55dvh] max-w-full self-center rounded-xl bg-surface-raised object-contain"
                         src={referenceImageUrl(character.referenceImagePath)}
                         alt={`Reference image of ${name}`}
                         draggable={false}
                     />
                 ) : (
-                    <span className={styles.initial} aria-hidden="true">
+                    <span className="grid size-24 place-items-center self-center rounded-full bg-(--speaker-colour) text-[2.5rem] leading-none font-bold text-on-character" aria-hidden="true">
                         {name.charAt(0).toUpperCase()}
                     </span>
                 )}
                 {character.expressions.length > 0 && (
-                    <ul className={styles.expressions} aria-label="Expressions">
+                    <ul className="m-0 flex list-none flex-wrap justify-center gap-x-3.5 gap-y-2.5 p-0" aria-label="Expressions">
                         {character.expressions.map((expression) => (
-                            <li key={expression.emotion} className={styles.expression}>
+                            <li key={expression.emotion} className="flex flex-col items-center gap-1 text-sm text-muted">
                                 <PortraitImage
                                     portrait={{ src: referenceImageUrl(expression.imagePath), crop: expression.crop ?? character.portraitCrop }}
-                                    className={styles.expressionPicture}
+                                    className="size-12"
                                 />
                                 <span>{EMOTION_LABEL[expression.emotion]}</span>
                             </li>
                         ))}
                     </ul>
                 )}
-                <h2 className={styles.name}>{name}</h2>
+                <h2 className="m-0 text-center text-xl text-(color:--speaker-colour) [overflow-wrap:anywhere]">{name}</h2>
                 {sections.map(([label, field]) => (
-                    <section key={field} className={styles.section}>
-                        <h3 className={styles.label}>{label}</h3>
-                        <p className={styles.text}>{character[field]}</p>
+                    <section key={field} className="rounded-lg bg-surface-raised px-3.5 py-3">
+                        <h3 className="mt-0 mb-1 text-sm font-semibold text-muted">{label}</h3>
+                        <p className="m-0 leading-normal whitespace-pre-wrap [overflow-wrap:anywhere]">{character[field]}</p>
                     </section>
                 ))}
             </div>

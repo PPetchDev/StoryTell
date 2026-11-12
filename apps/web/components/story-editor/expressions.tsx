@@ -2,6 +2,7 @@
 
 import { ChangeEvent, useEffect, useRef, useState } from 'react';
 
+import { announce } from '@/components/announcer';
 import { useConnection } from '@/components/connection';
 import { PortraitImage } from '@/components/portrait/portrait-image';
 import { ApiError, apiFetch, ApiUnreachableError } from '@/lib/api';
@@ -9,9 +10,10 @@ import { preparedForUpload } from '@/lib/cover';
 import { EMOTION_LABEL, Expression, EXPRESSION_EMOTIONS, ExpressionEmotion } from '@/lib/expressions';
 import { Character, PortraitCrop, referenceImageUrl, Story, storyApi } from '@/lib/story';
 import { SettingsResponse, usd } from '@/lib/types';
-import { ConfirmButton } from './fields';
+import { ConfirmButton, FIELD_HINT } from './fields';
+import { SUBSECTION, SUBSECTION_LEGEND } from './folding-card';
 import { PortraitCropper } from './portrait-cropper';
-import styles from './expressions.module.css';
+import { UndoNotice, useUndo } from './undo-notice';
 
 /** Runs a write that answers with the whole Story, after pending edits; a failure goes to `onError`. */
 type Commit = (run: () => Promise<Story>, onError: (message: string) => void) => Promise<Story | undefined>;
@@ -70,14 +72,14 @@ export function Expressions({ storyId, character, commit, flush, onDrawn }: Expr
     const byEmotion = new Map(character.expressions.map((expression) => [expression.emotion, expression]));
     const price = useDrawPrice();
     return (
-        <fieldset className="subsection">
-            <legend>Expressions</legend>
-            <p className="hint">
+        <fieldset className={`${SUBSECTION} lg:col-span-2`}>
+            <legend className={SUBSECTION_LEGEND}>Expressions</legend>
+            <p className={`${FIELD_HINT} mb-2`}>
                 A picture for each feeling. In a Chat, a line that shows one has this picture in place of the Portrait; the
                 others keep the Portrait.
             </p>
-            {character.referenceImagePath === null && <p className="hint">Add a Reference image to draw Expressions.</p>}
-            <ul className={styles.rows}>
+            {character.referenceImagePath === null && <p className={`${FIELD_HINT} mb-2`}>Add a Reference image to draw Expressions.</p>}
+            <ul className="m-0 mt-2 flex list-none flex-col gap-3 p-0">
                 {EXPRESSION_EMOTIONS.map((emotion) => (
                     <ExpressionRow
                         key={emotion}
@@ -114,7 +116,13 @@ function ExpressionRow({ storyId, character, heading, emotion, expression, price
     const [cropError, setCropError] = useState<string | null>(null);
     const [cropping, setCropping] = useState(false);
     const fileInput = useRef<HTMLInputElement>(null);
+    const row = useRef<HTMLDivElement>(null);
+    const undo = useUndo();
     const label = EMOTION_LABEL[emotion];
+    // A status mounted with its words is often not read: say each write as it starts too (audit H12).
+    useEffect(() => {
+        if (busy) announce(`${label}: ${busy}`);
+    }, [busy, label]);
     const src = expression ? referenceImageUrl(expression.imagePath) : null;
     const canDraw = character.referenceImagePath !== null;
     const drawLabel = price === null ? 'Draw' : `Draw · ${usd(price)}`;
@@ -139,6 +147,8 @@ function ExpressionRow({ storyId, character, heading, emotion, expression, price
         try {
             await flush();
             onDrawn(await storyApi.drawExpression(storyId, character.id, emotion));
+            // The picture changes out of sight of a screen reader (audit H12).
+            announce(`Drew the ${label} Expression.`);
         } catch (caught) {
             if (caught instanceof ApiUnreachableError) reportUnreachable();
             else if (caught instanceof ApiError && caught.code === OUT_OF_IMAGE_CREDIT) {
@@ -160,6 +170,19 @@ function ExpressionRow({ storyId, character, heading, emotion, expression, price
         });
     };
 
+    /** Reset acts at once, with an Undo that puts the picked square back (audit H3). */
+    const resetCrop = () => {
+        const before = expression?.crop;
+        void save('Saving…', () => storyApi.clearExpressionCrop(storyId, character.id, emotion)).then((saved) => {
+            if (!saved || !before) return;
+            undo.offer({
+                message: `Reset the ${label} Expression to the Portrait's face square.`,
+                undo: () => void save('Saving…', () => storyApi.setExpressionCrop(storyId, character.id, emotion, before)),
+                focusAfterUndo: () => row.current?.querySelector<HTMLElement>('[data-reset-face]'),
+            });
+        });
+    };
+
     const saveCrop = (crop: PortraitCrop) => {
         void save('Saving…', () => storyApi.setExpressionCrop(storyId, character.id, emotion, crop), setCropError).then((saved) => {
             if (saved) setCropping(false);
@@ -167,33 +190,36 @@ function ExpressionRow({ storyId, character, heading, emotion, expression, price
     };
 
     return (
-        <li className={styles.row} role="group" aria-label={`${label} Expression`}>
+        <li>
+        <div ref={row} className="flex flex-wrap items-center gap-x-2.5 gap-y-2" role="group" aria-label={`${label} Expression`}>
             {src ? (
-                <PortraitImage portrait={{ src, crop: expression!.crop ?? character.portraitCrop }} className={styles.thumb} />
+                <PortraitImage portrait={{ src, crop: expression!.crop ?? character.portraitCrop }} className="size-11 flex-none" />
             ) : (
-                <span className={`${styles.thumb} ${styles.empty}`} aria-hidden="true" />
+                <span className="block size-11 flex-none rounded-full border border-dashed border-faint" aria-hidden="true" />
             )}
-            <div className={styles.text}>
-                <span className={styles.label}>{label}</span>
+            <div className="flex min-w-24 flex-1 flex-col gap-0.5">
+                <span className="font-semibold">{label}</span>
                 {busy && (
-                    <span className="hint" role="status">
+                    <span className="hint mt-0" role="status">
                         {busy}
                     </span>
                 )}
-                {!busy && expression?.outdated && <span className="hint">Drawn from an earlier Reference image.</span>}
+                {!busy && expression?.outdated && <span className="hint mt-0">Drawn from an earlier Reference image.</span>}
                 {!busy && expression && !expression.outdated && (
-                    <span className="hint">{expression.crop ? 'Its own face square.' : "The Portrait's face square."}</span>
+                    <span className="hint mt-0">{expression.crop ? 'Its own face square.' : "The Portrait's face square."}</span>
                 )}
             </div>
-            <div className={styles.tools}>
+            {/* Full-size buttons, 8px apart (audit H25), each named for its row (M11). */}
+            <div className="flex flex-wrap gap-2">
                 {canDraw && !expression && (
-                    <button type="button" className="button button-small" disabled={busy !== null} onClick={() => void draw()}>
+                    <button type="button" className="button" disabled={busy !== null} onClick={() => void draw()}>
                         {drawLabel}
                     </button>
                 )}
                 {canDraw && expression && (
                     <ConfirmButton
                         label="Draw again"
+                        ariaLabel={`Draw again: ${label}`}
                         disabled={busy !== null}
                         question={`Draw a new ${label} Expression?`}
                         warning="It replaces the current one."
@@ -201,20 +227,34 @@ function ExpressionRow({ storyId, character, heading, emotion, expression, price
                         onConfirm={() => void draw()}
                     />
                 )}
-                <button type="button" className="button button-quiet button-small" disabled={busy !== null} onClick={() => fileInput.current?.click()}>
+                <button
+                    type="button"
+                    className="button button-quiet"
+                    aria-label={`Upload ${label}`}
+                    disabled={busy !== null}
+                    onClick={() => fileInput.current?.click()}
+                >
                     Upload
                 </button>
                 {expression && (
-                    <button type="button" className="button button-quiet button-small" disabled={busy !== null} onClick={() => setCropping(true)}>
+                    <button
+                        type="button"
+                        className="button button-quiet"
+                        aria-label={`Pick the face for ${label}`}
+                        disabled={busy !== null}
+                        onClick={() => setCropping(true)}
+                    >
                         Pick the face
                     </button>
                 )}
                 {expression?.crop && (
                     <button
                         type="button"
-                        className="button button-quiet button-small"
+                        className="button button-quiet"
+                        data-reset-face=""
+                        aria-label={`Reset ${label}`}
                         disabled={busy !== null}
-                        onClick={() => void save('Saving…', () => storyApi.clearExpressionCrop(storyId, character.id, emotion))}
+                        onClick={resetCrop}
                     >
                         Reset
                     </button>
@@ -222,6 +262,7 @@ function ExpressionRow({ storyId, character, heading, emotion, expression, price
                 {expression && (
                     <ConfirmButton
                         label="Remove"
+                        ariaLabel={`Remove ${label}`}
                         danger
                         disabled={busy !== null}
                         question={`Remove the ${label} Expression?`}
@@ -241,10 +282,13 @@ function ExpressionRow({ storyId, character, heading, emotion, expression, price
                 onChange={(event) => void upload(event)}
             />
             {error && (
-                <p className={`field-error ${styles.error}`} role="alert">
+                <p className="field-error m-0 basis-full" role="alert">
                     {error}
                 </p>
             )}
+            <div className="basis-full empty:hidden">
+                <UndoNotice undo={undo} />
+            </div>
             {cropping && src && (
                 <PortraitCropper
                     name={heading}
@@ -262,6 +306,7 @@ function ExpressionRow({ storyId, character, heading, emotion, expression, price
                     imageAlt={`${label} Expression of ${heading}`}
                 />
             )}
+        </div>
         </li>
     );
 }

@@ -51,7 +51,8 @@ test('a pasted Document is added with its passage count and survives a reload', 
         });
         await sheet.getByRole('button', { name: 'Add', exact: true }).tap();
         await expect(sheet.getByRole('button', { name: 'Adding…' })).toBeDisabled();
-        await expect(sheet.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+        // Cancel stays usable while it adds (audit H6): closing lets the Add carry on.
+        await expect(sheet.getByRole('button', { name: 'Cancel' })).toBeEnabled();
         release();
 
         await expect(sheet).toHaveCount(0);
@@ -163,7 +164,7 @@ async function scriptTurn(request: APIRequestContext) {
 async function openMemory(page: Page) {
     await page.getByRole('button', { name: 'Chat menu' }).click();
     await page.getByRole('dialog', { name: 'Chat menu' }).getByRole('button', { name: /^Memory/ }).click();
-    return page.getByRole('complementary', { name: 'Memory' });
+    return page.getByRole('dialog', { name: 'Memory' });
 }
 
 test('the Memory drawer lists the passages the last turn used, and says when its search failed', async ({ page, request }) => {

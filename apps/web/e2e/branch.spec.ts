@@ -89,7 +89,7 @@ test('⑂ Branch on an earlier reply opens "Chat 1 (branch)" ending on it, and t
         // An earlier reply shows ✎ Edit · ▶ Read aloud · ไทย · ⑂ Branch once tapped, ⑂ last (integration: "Message actions").
         await replies.first().tap();
         const tools = replies.first().getByRole('group', { name: 'Message tools' });
-        await expect(tools.getByRole('button')).toHaveText(['✎Edit', '▶Read aloud', 'ไทย', '⑂Branch']);
+        await expect(tools.getByRole('button')).toHaveText(['Edit', 'Read aloud', 'ไทย', 'Branch']);
         await tapBranch(tools);
 
         const branchId = await openedChat(page, played);
@@ -222,13 +222,13 @@ test('while the Story is unplayable a tapped User Message offers ⑂ Branch alon
         await page.goto(`/stories/${played.storyId}/chats/${played.chatId}`);
         const said = page.getByRole('article', { name: 'Ash said' }).first();
         await said.tap();
-        await expect(said.getByRole('group', { name: 'Message tools' }).getByRole('button')).toHaveText(['✎Edit', 'ไทย', '⑂Branch']);
+        await expect(said.getByRole('group', { name: 'Message tools' }).getByRole('button')).toHaveText(['Edit', 'ไทย', 'Branch']);
 
         await request.patch(`/api/stories/${played.storyId}`, { data: { setting: '' } });
         await page.reload();
         await said.tap();
         const tools = said.getByRole('group', { name: 'Message tools' });
-        await expect(tools.getByRole('button')).toHaveText(['ไทย', '⑂Branch']);
+        await expect(tools.getByRole('button')).toHaveText(['ไทย', 'Branch']);
         await tapBranch(tools);
 
         await openedChat(page, played);

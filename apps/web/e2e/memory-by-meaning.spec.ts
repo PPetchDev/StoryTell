@@ -44,7 +44,7 @@ async function play(request: APIRequestContext, storyId: number, chatId: number,
 async function openMemory(page: Page): Promise<Locator> {
     await page.getByRole('button', { name: 'Chat menu' }).click();
     await page.getByRole('dialog', { name: 'Chat menu' }).getByRole('button', { name: /^Memory/ }).click();
-    const drawer = page.getByRole('complementary', { name: 'Memory' });
+    const drawer = page.getByRole('dialog', { name: 'Memory' });
     await expect(drawer).toBeVisible();
     return drawer;
 }
@@ -87,12 +87,12 @@ test('Unlock on a locked Memory lets the AI change it again, and stays after a r
 
         await page.goto(`/stories/${storyId}/chats/${chatId}`);
         const drawer = await openMemory(page);
-        const memory = drawer.getByRole('listitem', { name: `Memory ${memoryId}` });
-        await expect(memory.getByText('🔒 Locked')).toBeVisible();
+        const memory = drawer.locator(`li[data-memory-id="${memoryId}"]`);
+        await expect(memory.getByText('Locked', { exact: true })).toBeVisible();
 
         await memory.getByRole('button', { name: 'Unlock' }).click();
 
-        await expect(memory.getByText('🔒 Locked')).toHaveCount(0);
+        await expect(memory.getByText('Locked', { exact: true })).toHaveCount(0);
         await expect(memory.getByRole('button', { name: 'Unlock' })).toHaveCount(0);
         expect((await (await request.get(`/api/stories/${storyId}/chats/${chatId}/memories`)).json()).memories).toMatchObject([
             { id: memoryId, locked: false, text: 'The ferry runs on Sundays.' },
@@ -100,9 +100,9 @@ test('Unlock on a locked Memory lets the AI change it again, and stays after a r
         await noSidewaysScroll(page);
 
         await page.reload();
-        const again = (await openMemory(page)).getByRole('listitem', { name: `Memory ${memoryId}` });
+        const again = (await openMemory(page)).locator(`li[data-memory-id="${memoryId}"]`);
         await expect(again.getByText('The ferry runs on Sundays.')).toBeVisible();
-        await expect(again.getByText('🔒 Locked')).toHaveCount(0);
+        await expect(again.getByText('Locked', { exact: true })).toHaveCount(0);
     } finally {
         await request.delete(`/api/stories/${storyId}`);
     }
