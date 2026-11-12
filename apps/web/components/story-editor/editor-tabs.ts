@@ -61,6 +61,16 @@ export function tabsWithMissing(missing: MissingField[], story: Story): Set<TabK
     return new Set(missing.map((item) => placeOf(item.field, story).tab));
 }
 
+/** How many missing fields each tab holds, for the count on its tab (audit L30: not colour alone). */
+export function missingByTab(missing: MissingField[], story: Story): Map<TabKey, number> {
+    const counts = new Map<TabKey, number>();
+    for (const item of missing) {
+        const { tab } = placeOf(item.field, story);
+        counts.set(tab, (counts.get(tab) ?? 0) + 1);
+    }
+    return counts;
+}
+
 /** The DOM ids of the inputs that are empty and needed to play, for their "Needed to play" marks. */
 export function neededIds(missing: MissingField[], story: Story): Set<string> {
     const ids = new Set<string>();

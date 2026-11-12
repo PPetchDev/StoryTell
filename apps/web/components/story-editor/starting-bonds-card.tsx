@@ -7,10 +7,9 @@ import { BOND_AXES, BondAxis } from '@/lib/bonds';
 import { Portrait } from '@/lib/character-colour';
 import { Character, Role, StartingBond } from '@/lib/story';
 import { BondLevelField } from './bond-level-field';
-import { TextField } from './fields';
-import { FoldingCard } from './folding-card';
+import { ConfirmButton, INPUT_BOX, inputEdge, TextField } from './fields';
+import { cardToggle, FoldingCard, NOTE } from './folding-card';
 import { FieldRewrites, rewritableField } from './rewrite';
-import styles from './story-editor.module.css';
 
 interface StartingBondsCardProps {
     /** The Character the Bonds go from. */
@@ -27,10 +26,14 @@ interface StartingBondsCardProps {
     onText(bondId: number, field: 'label' | 'description', value: string): void;
     /** A starting level picked by its word (.scratch/bond-axes/spec.md). */
     onLevel(bondId: number, axis: BondAxis, level: number): void;
-    onRemove(bondId: number): void;
+    /** Removes the Bond; focus goes back to the card's title once the promise it returns settles. */
+    onRemove(bondId: number): void | Promise<unknown>;
 }
 
 const ROLE_TARGET = 'role';
+
+/** One Bond in the card: a hairline above each but the first (the editor's own, not the Dashboard's .bond). */
+const BOND = 'mt-4 border-t border-line pt-4 first:mt-0 first:border-t-0 first:pt-0';
 
 /** One Character's StartingBonds, on the Bonds tab, folding: where they stand with the others at the start. */
 export function StartingBondsCard(props: StartingBondsCardProps) {
@@ -62,19 +65,27 @@ export function StartingBondsCard(props: StartingBondsCardProps) {
             fieldPrefixes={bonds.map((bond) => `field-startingBond.${bond.id}.`)}
             title={
                 <>
-                    <CharacterPortrait name={name} colour={props.colour} portrait={props.portrait} className={styles.cardPortrait} />
+                    <CharacterPortrait name={name} colour={props.colour} portrait={props.portrait} className="size-9 flex-none text-note" />
                     From {name}
                 </>
             }
         >
-            {bonds.length === 0 && <p className={styles.note}>Optional. With none, {name} starts as a stranger to everyone.</p>}
+            {bonds.length === 0 && <p className={NOTE}>Optional. With none, {name} starts as a stranger to everyone.</p>}
             {bonds.map((bond) => (
-                <div className={styles.bond} key={bond.id} role="group" aria-label={`Bond toward ${targetName(bond.toCharacterId)}`}>
-                    <div className={styles.cardHeader}>
+                <div className={BOND} key={bond.id} role="group" aria-label={`Bond toward ${targetName(bond.toCharacterId)}`}>
+                    <div className="mb-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
                         <strong>Toward {targetName(bond.toCharacterId)}</strong>
-                        <button type="button" className="button button-quiet button-small" onClick={() => props.onRemove(bond.id)}>
-                            Remove Bond
-                        </button>
+                        {/* Its label, description and levels go with it, so it asks first (audit H3). */}
+                        <ConfirmButton
+                            label="Remove Bond"
+                            ariaLabel={`Remove Bond toward ${targetName(bond.toCharacterId)}`}
+                            question={`Remove the Bond toward ${targetName(bond.toCharacterId)}?`}
+                            warning="Its label, description and starting levels go too."
+                            confirmLabel="Remove"
+                            danger
+                            onConfirm={() => props.onRemove(bond.id)}
+                            focusAfter={() => cardToggle(`Starting Bonds from ${name}`)}
+                        />
                     </div>
                     <TextField
                         label="Label"
@@ -92,7 +103,7 @@ export function StartingBondsCard(props: StartingBondsCardProps) {
                         onChange={(v) => props.onText(bond.id, 'description', v)}
                         {...rewritable(bond.id, 'description')}
                     />
-                    <div role="group" aria-label="Starting levels" className={styles.bondLevels}>
+                    <div role="group" aria-label="Starting levels" className="grid grid-cols-[repeat(auto-fit,minmax(9rem,1fr))] items-start gap-x-3">
                         {BOND_AXES.map((axis) => (
                             <BondLevelField key={axis} axis={axis} value={bond[axis]} onChange={(level) => props.onLevel(bond.id, axis, level)} />
                         ))}
@@ -100,10 +111,10 @@ export function StartingBondsCard(props: StartingBondsCardProps) {
                 </div>
             ))}
             {targets.length > 0 && (
-                <div className={styles.addBond}>
-                    <label>
-                        Toward{' '}
-                        <select value={chosen} onChange={(event) => setTarget(event.target.value)}>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <label className="flex min-w-0 items-center gap-2 text-md font-semibold text-muted">
+                        Toward
+                        <select className={`${INPUT_BOX} ${inputEdge()} max-w-full font-normal`} value={chosen} onChange={(event) => setTarget(event.target.value)}>
                             {targets.map((option) => (
                                 <option key={option.value} value={option.value}>
                                     {option.label}

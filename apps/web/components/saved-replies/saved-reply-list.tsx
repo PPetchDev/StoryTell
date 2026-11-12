@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import type { Autosave } from '@/components/story-editor/autosave';
 import { TextField } from '@/components/story-editor/fields';
-import editorStyles from '@/components/story-editor/story-editor.module.css';
+import { ADD_BUTTON } from '@/components/story-editor/add-button';
 import { SavedReply, SavedReplyStore } from '@/lib/saved-replies';
 import styles from './saved-replies.module.css';
 
@@ -117,7 +117,7 @@ export function SavedReplyList({ initial, store, autosave, saveKey }: {
                     </div>
                 </div>
             ))}
-            <button type="button" className={editorStyles.add} onClick={add}>
+            <button type="button" className={ADD_BUTTON} onClick={add}>
                 + Add saved reply
             </button>
         </div>

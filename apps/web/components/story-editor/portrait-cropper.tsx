@@ -6,8 +6,6 @@ import { DEFAULT_PORTRAIT_CROP, PortraitImage } from '@/components/portrait/port
 import { Sheet } from '@/components/sheet/sheet';
 import { PortraitCrop } from '@/lib/story';
 
-import styles from './portrait-cropper.module.css';
-
 /** The smallest square, as a fraction of the image's width: about a face in a full-body image. */
 const MIN_SIZE = 0.15;
 
@@ -42,8 +40,9 @@ interface PortraitCropperProps {
 }
 
 /**
- * Picks the Portrait: drag the square over the face, size it with the slider, and see the
- * round picture the Chat will show.
+ * Picks the Portrait: drag the square over the face, or tap where the face is, as on the Cover's
+ * picker (audit L32); size it with the slider, and see the round picture the Chat will show.
+ * Only the square holds a finger's drag; the rest of the picture scrolls the sheet (M45).
  */
 export function PortraitCropper({ name, src, initial, saving, error, onSave, onClose, sheetLabel, title, imageAlt }: PortraitCropperProps) {
     const stage = useRef<HTMLDivElement>(null);
@@ -77,6 +76,14 @@ export function PortraitCropper({ name, src, initial, saving, error, onSave, onC
     const end = () => {
         drag.current = null;
     };
+    /** A tap on the picture, off the square: the square centres there. */
+    const jump = (event: PointerEvent<HTMLDivElement>) => {
+        const box = stage.current?.getBoundingClientRect();
+        if (!shown || heightUnits === null || !box || event.target !== event.currentTarget.querySelector('img')) return;
+        const x = (event.clientX - box.left) / box.width - shown.size / 2;
+        const y = (event.clientY - box.top) / box.width - shown.size / 2;
+        setCrop(clampCrop({ ...shown, x, y }, heightUnits));
+    };
 
     const resize = (size: number) => {
         if (!shown || heightUnits === null) return;
@@ -88,11 +95,11 @@ export function PortraitCropper({ name, src, initial, saving, error, onSave, onC
 
     return (
         <Sheet label={sheetLabel ?? `Chat picture of ${name}`} title={title ?? 'Chat picture'} onClose={onClose}>
-            <p className="hint">Drag the square over {name}&apos;s face. The slider zooms.</p>
-            <div className={styles.stage} ref={stage}>
+            <p className="hint">Drag the square over {name}&apos;s face, or tap the face. The slider zooms.</p>
+            <div className="relative mx-auto mt-2 mb-3 w-[min(100%,22rem)] overflow-hidden rounded-sm select-none" ref={stage} onPointerDown={jump}>
                 {/* eslint-disable-next-line @next/next/no-img-element -- served by the API from the image folder */}
                 <img
-                    className={styles.image}
+                    className="block h-auto w-full rounded-sm"
                     src={src}
                     alt={imageAlt ?? `Reference image of ${name}`}
                     draggable={false}
@@ -100,9 +107,18 @@ export function PortraitCropper({ name, src, initial, saving, error, onSave, onC
                 />
                 {shown && heightUnits !== null && (
                     <div
-                        className={styles.square}
+                        className={[
+                            'absolute cursor-grab touch-none rounded-full border-2 border-accent-text active:cursor-grabbing',
+                            // Everything outside the circle is dimmed with the scrim; the frame is white in both themes.
+                            'shadow-[0_0_0_100vmax_var(--scrim)] focus-ring',
+                        ].join(' ')}
                         role="slider"
                         aria-label="Face square position"
+                        // A slider needs a value (audit M44): how far across, with both directions in its text.
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={Math.round(shown.x * 100)}
+                        aria-orientation="horizontal"
                         aria-valuetext={`${Math.round(shown.x * 100)}% from the left, ${Math.round((shown.y / heightUnits) * 100)}% from the top`}
                         tabIndex={0}
                         style={{
@@ -132,12 +148,12 @@ export function PortraitCropper({ name, src, initial, saving, error, onSave, onC
                 )}
             </div>
             {shown && heightUnits !== null && (
-                <div className={styles.controls}>
-                    <label className={styles.zoom}>
+                <div className="mb-3 flex items-center gap-4">
+                    <label className="flex flex-1 flex-col gap-1 text-md text-muted">
                         <span>Zoom</span>
                         <input
                             type="range"
-                            aria-label="Zoom"
+                            className="min-h-11 w-full accent-accent"
                             min={MIN_SIZE}
                             max={Math.min(1, heightUnits)}
                             step={0.01}
@@ -146,8 +162,8 @@ export function PortraitCropper({ name, src, initial, saving, error, onSave, onC
                             onChange={(event) => resize(Math.min(1, heightUnits) + MIN_SIZE - Number(event.target.value))}
                         />
                     </label>
-                    <div className={styles.preview}>
-                        <PortraitImage portrait={{ src, crop: shown }} className={styles.previewImage} />
+                    <div className="flex flex-none flex-col items-center gap-1">
+                        <PortraitImage portrait={{ src, crop: shown }} className="size-14" />
                         <span className="hint">In the Chat</span>
                     </div>
                 </div>
@@ -157,7 +173,7 @@ export function PortraitCropper({ name, src, initial, saving, error, onSave, onC
                     Couldn&apos;t save the chat picture: {error}
                 </p>
             )}
-            <button type="button" className="button" disabled={!shown || saving} onClick={() => shown && onSave(shown)}>
+            <button type="button" className="button w-full" disabled={!shown || saving} aria-busy={saving || undefined} onClick={() => shown && onSave(shown)}>
                 {saving ? 'Saving…' : 'Use this picture'}
             </button>
         </Sheet>

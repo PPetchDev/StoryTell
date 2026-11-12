@@ -15,7 +15,6 @@
 @import 'tailwindcss/utilities.css' layer(utilities) source('..');
 
 @import './styles/home.css';
-@import './styles/editor.css';
 @import './styles/chats.css';
 @import './styles/chat.css';
 @import './styles/dashboard.css';

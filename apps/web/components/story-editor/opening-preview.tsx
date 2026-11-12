@@ -4,12 +4,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { MessageBody } from '@/components/chat/message-body';
 import { useConnection } from '@/components/connection';
+import { PlayIcon } from '@/components/icons';
+import { ErrorState, Loading } from '@/components/query-state';
 import { Sheet } from '@/components/sheet/sheet';
 import { ApiError, ApiUnreachableError } from '@/lib/api';
 import { Cast, Portraits } from '@/lib/character-colour';
 import { AiMessage, MessagePart } from '@/lib/chat';
 import { storyApi } from '@/lib/story';
-import styles from './opening-preview.module.css';
 
 type Preview = { kind: 'loading' } | { kind: 'error'; message: string } | { kind: 'ready'; parts: MessagePart[] };
 
@@ -62,27 +63,23 @@ export function OpeningPreview({ storyId, cast, portraits, playable, flush, onPl
 
     return (
         <Sheet label="Opening preview" onClose={onClose}>
-            <p className={styles.kicker}>How every Chat begins</p>
-            {preview.kind === 'loading' && <p className="muted">Loading…</p>}
+            <p className="mt-0 mb-3 text-xs font-bold tracking-wider text-muted uppercase">How every Chat begins</p>
+            {preview.kind === 'loading' && <Loading label="Loading the Opening…" lines={2} className="mb-4" />}
             {preview.kind === 'error' && (
-                <p role="alert" className={styles.error}>
-                    Couldn&apos;t show the preview: {preview.message}{' '}
-                    <button type="button" className="button button-quiet button-small" onClick={() => void load()}>
-                        Retry
-                    </button>
-                </p>
+                <ErrorState error={preview.message} title="Couldn't show the preview." onRetry={() => void load()} className="mb-4" />
             )}
             {preview.kind === 'ready' &&
                 (preview.parts.length === 0 ? (
                     <p className="muted">The Opening is empty. Write it on the Story tab.</p>
                 ) : (
-                    <div className={styles.thread}>
+                    <div className="mb-4">
                         <MessageBody message={asMessage(preview.parts)} cast={cast} portraits={portraits} />
                     </div>
                 ))}
-            {!playable && <p className={styles.waiting}>Fill in the missing fields to play.</p>}
-            <button type="button" className={`button ${styles.play}`} disabled={!playable} onClick={onPlay}>
-                ▶ Play
+            {!playable && <p className="mt-0 mb-2 text-center text-md text-muted">Fill in the missing fields to play.</p>}
+            <button type="button" className="button w-full" disabled={!playable} onClick={onPlay}>
+                <PlayIcon size={18} />
+                Play
             </button>
         </Sheet>
     );

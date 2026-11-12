@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 
 import type { Autosave } from '@/components/story-editor/autosave';
 import { OrderButtons, TextField } from '@/components/story-editor/fields';
-import editorStyles from '@/components/story-editor/story-editor.module.css';
+import { ADD_BUTTON } from '@/components/story-editor/add-button';
 import { regexCompileError, ReplaceRule, ReplaceRuleFields, ReplaceRuleStore } from '@/lib/replace-rules';
 import styles from './replace-rules.module.css';
 import { useTryRule } from './use-try-rule';
@@ -187,7 +187,7 @@ export function ReplaceRuleList({ initial, store, autosave, saveKey }: {
                     </section>
                 );
             })}
-            <button type="button" className={editorStyles.add} onClick={add}>
+            <button type="button" className={ADD_BUTTON} onClick={add}>
                 + Add replace rule
             </button>
         </div>
