@@ -19,7 +19,7 @@ import {
 
 import { ACTION, ACTION_ICON, MessageTabStop } from '@/components/chat/chat-classes';
 import { AiMessageParts, MessageBody, UserLine } from '@/components/chat/message-body';
-import { ReadAloudAction, ReadAloudControls, useReadAloud, useReadingNow } from '@/components/chat/read-aloud';
+import { ReadAloudAction, ReadAloudControls, readingNowOf, useReadAloud } from '@/components/chat/read-aloud';
 import { MessageSnapshots } from '@/components/chat/snapshots';
 import { ThaiReadingAction, ThaiReadingBlock, ThaiReadings } from '@/components/chat/thai-reading';
 import { BranchIcon, CameraIcon, ChevronLeftIcon, ChevronRightIcon, MoreIcon, PencilIcon, UndoIcon } from '@/components/icons';
@@ -338,30 +338,54 @@ function ActionRow({ onAgain, onEdit, onSnapshot, onBranch, versions, read, thai
     return <OverflowActions label="Message actions" className="mt-2" items={items} />;
 }
 
+/** The Chat screen's callbacks and the thread's own, through one object that never changes. */
+interface RowHandlers extends Handlers {
+    /** Whether a tap on a Message may show its Edit now: no turn or write in flight, no edit open. */
+    canTap(): boolean;
+    /** Shows or hides a Message's Edit. */
+    onTap(messageId: number): void;
+    onThaiToggle(message: Message): void;
+    onThaiRetry(messageId: number): void;
+}
+
+/**
+ * One Message's props: each is a primitive, a stable object, or the Message itself, compared by
+ * content (audit M32). So a finished reply, which refetches the Chat and gives every Message a
+ * new object, redraws only the rows whose content or place changed.
+ */
 interface MessageViewProps {
     message: Message;
     cast: Cast;
     portraits: Portraits;
+    /** How many Messages come after it, while it is edited (saving discards them); 0 otherwise. */
     later: number;
     editing: boolean;
     /** The thread's one tab stop (audit H10): the others take focus from the arrow keys. */
     tabStop: boolean;
     /** Tells the Message what the arrow keys move to. */
     keysHintId: string;
-    /** What shows under the Message: its Edit once tapped, or the action row. */
-    tools: ReactNode;
-    /** Its Thai reading, or why one failed: under the story text, above the Snapshots. */
-    reading: ReactNode;
-    /** Its Snapshots and Snapshot jobs, for an AI Message. */
-    snapshots: ReactNode;
-    /** Read aloud's Pause, Resume and Stop while it is being read, whether or not its tools show. */
-    readAloud: ReactNode;
-    /** A tap on the Message shows or hides its Edit; null when it has none to show. */
-    onTap: (() => void) | null;
-    /** A sideways swipe: 1 for the next Reply version (a swipe left), -1 for the one before; null when it has none. */
-    onSwipe: ((step: 1 | -1) => void) | null;
-    onSave(text: string): void;
-    onCancel(): void;
+    /** It carries the action row: the latest AI Message, while Edit and Branch are offered. */
+    withRow: boolean;
+    /** With the action row, it is also the newest Message: ↺ Again and its Reply versions. */
+    newest: boolean;
+    /** Its Edit shows after a tap. */
+    tapped: boolean;
+    /** Sending is blocked; read only where the action row or a tapped Message's tools show. */
+    blocked: boolean;
+    /** The Chat has a Read aloud player. */
+    readable: boolean;
+    /** It is the Message the player reads (or last read). */
+    beingRead: boolean;
+    /** The part and paragraph being read out, while it is being read. */
+    readPart: number | null;
+    readParagraph: number | null;
+    thaiShown: boolean;
+    thaiBusy: boolean;
+    thaiFailed: boolean;
+    /** Its Snapshots and Snapshot jobs. */
+    snapshots: Snapshot[];
+    jobs: SnapshotJob[];
+    handlers: RowHandlers;
 }
 
 const MESSAGE = [
@@ -370,6 +394,52 @@ const MESSAGE = [
     // A Dashboard or Memory link's Message, outlined (ticket 27); `message-target` is set by script.
     '[&.message-target]:outline-2 [&.message-target]:outline-offset-2 [&.message-target]:outline-accent',
 ].join(' ');
+
+/**
+ * A Message that shows its Edit on a tap, while the thread allows taps (`data-can-tap`, set while
+ * Edit is offered). The thread's attribute, not a prop, so a turn starting or ending redraws no
+ * Message. The pointer is set on hover only, and the tap flash is off for good: both are inherited,
+ * and switching either on every Message restyled the whole thread twice a turn (audit M32).
+ */
+const TAPPABLE = '[[data-can-tap]_&:hover]:cursor-pointer [-webkit-tap-highlight-color:transparent]';
+
+/** Same story text, speaker and versions: what a Message row draws from (the rest is in its other props). */
+function sameMessage(a: Message, b: Message): boolean {
+    if (a === b) return true;
+    if (a.id !== b.id || a.thaiReading !== b.thaiReading) return false;
+    if (a.kind === 'user' || b.kind === 'user') {
+        return a.kind === 'user' && b.kind === 'user' && a.text === b.text && a.identityName === b.identityName;
+    }
+    return (
+        a.model === b.model &&
+        a.versions?.current === b.versions?.current &&
+        a.versions?.count === b.versions?.count &&
+        a.parts.length === b.parts.length &&
+        a.parts.every((part, index) => sameFields(part, b.parts[index]))
+    );
+}
+
+/** The same keys holding the same values, one level deep. */
+function sameFields(a: object, b: object): boolean {
+    const keys = Object.keys(a) as (keyof typeof a)[];
+    return keys.length === Object.keys(b).length && keys.every((key) => a[key] === b[key]);
+}
+
+/** Snapshots and jobs come back as new objects on every re-read; compared by what they hold. */
+function sameItems<T extends object>(a: T[], b: T[]): boolean {
+    return a === b || (a.length === b.length && a.every((item, index) => JSON.stringify(item) === JSON.stringify(b[index])));
+}
+
+function sameRow(prev: MessageViewProps, next: MessageViewProps): boolean {
+    for (const key of Object.keys(next) as (keyof MessageViewProps)[]) {
+        if (key === 'message') {
+            if (!sameMessage(prev.message, next.message)) return false;
+        } else if (key === 'snapshots' || key === 'jobs') {
+            if (!sameItems<object>(prev[key], next[key])) return false;
+        } else if (!Object.is(prev[key], next[key])) return false;
+    }
+    return true;
+}
 
 /** The thread's own keys on a Message: up and down to the Messages beside it, Home and End to the ends. */
 function moveBetweenMessages(event: KeyboardEvent<HTMLElement>): boolean {
@@ -389,7 +459,11 @@ function moveBetweenMessages(event: KeyboardEvent<HTMLElement>): boolean {
     return true;
 }
 
-function MessageView({
+/**
+ * One Message, with what goes under it: its Thai reading, Snapshots, tools and Read aloud controls.
+ * Memoised (audit M32): it redraws only when its own props change, compared by `sameRow`.
+ */
+const MessageView = memo(function MessageView({
     message,
     cast,
     portraits,
@@ -397,16 +471,76 @@ function MessageView({
     editing,
     tabStop,
     keysHintId,
-    tools,
-    reading,
+    withRow,
+    newest,
+    tapped,
+    blocked,
+    readable,
+    beingRead,
+    readPart,
+    readParagraph,
+    thaiShown,
+    thaiBusy,
+    thaiFailed,
     snapshots,
-    readAloud,
-    onTap,
-    onSwipe,
-    onSave,
-    onCancel,
+    jobs,
+    handlers,
 }: MessageViewProps) {
-    const readingNow = useReadingNow(message.id);
+    const readingNow = useMemo(() => (readPart === null ? null : { partIndex: readPart, paragraph: readParagraph }), [readPart, readParagraph]);
+    const readings = useMemo<ThaiReadings>(
+        () => ({
+            shown: () => thaiShown,
+            busy: () => thaiBusy,
+            failed: () => thaiFailed,
+            toggle: handlers.onThaiToggle,
+            retry: handlers.onThaiRetry,
+        }),
+        [thaiShown, thaiBusy, thaiFailed, handlers],
+    );
+
+    const edit = () => handlers.onEdit(message.id);
+    const branch = () => handlers.onBranch(message.id);
+    /** ▶ Read aloud for an AI Message, unless it is the one being read (its controls show instead). */
+    const read = message.kind === 'ai' && readable && !beingRead ? <ReadAloudAction messageId={message.id} /> : null;
+    // Only the newest reply has Reply versions, and they change only while no turn or write is in flight.
+    const versions = newest && message.kind === 'ai' ? message.versions : null;
+    let tools: ReactNode = null;
+    if (withRow) {
+        // ↺ Again runs a turn: only on a reply that is the newest Message, never the Opening.
+        const again = newest && !isOpening(message) && !blocked;
+        tools = (
+            <ActionRow
+                onAgain={again ? () => handlers.onAgain(message.id) : null}
+                onEdit={edit}
+                onSnapshot={handlers.onSnapshot}
+                onBranch={branch}
+                versions={versions ? { versions, onVersion: (version) => handlers.onVersion(message.id, version) } : null}
+                read={read}
+                thai={<ThaiReadingAction message={message} readings={readings} />}
+            />
+        );
+    } else if (tapped) {
+        // A User Message edit runs a turn, so it waits while sending is blocked; a Branch runs none.
+        const editable = message.kind === 'ai' || !blocked;
+        const items: OverflowItem[] = [];
+        if (editable) items.push({ key: 'edit', node: <EditAction onEdit={edit} /> });
+        if (read) items.push({ key: 'read', node: read });
+        items.push({ key: 'thai', node: <ThaiReadingAction message={message} readings={readings} /> });
+        items.push({ key: 'branch', node: <BranchAction onBranch={branch} /> });
+        tools = <OverflowActions label="Message tools" className={message.kind === 'user' ? 'mt-1.5 justify-end' : 'mt-1.5'} items={items} />;
+    }
+
+    /** A tap shows or hides its Edit, while the thread allows it; the action row's Message has its Edit already. */
+    const canTap = () => !withRow && handlers.canTap();
+    /** A sideways swipe: 1 for the next Reply version (a swipe left), -1 for the one before; null when it has none. */
+    const onSwipe =
+        versions && !editing
+            ? (by: 1 | -1) => {
+                  const version = versions.current + by;
+                  if (version >= 1 && version <= versions.count) handlers.onVersion(message.id, version);
+              }
+            : null;
+
     // Where a finger went down on a reply with versions; a sideways move past the threshold steps.
     const swipeRef = useRef<{ pointerId: number; x: number; y: number } | null>(null);
     const swipeStart = (event: PointerEvent<HTMLElement>) => {
@@ -426,15 +560,15 @@ function MessageView({
     const tap = (event: MouseEvent<HTMLElement>) => {
         // A drag that selects text is reading, not a tap.
         const selecting = (window.getSelection()?.toString() ?? '') !== '';
-        if (onTap && !selecting && !(event.target as Element).closest(OWN_CONTROLS)) onTap();
+        if (!selecting && !(event.target as Element).closest(OWN_CONTROLS) && canTap()) handlers.onTap(message.id);
     };
     // The same from the keyboard, so Edit stays reachable without a pointer; the arrows move between Messages.
     const key = (event: KeyboardEvent<HTMLElement>) => {
         if (event.target !== event.currentTarget) return;
         if (moveBetweenMessages(event)) return;
-        if (onTap && (event.key === 'Enter' || event.key === ' ')) {
+        if ((event.key === 'Enter' || event.key === ' ') && canTap()) {
             event.preventDefault();
-            onTap();
+            handlers.onTap(message.id);
         }
     };
     const self = () => document.getElementById(messageAnchor(message.id));
@@ -442,7 +576,7 @@ function MessageView({
         <article
             id={messageAnchor(message.id)}
             data-message-id={message.id}
-            className={[MESSAGE, onTap && 'cursor-pointer [-webkit-tap-highlight-color:transparent]', onSwipe && 'touch-pan-y'].filter(Boolean).join(' ')}
+            className={[MESSAGE, !withRow && TAPPABLE, onSwipe && 'touch-pan-y'].filter(Boolean).join(' ')}
             aria-label={messageLabel(message)}
             aria-describedby={keysHintId}
             tabIndex={tabStop ? 0 : -1}
@@ -458,25 +592,29 @@ function MessageView({
                         message={message}
                         later={later}
                         onSave={(text) => {
-                            onSave(text);
+                            handlers.onSave(message, text);
                             refocus(self);
                         }}
                         onCancel={() => {
-                            onCancel();
+                            handlers.onCancelEdit();
                             refocus(self);
                         }}
                     />
                 ) : (
                     <MessageBody message={message} cast={cast} portraits={portraits} readingNow={readingNow} />
                 )}
-                {!editing && reading}
-                {snapshots}
+                {/* Its Thai reading, or why one failed: under the story text, above the Snapshots. */}
+                {!editing && <ThaiReadingBlock message={message} readings={readings} />}
+                {message.kind === 'ai' && (
+                    <MessageSnapshots snapshots={snapshots} jobs={jobs} onOpen={handlers.onOpenSnapshot} onDismiss={handlers.onDismissSnapshot} />
+                )}
                 {!editing && tools}
-                {!editing && readAloud}
+                {/* Read aloud's Pause, Resume and Stop while it is being read, whether or not its tools show. */}
+                {!editing && message.kind === 'ai' && beingRead && <ReadAloudControls messageId={message.id} />}
             </MessageTabStop.Provider>
         </article>
     );
-}
+}, sameRow);
 
 /**
  * The Message whose Edit shows after a tap (spec: "Action row"). A second tap on it, or a tap
@@ -658,17 +796,32 @@ interface MessageListProps {
     snapshots: ChatSnapshots;
     thaiReadings: ThaiReadings;
     tapped: number | null;
-    setTapped(update: (current: number | null) => number | null): void;
     /** The Message that is the thread's tab stop. */
     tabStop: number | null;
     keysHintId: string;
-    /** The Chat screen's callbacks, through one object that never changes, so a streamed chunk never redraws this list. */
-    handlers: Handlers;
+    /** The callbacks, through one object that never changes, so a streamed chunk never redraws this list. */
+    handlers: RowHandlers;
+}
+
+const NONE: never[] = [];
+
+/** Each Message's Snapshots and jobs, by Message id. */
+function byMessage<T extends { messageId: number | null }>(items: T[]): Map<number, T[]> {
+    const map = new Map<number, T[]>();
+    for (const item of items) {
+        if (item.messageId === null) continue;
+        const list = map.get(item.messageId);
+        if (list) list.push(item);
+        else map.set(item.messageId, [item]);
+    }
+    return map;
 }
 
 /**
  * The stored Messages (audit M32): memoised, so a reply streaming in below them redraws only
  * itself. Its props hold still while a turn streams; the callbacks reach the screen's latest.
+ * Each row is memoised too and gets only what it uses, so when the Chat changes (a finished
+ * reply refetches it) only the Messages whose content or place changed redraw.
  */
 const MessageList = memo(function MessageList({
     shown,
@@ -680,87 +833,48 @@ const MessageList = memo(function MessageList({
     snapshots,
     thaiReadings,
     tapped,
-    setTapped,
     tabStop,
     keysHintId,
     handlers,
 }: MessageListProps) {
     const player = useReadAloud();
+    const now = readingNowOf(player);
     const last = shown[shown.length - 1];
-    /** ▶ Read aloud for an AI Message, unless it is the one being read (its controls show instead). */
-    const readAction = (message: Message) =>
-        message.kind === 'ai' && player && player.messageId !== message.id ? <ReadAloudAction messageId={message.id} /> : null;
     // The action row goes under the latest AI Message (the Opening counts), the one a Snapshot is taken of.
     const newestAiMessage = shown.findLast((message) => message.kind === 'ai');
-
-    const edit = (messageId: number) => {
-        setTapped(() => null);
-        handlers.onEdit(messageId);
-    };
+    const snapshotsOf = useMemo(() => byMessage(snapshots.snapshots), [snapshots.snapshots]);
+    const jobsOf = useMemo(() => byMessage(snapshots.jobs), [snapshots.jobs]);
 
     return shown.map((message, index) => {
-        // A User Message edit runs a turn, so it waits while sending is blocked; a Branch runs none.
-        const editable = canEdit && (message.kind === 'ai' || !blocked);
+        const isEditing = editing === message.id;
         const withRow = canEdit && message === newestAiMessage;
-        let tools: ReactNode = null;
-        // Only the newest reply has Reply versions, and they change only while no turn or write is in flight.
-        const versions = withRow && message === last && message.kind === 'ai' ? message.versions : null;
-        const step = versions
-            ? (by: 1 | -1) => {
-                  const version = versions.current + by;
-                  if (version >= 1 && version <= versions.count) handlers.onVersion(message.id, version);
-              }
-            : null;
-        if (withRow) {
-            // ↺ Again runs a turn: only on a reply that is the newest Message, never the Opening.
-            const again = message === last && !isOpening(message) && !blocked;
-            tools = (
-                <ActionRow
-                    onAgain={again ? () => handlers.onAgain(message.id) : null}
-                    onEdit={() => edit(message.id)}
-                    onSnapshot={handlers.onSnapshot}
-                    onBranch={() => handlers.onBranch(message.id)}
-                    versions={versions ? { versions, onVersion: (version) => handlers.onVersion(message.id, version) } : null}
-                    read={readAction(message)}
-                    thai={<ThaiReadingAction message={message} readings={thaiReadings} />}
-                />
-            );
-        } else if (canEdit && tapped === message.id) {
-            const items: OverflowItem[] = [];
-            if (editable) items.push({ key: 'edit', node: <EditAction onEdit={() => edit(message.id)} /> });
-            const read = readAction(message);
-            if (read) items.push({ key: 'read', node: read });
-            items.push({ key: 'thai', node: <ThaiReadingAction message={message} readings={thaiReadings} /> });
-            items.push({ key: 'branch', node: <BranchAction onBranch={() => handlers.onBranch(message.id)} /> });
-            tools = <OverflowActions label="Message tools" className={message.kind === 'user' ? 'mt-1.5 justify-end' : 'mt-1.5'} items={items} />;
-        }
+        const isTapped = canEdit && !withRow && tapped === message.id;
+        const reading = now?.messageId === message.id ? now : null;
         return (
             <MessageView
                 key={message.id}
                 message={message}
                 cast={cast}
                 portraits={portraits}
-                later={shown.length - index - 1}
-                editing={editing === message.id}
+                // Read only by its edit box: the others stay 0, so a new Message redraws none of them.
+                later={isEditing ? shown.length - index - 1 : 0}
+                editing={isEditing}
                 tabStop={message.id === tabStop}
                 keysHintId={keysHintId}
-                tools={tools}
-                reading={<ThaiReadingBlock message={message} readings={thaiReadings} />}
-                snapshots={
-                    message.kind === 'ai' && (
-                        <MessageSnapshots
-                            snapshots={snapshots.snapshots.filter((snapshot) => snapshot.messageId === message.id)}
-                            jobs={snapshots.jobs.filter((job) => job.messageId === message.id)}
-                            onOpen={handlers.onOpenSnapshot}
-                            onDismiss={handlers.onDismissSnapshot}
-                        />
-                    )
-                }
-                readAloud={message.kind === 'ai' && <ReadAloudControls messageId={message.id} />}
-                onTap={canEdit && !withRow ? () => setTapped((current) => (current === message.id ? null : message.id)) : null}
-                onSwipe={editing === message.id ? null : step}
-                onSave={(text) => handlers.onSave(message, text)}
-                onCancel={handlers.onCancelEdit}
+                withRow={withRow}
+                newest={withRow && message === last}
+                tapped={isTapped}
+                blocked={(withRow || isTapped) && blocked}
+                readable={player !== null}
+                beingRead={player !== null && player.messageId === message.id}
+                readPart={reading ? reading.partIndex : null}
+                readParagraph={reading ? reading.paragraph : null}
+                thaiShown={thaiReadings.shown(message)}
+                thaiBusy={thaiReadings.busy(message.id)}
+                thaiFailed={thaiReadings.failed(message.id)}
+                snapshots={snapshotsOf.get(message.id) ?? NONE}
+                jobs={jobsOf.get(message.id) ?? NONE}
+                handlers={handlers}
             />
         );
     });
@@ -791,29 +905,37 @@ export function ChatThread(props: ChatThreadProps) {
     const tabStop = shown.some((message) => message.id === focused) ? focused : (editing ?? last?.id ?? null);
 
     // The callbacks change with every render of the screen; the list reads them through this one object.
-    const latest = useRef<Handlers>(props);
+    const latest = useRef<ChatThreadProps>(props);
     useLayoutEffect(() => {
         latest.current = props;
     });
-    const handlers = useMemo<Handlers>(
+    const handlers = useMemo<RowHandlers>(
         () => ({
             onAgain: (id) => latest.current.onAgain(id),
             onVersion: (id, version) => latest.current.onVersion(id, version),
-            onEdit: (id) => latest.current.onEdit(id),
+            onEdit: (id) => {
+                setTapped(null);
+                latest.current.onEdit(id);
+            },
             onBranch: (id) => latest.current.onBranch(id),
             onSave: (message, text) => latest.current.onSave(message, text),
             onCancelEdit: () => latest.current.onCancelEdit(),
             onSnapshot: () => latest.current.onSnapshot(),
             onOpenSnapshot: (snapshot) => latest.current.onOpenSnapshot(snapshot),
             onDismissSnapshot: (job) => latest.current.onDismissSnapshot(job),
+            canTap: () => latest.current.canEdit,
+            onTap: (id) => setTapped((current) => (current === id ? null : id)),
+            onThaiToggle: (message) => latest.current.thaiReadings.toggle(message),
+            onThaiRetry: (id) => latest.current.thaiReadings.retry(id),
         }),
-        [],
+        [setTapped],
     );
 
     return (
         <section
             ref={threadRef}
             data-thread=""
+            data-can-tap={canEdit ? '' : undefined}
             className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
             style={storySize}
             aria-label="Messages"
@@ -836,7 +958,6 @@ export function ChatThread(props: ChatThreadProps) {
                     snapshots={snapshots}
                     thaiReadings={thaiReadings}
                     tapped={tapped}
-                    setTapped={setTapped}
                     tabStop={tabStop}
                     keysHintId={keysHintId}
                     handlers={handlers}

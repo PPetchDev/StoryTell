@@ -61,14 +61,15 @@ function replyAnnouncement(message: Message | undefined): string | null {
  * The Chat fills the screen below whatever the app shell shows above it, so the thread scrolls on
  * its own between the top bar and the composer. The page around it is styled from here: each
  * variant below that starts `.page:has(>&)` matches the layout's `.page` holding this screen (and
- * its other children: the banners), so nothing outside the Chat screen changes for it.
+ * its other children: the banners), so nothing outside the Chat screen changes for it. Those other
+ * children keep their size through `.page > *` in globals.css: a `:has()` rule reaching them
+ * restyled the whole thread on every change (audit M32).
  */
 const SCREEN = [
     'flex min-h-0 flex-1 flex-col',
     '[.page:has(>&)]:flex [.page:has(>&)]:h-dvh [.page:has(>&)]:flex-col',
     // The thin top bar sits at the very top, below only the phone's status bar.
     '[.page:has(>&)]:pt-[env(safe-area-inset-top)] [.page:has(>&)]:pb-0',
-    '[.page:has(>&)>:not(&)]:flex-none',
     // Desktop (spec: "Desktop layout"): the thread scrolls anywhere across the page beside the rail.
     'lg:[.page:has(>&)]:px-0',
 ].join(' ');
