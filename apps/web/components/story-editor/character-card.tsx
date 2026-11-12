@@ -1,18 +1,28 @@
 'use client';
 
+import { useRef } from 'react';
+
+import { CloseIcon } from '@/components/icons';
 import { CharacterPortrait } from '@/components/portrait/character-portrait';
 import { Portrait } from '@/lib/character-colour';
 import { Character, characterRemovalWarning, Story } from '@/lib/story';
 import { VoiceList } from '@/lib/voices';
+import { ADD_CHARACTER_ID } from './editor-tabs';
 import { useFieldMarks } from './field-marks';
 import { ExportCardButton } from './export-card';
 import { Expressions } from './expressions';
-import { ChangedMark, ConfirmButton, OrderButtons, TextField, Toolbar } from './fields';
-import { FoldingCard } from './folding-card';
+import { ChangedMark, ConfirmButton, FIELD_FLASH, FIELD_HINT, FIELD_INPUT, OrderButtons, TextField, Toolbar } from './fields';
+import { cardToggle, FoldingCard, SUBSECTION, SUBSECTION_LEGEND } from './folding-card';
 import { ReferenceImage } from './reference-image';
 import { VoiceField } from './voice-field';
 import { fieldDomId, FieldRewrites, rewritableField, rewriteKey } from './rewrite';
-import styles from './story-editor.module.css';
+import { UndoNotice, useUndo } from './undo-notice';
+
+/**
+ * On a desktop, seven rows: the Reference image down the left, the fields two by two, Expressions and
+ * Example lines across both. Every row is explicit, so the image's column spans them all.
+ */
+const CHARACTER_BODY = 'lg:grid lg:grid-cols-[13rem_repeat(2,minmax(0,1fr))] lg:grid-rows-[repeat(7,auto)] lg:items-start lg:gap-x-6 lg:gap-y-1';
 
 type TextKey = 'name' | 'appearance' | 'personality' | 'voice' | 'background' | 'secrets' | 'arcDirections';
 
@@ -36,7 +46,8 @@ interface CharacterCardProps {
     sampleHint?: string;
     onExampleLines(lines: string[]): void;
     onMove(direction: -1 | 1): void;
-    onRemove(): void;
+    /** Removes the Character; focus moves to the next card once the promise it returns settles. */
+    onRemove(): void | Promise<unknown>;
     /** For the Reference image: send pending edits, and run a whole-Story write after them. */
     flush(): Promise<void>;
     commit(run: () => Promise<Story>, onError: (message: string) => void): Promise<Story | undefined>;
@@ -54,6 +65,18 @@ export function CharacterCard(props: CharacterCardProps) {
     const linesChanged = rewrites.highlights.has(rewriteKey({ target: 'character', id: character.id, field: 'exampleLines' }));
     const ofCharacter = (field: TextKey) => rewritableField({ target: 'character', id: character.id, field }, rewrites);
 
+    const lineList = useRef<HTMLOListElement>(null);
+    const undo = useUndo();
+    /** One tap removes a line; Undo puts the list back as it was (audit H3). */
+    const removeLine = (lineIndex: number) => {
+        const before = character.exampleLines;
+        props.onExampleLines(before.filter((_, i) => i !== lineIndex));
+        undo.offer({
+            message: `Removed example line ${lineIndex + 1}.`,
+            undo: () => props.onExampleLines(before),
+            focusAfterUndo: () => lineList.current?.querySelector<HTMLElement>(`[aria-label="Remove example line ${lineIndex + 1}"]`),
+        });
+    };
     const setLine = (lineIndex: number, value: string) => {
         const lines = [...character.exampleLines];
         lines[lineIndex] = value;
@@ -71,10 +94,10 @@ export function CharacterCard(props: CharacterCardProps) {
             foldKey={`character:${character.id}`}
             label={`Character ${index + 1}`}
             fieldPrefixes={[`field-character.${character.id}.`]}
-            bodyClassName={styles.characterBody}
+            bodyClassName={CHARACTER_BODY}
             title={
                 <>
-                    <CharacterPortrait name={heading} colour={props.colour} portrait={props.portrait} className={styles.cardPortrait} />
+                    <CharacterPortrait name={heading} colour={props.colour} portrait={props.portrait} className="size-9 flex-none text-note" />
                     {heading}
                 </>
             }
@@ -87,13 +110,16 @@ export function CharacterCard(props: CharacterCardProps) {
                         question={`Remove ${heading}?`}
                         warning={characterRemovalWarning(heading)}
                         confirmLabel="Remove"
+                        ariaLabel={`Remove Character ${index + 1}`}
                         onConfirm={props.onRemove}
+                        focusAfter={() => cardToggle(`Character ${index + 1}`) ?? cardToggle(`Character ${index}`) ?? document.getElementById(ADD_CHARACTER_ID)}
                     />
                 </Toolbar>
             }
         >
             <TextField
                 label="Name"
+                required
                 value={character.name}
                 hint="What everyone calls them."
                 onChange={(v) => props.onText('name', v)}
@@ -101,6 +127,7 @@ export function CharacterCard(props: CharacterCardProps) {
             />
             <TextField
                 label="Appearance"
+                required
                 value={character.appearance}
                 multiline
                 hint="How they look. Snapshots and the Reference image are drawn from this."
@@ -123,6 +150,7 @@ export function CharacterCard(props: CharacterCardProps) {
             />
             <TextField
                 label="Personality"
+                required
                 value={character.personality}
                 multiline
                 hint="How they think and act. The AI plays them from this."
@@ -131,6 +159,7 @@ export function CharacterCard(props: CharacterCardProps) {
             />
             <TextField
                 label="Voice"
+                required
                 value={character.voice}
                 multiline
                 hint="How they talk: rhythm, words they use, what they never say."
@@ -147,19 +176,21 @@ export function CharacterCard(props: CharacterCardProps) {
                 hint={props.sampleHint ?? 'How their lines sound when read aloud.'}
             />
 
-            <fieldset id={linesId} className={linesFlashed ? `subsection ${styles.linesFlash}` : 'subsection'}>
-                <legend>Example lines {linesChanged && <ChangedMark />}</legend>
-                <p className="hint">Optional. A few lines in their voice, in order.</p>
-                <ol className="line-list">
+            <fieldset id={linesId} className={[SUBSECTION, 'lg:col-span-2', linesFlashed && FIELD_FLASH].filter(Boolean).join(' ')}>
+                <legend className={SUBSECTION_LEGEND}>Example lines {linesChanged && <ChangedMark />}</legend>
+                <p className={`${FIELD_HINT} mb-2`}>Optional. A few lines in their voice, in order.</p>
+                <ol ref={lineList} className="m-0 mb-2 grid list-none gap-2 p-0">
                     {character.exampleLines.map((line, lineIndex) => (
-                        <li key={lineIndex}>
+                        <li key={lineIndex} className="flex items-center gap-2">
                             <input
                                 type="text"
+                                className={`${FIELD_INPUT} flex-1`}
                                 aria-label={`Example line ${lineIndex + 1}`}
                                 value={line}
                                 onChange={(event) => setLine(lineIndex, event.target.value)}
                             />
-                            <Toolbar>
+                            {/* One row of three 44px buttons, 8px apart, that never wraps under the line. */}
+                            <div className="flex flex-none gap-2">
                                 <OrderButtons
                                     index={lineIndex}
                                     count={character.exampleLines.length}
@@ -170,19 +201,18 @@ export function CharacterCard(props: CharacterCardProps) {
                                     type="button"
                                     className="button button-quiet"
                                     aria-label={`Remove example line ${lineIndex + 1}`}
-                                    onClick={() =>
-                                        props.onExampleLines(character.exampleLines.filter((_, i) => i !== lineIndex))
-                                    }
+                                    onClick={() => removeLine(lineIndex)}
                                 >
-                                    ×
+                                    <CloseIcon size={18} />
                                 </button>
-                            </Toolbar>
+                            </div>
                         </li>
                     ))}
                 </ol>
+                <UndoNotice undo={undo} />
                 <button
                     type="button"
-                    className="button button-quiet"
+                    className="button button-quiet mt-2"
                     onClick={() => props.onExampleLines([...character.exampleLines, ''])}
                 >
                     Add example line

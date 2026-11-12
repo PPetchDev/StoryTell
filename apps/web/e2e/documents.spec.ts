@@ -51,7 +51,8 @@ test('a pasted Document is added with its passage count and survives a reload', 
         });
         await sheet.getByRole('button', { name: 'Add', exact: true }).tap();
         await expect(sheet.getByRole('button', { name: 'Adding…' })).toBeDisabled();
-        await expect(sheet.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+        // Cancel stays usable while it adds (audit H6): closing lets the Add carry on.
+        await expect(sheet.getByRole('button', { name: 'Cancel' })).toBeEnabled();
         release();
 
         await expect(sheet).toHaveCount(0);

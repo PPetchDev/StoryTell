@@ -10,13 +10,21 @@ import { coverGradient, coverPosition } from '@/lib/home';
 import { GalleryItem, galleryPath } from '@/lib/snapshot';
 import { CoverFocus, referenceImageUrl, Story, storyApi } from '@/lib/story';
 import { ConfirmButton } from './fields';
-import styles from './story-cover.module.css';
 
 /** Runs a write that answers with the whole Story, after pending edits; a failure goes to `onError`. */
 type Commit = (run: () => Promise<Story>, onError: (message: string) => void) => Promise<Story | undefined>;
 
 /** How far an arrow key moves the focus point. */
 const KEY_STEP = 0.05;
+/** Arrow keys move the point at once; it is saved once they rest this long (audit M44: not a PUT per press). */
+const KEY_SAVE_MS = 400;
+
+/** A picture's stage, behind letterboxing: the raised surface, a token like every colour (audit L5). */
+const PICTURE_STAGE = 'bg-surface-raised';
+/** Sections of the sheet: a small heading over each list of pictures. */
+const SHEET_HEADING = 'mt-2 mb-2 text-note';
+/** Pictures to pick from: three to a row on a phone, every tile the same 3:4 card shape. */
+const CHOICES = 'm-0 grid list-none grid-cols-[repeat(auto-fill,minmax(6.25rem,1fr))] gap-2 p-0';
 
 /**
  * The Cover at the top of the Story editor (spec: "Cover"), cropped around its focus point the
@@ -28,22 +36,22 @@ export function CoverBanner({ story, onOpen }: { story: Story; onOpen(): void })
     return (
         <button
             type="button"
-            className={styles.banner}
+            className="group bare-button relative mb-3 block aspect-[16/7] max-h-48 w-full overflow-hidden rounded-xl text-text focus-ring"
             style={{
                 background: cover
                     ? `url("${referenceImageUrl(cover.imagePath)}") ${coverPosition(cover.focus)} / cover no-repeat`
                     : coverGradient(story.id),
             }}
-            aria-label={cover ? 'Change the Cover' : 'Add a Cover'}
             onClick={onOpen}
         >
-            <span className={styles.bannerChip} aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            {/* Its words are the button's name, so what is said is what is shown (audit L10). */}
+            <span className="absolute right-2 bottom-2 inline-flex min-h-9 items-center gap-1.5 rounded-full border border-line bg-picture-chip px-3 text-sm font-semibold group-hover:border-accent-line group-active:border-accent-line">
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <rect x="3" y="5" width="18" height="14" rx="2" />
                     <circle cx="9" cy="10" r="1.6" />
                     <path d="M21 16l-5-5-8 8" />
                 </svg>
-                {cover ? 'Change cover' : 'Add a cover'}
+                {cover ? 'Change the cover' : 'Add a cover'}
             </span>
         </button>
     );
@@ -104,8 +112,8 @@ export function CoverSheet({ story, commit, onClose }: CoverSheetProps) {
 
     return (
         <Sheet label="Cover" title="Cover" onClose={onClose}>
-            <div className={styles.sheet}>
-                <p className="hint">The picture on this Story&apos;s card on Home.</p>
+            <div className="grid gap-3 pb-2">
+                <p className="hint mt-0">The picture on this Story&apos;s card on Home.</p>
 
                 {cover ? (
                     <FocusPicker
@@ -116,7 +124,7 @@ export function CoverSheet({ story, commit, onClose }: CoverSheetProps) {
                         onPick={(focus) => void save('Saving…', () => storyApi.setCoverFocus(story.id, focus))}
                     />
                 ) : (
-                    <p className={styles.empty}>
+                    <p className="m-0 rounded-md bg-surface-raised p-3.5 text-md text-muted">
                         No cover yet, so Home shows the newest Snapshot, or this Story&apos;s colours until there is one.
                     </p>
                 )}
@@ -156,7 +164,7 @@ export function CoverSheet({ story, commit, onClose }: CoverSheetProps) {
                     tabIndex={-1}
                     onChange={(event) => void upload(event)}
                 />
-                <p className={busy ? styles.status : 'visually-hidden'} role="status">
+                <p className={busy ? 'm-0 text-md text-muted' : 'sr-only'} role="status">
                     {busy}
                 </p>
                 {error && (
@@ -166,7 +174,7 @@ export function CoverSheet({ story, commit, onClose }: CoverSheetProps) {
                 )}
 
                 <section aria-labelledby="cover-from-gallery">
-                    <h3 id="cover-from-gallery" className={styles.heading}>
+                    <h3 id="cover-from-gallery" className={SHEET_HEADING}>
                         From the Gallery
                     </h3>
                     {galleryError && (
@@ -174,10 +182,10 @@ export function CoverSheet({ story, commit, onClose }: CoverSheetProps) {
                             {galleryError}
                         </p>
                     )}
-                    {gallery === null && !galleryError && <p className="hint">Loading…</p>}
-                    {gallery?.length === 0 && <p className="hint">No Snapshots yet. Take one in a Chat.</p>}
+                    {gallery === null && !galleryError && <p className="hint mt-0">Loading…</p>}
+                    {gallery?.length === 0 && <p className="hint mt-0">No Snapshots yet. Take one in a Chat.</p>}
                     {gallery && gallery.length > 0 && (
-                        <ul className={styles.choices}>
+                        <ul className={CHOICES}>
                             {gallery.map((snapshot, index) => (
                                 <li key={snapshot.id}>
                                     <Choice
@@ -194,13 +202,13 @@ export function CoverSheet({ story, commit, onClose }: CoverSheetProps) {
                 </section>
 
                 <section aria-labelledby="cover-from-characters">
-                    <h3 id="cover-from-characters" className={styles.heading}>
+                    <h3 id="cover-from-characters" className={SHEET_HEADING}>
                         Reference images
                     </h3>
                     {portraits.length === 0 ? (
-                        <p className="hint">No Character has a Reference image yet.</p>
+                        <p className="hint mt-0">No Character has a Reference image yet.</p>
                     ) : (
-                        <ul className={styles.choices}>
+                        <ul className={CHOICES}>
                             {portraits.map((character) => (
                                 <li key={character.id}>
                                     <Choice
@@ -235,15 +243,24 @@ function Choice({ label, caption, src, current, disabled, onPick }: ChoiceProps)
     return (
         <button
             type="button"
-            className={styles.choice}
+            className={[
+                'bare-button relative block aspect-[3/4] w-full overflow-hidden rounded-md border-2 border-transparent',
+                PICTURE_STAGE,
+                'focus-ring aria-pressed:cursor-default aria-pressed:border-accent disabled:cursor-progress disabled:opacity-60',
+            ].join(' ')}
             aria-label={`Use ${label} as the cover`}
             aria-pressed={current}
             disabled={disabled}
             onClick={current ? undefined : onPick}
         >
-            <img src={src} alt="" loading="lazy" />
-            {current && <span className={styles.currentMark}>Cover</span>}
-            {caption && <span className={styles.caption}>{caption}</span>}
+            <img src={src} alt="" loading="lazy" decoding="async" className="block size-full object-cover" />
+            {current && (
+                <span className="absolute top-1.5 left-1.5 rounded-full bg-accent-fill px-2 text-xs font-semibold text-accent-text">Cover</span>
+            )}
+            {/* On a solid band, not a fading scrim, so it reads over any picture (audit M46). */}
+            {caption && (
+                <span className="absolute inset-x-0 bottom-0 truncate bg-picture-chip px-1.5 py-1 text-left text-sm text-text">{caption}</span>
+            )}
         </button>
     );
 }
@@ -263,10 +280,12 @@ function FocusPicker({ src, focus, disabled, onPick }: FocusPickerProps) {
     const [point, setPoint] = useState<CoverFocus>(focus ?? { x: 0.5, y: 0.5 });
     const dragging = useRef(false);
     const image = useRef<HTMLImageElement>(null);
+    const keySave = useRef<ReturnType<typeof setTimeout>>(undefined);
 
     useEffect(() => {
         setPoint(focus ?? { x: 0.5, y: 0.5 });
     }, [focus]);
+    useEffect(() => () => clearTimeout(keySave.current), []);
 
     const moveTo = (event: PointerEvent<HTMLDivElement>) => {
         const box = image.current?.getBoundingClientRect();
@@ -300,15 +319,20 @@ function FocusPicker({ src, focus, disabled, onPick }: FocusPickerProps) {
         const clamp = (value: number) => Math.min(1, Math.max(0, Math.round(value * 1000) / 1000));
         const next = { x: clamp(point.x + move[0]), y: clamp(point.y + move[1]) };
         setPoint(next);
-        onPick(next);
+        clearTimeout(keySave.current);
+        keySave.current = setTimeout(() => onPick(next), KEY_SAVE_MS);
     };
 
     const position = coverPosition(point);
     const percent = (fraction: number) => Math.round(fraction * 100);
     return (
-        <div className={styles.picker}>
+        <div className="grid justify-items-center gap-2">
             <div
-                className={styles.focusArea}
+                className={[
+                    'relative inline-block max-w-full cursor-crosshair touch-pan-y overflow-hidden rounded-md leading-none select-none',
+                    PICTURE_STAGE,
+                    'focus-ring',
+                ].join(' ')}
                 role="group"
                 tabIndex={0}
                 aria-label={`Focus point, ${percent(point.x)}% across and ${percent(point.y)}% down. Tap the picture, or use the arrow keys, to move it.`}
@@ -321,17 +345,18 @@ function FocusPicker({ src, focus, disabled, onPick }: FocusPickerProps) {
                 }}
                 onKeyDown={onKeyDown}
             >
-                <img ref={image} src={src} alt="The cover" draggable={false} />
+                <img ref={image} src={src} alt="The cover" draggable={false} className="pointer-events-none block h-auto max-h-[45dvh] w-auto max-w-full" />
+                {/* The dot takes a drag (a 44px hit area round it); the rest of the picture takes a tap. */}
                 <span
-                    className={styles.dot}
+                    className="absolute -mt-3.5 -ml-3.5 size-7 touch-none rounded-full border-3 border-accent-text shadow-[0_0_0_2px_var(--accent-fill),0_2px_8px_var(--shadow-strong)] before:absolute before:-inset-3 before:content-['']"
                     style={{ left: `${point.x * 100}%`, top: `${point.y * 100}%` }}
                     aria-hidden="true"
                 />
             </div>
-            <p className="hint">Tap the part to keep in view when a card crops it.</p>
-            <div className={styles.previews} aria-hidden="true">
-                <span className={styles.previewCard} style={{ background: `url("${src}") ${position} / cover no-repeat` }} />
-                <span className={styles.previewWide} style={{ background: `url("${src}") ${position} / cover no-repeat` }} />
+            <p className="hint mt-0">Tap the part to keep in view when a card crops it, or drag the dot.</p>
+            <div className="flex items-end gap-2" aria-hidden="true">
+                <span className="aspect-[3/4] w-15 rounded-sm" style={{ background: `url("${src}") ${position} / cover no-repeat` }} />
+                <span className="aspect-[16/7] w-34 rounded-sm" style={{ background: `url("${src}") ${position} / cover no-repeat` }} />
             </div>
         </div>
     );

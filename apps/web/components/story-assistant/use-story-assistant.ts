@@ -228,19 +228,22 @@ export function useStoryAssistant({ storyId, commit, applyWhole, onApplied }: Op
         [applyWhole, commit, setUndo, storyId],
     );
 
-    /** An instruction filled into the box when the sheet opens, never sent by itself (the import notice's Tidy). */
-    const [prefill, setPrefill] = useState<{ text: string } | null>(null);
-    const openSheet = useCallback((instruction?: unknown) => {
+    /**
+     * What is typed in the box, not yet sent. It outlives a close (audit M19), so Close or a stray
+     * tap never loses it; an instruction handed to `openSheet` (the import notice's Tidy) replaces
+     * it, and is never sent by itself.
+     */
+    const [instruction, setInstruction] = useState('');
+    const openSheet = useCallback((given?: unknown) => {
         conversation.current++;
         setEntries([]);
         // A click handler passes its event: only a string is an instruction to fill in.
-        setPrefill(typeof instruction === 'string' ? { text: instruction } : null);
+        if (typeof given === 'string') setInstruction(given);
         setOpen(true);
     }, []);
     const closeSheet = useCallback(() => {
         conversation.current++;
         setEntries([]);
-        setPrefill(null);
         setOpen(false);
     }, []);
 
@@ -259,7 +262,7 @@ export function useStoryAssistant({ storyId, commit, applyWhole, onApplied }: Op
 
     const busy = entries.some((entry) => entry.kind === 'busy');
 
-    return { open, openSheet, closeSheet, prefill, entries, busy, send, confirmPending, cancelPending, undo, highlights };
+    return { open, openSheet, closeSheet, instruction, setInstruction, entries, busy, send, confirmPending, cancelPending, undo, highlights };
 }
 
 export type StoryAssistant = ReturnType<typeof useStoryAssistant>;

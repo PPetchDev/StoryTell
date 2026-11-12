@@ -6,7 +6,6 @@ import { useConnection } from '@/components/connection';
 import { ApiUnreachableError } from '@/lib/api';
 import { drawCardPicture, exportCard, shareOrDownload } from '@/lib/character-card';
 import { Character } from '@/lib/story';
-import styles from './story-editor.module.css';
 
 interface Props {
     storyId: number;
@@ -40,7 +39,7 @@ export function ExportCardButton({ storyId, character, colour }: Props) {
     };
 
     return (
-        <div className={styles.exportCard}>
+        <div className="mt-3 border-t border-line pt-3">
             <button type="button" className="button button-quiet" onClick={() => void run()} disabled={busy}>
                 {busy ? 'Exporting…' : 'Export as Character card'}
             </button>
