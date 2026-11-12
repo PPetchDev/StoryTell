@@ -80,3 +80,10 @@ export class SnapshotPromptNotFoundError extends AppError {
         super('404.002.012', 'That Snapshot prompt is gone. Write it again.');
     }
 }
+
+/** A thumbnail width the store doesn't make (audit H33): the web asks for one of THUMBNAIL_WIDTHS. */
+export class InvalidThumbnailWidthError extends AppError {
+    constructor(widths: readonly number[]) {
+        super('400.002.013', `A thumbnail is ${widths.join(' or ')} pixels wide.`);
+    }
+}
