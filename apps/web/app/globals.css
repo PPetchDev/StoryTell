@@ -510,7 +510,8 @@
     kbd,
     samp,
     pre {
-        font-size: 0.8125em;
+        /* Never under the 12px floor (audit M7), even inside small text. */
+        font-size: max(0.8125em, 0.75rem);
     }
 
     /* Preflight makes headings plain text; the page title keeps its size and weight. */
