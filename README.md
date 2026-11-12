@@ -220,9 +220,10 @@ LIVE_HOME/            C:\StorytellLive by default; keep it outside this checkout
    tailscale serve status
    ```
 
-   With `--bg` the setting persists across reboots. Never use `tailscale funnel`: Funnel puts
-   the app on the public internet, and the app has no login. `tailscale serve reset` removes
-   the setting.
+   With `--bg` the setting persists across reboots. Never use `tailscale funnel` without
+   `LOGIN_PASSWORD` in `.env.live`: Funnel puts the app on the public internet, and without the
+   password every route answers anyone. The API can't tell, since Funnel reaches it on loopback.
+   `tailscale serve reset` removes the setting.
 6. **Install the PWA** from `https://<machine>.<tailnet>.ts.net` on the phone (Chrome → Add to
    Home screen) and on the desktop (Chrome or Edge → Install).
 7. **Check autostart:** reboot, don't log on, and open the PWA on the phone: it should list your
