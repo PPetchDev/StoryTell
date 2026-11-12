@@ -1,6 +1,9 @@
 'use client';
 
-import { KeyboardEvent, ReactNode, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { HTMLAttributes, KeyboardEvent, ReactNode, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+
+import { announce } from '@/components/announcer';
+import { ArrowDownIcon, ArrowUpIcon } from '@/components/icons';
 
 import { focusChoice, movedIndex } from './arrow-keys';
 import { useFieldMarks } from './field-marks';
@@ -90,6 +93,18 @@ interface TextFieldProps {
     highlighted?: boolean;
     /** Why the API refused what is typed, shown under the field (a Lore pattern that doesn't compile). */
     error?: string | null;
+    /**
+     * What a one-line box holds, for the phone's keyboard (audit M39): 'url' for a link, 'search',
+     * 'email'… Plain text when left out. A multiline box is always text.
+     */
+    type?: 'text' | 'url' | 'email' | 'search' | 'tel';
+    inputMode?: HTMLAttributes<HTMLInputElement>['inputMode'];
+    /** false for what is not prose (a regex, a find-and-replace pattern, a URL): no red squiggles. */
+    spellCheck?: boolean;
+    /** 'off' for code-like text, so a phone doesn't capitalise its first letter. */
+    autoCapitalize?: 'off' | 'none' | 'on' | 'sentences' | 'words' | 'characters';
+    /** The browser's autofill hint; 'off' where its suggestions would only get in the way. */
+    autoComplete?: string;
 }
 
 export function TextField({
@@ -105,6 +120,11 @@ export function TextField({
     rewrite,
     highlighted,
     error,
+    type = 'text',
+    inputMode,
+    spellCheck,
+    autoCapitalize,
+    autoComplete,
 }: TextFieldProps) {
     const ownId = useId();
     const id = domId ?? ownId;
@@ -123,6 +143,10 @@ export function TextField({
         readOnly: busy,
         'aria-describedby': describedBy || undefined,
         'aria-invalid': error ? true : undefined,
+        inputMode,
+        spellCheck,
+        autoCapitalize,
+        autoComplete,
     };
     return (
         <div
@@ -155,7 +179,7 @@ export function TextField({
                     onChange={(event) => onChange(event.target.value)}
                 />
             ) : (
-                <input {...shared} type="text" className={styles.input} onChange={(event) => onChange(event.target.value)} />
+                <input {...shared} type={type} className={styles.input} onChange={(event) => onChange(event.target.value)} />
             )}
             {error && (
                 <p id={errorId} role="alert" className={styles.error}>
@@ -258,44 +282,97 @@ interface ConfirmButtonProps {
     label: string;
     question: string;
     confirmLabel: string;
-    onConfirm(): void;
+    /** The action. A promise it returns is waited for before focus moves on (see `focusAfter`). */
+    onConfirm(): void | Promise<unknown>;
     danger?: boolean;
     disabled?: boolean;
     /** What the action deletes beyond the obvious, shown under the question while it asks. */
     warning?: string;
+    /**
+     * The button's name when its label repeats down a list (audit M11): "Delete Chat 3" for a
+     * "Delete" beside each Chat. Start it with the label, so voice control finds it by what it shows.
+     */
+    ariaLabel?: string;
+    /**
+     * Where focus goes once the action is done (audit H2), when this button is gone with what it
+     * removed: return the next item, or the list's heading (give it tabIndex={-1}). Without it,
+     * focus comes back to this button if it is still on the page.
+     */
+    focusAfter?(): HTMLElement | null | undefined;
 }
 
-/** A destructive action that asks first, in place, without a browser dialog. */
-export function ConfirmButton({ label, question, confirmLabel, onConfirm, danger, disabled, warning }: ConfirmButtonProps) {
+/**
+ * A destructive action that asks first, in place, without a browser dialog. Asking moves focus
+ * to Cancel, the safe choice, inside a group named by the question, so a screen reader reads the
+ * question out; Escape or Cancel puts focus back on the button (audit H2).
+ */
+export function ConfirmButton({ label, question, confirmLabel, onConfirm, danger, disabled, warning, ariaLabel, focusAfter }: ConfirmButtonProps) {
     const [asking, setAsking] = useState(false);
+    const trigger = useRef<HTMLButtonElement>(null);
+    const cancel = useRef<HTMLButtonElement>(null);
+    const backToTrigger = useRef(false);
+    const questionId = useId();
+    const warningId = useId();
+
+    useEffect(() => {
+        if (asking) cancel.current?.focus();
+        else if (backToTrigger.current) {
+            backToTrigger.current = false;
+            trigger.current?.focus();
+        }
+    }, [asking]);
+
+    const stop = () => {
+        backToTrigger.current = true;
+        setAsking(false);
+    };
+    const confirm = () => {
+        setAsking(false);
+        const land = () =>
+            requestAnimationFrame(() => {
+                const next = focusAfter?.() ?? (trigger.current?.isConnected ? trigger.current : null);
+                next?.focus();
+            });
+        Promise.resolve(onConfirm()).then(land, land);
+    };
+
     if (!asking) {
         return (
             <button
+                ref={trigger}
                 type="button"
                 className={danger ? 'button button-danger' : 'button button-quiet'}
                 onClick={() => setAsking(true)}
                 disabled={disabled}
+                aria-label={ariaLabel}
             >
                 {label}
             </button>
         );
     }
     return (
-        <span className="confirm" role="group" aria-label={question}>
-            <span>{question}</span>
-            {warning && <span className="confirm-warning">{warning}</span>}
-            <button
-                type="button"
-                className="button button-danger"
-                onClick={() => {
-                    setAsking(false);
-                    onConfirm();
-                }}
-            >
-                {confirmLabel}
-            </button>
-            <button type="button" className="button button-quiet" onClick={() => setAsking(false)}>
+        <span
+            className="confirm"
+            role="group"
+            aria-labelledby={questionId}
+            aria-describedby={warning ? warningId : undefined}
+            onKeyDown={(event) => {
+                if (event.key !== 'Escape') return;
+                event.stopPropagation();
+                stop();
+            }}
+        >
+            <span id={questionId}>{question}</span>
+            {warning && (
+                <span id={warningId} className="confirm-warning">
+                    {warning}
+                </span>
+            )}
+            <button ref={cancel} type="button" className="button button-quiet" onClick={stop}>
                 Cancel
+            </button>
+            <button type="button" className="button button-danger" onClick={confirm}>
+                {confirmLabel}
             </button>
         </span>
     );
@@ -308,26 +385,49 @@ interface OrderButtonsProps {
     onMove(direction: -1 | 1): void;
 }
 
+const moveLabel = (what: string, direction: -1 | 1) => `Move ${what} ${direction === -1 ? 'up' : 'down'}`;
+
+/**
+ * Move up and Move down for an item in a list (audit M36). At either end its button stays
+ * focusable but does nothing (aria-disabled), so focus is never dropped; after a move, focus
+ * follows the item to its new place, onto the button that can still move it, and the new
+ * position is said: "Moved Mira to position 1 of 3".
+ */
 export function OrderButtons({ index, count, what, onMove }: OrderButtonsProps) {
+    const move = (direction: -1 | 1) => {
+        const to = index + direction;
+        if (to < 0 || to >= count) return;
+        onMove(direction);
+        announce(`Moved ${what} to position ${to + 1} of ${count}`);
+        // The item re-renders in its new place, so find its buttons again by name.
+        const keep = to === 0 || to === count - 1 ? (-direction as -1 | 1) : direction;
+        requestAnimationFrame(() => {
+            const buttons = [...document.querySelectorAll<HTMLButtonElement>('button[data-order-move]')];
+            const named = (dir: -1 | 1) => buttons.find((button) => button.getAttribute('aria-label') === moveLabel(what, dir));
+            named(keep)?.focus();
+        });
+    };
     return (
         <>
             <button
                 type="button"
                 className="button button-quiet"
-                aria-label={`Move ${what} up`}
-                disabled={index === 0}
-                onClick={() => onMove(-1)}
+                data-order-move=""
+                aria-label={moveLabel(what, -1)}
+                aria-disabled={index === 0 || undefined}
+                onClick={() => move(-1)}
             >
-                ↑
+                <ArrowUpIcon size={18} />
             </button>
             <button
                 type="button"
                 className="button button-quiet"
-                aria-label={`Move ${what} down`}
-                disabled={index === count - 1}
-                onClick={() => onMove(1)}
+                data-order-move=""
+                aria-label={moveLabel(what, 1)}
+                aria-disabled={index === count - 1 || undefined}
+                onClick={() => move(1)}
             >
-                ↓
+                <ArrowDownIcon size={18} />
             </button>
         </>
     );

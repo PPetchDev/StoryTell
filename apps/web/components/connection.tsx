@@ -48,10 +48,22 @@ export type QueryState<T> =
     | { status: 'ready'; data: T }
     | { status: 'error'; error: ApiError };
 
-/** Loads `path` once on mount. An unreachable API switches to the "can't connect" screen. */
-export function useApiQuery<T>(path: string): QueryState<T> {
+/** A query's state, and `retry`, which loads it again from scratch (audit M9). */
+export type QueryResult<T> = QueryState<T> & { retry(): void };
+
+/**
+ * Loads `path` on mount, and again on `retry()`. An unreachable API switches to the "can't
+ * connect" screen. Show the states with the shared Loading and ErrorState (components/query-state):
+ * `{query.status === 'error' && <ErrorState error={query.error} onRetry={query.retry} />}`.
+ */
+export function useApiQuery<T>(path: string): QueryResult<T> {
     const { reportUnreachable } = useContext(ConnectionContext);
     const [state, setState] = useState<QueryState<T>>({ status: 'loading' });
+    const [attempt, setAttempt] = useState(0);
+    const retry = useCallback(() => {
+        setState({ status: 'loading' });
+        setAttempt((count) => count + 1);
+    }, []);
 
     useEffect(() => {
         let cancelled = false;
@@ -67,7 +79,7 @@ export function useApiQuery<T>(path: string): QueryState<T> {
         return () => {
             cancelled = true;
         };
-    }, [path, reportUnreachable]);
+    }, [path, reportUnreachable, attempt]);
 
-    return state;
+    return { ...state, retry };
 }

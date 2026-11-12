@@ -29,6 +29,20 @@ function isErrorBody(body: unknown): body is ErrorBody {
     );
 }
 
+/** A browser sends at most 64 KB of keepalive bodies at once; a bigger write goes as a plain one. */
+const KEEPALIVE_MAX = 60_000;
+
+/**
+ * A write made while the page is hidden (the tab switched away, the app closed: autosave sends
+ * what is waiting then) is a keepalive request, so it still reaches the API after the page is
+ * gone (audit H1).
+ */
+function keepaliveFor(init?: RequestInit): boolean {
+    if (!init?.method || init.method === 'GET' || typeof document === 'undefined') return false;
+    if (document.visibilityState !== 'hidden') return false;
+    return init.body === undefined || init.body === null || (typeof init.body === 'string' && init.body.length < KEEPALIVE_MAX);
+}
+
 /**
  * Every request goes straight to the network: the app is online-only, with no cached data
  * and nothing queued (spec: "PWA").
@@ -38,6 +52,7 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     try {
         response = await fetch(`/api${path}`, {
             ...init,
+            keepalive: init?.keepalive || keepaliveFor(init),
             cache: 'no-store',
             headers: { Accept: 'application/json', ...init?.headers },
         });
