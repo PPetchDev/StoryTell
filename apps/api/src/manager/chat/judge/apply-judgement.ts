@@ -167,13 +167,15 @@ export function applyJudgement(input: ApplyInput, judgement: Judgement): Applied
             rejected.push('Scene: a second advance in one turn');
         }
     } else if (here && passedBy) {
-        // To the next Scene in order, or free play from the last, past the condition and the gates.
+        // To the next Scene in order, or free play from the last, past the condition and the gates. The
+        // event says only where the story went: the reason restates the condition and can get it wrong.
+        const wentTo = passedBy.wentTo?.trim() ?? '';
         scene = {
             fromSceneId: here.id,
             fromSceneName: here.name,
             toSceneId: next?.id ?? null,
             toSceneName: next?.name ?? null,
-            event: `The story moved past ${here.name}: ${passedBy.reason}`,
+            event: wentTo ? `The story moved past ${here.name}: ${wentTo}` : `The story moved past ${here.name}.`,
         };
         passedByReason = passedBy.reason;
     } else if (moveOn && !here) {

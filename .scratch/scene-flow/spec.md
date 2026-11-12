@@ -18,7 +18,7 @@ Three steps, in order of preference:
 
 1. **The Narrator draws a lingering Scene toward its end.** From the 8th reply in a Scene, the Narrator's Scene line changes. The Characters now open the way toward the move-on condition and the gates, in-world and in character. Nara might offer to show the user where the herd grazes. The Narrator still never acts for the user. The user's part stays the user's to do.
 2. **The Judge reads the condition for its substance.** A condition is met when what it describes has happened, even in other words or in a different order. Part of a condition met earlier still counts. Being strict about "fully happened" stays. Being strict about the exact wording goes.
-3. **A passed-by Scene moves on.** From the 20th reply in a Scene, the Judge may also say the story has passed the Scene by: it went somewhere else so clearly that the condition can't happen soon. The Scene then moves on to the next Scene in order, even though its condition and gates weren't met. Its event says why.
+3. **A passed-by Scene moves on.** From the 20th reply in a Scene, the Judge may also say the story has passed the Scene by: it went somewhere else so clearly that the condition can't happen soon. The Scene then moves on to the next Scene in order, even though its condition and gates weren't met. Its event says where the story went.
 
 The user has no Move on button and never sees the reply counts.
 
@@ -33,7 +33,7 @@ The user has no Move on button and never sees the reply counts.
 7. As a player, I want a condition met in pieces over many replies to count, so that tasting the milk early still counts when I ask about the cows later.
 8. As a player, I want a Scene the story has clearly left behind to move on after a long while, so that the story is never stuck forever.
 9. As a player, I want a Scene to move on only to the next Scene in order, so that no later part of the plan is jumped over.
-10. As a player, I want the event of a passed-by Scene to say why it moved on, so that I understand what happened.
+10. As a player, I want the event of a passed-by Scene to say where the story went instead, so that I understand what happened, and never to claim what did or didn't happen.
 11. As a player, I want a short Scene to keep its old patience, so that early Scenes still get room to breathe.
 12. As a player, I want an edit or a Regenerate to roll back a passed-by move, like any other Scene move, so that the story stays consistent.
 13. As a player using a Branch, I want the reply count to follow the Branch's own story, so that each line of the story moves on its own.
@@ -65,14 +65,14 @@ The user has no Move on button and never sees the reply counts.
   - The rule "A Scene is meant to last many exchanges" goes.
 - **Passed by:**
   - From the passed-by threshold on, and only then, the Judge prompt's Current Scene section adds the passed-by rule.
-  - The output gains `"passed_by": false` next to `move_on`.
-  - `passed_by: true` means the story has clearly gone somewhere the condition can't happen soon, and nothing in the latest exchanges is heading back toward it. The reason must say where the story went.
+  - The output gains `"passed_by": false` and `"went_to": null` next to `move_on`.
+  - `passed_by: true` means the story has clearly gone somewhere the condition can't happen soon, and nothing in the latest exchanges is heading back toward it. Then `went_to` must say, in one short sentence, where the story went instead, and nothing about what has or hasn't happened. (Changed 2026-11-12, see Further Notes; it was "the reason must say where the story went".)
   - `apply-judgement`:
     - a `passed_by` under the threshold, or in free play, is rejected and logged;
     - `move_on` wins when both are true;
     - a valid passed-by moves to the next Scene in order, ignoring the condition and the gates. At the last Scene, it goes to free play, as `move_on` does.
-  - The Scene advance's event is "The story moved past {Scene name}: {reason}". It's a normal Scene advance in the ledger, so it's rolled back, branched and reset like any other.
-  - The passed-by decision and its reason are logged at `log` level.
+  - The Scene advance's event is "The story moved past {Scene name}: {went_to}". With `went_to` missing or blank it is just "The story moved past {Scene name}." It never falls back to the reason. It's a normal Scene advance in the ledger, so it's rolled back, branched and reset like any other. A `move_on` event is unchanged: it is the reason.
+  - The passed-by decision and its full reason are logged at `log` level.
 - **No new storage, API or UI.** The Scene strip and the Dashboard already show the current Scene and Scene advance events.
 
 ## Testing Decisions
@@ -83,10 +83,11 @@ The user has no Move on button and never sees the reply counts.
   - the lingering line with a condition, with gates, and gates-only;
   - the lingering line never contains a digit;
   - the Judge prompt has the passed-by rule only at or past the passed-by threshold;
-  - the Judge output parser reads `passed_by`.
+  - the Judge output parser reads `passed_by` and `went_to`;
+  - a passed-by event is "The story moved past {Scene}: {went_to}", or ends at the Scene name when `went_to` is missing or blank, and never holds the reason.
 - **API tests** (prior art: the Scene tests in `judge.spec.ts`, `bond-gates-api.spec.ts`), with a scripted Judge:
   - `passed_by` at 19 replies is rejected and the Scene stays;
-  - at 20 the Scene moves to the next one, ignoring an unmet condition and an unheld gate, and the event reads "The story moved past …";
+  - at 20 the Scene moves to the next one, ignoring an unmet condition and an unheld gate, and the event reads "The story moved past {Scene}: {went_to}", not the reason;
   - after an advance the count starts again;
   - at the last Scene it goes to free play;
   - editing the reply rolls the move back;
@@ -131,3 +132,8 @@ The user has no Move on button and never sees the reply counts.
   - **Why not 0:** at 0 a live move_on (Chat 1 Message 543) was missed both times; at 0.3 and the default it was met 1 of 2.
   - **Arcs:** too rare in the sample to compare.
   - A host that stops taking the value fails the call as a plain outage. It never tells the user to reset Sampling: the value isn't theirs.
+- **A passed-by event says only where the story went (2026-11-12).**
+  - Seen in play: Chat 2 left Scene 1 by itself at Message 697 (Scene advance 22), and moving on was right. But its event read "The story moved past First Taste: The user has not yet tasted the milk or asked where the tribe keeps its cows. The conversation has moved to …". The first claim is false: the milk was tasted in the very first exchange.
+  - Cause: the event reused the Judge's whole `reason`, and the reason restates which parts of the condition have or haven't happened. That restatement is unreliable. Here the Story so far had just been re-summarised from 4,352 to 1,846 characters, and the summary dropped the tasting.
+  - Decision: the Judge's `scene` output gains `went_to`, one short sentence saying where the story went instead, asked for only when `passed_by` is true. The event is "The story moved past {Scene}: {went_to}", or "The story moved past {Scene}." when `went_to` is missing or blank. It never falls back to the reason. The log line keeps the full reason for debugging.
+  - Out of scope here: the Story so far summariser dropping key facts such as the tasting. That is a separate issue, and the summariser is unchanged.

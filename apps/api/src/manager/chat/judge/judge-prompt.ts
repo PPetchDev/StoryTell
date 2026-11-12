@@ -130,7 +130,7 @@ Time of day rule:
 Reply with JSON only:
 {"bond_changes":[{"from":"Name","to":"user|Name","label":"...","description":"...","levels":{"trust":0,"affection":0,"desire":0,"tension":0},"cause":"..."}],
  "arc_steps":[{"character":"Name","step":"...","cause":"..."}],
- "scene":{"reason":"...","move_on":false,"passed_by":false},
+ "scene":{"reason":"...","move_on":false,"passed_by":false,"went_to":null},
  "time_of_day":null}
 Empty arrays when nothing changed.`;
 
@@ -151,10 +151,12 @@ const SYSTEM_WITH_EXPRESSIONS = SYSTEM.replace('Reply with JSON only:', `${EXPRE
 
 /**
  * A Passed-by Scene (.scratch/scene-flow/spec.md, "Passed by"): offered in the Current Scene section
- * only from `PASSED_BY_REPLIES` replies in the Scene, so the system message stays the same.
+ * only from `PASSED_BY_REPLIES` replies in the Scene, so the system message stays the same. Its
+ * `went_to` becomes the Scene advance's event; the reason, which restates the condition and can get
+ * it wrong, is kept only for the log.
  */
 export const PASSED_BY_RULE =
-    'Passed-by rule: This Scene has gone on a long time. Set "passed_by": true only when the story has clearly gone somewhere the move-on condition can\'t happen soon, and nothing in the latest exchanges is heading back toward it; then the reason must say where the story went. When in doubt, passed_by is false.';
+    'Passed-by rule: This Scene has gone on a long time. Set "passed_by": true only when the story has clearly gone somewhere the move-on condition can\'t happen soon, and nothing in the latest exchanges is heading back toward it; then also give "went_to": one short sentence saying where the story went instead, never what has or hasn\'t happened. When in doubt, passed_by is false.';
 
 /** The reply as `partsToText` writes it, with each speech line numbered in order: `[1] @Name: …`. */
 export function numberedReplyText(parts: ReplyPart[]): string {
@@ -238,6 +240,8 @@ export interface JudgedScene {
     /** The story has passed the Scene by (.scratch/scene-flow/spec.md); the parser always sets it, false when not given. */
     passedBy?: boolean;
     reason: string;
+    /** Where the story went when it passed the Scene by; the parser always sets it, '' when not given. */
+    wentTo?: string;
 }
 
 /** The judge's output, read loosely: every item that is not an object with the fields is dropped. */
@@ -294,7 +298,9 @@ export function parseJudgement(text: string): Judgement {
             : [],
     );
     const scenes = (Array.isArray(json.scene) ? json.scene : [json.scene]).flatMap((item): JudgedScene[] =>
-        isObject(item) ? [{ moveOn: item.move_on === true, passedBy: item.passed_by === true, reason: str(item.reason) }] : [],
+        isObject(item)
+            ? [{ moveOn: item.move_on === true, passedBy: item.passed_by === true, reason: str(item.reason), wentTo: str(item.went_to) }]
+            : [],
     );
     // Read loosely: an item without a whole `line` or a known emotion (any case) is dropped.
     const expressions = list(json.expressions).flatMap((item): JudgedExpression[] => {

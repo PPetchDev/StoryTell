@@ -221,14 +221,16 @@ describe('The Judge prompt\'s passed-by rule', () => {
         );
     });
 
-    it('from the threshold, the Current Scene section adds the rule: clearly gone elsewhere, nothing heading back, the reason says where', () => {
+    it('from the threshold, the Current Scene section adds the rule: clearly gone elsewhere, nothing heading back, went_to says where', () => {
         for (const replies of [PASSED_BY_REPLIES, 43]) {
             const section = currentScene(withReplies(replies));
             expect(section).toContain('Move-on condition: Ash tastes the milk and openly asks where the tribe keeps its cows.\nPassed-by rule:');
             expect(section).toContain('This Scene has gone on a long time.');
             expect(section).toContain('"passed_by": true only when the story has clearly gone somewhere the move-on condition can\'t happen soon');
             expect(section).toContain('nothing in the latest exchanges is heading back toward it');
-            expect(section).toContain('the reason must say where the story went');
+            // 2026-11-12: where the story went is its own field, never the reason, which may restate the condition wrongly.
+            expect(section).toContain('then also give "went_to": one short sentence saying where the story went instead, never what has or hasn\'t happened.');
+            expect(section).not.toContain('the reason must say where the story went');
             expect(section).toContain('When in doubt, passed_by is false.');
         }
     });
@@ -237,20 +239,30 @@ describe('The Judge prompt\'s passed-by rule', () => {
         expect(buildJudgePrompt({ ...JUDGE_INPUT, scene: null }).messages[1].content).not.toContain('Passed-by rule');
     });
 
-    it('the reply shape gains "passed_by": false next to move_on', () => {
-        expect(buildJudgePrompt(JUDGE_INPUT).messages[0].content).toContain('"scene":{"reason":"...","move_on":false,"passed_by":false}');
+    it('the reply shape gains "passed_by": false and "went_to": null next to move_on', () => {
+        expect(buildJudgePrompt(JUDGE_INPUT).messages[0].content).toContain('"scene":{"reason":"...","move_on":false,"passed_by":false,"went_to":null}');
     });
 });
 
-describe('Reading passed_by from the Judge', () => {
+describe('Reading passed_by and went_to from the Judge', () => {
     const judged = (scene: unknown) => parseJudgement(JSON.stringify({ bond_changes: [], arc_steps: [], scene })).scenes;
 
     it('reads passed_by, and a missing or non-true one is false', () => {
         expect(judged({ reason: 'The story went to the lord\'s fire.', move_on: false, passed_by: true })).toEqual([
-            { moveOn: false, passedBy: true, reason: 'The story went to the lord\'s fire.' },
+            { moveOn: false, passedBy: true, reason: 'The story went to the lord\'s fire.', wentTo: '' },
         ]);
-        expect(judged({ reason: 'Not yet.', move_on: false })).toEqual([{ moveOn: false, passedBy: false, reason: 'Not yet.' }]);
-        expect(judged({ reason: 'Not yet.', move_on: false, passed_by: 'true' })).toEqual([{ moveOn: false, passedBy: false, reason: 'Not yet.' }]);
+        expect(judged({ reason: 'Not yet.', move_on: false })).toEqual([{ moveOn: false, passedBy: false, reason: 'Not yet.', wentTo: '' }]);
+        expect(judged({ reason: 'Not yet.', move_on: false, passed_by: 'true' })).toEqual([{ moveOn: false, passedBy: false, reason: 'Not yet.', wentTo: '' }]);
+    });
+
+    it('reads went_to trimmed, and a missing, null or non-string one is empty', () => {
+        const passed = { reason: 'Ash has not asked about the cows.', move_on: false, passed_by: true };
+        expect(judged({ ...passed, went_to: '  The story went to the lord\'s fire.  ' })).toEqual([
+            { moveOn: false, passedBy: true, reason: 'Ash has not asked about the cows.', wentTo: 'The story went to the lord\'s fire.' },
+        ]);
+        for (const wentTo of [undefined, null, 3, true, ['The fire.']]) {
+            expect(judged({ ...passed, went_to: wentTo })[0].wentTo).toBe('');
+        }
     });
 });
 
@@ -270,26 +282,41 @@ describe('Applying a passed-by judgement', () => {
         repliesInScene: PASSED_BY_REPLIES,
         ...overrides,
     });
-    const judgement = (scene: { moveOn?: boolean; passedBy?: boolean; reason: string }): Judgement => ({
+    const judgement = (scene: { moveOn?: boolean; passedBy?: boolean; reason: string; wentTo?: string }): Judgement => ({
         bondChanges: [],
         arcSteps: [],
-        scenes: [{ moveOn: scene.moveOn ?? false, passedBy: scene.passedBy ?? false, reason: scene.reason }],
+        scenes: [{ moveOn: scene.moveOn ?? false, passedBy: scene.passedBy ?? false, reason: scene.reason, wentTo: scene.wentTo ?? '' }],
         timeOfDay: null,
         expressions: [],
     });
-    const PASSED = judgement({ passedBy: true, reason: 'The story went to the stall and the lord\'s fire.' });
+    // Seen in play (2026-11-12): the reason restated the condition, and wrongly ("has not yet tasted the milk").
+    const REASON = 'Ash has not yet tasted the milk or asked about the cows. The talk is all of the stall.';
+    const WENT_TO = 'The story went to the stall and the lord\'s fire.';
+    const PASSED = judgement({ passedBy: true, reason: REASON, wentTo: WENT_TO });
 
-    it('at the threshold, moves to the next Scene past an unmet condition and an unheld gate, saying why', () => {
+    it('at the threshold, moves to the next Scene past an unmet condition and an unheld gate, saying where the story went', () => {
         const applied = applyJudgement(input(), PASSED);
         expect(applied.scene).toEqual({
             fromSceneId: 10,
             fromSceneName: 'Mare\'s milk',
             toSceneId: 11,
             toSceneName: 'The guest tent',
-            event: 'The story moved past Mare\'s milk: The story went to the stall and the lord\'s fire.',
+            event: `The story moved past Mare's milk: ${WENT_TO}`,
         });
         expect(applied.rejected).toEqual([]);
-        expect(applied.passedBy).toBe('The story went to the stall and the lord\'s fire.');
+        // The log keeps the Judge's whole reason; the event never shows it.
+        expect(applied.passedBy).toBe(REASON);
+    });
+
+    it('with went_to missing or blank, the event names only the Scene, never the reason', () => {
+        for (const wentTo of ['', '   ', undefined]) {
+            const applied = applyJudgement(input(), judgement({ passedBy: true, reason: REASON, wentTo }));
+            expect(applied.scene).toMatchObject({ fromSceneId: 10, toSceneId: 11, event: 'The story moved past Mare\'s milk.' });
+            expect(applied.passedBy).toBe(REASON);
+        }
+        // A judgement with no wentTo field at all.
+        const without = applyJudgement(input(), { ...PASSED, scenes: [{ moveOn: false, passedBy: true, reason: REASON }] });
+        expect(without.scene?.event).toBe('The story moved past Mare\'s milk.');
     });
 
     it('under the threshold, or with no count, is rejected and the Scene stays', () => {
@@ -309,14 +336,15 @@ describe('Applying a passed-by judgement', () => {
 
     it('with move_on too, move_on wins: one advance, with its reason', () => {
         const scenesWithoutGates = scenes.map((scene) => ({ ...scene, gates: [] }));
-        const both = judgement({ moveOn: true, passedBy: true, reason: 'Ash asked about the cows.' });
+        const both = judgement({ moveOn: true, passedBy: true, reason: 'Ash asked about the cows.', wentTo: WENT_TO });
         const applied = applyJudgement(input({ scenes: scenesWithoutGates }), both);
+        // A move_on event is unchanged: its reason, never went_to.
         expect(applied.scene).toMatchObject({ toSceneId: 11, event: 'Ash asked about the cows.' });
         expect(applied.passedBy).toBeNull();
     });
 
     it('from the last Scene, goes to free play', () => {
         const applied = applyJudgement(input({ currentSceneId: 12 }), PASSED);
-        expect(applied.scene).toMatchObject({ fromSceneId: 12, toSceneId: null, toSceneName: null, event: 'The story moved past The fire: The story went to the stall and the lord\'s fire.' });
+        expect(applied.scene).toMatchObject({ fromSceneId: 12, toSceneId: null, toSceneName: null, event: `The story moved past The fire: ${WENT_TO}` });
     });
 });

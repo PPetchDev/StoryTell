@@ -193,7 +193,9 @@ describe('Scenes that keep moving', () => {
     // .scratch/scene-flow/issues/03-passed-by-scenes.md
     describe('a passed-by Scene', () => {
         const WENT = 'The story went to the stall and the lord\'s fire.';
-        const PASSED_BY = JSON.stringify({ bond_changes: [], arc_steps: [], scene: { reason: WENT, move_on: false, passed_by: true } });
+        // As seen in play (2026-11-12), the reason restates the condition, and wrongly: the event must never show it.
+        const REASON = 'Ash has not yet tasted the milk or asked about the cows. The talk is all of the stall.';
+        const PASSED_BY = JSON.stringify({ bond_changes: [], arc_steps: [], scene: { reason: REASON, move_on: false, passed_by: true, went_to: WENT } });
 
         afterEach(() => {
             vi.restoreAllMocks();
@@ -238,7 +240,18 @@ describe('Scenes that keep moving', () => {
                 event: `The story moved past Mare's milk: ${WENT}`,
                 messageId: moved.messages.at(-1)!.id,
             });
-            expect(lines()).toContainEqual(expect.stringMatching(new RegExp(`passed Scene "Mare's milk" by: ${WENT.replace('.', '\\.')}$`)));
+            // The log line keeps the Judge's whole reason for debugging.
+            expect(lines().filter((line) => line.endsWith(`after 20 replies the story passed Scene "Mare's milk" by: ${REASON}`))).toHaveLength(1);
+        });
+
+        it('with no went_to, the event names only the Scene, never the reason', async () => {
+            const story = await createStory();
+            const chatId = await createChat(story.id);
+            await playMany(story.id, chatId, 19);
+
+            const noWentTo = JSON.stringify({ bond_changes: [], arc_steps: [], scene: { reason: REASON, move_on: false, passed_by: true } });
+            expect((await play(story.id, chatId, noWentTo)).currentScene?.name).toBe('The guest tent');
+            expect((await advance(story.id, chatId))!.event).toBe('The story moved past Mare\'s milk.');
         });
 
         it('with move_on as well, advances once, with move_on\'s reason', async () => {

@@ -27,8 +27,8 @@ describe('Judge prompt: the Scene rule', () => {
         expect(system).toContain('When in doubt, move_on is false.');
         // The reason comes before the verdict, so the model reasons first and decides from it.
         expect(system).toContain('Write the reason first, saying what has and has not happened yet, then decide move_on from it.');
-        // .scratch/scene-flow/spec.md: "The output gains "passed_by": false next to move_on."
-        expect(system).toContain('"scene":{"reason":"...","move_on":false,"passed_by":false}');
+        // .scratch/scene-flow/spec.md: "The output gains "passed_by": false and "went_to": null next to move_on."
+        expect(system).toContain('"scene":{"reason":"...","move_on":false,"passed_by":false,"went_to":null}');
     });
 
     it('still shows the current Scene and its condition to judge', () => {
