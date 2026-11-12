@@ -14,7 +14,6 @@
 @import 'tailwindcss/theme.css' layer(theme);
 @import 'tailwindcss/utilities.css' layer(utilities) source('..');
 
-@import './styles/home.css';
 @import './styles/editor.css';
 @import './styles/chats.css';
 @import './styles/chat.css';
@@ -97,6 +96,14 @@
     --color-bond-tension: var(--bond-tension);
     --color-bond-neutral: var(--bond-neutral);
     --color-backdrop-dim: var(--backdrop-dim);
+    --color-viewer-stage: var(--viewer-stage);
+    --color-viewer-text: var(--viewer-text);
+    --color-viewer-muted: var(--viewer-muted);
+    --color-viewer-link: var(--viewer-link);
+    --color-viewer-panel: var(--viewer-panel);
+    --color-viewer-panel-text: var(--viewer-panel-text);
+    --color-viewer-press: var(--viewer-press);
+    --color-picture-badge: var(--picture-badge);
 }
 
 /*
@@ -266,6 +273,18 @@
     --bond-neutral: var(--character-neutral);
     /* Chat looks ticket 03: the page colour laid over a Backdrop picture, so lines on it stay readable. */
     --backdrop-dim: rgba(22, 19, 31, 0.94);
+    /*
+     * Audit L5: the Snapshot viewer's black stage and what sits on it, and the scrim under a badge on
+     * a picture. Pictures keep their colours, so these are the same in both themes (no light values).
+     */
+    --viewer-stage: #000000;
+    --viewer-text: #ffffff;
+    --viewer-muted: #bbbbbb;
+    --viewer-link: #c9b9ff;
+    --viewer-panel: #1a1a1a;
+    --viewer-panel-text: #dddddd;
+    --viewer-press: rgba(255, 255, 255, 0.14);
+    --picture-badge: rgba(0, 0, 0, 0.78);
     /* Friendly UI ticket 10: a modeless sheet's height, and the room a page leaves under it. */
     --sheet-half: 50dvh;
     /* The side rail's width on a wide screen; nothing on a phone, where the nav is a bottom bar. */

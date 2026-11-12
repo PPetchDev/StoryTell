@@ -79,6 +79,14 @@ export function snapshotImageUrl(snapshot: Snapshot): string {
     return `/api/images/${snapshot.imagePath}`;
 }
 
+/**
+ * A small WebP copy for a grid tile (audit H33): 320px wide, or 640 for a dense screen. The API
+ * makes it once and the browser keeps it, as it keeps the full image.
+ */
+export function snapshotThumbUrl(snapshot: Snapshot, width: 320 | 640 = 320): string {
+    return `${snapshotImageUrl(snapshot)}?w=${width}`;
+}
+
 /** Where the API serves a Snapshot as a download. */
 export function snapshotDownloadUrl(snapshot: Snapshot): string {
     return `/api/stories/${snapshot.storyId}/snapshots/${snapshot.id}/download`;

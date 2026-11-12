@@ -77,6 +77,15 @@ const DARK = {
     '--character-neutral': '#c4bdd6',
     '--on-character': '#16131f',
     '--backdrop-dim': 'rgba(22, 19, 31, 0.94)',
+    // Audit L5: the Snapshot viewer and a badge's scrim on a picture, the same in both themes.
+    '--viewer-stage': '#000000',
+    '--viewer-text': '#ffffff',
+    '--viewer-muted': '#bbbbbb',
+    '--viewer-link': '#c9b9ff',
+    '--viewer-panel': '#1a1a1a',
+    '--viewer-panel-text': '#dddddd',
+    '--viewer-press': 'rgba(255, 255, 255, 0.14)',
+    '--picture-badge': 'rgba(0, 0, 0, 0.78)',
 };
 // What `:root[data-theme='light']` overrides; every other token keeps its dark value.
 const LIGHT_OVERRIDES = {
@@ -271,12 +280,22 @@ pair('Rewrite ✨ on surface', '--rewrite-text', SF);
 pair('Cover banner chip text over a white picture', '--text', ['#ffffff', '--picture-chip']);
 pair('Cover banner chip text over a black picture', '--text', ['#000000', '--picture-chip']);
 // Snapshot viewer (black stage, literal in both themes)
-pair('Viewer text #fff on black', '#ffffff', ['#000000']);
-pair('Viewer count/meta #bbb on black', '#bbbbbb', ['#000000']);
-pair('Viewer link #c9b9ff on black', '#c9b9ff', ['#000000']);
-pair('Viewer prompt #ddd on #1a1a1a', '#dddddd', ['#1a1a1a']);
+pair('Viewer text on its stage', '--viewer-text', ['--viewer-stage']);
+pair('Viewer count/meta on its stage', '--viewer-muted', ['--viewer-stage']);
+pair('Viewer link on its stage', '--viewer-link', ['--viewer-stage']);
+pair('Viewer prompt on its panel', '--viewer-panel-text', ['--viewer-panel']);
+pair('Viewer text on a pressed button', '--viewer-text', ['--viewer-stage', '--viewer-press']);
+pair('Viewer error or loading text on its panel', '--viewer-panel-text', ['--viewer-panel']);
+pair('Viewer muted text on its panel', '--viewer-muted', ['--viewer-panel']);
+pair('Viewer quiet button text on quiet fill', '--text', ['--quiet-fill']);
+pair('Viewer focus ring (accent) on its stage', '--accent', ['--viewer-stage'], 3);
+pair('Viewer prev/next edge on its stage (icon button outline)', '--viewer-muted', ['--viewer-stage'], 3);
+pair('Usage credit bar on its track (graphic)', '--accent', ['--quiet-fill'], 3);
+pair('Usage credit bar when low on its track (graphic)', '--warning', ['--quiet-fill'], 3);
+pair('Add button dashed edge on the card (H14)', '--field-line', SF, 3);
 // Over pictures: a literal scrim, so the text on it keeps one colour in both themes
 pair('Cover badge on 78% black over a white cover', '--on-picture-warning', ['#ffffff', 'rgba(0,0,0,0.78)']);
+pair('Home Draft badge on its scrim over a white cover', '--on-picture-warning', ['#ffffff', '--picture-badge']);
 pair('Picker caption on its scrim over a white picture', '--on-picture-text', ['#ffffff', 'rgba(5,3,12,0.85)']);
 pair('Danger text on raised surface (Reset row pressed)', '--danger', SR);
 pair('Warning text on raised surface', '--warning', SR);
