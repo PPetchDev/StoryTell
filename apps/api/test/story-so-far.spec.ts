@@ -1,6 +1,6 @@
 import { ProviderOutageError } from '../src/errors/model-gateway.errors.js';
 import { ChatManagerService } from '../src/manager/chat/chat.service.js';
-import { storySoFarCoverage } from '../src/manager/chat/story-so-far/story-so-far-prompt.js';
+import { storySoFarCoverage, storySoFarPromptMessages } from '../src/manager/chat/story-so-far/story-so-far-prompt.js';
 import { buildTurnPrompt, PROMPT_LAYERS, PromptLayersInput } from '../src/manager/chat/turn/prompt.js';
 import { buildSuggestionsPrompt } from '../src/manager/chat/suggestions/suggestions-prompt.js';
 import { Pov, ReplyLength, Tense } from '../src/model/story/entities/story.entity.js';
@@ -92,6 +92,42 @@ describe('Story so far: prompt (pure)', () => {
         expect(next).toBeGreaterThan(0);
         // The newest two are always sent word for word.
         expect(next).toBeLessThanOrEqual(28);
+    });
+});
+
+// .scratch/story-so-far/spec.md, "Facts the Scenes need".
+describe('Story so far: the writer keeps what the Scenes need (pure)', () => {
+    const base = {
+        identityName: 'Petch',
+        castNames: ['Nara', 'Morra'],
+        messages: [{ speaker: 'Petch', text: 'I drink the milk.' }],
+        corrections: null,
+    };
+    const user = (input: Parameters<typeof storySoFarPromptMessages>[0]): string => storySoFarPromptMessages(input)[1].content;
+
+    it('lists the given conditions, asks to keep every event bearing on them, and never to name them', () => {
+        const text = user({
+            ...base,
+            sceneConditions: ['The user tastes the milk and openly asks where the tribe keeps its cows.', 'Tavri lets a clue slip.'],
+        });
+        expect(text).toContain(
+            'Story goals the account must keep track of. Keep every event that bears on them, even a small one: what happened and who did it. Never name or hint at these goals in the account:\n- The user tastes the milk and openly asks where the tribe keeps its cows.\n- Tavri lets a clue slip.',
+        );
+        // After the Messages, before the closing request.
+        expect(text.indexOf('Story goals')).toBeGreaterThan(text.indexOf('I drink the milk.'));
+        expect(text.trimEnd().endsWith('Write the account now.')).toBe(true);
+    });
+
+    it('is exactly as before with no conditions, empty ones, or none given', () => {
+        const before = storySoFarPromptMessages(base);
+        expect(storySoFarPromptMessages({ ...base, sceneConditions: [] })).toEqual(before);
+        expect(storySoFarPromptMessages({ ...base, sceneConditions: ['', '   '] })).toEqual(before);
+        expect(before[1].content).not.toContain('Story goals');
+    });
+
+    it('trims each condition and leaves out the empty ones', () => {
+        const text = user({ ...base, sceneConditions: ['  Tavri lets a clue slip.  ', ''] });
+        expect(text).toContain('in the account:\n- Tavri lets a clue slip.\n\nWrite the account now.');
     });
 });
 
@@ -204,6 +240,32 @@ describe('Story so far', () => {
         expect(next.messages[0].content).toContain(`${PROMPT_LAYERS.storySoFar}`);
         expect(next.messages[0].content).toContain('Ash came through the storm and Mira took the first watch.');
         expect(next.messages.slice(1).map((message) => message.content).join('\n')).not.toContain('Rain hammers the gallery windows.');
+    });
+
+    // .scratch/story-so-far/spec.md, "Facts the Scenes need".
+    it("gives the writer the current and the next Scene's conditions, and none in free play", async () => {
+        const storyId = await createStory();
+        const scene = (name: string, moveOnCondition: string) =>
+            t.http.post(`/api/stories/${storyId}/scenes`).send({ name, situation: `${name}.`, moveOnCondition }).expect(201);
+        await scene('First Taste', 'Ash tastes the milk and asks where the cows are.');
+        await scene('Three Laps', 'Tavri lets a clue slip.');
+        await scene('The Crescent', 'Mira shows Ash the crescent seal.');
+        const chat = await createChat(storyId);
+
+        await playUntilSummarised(storyId, chat.id, 'Ash tasted the milk.');
+
+        const input = t.gateway.textCalls('story_summary')[0].messages.map((message) => message.content).join('\n');
+        expect(input).toContain('Story goals the account must keep track of.');
+        expect(input).toContain('- Ash tastes the milk and asks where the cows are.\n- Tavri lets a clue slip.');
+        expect(input).not.toContain('crescent seal');
+
+        // Free play: a Story with no Scenes sends the writer no goals.
+        const plain = await createStory();
+        const plainChat = await createChat(plain);
+        t.gateway.reset();
+        await playUntilSummarised(plain, plainChat.id, 'Ash came through the storm.');
+        const plainInput = t.gateway.textCalls('story_summary')[0].messages.map((message) => message.content).join('\n');
+        expect(plainInput).not.toContain('Story goals');
     });
 
     it("rewrites from every covered Message each time, and keeps the user's corrections in every rewrite", async () => {

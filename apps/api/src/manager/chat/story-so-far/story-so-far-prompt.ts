@@ -83,6 +83,11 @@ export interface StorySoFarPromptInput {
     messages: Array<{ speaker: string; text: string }>;
     /** The user's own last text, if they ever wrote one: their corrections win. Null otherwise. */
     corrections: string | null;
+    /**
+     * The move-on conditions of the current Scene and the next one (spec: "Facts the Scenes need"),
+     * whose events the account must keep. Left out, empty or blank: the prompt is as before.
+     */
+    sceneConditions?: string[];
 }
 
 /**
@@ -108,6 +113,13 @@ Reply with the account only.`;
     if (input.corrections && input.corrections.trim() !== '') {
         sections.push(
             `The user corrected the previous account to read as below. Where it and the Messages differ, the user's version wins; keep everything it says:\n\n${input.corrections.trim()}`,
+        );
+    }
+    // A rewrite once dropped half of a Scene's condition, and the Judge then read it as never done.
+    const goals = (input.sceneConditions ?? []).map((condition) => condition.trim()).filter((condition) => condition !== '');
+    if (goals.length > 0) {
+        sections.push(
+            `Story goals the account must keep track of. Keep every event that bears on them, even a small one: what happened and who did it. Never name or hint at these goals in the account:\n${goals.map((goal) => `- ${goal}`).join('\n')}`,
         );
     }
     sections.push('Write the account now.');

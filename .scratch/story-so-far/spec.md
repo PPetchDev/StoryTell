@@ -48,6 +48,9 @@ Each Chat gets a **Story so far**: a prose account, in order, of everything that
   - no guessed gender for the worn identity unless the Role or Persona states one;
   - no repeating the Memory list;
   - no new events.
+- **Facts the Scenes need (2026-11-12).** When the Chat is in a Scene, the writer is also given the move-on condition of the current Scene and of the next Scene in order, where they have one. It is told to keep every event that bears on them, even a small one: what happened and who did it. It is also told never to name or hint at the conditions themselves, because the account is read by the storyteller. In free play, or with no conditions, the input is exactly as before.
+  - Why: in a dev Chat, a rewrite from 4,352 to 1,846 characters dropped "Petch tasted the milk", the first half of the current Scene's condition. The Judge then wrote that it had never happened.
+  - The Bond gates are not given; they are levels, not events.
 - **Failure.** A failed or unreadable update keeps the old text and position, records the reason, and never blocks a send. The next turn's check runs it again. Until then, the trimming that already exists leaves out the oldest uncovered Messages.
 - **Edits, Regenerate, Reset.** Any rewind from a position at or before the covered position clears the Story so far. That covers an edited User or AI Message and a Regenerate. The next check writes it again from the remaining Messages when needed. A Reset clears it too. A user-written Story so far cleared this way is lost, because the events it told were rewound away.
 - **Concurrency.** At most one update per Chat runs at a time. A turn never waits for one. An update that finishes after a rewind cleared the Story so far, or after the user saved their own text, is dropped, so it never overwrites either.
@@ -76,6 +79,10 @@ Each Chat gets a **Story so far**: a prose account, in order, of everything that
   - Past the threshold, one call runs. Its input holds every Message through the new position, and the next turn's prompt carries the summary and leaves those Messages out.
   - A second update sends all covered Messages again, not the old summary alone.
 - **User edit.** The PUT stores `writtenBy: user`. The next update's input carries that text with the "corrections win" instruction.
+- **Facts the Scenes need.**
+  - Pure: the given conditions are listed after the Messages and the corrections, trimmed, with the "keep every event" and "never name them" instruction.
+  - Pure: with none given, an empty list or only blank ones, the prompt is exactly as before.
+  - API: in a Chat on the first of three Scenes, the update's input carries the first two conditions and not the third. A Story with no Scenes sends no goals.
 - **Failure.** A failed call leaves the old text and records the reason, a send is not blocked, and the next turn retries.
 - **Rewind.** Editing a covered Message, Regenerate after the covered position is reached by a rewind, and Reset each clear it. An update that lands after a clear is dropped.
 - **e2e.** The drawer shows "Not needed yet" on a short Chat. Seeded with a Story so far, it shows the text and the count, and editing saves.
