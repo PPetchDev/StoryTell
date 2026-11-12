@@ -3,16 +3,14 @@
  * shared classes. docs/adr/0004-tailwind-css.md is the rulebook: read it before adding CSS here.
  *
  * Order matters. Tailwind's layers come first, so the shared classes below can sit in `components`
- * and a utility on the same element wins over them. The area files under ./styles hold what was
- * left of each screen's rules, moved here unchanged and still unlayered: they beat both, as they
- * did before. New CSS is layered; nothing new goes in unlayered.
+ * and a utility on the same element wins over them. ./styles/memory.css holds the Memory graph's SVG
+ * styling, layered too. Nothing here is unlayered, and nothing new may be.
  *
- * Preflight is off: only Tailwind's theme and utilities are imported, and the base styles below
- * stand in for it until every area has converted (the ADR's TODO turns it on).
+ * Preflight (Tailwind's reset) is on. The base rules below add the app's colours, font, `h1`, links,
+ * the focus ring and placeholders on top of it.
  */
 @layer theme, base, components, utilities;
-@import 'tailwindcss/theme.css' layer(theme);
-@import 'tailwindcss/utilities.css' layer(utilities) source('..');
+@import 'tailwindcss' source('..');
 
 @import './styles/memory.css';
 
@@ -464,10 +462,6 @@
 }
 
 @layer base {
-    * {
-        box-sizing: border-box;
-    }
-
     /* A folded card's body, and anything else marked hidden, stays hidden whatever its own display. */
     [hidden] {
         display: none !important;
@@ -475,7 +469,6 @@
 
     html,
     body {
-        margin: 0;
         min-height: 100%;
         background: var(--bg);
         color: var(--text);
@@ -495,13 +488,42 @@
         }
     }
 
+    /*
+     * What the screens were converted against while preflight was off, kept on top of it: bold
+     * headings, a paragraph's 1em above and below, and code a little smaller than the text around
+     * it. A utility on the element still wins (`mt-0`, `font-normal`).
+     */
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+        font-weight: 700;
+    }
+
+    p {
+        margin-block: 1em;
+    }
+
+    code,
+    kbd,
+    samp,
+    pre {
+        font-size: 0.8125em;
+    }
+
+    /* Preflight makes headings plain text; the page title keeps its size and weight. */
     h1 {
         font-size: 1.75rem;
+        font-weight: 700;
         margin: 0 0 1rem;
     }
 
+    /* Preflight takes the underline off; a link in running text keeps it, so it is not told by colour alone. */
     a {
         color: var(--accent);
+        text-decoration: underline;
     }
 
     /* Audit M2: one ring for everything that takes focus; a component may draw its own instead. */

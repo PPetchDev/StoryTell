@@ -8,7 +8,7 @@ This file is the rulebook for the conversion. When it and the code disagree, fix
 
 - `tailwindcss` and `@tailwindcss/postcss` 4.3.5, devDependencies of `apps/web`.
 - `apps/web/postcss.config.mjs`. Turbopack reads it from the Next.js project folder, not from `turbopack.root` (the repo root, set in `next.config.ts`); a production build confirms it (`@apply` is expanded, the layers are emitted).
-- `app/globals.css` imports `tailwindcss/theme.css` and `tailwindcss/utilities.css` with `source('..')`, so classes are found in `apps/web` only, never in `.claude/worktrees/`.
+- `app/globals.css` imports `tailwindcss` (preflight included) with `source('..')`, so classes are found in `apps/web` only, never in `.claude/worktrees/`.
 
 ## Colours: tokens only
 
@@ -52,12 +52,10 @@ The type scale uses Tailwind's names with this app's sizes: `text-sm` here is 13
 
 Tailwind v4 puts its output in cascade layers: `theme`, `base`, `components`, `utilities`, in that order. A rule outside any layer beats every layered rule, whatever its specificity. So:
 
-1. **`base`**: element defaults in `globals.css` (`html`, `body`, `h1`, `a`, `[hidden]`, `:focus-visible`, `::placeholder`).
+1. **`base`**: Tailwind's preflight, then the app's element defaults in `globals.css` (below).
 2. **`components`**: the shared classes in `globals.css`. A utility on the same element overrides them: `button button-quiet w-full`.
 3. **`utilities`**: Tailwind's, and the custom ones in `globals.css`.
-4. **Unlayered**: what is not converted yet. The `.module.css` files and the area files under `app/styles/` beat everything above, as they did before the move.
-
-The rule: **no new unlayered CSS.** New styling is utilities in the component. A pattern every screen repeats may become a shared class in `@layer components`; a one-off property Tailwind lacks may become an `@utility`.
+Apart from the colour tokens on `:root`, nothing in `apps/web` is unlayered any more, and it stays that way. **No new unlayered CSS:** a rule outside the layers beats every utility on the same element. New styling is utilities in the component. A pattern every screen repeats may become a shared class in `@layer components`; a one-off property Tailwind lacks may become an `@utility`.
 
 ## The shared classes
 
@@ -76,7 +74,7 @@ These stay as classes, layered, because every screen uses them. Their audit fixe
 | `chip`, `chip-muted`, `chip-pick` | a label; a pick is a 44px target with its own checked and focus looks (H31); 8px between chips |
 | `muted`, `hint`, `small`, `field-error`, `turn-error`, `save-state`, `confirm`, `confirm-warning` | text |
 | `visually-hidden` | an alias of Tailwind's `sr-only` (L38). Write `sr-only` in new code. |
-| `bare-button` | a `<button>` without the browser's look. Needed while preflight is off (below); harmless after. |
+| `bare-button` | a `<button>` without the browser's look. Written while preflight was off; preflight does the same now, so new code doesn't need it. |
 
 Custom utilities:
 
@@ -104,38 +102,34 @@ Utilities can't say everything. These may stay CSS:
 - SVG styling: the Memory graph, the Bond chart (`fill`, `stroke`, `paint-order`, states on `<g>`).
 - Selectors utilities can't reach cleanly: `:has()` across components, styling the HTML a Markdown renderer makes, `::-webkit-*` parts.
 
-Such CSS goes in the area's file under `app/styles/` (never back into `globals.css`), inside `@layer components`. Those files are imported by `globals.css`, so `@apply`, `@variant` and `var(--breakpoint-lg)` work in them as they are. A stylesheet Tailwind processes on its own (a `.module.css` kept for a reason) needs `@reference '../../app/globals.css';` (its own relative path) at its top before it can use them. Rules moved into `app/styles/` unlayered by the foundation are leftovers to convert, not a place to add to.
+Such CSS goes in the area's file under `app/styles/` (never back into `globals.css`), inside `@layer components`. Those files are imported by `globals.css`, so `@apply`, `@variant` and `var(--breakpoint-lg)` work in them as they are. A stylesheet Tailwind processes on its own (a `.module.css` kept for a reason) needs `@reference '../../app/globals.css';` (its own relative path) at its top before it can use them.
 
 ## The area files
 
-The foundation moved each screen's rules out of `globals.css`, unchanged, so each conversion session owns one file and nothing collides in `globals.css`:
+The foundation moved each screen's rules out of `globals.css` into `app/styles/<area>.css`, so the four conversion sessions never collided there. Each was converted and deleted, except one:
 
-| File | Owner | Holds |
-|---|---|---|
-| `app/styles/home.css` | Home, Gallery, Personas, Settings, Usage | the New Story panel, Character card import, Personas, the Gallery and Snapshot viewer leftovers, Usage's facts |
-| `app/styles/editor.css` | Story editor | status card, sub-sections, line lists, Starting Bonds, reference images, the assistant's marks |
-| `app/styles/chat.css` | Chat screen | Chat headings, message edit, the Dashboard link target, rollback notice, the Memory toast |
-| `app/styles/chats.css` | Chats list, Dashboard, Memory | the Chats list, `message-text` |
-| `app/styles/dashboard.css` | Chats list, Dashboard, Memory | the Dashboard and the Bond chart |
-| `app/styles/memory.css` | Chats list, Dashboard, Memory | the Memory drawer, its graph, Show Bonds |
+| File | Holds |
+|---|---|
+| `app/styles/memory.css` | the Memory graph's SVG styling, and `.page:has(.memory-drawer)`, which makes the Chat leave room for the docked drawer on a desktop. All in `@layer components`. |
 
-`globals.css` imports them in their old order. `.bond` is in both `editor.css` and `dashboard.css`, and both match every `.bond`; dashboard's padding wins by import order. Convert both together or give the editor its own class first.
-
-When an area is converted, its file is empty: delete it and its `@import`.
+A new area file is for what "What may stay plain CSS" allows, inside `@layer components`.
 
 ## Class order
 
 Write classes in this order, so a diff reads the same everywhere: the shared class first, then layout (`relative`, `flex`, `grid`, `items-*`, `gap-*`), box (`size-*`, `min-h-*`, `w-*`, `p-*`, `m-*`), border and radius, background, text (`text-*` size, `font-*`, `leading-*`, colour), effects, interaction (`cursor-*`, `press`, `focus-ring`), then state variants (`hover:`, `active:`, `aria-*:`, `disabled:`), then breakpoints (`md:`, `lg:`), then `motion-safe:`. Long lists go in a constant or an array joined with spaces, not one 200-character string. Don't run prettier on existing files (the repo is hand-formatted); there is no class-sorting plugin.
 
-## TODO: turn preflight on
+## Preflight and the base rules
 
-Preflight (Tailwind's reset) is off: `globals.css` imports only Tailwind's theme and utilities, and its own base rules stand in for the reset, because the unconverted screens rely on browser defaults (button padding, list bullets, heading margins). Until it is on, put `bare-button` on every `<button>` that isn't a `.button`, and set margins on headings and lists yourself.
+Preflight (Tailwind's reset) is on. The screens were converted while it was off, so the base layer keeps, on top of it, what they were written against:
 
-Once all four areas have converted and every `app/styles/*.css` file is gone, the final integration:
+- the colours, the font and `line-height: 1.5` on `html, body`;
+- bold headings (`h1`–`h6`), and the page title's size and margin (`h1`);
+- a paragraph's `1em` above and below (`p`);
+- code a little smaller than the text around it;
+- underlined links in the accent colour, so a link in running text is not told by colour alone;
+- one focus ring (`:focus-visible`), muted placeholders, and `[hidden]` staying hidden.
 
-1. Replaces the two imports with `@import 'tailwindcss' source('..');`.
-2. Deletes the base rules that preflight now covers (`* { box-sizing }`, `html, body { margin }`), keeping the colours, the font, `h1`, `a`, `:focus-visible` and `::placeholder`.
-3. Checks every screen in both themes at 375px and 1280px for spacing that preflight removed.
+Before preflight went on, every screen was shot at 375px and 1280px in both themes; after, with these rules, the shots match (a 1px line-height change in inline code aside). A utility on the element still wins over all of them (`mt-0`, `font-normal`, `no-underline`).
 
 ## Considered Options
 
@@ -144,6 +138,6 @@ Once all four areas have converted and every `app/styles/*.css` file is gone, th
 
 ## Consequences
 
-- Until every area converts, two systems live side by side, and unlayered leftovers silently beat utilities on the same element. A utility that "does nothing" is usually losing to a module class or an `app/styles/` rule.
+- A utility that "does nothing" is losing to something unlayered. There is none now; keep it that way.
 - The colour utilities are only as good as the tokens: a colour that isn't a token can't be written as a class.
-- With preflight off, Tailwind's `border` and `outline` utilities still work (they set their own style), but a bare `<button>` keeps the browser's look until `bare-button` or preflight removes it.
+- The base layer is not a pure reset: a new screen gets bold headings and paragraph margins unless it says otherwise.
