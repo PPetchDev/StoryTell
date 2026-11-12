@@ -1,7 +1,8 @@
 import Link from 'next/link';
 
+import { CoverPicture } from '@/components/home/cover-picture';
 import { PlayIcon } from '@/components/icons';
-import { ContinuableStory, coverThumbBackground, playedAgo } from '@/lib/home';
+import { ContinuableStory, playedAgo } from '@/lib/home';
 import { storyTitle } from '@/lib/story';
 
 const ROW = [
@@ -15,7 +16,7 @@ export function ContinueRow({ story }: { story: ContinuableStory }) {
     const where = story.latestChat.sceneName ?? 'Free play';
     return (
         <Link href={`/stories/${story.id}/chats/${story.latestChat.id}`} className={ROW}>
-            <span className="block size-16 flex-none rounded-md" style={{ background: coverThumbBackground(story) }} aria-hidden="true" />
+            <CoverPicture story={story} className="size-16 flex-none rounded-md" />
             <span className="flex min-w-0 flex-1 flex-col">
                 <span className="mb-0.5 text-xs font-bold tracking-wider text-accent uppercase">Continue where you left off</span>
                 {/* Two lines before it is cut, never one with an ellipsis (audit L8). */}

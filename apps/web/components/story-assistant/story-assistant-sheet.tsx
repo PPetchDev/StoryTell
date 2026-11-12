@@ -206,8 +206,22 @@ export function StoryAssistantSheet({ assistant, onShow }: { assistant: StoryAss
                 {assistant.entries.length === 0 && (
                     <p className="m-0 flex-none text-md text-muted">
                         Say what to change, e.g. &quot;give Mira a sister&quot; or &quot;add Scenes&quot;. Changes land in the editor at once,
-                        each with an Undo here. It starts fresh every time you open it.
+                        each with an Undo here. The conversation stays until you leave the editor.
                     </p>
+                )}
+                {assistant.entries.length > 0 && (
+                    <div className="flex flex-none justify-end">
+                        <button
+                            type="button"
+                            className="button button-quiet button-small"
+                            onClick={() => {
+                                assistant.startOver();
+                                document.getElementById('assistant-instruction')?.focus();
+                            }}
+                        >
+                            Start over
+                        </button>
+                    </div>
                 )}
                 <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain" role="log" aria-live="polite" aria-label="Assistant answers">
                     <ol className="m-0 flex list-none flex-col gap-3 p-0" aria-label="Conversation" ref={transcript}>

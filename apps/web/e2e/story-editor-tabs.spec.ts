@@ -40,6 +40,8 @@ test('a missing Scene goal: its item lands on the field in the Scenes tab, and f
 
         const status = page.getByRole('region', { name: 'Playable status' });
         await expect(status).toContainText('1 to fill in before you can play');
+        // The list starts folded to its count (audit M47).
+        await status.getByRole('button', { name: /to fill in/ }).click();
         await status.getByRole('button', { name: 'The lamp: Situation' }).click();
 
         await expect(page).toHaveURL(new RegExp(`/stories/${storyId}\\?tab=scenes$`));

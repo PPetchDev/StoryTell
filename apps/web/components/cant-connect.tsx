@@ -5,8 +5,8 @@ import { useState } from 'react';
 import { apiFetch } from '@/lib/api';
 
 // public/offline.html is the same screen, served by the service worker when this Next.js
-// server can't be reached either. Keep the two in step.
-export function CantConnect({ onRecovered }: { onRecovered: () => void }) {
+// server can't be reached either. Keep the two in step (it has no edits to keep, so no `waiting` line).
+export function CantConnect({ onRecovered, waiting = 0 }: { onRecovered: () => Promise<void>; waiting?: number }) {
     const [checking, setChecking] = useState(false);
     const [stillDown, setStillDown] = useState(false);
 
@@ -14,7 +14,7 @@ export function CantConnect({ onRecovered }: { onRecovered: () => void }) {
         setChecking(true);
         try {
             await apiFetch('/health');
-            onRecovered();
+            await onRecovered();
         } catch {
             setStillDown(true);
             setChecking(false);
@@ -30,6 +30,12 @@ export function CantConnect({ onRecovered }: { onRecovered: () => void }) {
                 <li>the PC is on</li>
                 <li>Tailscale is connected on this device</li>
             </ul>
+            {waiting > 0 && (
+                <p className="notice">
+                    {waiting === 1 ? 'An edit' : `${waiting} edits`} couldn&apos;t be saved yet. {waiting === 1 ? 'It is' : 'They are'} kept
+                    while this tab stays open, and saved when Retry connects.
+                </p>
+            )}
             <button type="button" className="button" onClick={retry} disabled={checking} aria-busy={checking}>
                 {checking ? 'Retrying…' : 'Retry'}
             </button>

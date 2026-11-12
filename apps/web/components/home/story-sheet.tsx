@@ -4,12 +4,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { CoverPicture } from '@/components/home/cover-picture';
 import { useConnection } from '@/components/connection';
 import { PlayIcon } from '@/components/icons';
 import { Sheet } from '@/components/sheet/sheet';
 import { ApiError, ApiUnreachableError } from '@/lib/api';
 import { chatApi } from '@/lib/chat';
-import { coverThumbBackground, stillToFillIn } from '@/lib/home';
+import { stillToFillIn } from '@/lib/home';
 import { storyTitle, storyApi, StorySummary } from '@/lib/story';
 
 /** The sheet's buttons: one full-width column, each 44px or taller. */
@@ -51,7 +52,7 @@ export function StorySheet({ story, onClose }: { story: StorySummary; onClose():
     return (
         <Sheet label={title} onClose={onClose}>
             <div className="flex flex-col gap-2">
-                <span className="block h-40 rounded-lg" style={{ background: coverThumbBackground(story, true) }} aria-hidden="true" />
+                <CoverPicture story={story} large className="h-40 rounded-lg" />
                 <h2 className="mt-1 mb-0 text-xl [overflow-wrap:anywhere]">{title}</h2>
                 {story.hook && <p className="mt-0 mb-1 text-md text-muted">{story.hook}</p>}
                 {story.playable ? (

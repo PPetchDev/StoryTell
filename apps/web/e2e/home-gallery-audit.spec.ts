@@ -167,6 +167,8 @@ test('New Story moves focus to the Idea and back, Cancel works while drafting, a
         await expect(page.getByRole('button', { name: 'Drafting…' })).toBeDisabled();
         const cancel = page.getByRole('region', { name: 'New Story' }).getByRole('button', { name: 'Cancel' });
         await expect(cancel).toBeEnabled();
+        // The draft is paid for, so it finishes all the same: the note under Cancel says so.
+        await expect(cancel).toHaveAccessibleDescription('Cancel closes this. A draft already under way still finishes and appears in your Stories.');
         await cancel.tap();
         await expect(page.getByRole('region', { name: 'New Story' })).toHaveCount(0);
         await expect(page.getByRole('button', { name: 'New Story' })).toBeFocused();

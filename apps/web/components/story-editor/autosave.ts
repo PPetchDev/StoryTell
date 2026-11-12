@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
 import { useConnection } from '@/components/connection';
 import { ApiError, ApiUnreachableError } from '@/lib/api';
@@ -42,11 +42,15 @@ const DEBOUNCE_MS = 600;
  *
  * Nothing typed is lost (audit H1): an edit that fails is kept, and the error state's `retry`
  * (SaveStatus's Try again) sends it again, until it lands or a newer edit of the same field
- * replaces it. When the tab is hidden or the page is left, every waiting edit is sent at once,
- * as a keepalive request that outlives the page (lib/api.ts).
+ * replaces it. An edit that finds the API unreachable is kept by the ConnectionBoundary and sent
+ * when Retry on the can't-connect screen connects, in this tab only. When the tab is hidden or the
+ * page is left, every waiting edit is sent at once, as a keepalive request that outlives the page
+ * (lib/api.ts).
  */
 export function useAutosave() {
-    const { reportUnreachable } = useConnection();
+    const { reportUnreachable, keepUnsent } = useConnection();
+    // Keys of the edits kept through an outage are this hook's own, so two autosaves on a page never collide.
+    const instance = useId();
     const [state, setState] = useState<SaveState>({ kind: 'saved' });
     const pending = useRef(new Map<string, Pending>());
     // Edits whose save failed, by key, in the order they were made; a structural change gets a key of its own.
@@ -88,6 +92,9 @@ export function useAutosave() {
                 (error: unknown) => {
                     inFlight.current -= 1;
                     if (error instanceof ApiUnreachableError) {
+                        // The can't-connect screen replaces the page: the boundary keeps the edit
+                        // and sends it on Retry, before the page loads again (audit H1).
+                        keepUnsent(`${instance}:${key}`, run);
                         reportUnreachable();
                         return undefined;
                     }
@@ -104,7 +111,7 @@ export function useAutosave() {
                     return undefined;
                 },
             ),
-        [reportUnreachable, settle],
+        [instance, keepUnsent, reportUnreachable, settle],
     );
 
     /** Sends a write once every write before it has answered, so nothing lands out of order. */

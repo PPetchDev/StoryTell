@@ -470,6 +470,21 @@ export function MemoryDrawer({ storyId, chatId, focusMemoryId, version, onClose,
     useDrawerFocus(root, panel, heading, onClose, !docked);
 
     /**
+     * "Go to the Message". Below 1024px the drawer is a dialog over the Chat and would hide the
+     * Message it scrolls to, so it closes first and focus lands on the Message; docked beside the
+     * Chat at `lg`, it stays open and keeps focus.
+     */
+    const jump = (messageId: number) => {
+        if (docked) return onJump(messageId);
+        onClose();
+        // After the drawer has gone and handed focus back, so the Message keeps it.
+        requestAnimationFrame(() => {
+            onJump(messageId);
+            document.getElementById(`message-${messageId}`)?.focus({ preventScroll: true });
+        });
+    };
+
+    /**
      * A pick in the graph. What it opens under the graph comes into view and is said (audit M52),
      * so a tap or Enter on a node that opens something out of sight is never silent.
      */
@@ -593,7 +608,7 @@ export function MemoryDrawer({ storyId, chatId, focusMemoryId, version, onClose,
             onDelete={() => write(() => memoryApi.remove(storyId, chatId, memory.id))}
             onRestore={() => void write(() => memoryApi.restore(storyId, chatId, memory.id))}
             onUnlock={() => void write(() => memoryApi.unlock(storyId, chatId, memory.id))}
-            onJump={onJump}
+            onJump={jump}
             focusAfter={focusAfterDelete(siblings, memory)}
         />
     );
@@ -772,7 +787,7 @@ export function MemoryDrawer({ storyId, chatId, focusMemoryId, version, onClose,
                             onAdd={(fields) => writeBelief(() => beliefApi.add(storyId, chatId, fields))}
                             onEdit={(beliefId, fields) => writeBelief(() => beliefApi.edit(storyId, chatId, beliefId, fields))}
                             onDelete={(beliefId) => writeBelief(() => beliefApi.remove(storyId, chatId, beliefId))}
-                            onJump={onJump}
+                            onJump={jump}
                         />
                     </>
                 )}

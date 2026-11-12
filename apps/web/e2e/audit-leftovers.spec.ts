@@ -1,6 +1,7 @@
 import { APIRequestContext, expect, Page, test } from '@playwright/test';
 
-// UI audit rows finished after the Tailwind move (docs/ui-audit.md: M3, M38, H19), on a phone: 390px wide, with touch.
+// UI audit rows finished after the Tailwind move (docs/ui-audit.md: M3, M38, H19, the Memory drawer on a jump), on a phone:
+// 390px wide, with touch, unless a block says otherwise.
 test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
 /** A playable Story with Mira and one Chat, made through the API, with `memories` hand-written Memories known by Mira. */
@@ -161,4 +162,41 @@ test('H19: with 30 Memories or fewer, Graph opens as the graph', async ({ page, 
     } finally {
         await request.delete(`/api/stories/${storyId}`);
     }
+});
+
+test.describe('docked beside the Chat (1440px wide)', () => {
+    test.use({ viewport: { width: 1440, height: 900 }, hasTouch: false, isMobile: false });
+
+    test('"Go to the Message" keeps the docked Memory drawer open', async ({ page, request }) => {
+        const { storyId } = await createChat(request);
+        const extraction = JSON.stringify({
+            operations: [{ op: 'add', text: '{user} climbed the cliff path in the storm.', known_by: ['Mira'], cause: 'Ash said so.' }],
+        });
+        await request.delete('/api/testing/fake-gateway');
+        await request.post('/api/testing/fake-gateway/text', {
+            data: { kind: 'turn', replies: [{ text: 'Mira looks up at last.\n\n@Mira: In this weather?', model: 'glm-5.3' }] },
+        });
+        await request.post('/api/testing/fake-gateway/text', {
+            data: { kind: 'judge', replies: ['{"bond_changes":[],"arc_steps":[],"scene":{"move_on":false}}'] },
+        });
+        await request.post('/api/testing/fake-gateway/text', { data: { kind: 'memory_extraction', replies: [extraction] } });
+        try {
+            await page.goto(`/stories/${storyId}/chats`);
+            await page.getByRole('button', { name: 'New Chat' }).click();
+            await page.getByLabel('Write as Ash').fill('I climbed the cliff path in the storm.');
+            await page.getByRole('button', { name: 'Send' }).click();
+            const reply = page.getByRole('article', { name: 'AI reply' });
+            await expect(reply).toContainText('In this weather?');
+            await page.getByRole('status').filter({ hasText: 'Memory added' }).click();
+
+            const drawer = page.getByRole('complementary', { name: 'Memory' });
+            const added = drawer.getByRole('listitem').filter({ hasText: 'Ash climbed the cliff path' });
+            await added.getByRole('link', { name: 'Go to the Message' }).click();
+            await expect(reply).toHaveClass(/message-target/);
+            await expect(drawer).toBeVisible();
+        } finally {
+            await request.delete('/api/testing/fake-gateway');
+            await request.delete(`/api/stories/${storyId}`);
+        }
+    });
 });

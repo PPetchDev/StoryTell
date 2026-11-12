@@ -14,6 +14,11 @@ function startingCrop(heightUnits: number): PortraitCrop {
     return clampCrop(DEFAULT_PORTRAIT_CROP, heightUnits);
 }
 
+/** How far along its track a slider is, 0 to 100: a square that fills the way has nowhere to go, so 0. */
+function percentOf(value: number, most: number): number {
+    return most <= 0 ? 0 : Math.round((value / most) * 100);
+}
+
 /** Keeps the square inside the image: `heightUnits` is the image's height in widths. */
 export function clampCrop(crop: PortraitCrop, heightUnits: number): PortraitCrop {
     const size = Math.min(Math.max(crop.size, MIN_SIZE), 1, heightUnits);
@@ -95,7 +100,7 @@ export function PortraitCropper({ name, src, initial, saving, error, onSave, onC
 
     return (
         <Sheet label={sheetLabel ?? `Chat picture of ${name}`} title={title ?? 'Chat picture'} onClose={onClose}>
-            <p className="hint">Drag the square over {name}&apos;s face, or tap the face. The slider zooms.</p>
+            <p className="hint">Drag the square over {name}&apos;s face, or tap the face. The sliders move it and zoom.</p>
             <div className="relative mx-auto mt-2 mb-3 w-[min(100%,22rem)] overflow-hidden rounded-sm select-none" ref={stage} onPointerDown={jump}>
                 {/* eslint-disable-next-line @next/next/no-img-element -- served by the API from the image folder */}
                 <img
@@ -110,17 +115,11 @@ export function PortraitCropper({ name, src, initial, saving, error, onSave, onC
                         className={[
                             'absolute cursor-grab touch-none rounded-full border-2 border-accent-text active:cursor-grabbing',
                             // Everything outside the circle is dimmed with the scrim; the frame is white in both themes.
-                            'shadow-[0_0_0_100vmax_var(--scrim)] focus-ring',
+                            'shadow-[0_0_0_100vmax_var(--scrim)]',
                         ].join(' ')}
-                        role="slider"
-                        aria-label="Face square position"
-                        // A slider needs a value (audit M44): how far across, with both directions in its text.
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        aria-valuenow={Math.round(shown.x * 100)}
-                        aria-orientation="horizontal"
-                        aria-valuetext={`${Math.round(shown.x * 100)}% from the left, ${Math.round((shown.y / heightUnits) * 100)}% from the top`}
-                        tabIndex={0}
+                        // A finger's way to move it; the Across and Down sliders below are the keyboard's
+                        // and a screen reader's, each one direction with its own value (audit M44).
+                        aria-hidden="true"
                         style={{
                             left: `${shown.x * 100}%`,
                             top: `${(shown.y / heightUnits) * 100}%`,
@@ -131,25 +130,39 @@ export function PortraitCropper({ name, src, initial, saving, error, onSave, onC
                         onPointerMove={move}
                         onPointerUp={end}
                         onPointerCancel={end}
-                        onKeyDown={(event) => {
-                            const step = event.shiftKey ? 0.05 : 0.01;
-                            const by: Record<string, [number, number]> = {
-                                ArrowLeft: [-step, 0],
-                                ArrowRight: [step, 0],
-                                ArrowUp: [0, -step],
-                                ArrowDown: [0, step],
-                            };
-                            const delta = by[event.key];
-                            if (!delta) return;
-                            event.preventDefault();
-                            setCrop(clampCrop({ ...shown, x: shown.x + delta[0], y: shown.y + delta[1] }, heightUnits));
-                        }}
                     />
                 )}
             </div>
             {shown && heightUnits !== null && (
                 <div className="mb-3 flex items-center gap-4">
-                    <label className="flex flex-1 flex-col gap-1 text-md text-muted">
+                    <div className="flex min-w-0 flex-1 flex-col gap-2">
+                    <label className="flex flex-col gap-1 text-md text-muted">
+                        <span>Across</span>
+                        <input
+                            type="range"
+                            className="min-h-11 w-full accent-accent"
+                            min={0}
+                            max={1 - shown.size}
+                            step={0.01}
+                            value={shown.x}
+                            aria-valuetext={`${percentOf(shown.x, 1 - shown.size)}% across`}
+                            onChange={(event) => setCrop(clampCrop({ ...shown, x: Number(event.target.value) }, heightUnits))}
+                        />
+                    </label>
+                    <label className="flex flex-col gap-1 text-md text-muted">
+                        <span>Down</span>
+                        <input
+                            type="range"
+                            className="min-h-11 w-full accent-accent"
+                            min={0}
+                            max={heightUnits - shown.size}
+                            step={0.01}
+                            value={shown.y}
+                            aria-valuetext={`${percentOf(shown.y, heightUnits - shown.size)}% down`}
+                            onChange={(event) => setCrop(clampCrop({ ...shown, y: Number(event.target.value) }, heightUnits))}
+                        />
+                    </label>
+                    <label className="flex flex-col gap-1 text-md text-muted">
                         <span>Zoom</span>
                         <input
                             type="range"
@@ -162,6 +175,7 @@ export function PortraitCropper({ name, src, initial, saving, error, onSave, onC
                             onChange={(event) => resize(Math.min(1, heightUnits) + MIN_SIZE - Number(event.target.value))}
                         />
                     </label>
+                    </div>
                     <div className="flex flex-none flex-col items-center gap-1">
                         <PortraitImage portrait={{ src, crop: shown }} className="size-14" />
                         <span className="hint">In the Chat</span>

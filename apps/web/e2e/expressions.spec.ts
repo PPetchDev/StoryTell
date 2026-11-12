@@ -89,9 +89,10 @@ test("picks an Expression's own square, which Reset gives back to the Portrait's
 
     await happy.getByRole('button', { name: 'Pick the face' }).tap();
     const sheet = page.getByRole('dialog', { name: 'Happy Expression of Mira' });
-    const square = sheet.getByRole('slider', { name: 'Face square position' });
-    await square.focus();
-    for (const key of ['ArrowRight', 'ArrowRight', 'ArrowDown']) await square.press(key);
+    // Two sliders, one direction each (audit M44); a slider's value goes up with ArrowRight.
+    const across = sheet.getByRole('slider', { name: 'Across' });
+    for (const key of ['ArrowRight', 'ArrowRight']) await across.press(key);
+    await sheet.getByRole('slider', { name: 'Down' }).press('ArrowRight');
     await sheet.getByRole('button', { name: 'Use this picture' }).tap();
     await expect(sheet).toHaveCount(0);
 

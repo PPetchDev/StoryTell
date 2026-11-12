@@ -378,7 +378,8 @@ Keep this suite small: behaviour detail belongs in the API tests.
 
 - The manifest is `apps/web/app/manifest.ts`. The icons are rendered from
   `apps/web/public/icons/icon.svg` by `node apps/web/scripts/make-icons.mjs`.
-- The app is online-only. Nothing is cached for offline use and nothing is queued.
+- The app is online-only. Nothing is cached for offline use and nothing is queued, except an autosaved
+  edit that was on its way when the API went away: the open tab holds it and Retry sends it first.
 - When an API call can't reach the API, the app swaps the page for the "can't connect" screen.
   Its Retry checks the API and reloads the page.
 - When the app itself can't be loaded (the PC is off), the service worker (`public/sw.js`)

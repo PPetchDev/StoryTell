@@ -553,7 +553,7 @@ export function StoryEditor({ initial }: { initial: Story }) {
                         </div>
                     </section>
                 )}
-                <StatusBox playable={story.playable} missing={story.missing} onGo={goTo} foldKey={`status:${storyId}`} />
+                <StatusBox playable={story.playable} missing={story.missing} onGo={goTo} foldKey={`statusOpen:${storyId}`} />
 
                 <FieldMarksContext.Provider value={marks}>
                     <div id="editor-panel" role="tabpanel" aria-labelledby={`tab-${tab}`}>

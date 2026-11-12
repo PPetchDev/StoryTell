@@ -34,6 +34,32 @@ test('stopping the API shows the can\'t-connect screen, and Retry recovers once 
     await expect(page.getByText('No Stories yet.')).toBeVisible();
 });
 
+test('an edit that finds the API gone is kept in the tab and saved when Retry connects', async ({ page, request }) => {
+    const created = await request.post('/api/personas', { data: { name: 'Rin', description: 'A drifter.' } });
+    expect(created.ok()).toBe(true);
+    const personaId = (await created.json()).id as number;
+
+    try {
+        await page.goto('/personas');
+        const description = page.getByRole('list', { name: 'Personas' }).getByRole('listitem', { name: 'Rin' }).getByLabel('Description');
+        await expect(description).toHaveValue('A drifter.');
+
+        await stopApi();
+        await description.fill('A drifter who kept her words.');
+        await expectCantConnectScreen(page);
+        await expect(page.getByText("An edit couldn't be saved yet.")).toBeVisible();
+
+        await startApi();
+        await page.getByRole('button', { name: 'Retry' }).click();
+        await expect(
+            page.getByRole('list', { name: 'Personas' }).getByRole('listitem', { name: 'Rin' }).getByLabel('Description'),
+        ).toHaveValue('A drifter who kept her words.');
+        expect((await (await request.get(`/api/personas/${personaId}`)).json()).description).toBe('A drifter who kept her words.');
+    } finally {
+        await request.delete(`/api/personas/${personaId}`);
+    }
+});
+
 test('the service worker shows the same screen when the app itself can\'t be reached', async ({
     page,
     context,

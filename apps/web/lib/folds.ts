@@ -8,7 +8,7 @@ import { useSyncExternalStore } from 'react';
  * and in the Gallery `galleryStory:<storyId>` and `galleryChat:<storyId>:<chatId or "deleted">`.
  * A Lore card's More triggers fold starts folded, so its key, `loreMoreOpen:<id>`, records the
  * opposite: that it is open (FoldTitle's `startsFolded`). So does a Character's Arc changes fold
- * on the Dashboard, `arcChanges:<characterId>`.
+ * on the Dashboard, `arcChanges:<characterId>`, and the Story editor's Status box list, `statusOpen:<storyId>`.
  */
 const STORAGE_KEY = 'storytell.folded';
 

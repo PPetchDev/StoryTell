@@ -55,7 +55,7 @@ export function bondDirection(list: MemoryList, bond: Pick<GraphBond, 'from' | '
 }
 
 /** A dot's name says this much of its Memory, so a screen reader doesn't read a whole paragraph per dot (audit M52). */
-const DOT_LABEL_CHARS = 90;
+const DOT_LABEL_CHARS = 60;
 
 function shortened(text: string): string {
     return text.length <= DOT_LABEL_CHARS ? text : `${text.slice(0, DOT_LABEL_CHARS).trimEnd()}…`;
@@ -380,8 +380,10 @@ export function MemoryGraph({ list, memories, selected, onSelect, portraits = {}
                             key={key}
                             className="memory-graph-dot"
                             data-state={state}
+                            data-memory-id={memory.id}
                             transform={`translate(${at.x} ${at.y})`}
-                            {...nodeProps(key, state === 'selected', `Memory ${memory.id}: ${text}${names.length ? ` About ${names.join(', ')}.` : ''}`)}
+                            // Its words and who it is about; never the internal id (audit M52, L36).
+                            {...nodeProps(key, state === 'selected', `${text}${names.length ? ` About ${names.join(', ')}.` : ''}`)}
                         >
                             <circle r={MEMORY_RADIUS + 6} className="memory-graph-hit" />
                             <circle r={MEMORY_RADIUS} className={memory.writtenBy === 'user' ? 'memory-graph-dot-own' : undefined} />

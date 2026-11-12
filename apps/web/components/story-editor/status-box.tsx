@@ -13,8 +13,9 @@ interface StatusBoxProps {
     /** Takes the author to a missing item's field: its tab, scrolled to, focused, lit. */
     onGo(item: MissingField): void;
     /**
-     * Where the list's folded state is kept, per device (lib/folds.ts), e.g. `status:12`: folded
-     * once, it stays folded on this Story (audit M47).
+     * Where the list's state is kept, per device (lib/folds.ts), e.g. `statusOpen:12`. The list
+     * starts folded to its count (audit M47), so the key records that it was opened: opened once,
+     * it stays open on this Story.
      */
     foldKey: string;
 }
@@ -45,10 +46,10 @@ function useSayPlayable(playable: boolean) {
 /**
  * The playable status (spec: "Story editor", Status box): Playable, or what is still missing.
  * The missing items flow side by side, so eight of them take a few short rows rather than most
- * of a phone's screen (M47), and the list can be folded away.
+ * of a phone's screen (M47). It starts folded to "N to fill in", and remembers being opened.
  */
 export function StatusBox({ playable, missing, onGo, foldKey }: StatusBoxProps) {
-    const open = !useFolded(foldKey);
+    const open = useFolded(foldKey);
     useSayPlayable(playable);
     if (playable) {
         return (
@@ -63,7 +64,7 @@ export function StatusBox({ playable, missing, onGo, foldKey }: StatusBoxProps) 
                 type="button"
                 className={`bare-button flex min-h-11 w-full items-center justify-between gap-2 px-3.5 py-2 text-left text-md text-status-toggle-text ${WARNING_RING}`}
                 aria-expanded={open}
-                onClick={() => setFolded(foldKey, open)}
+                onClick={() => setFolded(foldKey, !open)}
             >
                 <span>
                     <strong>{missing.length} to fill in</strong> before you can play

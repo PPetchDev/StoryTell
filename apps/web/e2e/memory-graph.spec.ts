@@ -80,10 +80,11 @@ test('the Memory graph links each Memory to the people it names; a tapped person
         await expect(graph.getByRole('button', { name: 'Ash (you), 1 Memory' })).toBeVisible();
         await expect(graph.getByRole('button', { name: 'Mira, 1 Memory' })).toBeVisible();
         await expect(graph.getByRole('button', { name: 'Jonah, 2 Memories' })).toBeVisible();
-        const dot = (id: number) => graph.getByRole('button', { name: new RegExp(`^Memory ${id}:`) });
-        await expect(graph.getByRole('button', { name: /^Memory \d+:/ })).toHaveCount(3);
-        await expect(dot(lamp)).toHaveAccessibleName('Memory ' + lamp + ': Ash gave Mira the lamp. About Ash, Mira.');
-        await expect(dot(storm)).toHaveAccessibleName('Memory ' + storm + ': The storm lasted three days. About Jonah.');
+        // A dot is named by its words and who it is about, with no id (audit M52, L36); the test finds it by its id.
+        const dot = (id: number) => graph.locator(`g[data-memory-id="${id}"]`);
+        await expect(graph.locator('g[data-memory-id]')).toHaveCount(3);
+        await expect(dot(lamp)).toHaveAccessibleName('Ash gave Mira the lamp. About Ash, Mira.');
+        await expect(dot(storm)).toHaveAccessibleName('The storm lasted three days. About Jonah.');
 
         // Mira: the Memory about her below the graph, and the one she doesn't know faded.
         await graph.getByRole('button', { name: /^Mira,/ }).tap();
@@ -117,7 +118,7 @@ test('a tapped Memory dot opens its card under the graph, where it is edited and
         let drawer = await openMemory(page);
         await drawer.getByRole('radio', { name: 'Graph' }).tap();
         const graph = drawer.getByRole('group', { name: 'Memory graph' });
-        const boatDot = graph.getByRole('button', { name: new RegExp(`^Memory ${boat}:`) });
+        const boatDot = graph.locator(`g[data-memory-id="${boat}"]`);
 
         await boatDot.tap();
         await expect(boatDot).toHaveAttribute('aria-pressed', 'true');
@@ -132,13 +133,13 @@ test('a tapped Memory dot opens its card under the graph, where it is edited and
         await expect(card).toContainText('Jonah mended the boat with Mira.');
         await expect(card).toContainText('Locked');
         await expect(graph.getByRole('button', { name: 'Mira, 2 Memories' })).toBeVisible();
-        await expect(boatDot).toHaveAccessibleName(`Memory ${boat}: Jonah mended the boat with Mira. About Mira, Jonah.`);
+        await expect(boatDot).toHaveAccessibleName('Jonah mended the boat with Mira. About Mira, Jonah.');
 
         // Delete from the card: the dot goes.
         await card.getByRole('button', { name: 'Delete' }).click();
         await card.getByRole('button', { name: 'Delete' }).click();
         await expect(boatDot).toHaveCount(0);
-        await expect(graph.getByRole('button', { name: /^Memory \d+:/ })).toHaveCount(2);
+        await expect(graph.locator('g[data-memory-id]')).toHaveCount(2);
         await expect(drawer.getByRole('list', { name: 'Picked Memory' })).toHaveCount(0);
 
         // Graph is this device's choice now.
