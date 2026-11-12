@@ -43,6 +43,8 @@ const memoryGraphBonds = devicePreference<boolean>({
 
 /** A Memory list's look: no bullets, the cards 14px apart. */
 const MEMORY_LIST = 'mt-4 mb-0 grid list-none gap-3.5 p-0';
+/** The most Memories the graph opens with; past this the dots crowd too close to tap (audit H19). */
+const GRAPH_MOST = 30;
 
 /** "Show Bonds", a switch beside the List / Graph choice: its track reads 3:1 when off (L34), and it slides only with motion on (M33). */
 function ShowBondsSwitch({ on, onChange }: { on: boolean; onChange(on: boolean): void }) {
@@ -455,6 +457,8 @@ export function MemoryDrawer({ storyId, chatId, focusMemoryId, version, onClose,
     const [addedId, setAddedId] = useState<number | null>(null);
     const focusedRef = useRef<number | null>(null);
     const viewKind = memoryViewKind.useValue();
+    /** Graph chosen on this visit while there are too many Memories for it to open on its own. */
+    const [graphAnyway, setGraphAnyway] = useState(false);
     const showBonds = memoryGraphBonds.useValue();
     const [selection, setSelection] = useState<GraphSelection>(null);
     /**
@@ -558,6 +562,14 @@ export function MemoryDrawer({ storyId, chatId, focusMemoryId, version, onClose,
     const shown = list?.memories.filter((memory) => memory.id !== addedId) ?? [];
     const active = shown.filter((memory) => !memory.archived);
     const archived = shown.filter((memory) => memory.archived);
+    // Past GRAPH_MOST the dots crowd until a tap can't tell them apart (audit H19): Graph opens as the
+    // List, saying why, until Graph is chosen again for this visit. The stored choice stays Graph.
+    const crowded = viewKind === 'graph' && active.length > GRAPH_MOST && !graphAnyway;
+    const shownKind: MemoryViewKind = crowded ? 'list' : viewKind;
+    const chooseView = (kind: MemoryViewKind) => {
+        if (kind === 'graph') setGraphAnyway(true);
+        memoryViewKind.set(kind);
+    };
 
     /** After a delete, focus goes to the Memory that took its place in the same list, or the drawer's heading (audit H2). */
     const focusAfterDelete = (siblings: readonly Memory[], memory: Memory) => {
@@ -711,12 +723,18 @@ export function MemoryDrawer({ storyId, chatId, focusMemoryId, version, onClose,
                         <LoreInPlayCard storyId={storyId} chatId={chatId} version={version} />
                         <DocumentsInPlayCard storyId={storyId} chatId={chatId} version={version} />
                         <div className="flex items-center gap-3">
-                            <MemoryViewSwitch value={viewKind} onChange={memoryViewKind.set} />
-                            {viewKind === 'graph' && <ShowBondsSwitch on={showBonds} onChange={memoryGraphBonds.set} />}
+                            <MemoryViewSwitch value={shownKind} onChange={chooseView} />
+                            {shownKind === 'graph' && <ShowBondsSwitch on={showBonds} onChange={memoryGraphBonds.set} />}
                         </div>
+                        {crowded && (
+                            <p className="mt-0 text-sm text-muted">
+                                {active.length} Memories are too many to tap apart in the graph, so they open as a list. Choose Graph to see it
+                                anyway.
+                            </p>
+                        )}
                         {active.length === 0 ? (
                             <p className="mt-0 text-muted">Nothing remembered yet.</p>
-                        ) : viewKind === 'graph' ? (
+                        ) : shownKind === 'graph' ? (
                             <>
                                 <MemoryGraph
                                     list={list}
@@ -735,12 +753,12 @@ export function MemoryDrawer({ storyId, chatId, focusMemoryId, version, onClose,
                                 {active.map(view(list, active))}
                             </ul>
                         )}
-                        {viewKind === 'graph' && archived.length > 0 && (
+                        {shownKind === 'graph' && archived.length > 0 && (
                             <p className="mt-3 mb-0 text-sm text-muted">
                                 Archived Memories ({archived.length}) are left out of the graph. List shows them.
                             </p>
                         )}
-                        {viewKind === 'list' && archived.length > 0 && (
+                        {shownKind === 'list' && archived.length > 0 && (
                             <details className="group mt-4">
                                 <Summary className="text-muted">Archived ({archived.length})</Summary>
                                 <ul className={MEMORY_LIST} aria-label="Archived Memories">

@@ -75,11 +75,10 @@ export function useAutosave() {
         else if (inFlight.current === 0 && pending.current.size === 0) setState({ kind: 'saved' });
     }, [retry]);
 
-    const enqueue = useCallback(
-        <T,>(key: string, run: () => Promise<T>, apply: (value: T) => void, onError?: OnError): Promise<T | undefined> => {
-            inFlight.current += 1;
-            setState({ kind: 'saving' });
-            const result = chain.current.then(run).then(
+    /** Settles one write once its request answers: applies the answer, or keeps the edit for Try again. */
+    const track = useCallback(
+        <T,>(key: string, sent: Promise<T>, run: () => Promise<T>, apply: (value: T) => void, onError?: OnError): Promise<T | undefined> =>
+            sent.then(
                 (value) => {
                     inFlight.current -= 1;
                     if (!unmounted.current) apply(value);
@@ -104,11 +103,41 @@ export function useAutosave() {
                     settle();
                     return undefined;
                 },
-            );
+            ),
+        [reportUnreachable, settle],
+    );
+
+    /** Sends a write once every write before it has answered, so nothing lands out of order. */
+    const enqueue = useCallback(
+        <T,>(key: string, run: () => Promise<T>, apply: (value: T) => void, onError?: OnError): Promise<T | undefined> => {
+            inFlight.current += 1;
+            setState({ kind: 'saving' });
+            const result = track(key, chain.current.then(run), run, apply, onError);
             chain.current = result.then(() => undefined);
             return result;
         },
-        [reportUnreachable, settle],
+        [track],
+    );
+
+    /**
+     * Sends a write now, beside any still in flight: the page is being hidden or left, and a write
+     * that waited its turn would start after the page is gone (audit H1). Its request starts while
+     * the page is hidden, so lib/api.ts makes it a keepalive one.
+     */
+    const sendNow = useCallback(
+        (key: string, item: Send) => {
+            inFlight.current += 1;
+            setState({ kind: 'saving' });
+            let sent: Promise<unknown>;
+            try {
+                sent = item.run();
+            } catch (error) {
+                sent = Promise.reject(error);
+            }
+            const result = track(key, sent, item.run, item.apply, item.onError);
+            chain.current = Promise.all([chain.current, result]).then(() => undefined);
+        },
+        [track],
     );
 
     useEffect(() => {
@@ -170,12 +199,20 @@ export function useAutosave() {
         await chain.current;
     }, [enqueue]);
 
-    // Hiding the tab or leaving the page sends what is waiting, failed edits too, at once: lib/api.ts
-    // makes a write sent while the page is hidden a keepalive request, which outlives the page.
+    // Hiding the tab or leaving the page sends what is waiting, failed edits too, at once and side by
+    // side, not behind a save still in flight: lib/api.ts makes a write sent while the page is hidden a
+    // keepalive request, which outlives the page. Only an edit of a field whose earlier save is still in
+    // flight could land out of order; it was sent last, so it almost always lands last.
     useEffect(() => {
         const sendAll = () => {
-            if (failed.current.size > 0) retryRef.current();
-            void flush();
+            const waiting: [string, Send][] = [...failed.current];
+            failed.current.clear();
+            for (const [key, item] of pending.current) {
+                clearTimeout(item.timer);
+                waiting.push([key, item]);
+            }
+            pending.current.clear();
+            for (const [key, item] of waiting) sendNow(key, item);
         };
         const onVisibility = () => {
             if (document.visibilityState === 'hidden') sendAll();
@@ -186,7 +223,7 @@ export function useAutosave() {
             document.removeEventListener('visibilitychange', onVisibility);
             window.removeEventListener('pagehide', sendAll);
         };
-    }, [flush]);
+    }, [sendNow]);
 
     /**
      * A structural change: runs after pending field edits, and applies its answer whole. With

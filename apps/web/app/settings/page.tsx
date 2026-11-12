@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-import { BackupBanner } from '@/components/backup-banner';
+import { BackupBannerView, useBackupStatus } from '@/components/backup-banner';
 import { useApiQuery } from '@/components/connection';
 import { ErrorState, Loading } from '@/components/query-state';
 import { STICKY_HEADER } from '@/components/settings/sticky-header';
@@ -282,6 +282,7 @@ function SettingsForm({ initial, autosave }: { initial: SettingsResponse; autosa
 export default function SettingsPage() {
     const settings = useApiQuery<SettingsResponse>('/settings');
     const autosave = useAutosave();
+    const backup = useBackupStatus();
 
     return (
         <main>
@@ -295,14 +296,17 @@ export default function SettingsPage() {
             </div>
             {/*
              * This device's settings come first: they are there at once, so nothing that loads after
-             * them (the form, the backup banner) pushes them down under a finger (audit M38).
+             * them (the form, the backup banner) pushes them down under a finger. The banner and the
+             * form wait for each other, so neither arrives above the other once it shows (audit M38).
              */}
             <ThemeSetting />
             <TextSizeSetting />
-            <BackupBanner />
-            {settings.status === 'loading' && <Loading label="Loading Settings…" className="card" />}
+            {(settings.status === 'loading' || backup === undefined) && settings.status !== 'error' && (
+                <Loading label="Loading Settings…" className="card" />
+            )}
+            {backup !== undefined && settings.status !== 'loading' && <BackupBannerView status={backup} />}
             {settings.status === 'error' && <ErrorState title="Couldn't load Settings." error={settings.error} onRetry={settings.retry} />}
-            {settings.status === 'ready' && <SettingsForm initial={settings.data} autosave={autosave} />}
+            {settings.status === 'ready' && backup !== undefined && <SettingsForm initial={settings.data} autosave={autosave} />}
         </main>
     );
 }
