@@ -88,11 +88,11 @@ test('Unlock on a locked Memory lets the AI change it again, and stays after a r
         await page.goto(`/stories/${storyId}/chats/${chatId}`);
         const drawer = await openMemory(page);
         const memory = drawer.locator(`li[data-memory-id="${memoryId}"]`);
-        await expect(memory.getByText('🔒 Locked')).toBeVisible();
+        await expect(memory.getByText('Locked', { exact: true })).toBeVisible();
 
         await memory.getByRole('button', { name: 'Unlock' }).click();
 
-        await expect(memory.getByText('🔒 Locked')).toHaveCount(0);
+        await expect(memory.getByText('Locked', { exact: true })).toHaveCount(0);
         await expect(memory.getByRole('button', { name: 'Unlock' })).toHaveCount(0);
         expect((await (await request.get(`/api/stories/${storyId}/chats/${chatId}/memories`)).json()).memories).toMatchObject([
             { id: memoryId, locked: false, text: 'The ferry runs on Sundays.' },
@@ -102,7 +102,7 @@ test('Unlock on a locked Memory lets the AI change it again, and stays after a r
         await page.reload();
         const again = (await openMemory(page)).locator(`li[data-memory-id="${memoryId}"]`);
         await expect(again.getByText('The ferry runs on Sundays.')).toBeVisible();
-        await expect(again.getByText('🔒 Locked')).toHaveCount(0);
+        await expect(again.getByText('Locked', { exact: true })).toHaveCount(0);
     } finally {
         await request.delete(`/api/stories/${storyId}`);
     }
