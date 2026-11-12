@@ -15,7 +15,7 @@ export interface TrackedChange {
     undo: UndoState;
 }
 
-/** The conversation, newest last. It lives in this hook only; closing the sheet drops it. */
+/** The conversation, newest last. It lives in this hook only: it outlives a close, and leaving the editor or Start over drops it. */
 export type AssistantEntry =
     | { id: number; kind: 'instruction'; text: string }
     | { id: number; kind: 'busy'; what: 'thinking' | 'applying' }
@@ -108,7 +108,8 @@ function removeAdded(storyId: number, change: Extract<AppliedChange, { kind: 'ad
  * The Story assistant's state (spec: "Story assistant", "Undo"). Each instruction is one
  * stateless call; the answer's changes are already applied when it lands, so the hook only
  * records them, lights their fields up, and offers Undo from the old values the API answered.
- * Nothing here is persisted: closing the sheet forgets the conversation and the Undos.
+ * Nothing here is persisted. Closing the sheet keeps the conversation and its Undos for when it
+ * opens again (audit M19); leaving the editor forgets them, and Start over clears them.
  */
 export function useStoryAssistant({ storyId, commit, applyWhole, onApplied }: Options) {
     const [open, setOpen] = useState(false);
@@ -117,8 +118,8 @@ export function useStoryAssistant({ storyId, commit, applyWhole, onApplied }: Op
         onAppliedRef.current = onApplied;
     }, [onApplied]);
     /**
-     * Counts opens and closes. An answer that lands after its conversation was closed only
-     * updates the Story, as it always did: there is no transcript left to show it or undo it.
+     * Counts conversations (Start over begins a new one). An answer that lands after its
+     * conversation was cleared only updates the Story: there is no transcript left to show it or undo it.
      */
     const conversation = useRef(0);
     const [entries, setEntries] = useState<AssistantEntry[]>([]);
@@ -235,21 +236,21 @@ export function useStoryAssistant({ storyId, commit, applyWhole, onApplied }: Op
      */
     const [instruction, setInstruction] = useState('');
     const openSheet = useCallback((given?: unknown) => {
-        conversation.current++;
-        setEntries([]);
         // A click handler passes its event: only a string is an instruction to fill in.
         if (typeof given === 'string') setInstruction(given);
         setOpen(true);
     }, []);
-    const closeSheet = useCallback(() => {
+    const closeSheet = useCallback(() => setOpen(false), []);
+    /** Clears the conversation and its Undos; the changes stay in the Story. */
+    const startOver = useCallback(() => {
         conversation.current++;
         setEntries([]);
-        setOpen(false);
     }, []);
 
-    /** Every field changed by an answer and not undone. */
+    /** Every field changed by an answer and not undone, lit while the sheet is open. */
     const highlights = useMemo(() => {
         const keys = new Set<string>();
+        if (!open) return keys as ReadonlySet<string>;
         for (const entry of entries) {
             if (entry.kind !== 'answer') continue;
             for (const item of entry.changes) {
@@ -258,11 +259,11 @@ export function useStoryAssistant({ storyId, commit, applyWhole, onApplied }: Op
             }
         }
         return keys as ReadonlySet<string>;
-    }, [entries]);
+    }, [entries, open]);
 
     const busy = entries.some((entry) => entry.kind === 'busy');
 
-    return { open, openSheet, closeSheet, instruction, setInstruction, entries, busy, send, confirmPending, cancelPending, undo, highlights };
+    return { open, openSheet, closeSheet, startOver, instruction, setInstruction, entries, busy, send, confirmPending, cancelPending, undo, highlights };
 }
 
 export type StoryAssistant = ReturnType<typeof useStoryAssistant>;

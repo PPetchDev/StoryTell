@@ -132,11 +132,14 @@ test('picks the face for the chat picture, which the Chat then shows, and Reset 
         await picture.getByRole('button', { name: 'Pick the face' }).click();
 
         const sheet = page.getByRole('dialog', { name: 'Chat picture of Mira' });
-        const square = sheet.getByRole('slider', { name: 'Face square position' });
-        await expect(square).toBeVisible();
-        // The keyboard moves the square: three steps right, two down, of 1% of the width each.
-        await square.focus();
-        for (const key of ['ArrowRight', 'ArrowRight', 'ArrowRight', 'ArrowDown', 'ArrowDown']) await square.press(key);
+        // Two sliders move the square, one direction each (audit M44): three steps across, two down,
+        // of 1% of the width each. A slider's value goes up with ArrowRight.
+        const across = sheet.getByRole('slider', { name: 'Across' });
+        const down = sheet.getByRole('slider', { name: 'Down' });
+        await expect(across).toBeVisible();
+        for (let step = 0; step < 3; step += 1) await across.press('ArrowRight');
+        for (let step = 0; step < 2; step += 1) await down.press('ArrowRight');
+        await expect(down).toHaveAttribute('aria-valuetext', /% down$/);
         await sheet.getByRole('button', { name: 'Use this picture' }).click();
         await expect(sheet).toHaveCount(0);
         await expect(picture).toContainText('The face you picked.');

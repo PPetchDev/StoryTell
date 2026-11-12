@@ -21,6 +21,11 @@ test('writes a Story by hand, sees it become playable, and the edits survive a r
     const status = page.getByRole('region', { name: 'Playable status' });
     const play = page.getByRole('button', { name: 'Play', exact: true });
     await expect(status).toContainText('before you can play');
+    // The list starts folded to its count (audit M47); opened, it stays open on this Story.
+    const toggle = status.getByRole('button', { name: /to fill in/ });
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(status.getByRole('button', { name: 'Title' })).toHaveCount(0);
+    await toggle.click();
     await expect(status.getByRole('button', { name: 'Title' })).toBeVisible();
     await expect(status.getByRole('button', { name: 'At least one Character' })).toBeVisible();
     await expect(play).toBeDisabled();

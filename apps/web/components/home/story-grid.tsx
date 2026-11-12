@@ -2,7 +2,8 @@
 
 import { useId, useState } from 'react';
 
-import { coverThumbBackground, playedAgo } from '@/lib/home';
+import { CoverPicture } from '@/components/home/cover-picture';
+import { playedAgo } from '@/lib/home';
 import { StorySummary, storyTitle } from '@/lib/story';
 import { useSettled } from '@/lib/use-settled';
 
@@ -118,7 +119,7 @@ function StoryCard({ story, onOpen }: { story: StorySummary; onOpen(story: Story
             aria-describedby={`${id}-hook ${id}-meta`}
             onClick={() => onOpen(story)}
         >
-            <span className="relative mb-1 block aspect-[3/4] w-full rounded-lg" style={{ background: coverThumbBackground(story) }}>
+            <CoverPicture story={story} className="mb-1 aspect-[3/4] w-full rounded-lg">
                 {!story.playable && (
                     <span
                         id={`${id}-badge`}
@@ -127,7 +128,7 @@ function StoryCard({ story, onOpen }: { story: StorySummary; onOpen(story: Story
                         Draft
                     </span>
                 )}
-            </span>
+            </CoverPicture>
             <strong id={`${id}-title`} className="text-note leading-snug [overflow-wrap:anywhere]">
                 {storyTitle(story)}
             </strong>

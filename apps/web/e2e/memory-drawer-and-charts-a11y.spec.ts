@@ -108,7 +108,7 @@ test.describe('on a phone', () => {
             const drawer = page.getByRole('dialog', { name: 'Memory' });
             await drawer.getByRole('radio', { name: 'Graph' }).tap();
             const graph = drawer.getByRole('group', { name: 'Memory graph' });
-            const dot = graph.getByRole('button', { name: new RegExp(`^Memory ${lamp}:`) });
+            const dot = graph.locator(`g[data-memory-id="${lamp}"]`);
             await dot.scrollIntoViewIfNeeded();
 
             // The point 18px from the dot's centre that is furthest from every other node.
@@ -150,7 +150,7 @@ test.describe('on a phone', () => {
             await page.keyboard.press('ArrowRight');
             await expect(people.nth(1)).toBeFocused();
             await page.keyboard.press('End');
-            await expect(graph.getByRole('button', { name: /^Memory \d+:/ }).last()).toBeFocused();
+            await expect(graph.locator('g[data-memory-id]').last()).toBeFocused();
             await expect(graph.locator('[tabindex="0"]')).toHaveCount(1);
 
             // A person's name reads 12px or more as drawn.

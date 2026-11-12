@@ -37,8 +37,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 <ServiceWorkerRegistration />
                 <Announcer />
                 <ConnectionBoundary>
-                    <LowCreditBanner />
                     {children}
+                    {/* After the page, so it arrives below what is already there (audit M3). */}
+                    <LowCreditBanner />
                     <BottomNav />
                 </ConnectionBoundary>
             </body>

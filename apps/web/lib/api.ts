@@ -45,7 +45,7 @@ function keepaliveFor(init?: RequestInit): boolean {
 
 /**
  * Every request goes straight to the network: the app is online-only, with no cached data
- * and nothing queued (spec: "PWA").
+ * and nothing queued (spec: "PWA"), but for the autosaved edits ConnectionBoundary holds through an outage.
  */
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
     let response: Response;

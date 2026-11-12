@@ -20,25 +20,38 @@ const TARGET_LABEL: Record<BackupTarget, string> = {
     drive: 'Google Drive',
 };
 
-/**
- * Shown on the Usage and Settings pages when the daily backup's last run failed a target
- * (spec: "Failures are logged and shown as a banner ... They never block play"). Shows
- * nothing in dev, before the first run, or when the status can't be fetched.
- */
-export function BackupBanner() {
-    const [status, setStatus] = useState<BackupStatus | undefined>();
+/** The last backup's status: `undefined` while it loads, `null` when it can't be read. */
+export type BackupRead = BackupStatus | null | undefined;
+
+/** Reads the backup status once. A page can wait for it, so the banner doesn't arrive late above what it shows (audit M38). */
+export function useBackupStatus(): BackupRead {
+    const [status, setStatus] = useState<BackupRead>(undefined);
 
     useEffect(() => {
         let cancelled = false;
         apiFetch<BackupStatus>('/backup').then(
             (data) => !cancelled && setStatus(data),
-            () => !cancelled && setStatus(undefined),
+            () => !cancelled && setStatus(null),
         );
         return () => {
             cancelled = true;
         };
     }, []);
 
+    return status;
+}
+
+/**
+ * Shown on the Usage and Settings pages when the daily backup's last run failed a target
+ * (spec: "Failures are logged and shown as a banner ... They never block play"). Shows
+ * nothing in dev, before the first run, or when the status can't be fetched.
+ */
+export function BackupBanner() {
+    return <BackupBannerView status={useBackupStatus()} />;
+}
+
+/** The banner for a status the page read itself with `useBackupStatus`. */
+export function BackupBannerView({ status }: { status: BackupRead }) {
     if (!status?.failed) return null;
     const when = status.attemptedAt ? new Date(status.attemptedAt).toLocaleString() : undefined;
 

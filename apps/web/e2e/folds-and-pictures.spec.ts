@@ -180,6 +180,8 @@ test.describe('on a phone', () => {
             // Folded, Jonah's card says it needs filling in; the missing item's link opens it on the field.
             await jonah.getByRole('button', { name: 'Jonah', exact: true }).click();
             await expect(jonah.getByText('Needs filling in')).toBeVisible();
+            // The list starts folded to its count (audit M47).
+            await page.getByRole('region', { name: 'Playable status' }).getByRole('button', { name: /to fill in/ }).click();
             await page.getByRole('region', { name: 'Playable status' }).getByRole('button', { name: /Jonah: Voice/ }).click();
             await expect(jonah.getByRole('button', { name: 'Jonah', exact: true })).toHaveAttribute('aria-expanded', 'true');
             await expect(jonah.getByLabel('Voice', { exact: true })).toBeFocused();

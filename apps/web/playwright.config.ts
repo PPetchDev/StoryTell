@@ -27,8 +27,7 @@ export default defineConfig({
                 // unlock is checked by eye.
                 // A fake microphone for Dictation (it records a test tone; the mic is still asked
                 // for per page). Set here for every file: launch options in one file's test.use
-                // start a worker of its own, and the API that cant-connect.spec restarts from the
-                // first worker dies when that worker exits.
+                // start a worker of its own, and a new worker per such file only slows the run.
                 launchOptions: {
                     args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--autoplay-policy=no-user-gesture-required'],
                 },

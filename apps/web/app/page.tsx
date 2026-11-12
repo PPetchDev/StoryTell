@@ -175,10 +175,21 @@ export default function HomePage() {
                                 <button type="button" className="button button-quiet" onClick={chooseCard} disabled={busy}>
                                     From a Character card
                                 </button>
-                                <button type="button" className="button button-quiet" onClick={close}>
+                                <button
+                                    type="button"
+                                    className="button button-quiet"
+                                    aria-describedby={newStory.kind === 'drafting' ? 'cancel-draft-note' : undefined}
+                                    onClick={close}
+                                >
                                     Cancel
                                 </button>
                             </div>
+                            {/* The draft is already paid for, so Cancel closes this panel and lets it finish (audit M37). */}
+                            {newStory.kind === 'drafting' && (
+                                <p id="cancel-draft-note" className="hint mb-0">
+                                    Cancel closes this. A draft already under way still finishes and appears in your Stories.
+                                </p>
+                            )}
                         </>
                     )}
                 </section>

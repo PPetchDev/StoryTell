@@ -98,9 +98,11 @@ test("picks an older Snapshot from the Gallery as the Cover, and Home's card sho
 
         await page.goto('/');
         const card = page.getByRole('list', { name: 'Stories' }).getByRole('button', { name: /The Lighthouse/ });
-        const picture = card.locator('span').first();
-        await expect(picture).toHaveAttribute('style', new RegExp(older.imagePath));
-        await expect(picture).not.toHaveAttribute('style', new RegExp(newer.imagePath));
+        // A lazy thumbnail over the Story's gradient (audit H34).
+        const picture = card.locator('img');
+        await expect(picture).toHaveAttribute('src', new RegExp(`${older.imagePath}\\?w=320$`));
+        await expect(picture).toHaveAttribute('loading', 'lazy');
+        await expect(picture).not.toHaveAttribute('src', new RegExp(newer.imagePath));
     } finally {
         await request.delete(`/api/stories/${storyId}`);
     }
@@ -138,9 +140,9 @@ test('uploads a picture from the phone, taps the point to keep in view, sees it 
         await sheet.getByRole('button', { name: 'Close' }).tap();
         await page.goto('/');
         const card = page.getByRole('list', { name: 'Stories' }).getByRole('button', { name: /The Lighthouse/ });
-        const picture = card.locator('span').first();
-        await expect(picture).toHaveAttribute('style', new RegExp(uploaded.imagePath));
-        const position = await picture.evaluate((element) => getComputedStyle(element).backgroundPosition);
+        const picture = card.locator('img');
+        await expect(picture).toHaveAttribute('src', new RegExp(uploaded.imagePath));
+        const position = await picture.evaluate((element) => getComputedStyle(element).objectPosition);
         const [x, y] = position.split(' ').map((value) => parseFloat(value));
         expect(x).toBeCloseTo(focus.x * 100, 0);
         expect(y).toBeCloseTo(focus.y * 100, 0);

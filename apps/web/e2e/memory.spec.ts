@@ -85,8 +85,9 @@ test('a "Memory added" toast follows a turn and opens the Memory; a hand-added M
         await added.getByRole('link', { name: 'Go to the Message' }).click();
         await expect(page).toHaveURL(new RegExp(`/stories/${storyId}/chats/\\d+#message-\\d+$`));
         await expect(reply).toHaveClass(/message-target/);
-        await drawer.getByRole('button', { name: 'Close' }).click();
+        // On a phone the drawer covers the Chat, so the jump closes it and the Message takes focus.
         await expect(drawer).toHaveCount(0);
+        await expect(reply).toBeFocused();
     } finally {
         // Leaves the shared e2e database as it was found, Chats included.
         await request.delete(`/api/stories/${storyId}`);

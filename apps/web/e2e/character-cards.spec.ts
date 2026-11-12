@@ -60,6 +60,8 @@ test('a JSON card on Home makes a new Story, with the notice and an unsent tidy 
         await expect(story.getByLabel('Opening')).toHaveValue('Rain hammers the gallery windows. "You\'re Ash? You\'re late."');
         // Appearance, Voice and the Role's description are still to fill in.
         const status = page.getByRole('region', { name: 'Playable status' });
+        // The list starts folded to its count (audit M47).
+        await status.getByRole('button', { name: /to fill in/ }).click();
         await expect(status).toContainText('Mira: Appearance');
         await expect(status).toContainText('Mira: Voice');
         await expect(status).toContainText('Role: Description');
@@ -137,7 +139,7 @@ test('a PNG card shows its picture in the panel, and becomes the Portrait and th
 
         await page.goto('/');
         const card = page.getByRole('list', { name: 'Stories' }).getByRole('button', { name: /Mira/ });
-        await expect(card.locator('span').first()).toHaveAttribute('style', new RegExp(imagePath));
+        await expect(card.locator('img')).toHaveAttribute('src', new RegExp(imagePath));
     } finally {
         await request.delete(`/api/stories/${storyId}`);
     }

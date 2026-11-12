@@ -59,6 +59,52 @@ test('when the API fails a save, "Couldn\'t save" shows with the reason and the 
     }
 });
 
+test('hiding the page sends a waiting edit at once, without waiting for a save still in flight', async ({ page, request }) => {
+    const ids: number[] = [];
+    for (const name of ['Rin', 'Tam']) {
+        const created = await request.post('/api/personas', { data: { name, description: 'A drifter.' } });
+        expect(created.ok()).toBe(true);
+        ids.push((await created.json()).id as number);
+    }
+    const [rinId, tamId] = ids;
+
+    try {
+        // Rin's save is held, as if the network were slow, until the end of the test.
+        let release = () => {};
+        const held = new Promise<void>((resolve) => (release = resolve));
+        await page.route(`**/api/personas/${rinId}`, async (route) => {
+            if (route.request().method() === 'PATCH') await held;
+            await route.continue();
+        });
+        await page.goto('/personas');
+        const personas = page.getByRole('list', { name: 'Personas' });
+        const rinSent = page.waitForRequest((sent) => sent.method() === 'PATCH' && sent.url().endsWith(`/api/personas/${rinId}`));
+        await personas.getByRole('listitem', { name: 'Rin' }).getByLabel('Description').fill('Rin, held up.');
+        await rinSent;
+
+        // Tam's edit is still waiting out the typing pause when the tab is switched away.
+        const tamSent = page.waitForRequest((sent) => sent.method() === 'PATCH' && sent.url().endsWith(`/api/personas/${tamId}`), {
+            timeout: 3_000,
+        });
+        await personas.getByRole('listitem', { name: 'Tam' }).getByLabel('Description').fill('Tam, sent on the way out.');
+        await page.evaluate(() => {
+            Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+            document.dispatchEvent(new Event('visibilitychange'));
+        });
+        await tamSent;
+        await expect
+            .poll(async () => (await (await request.get(`/api/personas/${tamId}`)).json()).description)
+            .toBe('Tam, sent on the way out.');
+
+        release();
+        await expect
+            .poll(async () => (await (await request.get(`/api/personas/${rinId}`)).json()).description)
+            .toBe('Rin, held up.');
+    } finally {
+        for (const id of ids) await request.delete(`/api/personas/${id}`);
+    }
+});
+
 /** A playable Story with one Chat and one hand-written Memory, made through the API. */
 async function createChatWithMemory(request: APIRequestContext): Promise<{ storyId: number; chatId: number; memoryId: number }> {
     const created = await request.post('/api/stories', { data: { title: 'The Lighthouse' } });

@@ -15,6 +15,7 @@ import { SnapshotSheet } from '@/components/chat/snapshot-sheet';
 import { SnapshotViewer, useChatSnapshots } from '@/components/chat/snapshots';
 import { useThaiReadings } from '@/components/chat/thai-reading';
 import { useConnection } from '@/components/connection';
+import { LowCreditLine } from '@/components/low-credit-banner';
 import { ApiError, apiFetch, ApiUnreachableError, StreamBrokenError, StreamStoppedError } from '@/lib/api';
 import { backdropOf } from '@/lib/backdrop';
 import { handOffBranch, takeBranchHandoff } from '@/lib/branch';
@@ -556,12 +557,13 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
             )}
 
             {/*
-             * The "Memory added" toasts lie over the top of the thread rather than pushing it down
-             * (audit M14). Their status region is there throughout, so what comes into it is read
-             * (M13); each toast inside is a real button, which opens the Memory.
+             * The low-credit line (audit M3) and the "Memory added" toasts lie over the top of the
+             * thread rather than pushing it down (M14). Their status region is there throughout, so
+             * what comes into it is read (M13); each toast inside is a real button, which opens the Memory.
              */}
             <div className={`relative z-sticky h-0 ${COLUMN}`}>
                 <div ref={toastsRef} role="status" className="absolute inset-x-0 top-2 grid gap-2">
+                    <LowCreditLine />
                     {toasts.map((toast) => (
                         <button
                             key={toast.memoryId}

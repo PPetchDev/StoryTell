@@ -27,6 +27,8 @@ test('the Scene editor adds a Bond gate by its word, which makes the Scene playa
 
         await page.goto(`/stories/${storyId}?tab=scenes`);
         const status = page.getByRole('region', { name: 'Playable status' });
+        // The list starts folded to its count (audit M47).
+        await status.getByRole('button', { name: /to fill in/ }).click();
         await expect(status).toContainText('Arrival: Move-on condition');
 
         const arrival = page.getByRole('region', { name: 'Scene 1' });

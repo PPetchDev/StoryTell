@@ -107,7 +107,7 @@ test('a change to a Character lands on the Characters tab, above the sheet and l
     }
 });
 
-test('an instruction changes fields, lit up with Undo; a removal asks first; reopening starts fresh', async ({ page, request }) => {
+test('an instruction changes fields, lit up with Undo; a removal asks first; reopening keeps the conversation until Start over', async ({ page, request }) => {
     const story = await createStory(request);
     await scriptText(request, 'story_assistant', [
         // The first try fails at the provider; Retry sends the same instruction again.
@@ -229,12 +229,16 @@ test('an instruction changes fields, lit up with Undo; a removal asks first; reo
     );
     expect(sentAfter).toHaveLength(sent.length + 2);
 
-    // Closing and reopening shows no previous conversation.
+    // Closing and reopening keeps the conversation (audit M19); Start over clears it.
     await reopened.getByRole('button', { name: 'Close' }).click();
     await expect(page.getByRole('dialog', { name: 'Assistant' })).toHaveCount(0);
     await page.getByRole('button', { name: 'Assistant' }).click();
-    await expect(page.getByRole('dialog', { name: 'Assistant' }).getByRole('list', { name: 'Conversation' }).getByRole('listitem')).toHaveCount(0);
-    await expect(page.getByRole('dialog', { name: 'Assistant' })).not.toContainText('Tomas');
+    const again = page.getByRole('dialog', { name: 'Assistant' });
+    await expect(again.getByRole('list', { name: 'Changes' }).getByRole('listitem').filter({ hasText: 'Removed Character Tomas' })).toBeVisible();
+    await again.getByRole('button', { name: 'Start over' }).click();
+    await expect(again.getByRole('list', { name: 'Conversation' }).getByRole('listitem')).toHaveCount(0);
+    await expect(again).not.toContainText('Tomas');
+    await expect(again.getByLabel('Instruction')).toBeFocused();
 
     // Leave the shared database as it was found.
     await page.getByRole('tab', { name: 'Story' }).click();
