@@ -51,7 +51,7 @@ function TryIt({ fields, runnable }: { fields: ReplaceRuleFields; runnable: bool
     const logic = settledRule === null ? null : (JSON.parse(settledRule) as [string, string, boolean, boolean]);
     const result = useTryRule(logic && { find: logic[0], replace: logic[1], regex: logic[2], ignoreCase: logic[3] }, settledSample);
     return (
-        <div className="border-t border-dashed border-line pt-2">
+        <div className="border-x-0 border-t border-b-0 border-dashed border-line pt-2">
             <TextField
                 label="Try it"
                 value={sample}
