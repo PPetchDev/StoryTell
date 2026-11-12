@@ -13,8 +13,16 @@ The place, situation and premise a Story takes place in; every Story has one.
 _Avoid_: Scene, world, background
 
 **Scene**:
-An optional, author-defined stage of a Story that the plot moves through in order, each ending when its plain-language move-on condition is met and its Bond gates all hold; a Scene steers the story but never limits what the user or the Characters can do.
+An optional, author-defined stage of a Story that the plot moves through in order, each ending when its plain-language move-on condition is met and its Bond gates all hold; a Scene steers the story but never limits what the user or the Characters can do. Scenes only ever move on by themselves: the user cannot skip one.
 _Avoid_: Chapter, act, stage
+
+**Lingering Scene**:
+A Scene that has lasted many replies without moving on. The Narrator then has the Characters open the way toward its move-on condition and gates, without acting for the user.
+_Avoid_: Stuck Scene, stalled Scene
+
+**Passed-by Scene**:
+A Scene that has lasted a long time while the story clearly went somewhere its move-on condition can no longer happen soon. The Judge moves it on to the next Scene even though its condition and gates were never met.
+_Avoid_: Skipped Scene, forced advance
 
 **Bond gate**:
 A condition on a Scene that one Bond has reached at least a given level on one Bond axis ("Nara toward the user: Trust at least *close*"). A Scene moves on only when all its gates hold, as well as its move-on condition when it has one.

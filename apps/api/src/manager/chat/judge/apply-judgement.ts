@@ -1,6 +1,7 @@
 import { TimeOfDay } from '../../../model/chat/entities/chat.entity.js';
 import { BOND_AXES, BOND_AXIS_NAMES, BondLevels, clampToRange, sameBondLevels } from '../../../model/ledger/bond-axes.js';
 import { MessageChanges, NewBondChange, PartEmotion } from '../../../model/ledger/ledger.service.js';
+import { PASSED_BY_REPLIES } from '../scene-replies.js';
 import { BondGate, bondGateInWords, GateBond, gatesHold } from './bond-gates.js';
 import { Judgement, JudgedExpression } from './judge-prompt.js';
 
@@ -51,11 +52,18 @@ export interface ApplyInput {
      * and Arc stay as they were, while others' feelings toward them may still change.
      */
     sittingOut?: number[];
+    /**
+     * The replies in the current Scene, the judged one included (.scratch/scene-flow/spec.md); a
+     * passed_by is allowed only from `PASSED_BY_REPLIES`. Null or left out (free play): never.
+     */
+    repliesInScene?: number | null;
 }
 
 export interface AppliedJudgement extends MessageChanges {
     /** Why each dropped item was dropped, for the log. */
     rejected: string[];
+    /** The Judge's reason when the Scene moved on because the story passed it by; otherwise null. */
+    passedBy: string | null;
 }
 
 const same = (a: string, b: string): boolean => a.trim().toLowerCase() === b.trim().toLowerCase();
@@ -135,8 +143,14 @@ export function applyJudgement(input: ApplyInput, judgement: Judgement): Applied
     // turn's changes, so a reply that opens a gate moves the Scene on in the same judgement.
     const gatesOnly = gates.length > 0 && here?.moveOnCondition !== undefined && here.moveOnCondition.trim() === '';
     const held = gates.length === 0 || gatesHold(gates, bondsAfter(input.bonds, bonds)).every(Boolean);
+    // A Passed-by Scene (.scratch/scene-flow/spec.md, "Passed by"): only from the threshold, and only
+    // when the Scene does not move on by its own rules, which win when both are given.
+    const passed = judgement.scenes.find((signal) => signal.passedBy === true);
+    const replies = input.repliesInScene ?? null;
+    const passedBy = passed && here && replies !== null && replies >= PASSED_BY_REPLIES ? passed : undefined;
+    const next: ApplyScene | undefined = input.scenes[index + 1];
+    let passedByReason: string | null = null;
     if (here && (gatesOnly ? held : moveOn && held)) {
-        const next: ApplyScene | undefined = input.scenes[index + 1];
         const nameOf = (characterId: number | null): string =>
             characterId === null ? input.identityName : (input.cast.find((member) => member.id === characterId)?.name ?? 'someone');
         scene = {
@@ -152,12 +166,27 @@ export function applyJudgement(input: ApplyInput, judgement: Judgement): Applied
         if (judgement.scenes.filter((signal) => signal.moveOn).length > 1) {
             rejected.push('Scene: a second advance in one turn');
         }
+    } else if (here && passedBy) {
+        // To the next Scene in order, or free play from the last, past the condition and the gates.
+        scene = {
+            fromSceneId: here.id,
+            fromSceneName: here.name,
+            toSceneId: next?.id ?? null,
+            toSceneName: next?.name ?? null,
+            event: `The story moved past ${here.name}: ${passedBy.reason}`,
+        };
+        passedByReason = passedBy.reason;
     } else if (moveOn && !here) {
         rejected.push('Scene: move on while in free play');
     } else if (moveOn && gatesOnly) {
         rejected.push('Scene: move on for a Scene its Bond gates alone decide');
     } else if (moveOn) {
         rejected.push('Scene: move on while a Bond gate does not hold');
+    }
+    if (passed && !here) {
+        rejected.push('Scene: passed by while in free play');
+    } else if (passed && !passedBy) {
+        rejected.push(`Scene: passed by with only ${replies ?? 0} replies in the Scene, under ${PASSED_BY_REPLIES}`);
     }
 
     const now = input.timeOfDay ?? null;
@@ -168,7 +197,7 @@ export function applyJudgement(input: ApplyInput, judgement: Judgement): Applied
         rejected.push(`Time of day: still ${judgement.timeOfDay} — not a change`);
     }
 
-    return { bonds, arcs, scene, time, rejected };
+    return { bonds, arcs, scene, time, rejected, passedBy: passedByReason };
 }
 
 /** Every Bond as it stands once this turn's changes are written. */

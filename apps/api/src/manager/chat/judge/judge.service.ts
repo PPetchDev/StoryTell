@@ -11,6 +11,7 @@ import { StoryEntity } from '../../../model/story/entities/story.entity.js';
 import { ModelGateway } from '../../../service/model-gateway/model-gateway.js';
 import { exchangeUserText } from '../exchange.js';
 import { exchangeIdentityName } from '../identity.js';
+import { repliesInScene } from '../scene-replies.js';
 import { Attempt, BackgroundRuns } from '../background-runs.js';
 import { partsToText } from '../turn/reply-parser.js';
 import { applyJudgement, emotionsOfParts } from './apply-judgement.js';
@@ -124,6 +125,12 @@ export class JudgeManagerService {
             const state = await this.ledger.state(chat.id);
             const bonds = currentBonds(state.bondChanges);
             const scene = story.scenes.find((candidate) => candidate.id === chat.currentSceneId) ?? null;
+            // Up to and including the judged reply (.scratch/scene-flow/spec.md); null in free play.
+            const replies = repliesInScene({
+                currentSceneId: scene?.id ?? null,
+                messages: chat.messages.slice(0, index + 1),
+                sceneAdvances: state.sceneAdvances,
+            });
             // Read with the Chat as it is now, like the Scene: who sits out when the judge runs.
             const sittingOut = chat.sittingOutIds();
             const replyParts = message.parts.map((part) => part.toResponse());
@@ -154,9 +161,11 @@ export class JudgeManagerService {
                           name: scene.name,
                           moveOnCondition: scene.moveOnCondition,
                           ...((scene.gates ?? []).length > 0 && scene.moveOnCondition.trim() === '' ? { gatesOnly: true } : {}),
+                          replies: replies ?? 0,
                       }
                     : null,
                 timeOfDay: chat.timeOfDay,
+                storySoFar: chat.storySoFar,
                 recent: context.map((entry) => messageLine(entry, identityName)),
                 userText,
                 aiText: partsToText(replyParts),
@@ -191,11 +200,17 @@ export class JudgeManagerService {
                     currentSceneId: chat.currentSceneId,
                     timeOfDay: chat.timeOfDay,
                     sittingOut,
+                    repliesInScene: replies,
                 },
                 judgement,
             );
             for (const reason of applied.rejected) {
                 this.logger.log(`Chat ${chat.id}, Message ${message.id}: judge item dropped: ${reason}`);
+            }
+            if (applied.passedBy !== null && applied.scene) {
+                this.logger.log(
+                    `Chat ${chat.id}, Message ${message.id}: after ${replies} replies the story passed Scene "${applied.scene.fromSceneName}" by: ${applied.passedBy}`,
+                );
             }
             // Written with the rest of the judgement, in its one transaction, never after it. Without
             // Expressions the parts are not touched, so the record is exactly as before.

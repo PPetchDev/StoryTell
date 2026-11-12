@@ -35,7 +35,7 @@ The play-model list grows, but only through a check. Each candidate (Kimi K3.1-P
 15. As a player, I want my sampling used on every turn: send, Retry, Continue, Regenerate and a User Message edit, so that the story reads consistently.
 16. As a player, I want Suggested replies and Write for me to use the same sampling, so that what is written for me sounds like the story.
 17. As an author, I want Story drafting, the Story assistant and field rewrites to keep their defaults, so that a play-tuned temperature never breaks their structured answers.
-18. As a player, I want the Judge, Memory extraction, Snapshot descriptions and the Story so far to keep their defaults, so that the story's bookkeeping stays reliable.
+18. As a player, I want the Judge, Memory extraction, Snapshot descriptions and the Story so far to keep their defaults, so that the story's bookkeeping stays reliable. (Since 2026-11-12, the Judge sends a fixed temperature 0.3 of its own instead: see .scratch/scene-flow/spec.md, "Judge temperature".)
 19. As a player, I want a turn to fail loudly, telling me to reset Sampling, if the host stops taking one of my values, so that I never play on a setting that silently stopped working.
 20. As a player, I want changing Sampling not to raise a Drift notice, so that the notice keeps meaning "a different model wrote this".
 21. As a player, I want to see each play model's price per million tokens in Settings, so that I know what I'm choosing.

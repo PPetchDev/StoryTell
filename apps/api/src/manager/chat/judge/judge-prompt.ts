@@ -4,6 +4,7 @@ import { BOND_AXES, bondAxisScale, BondLevels, bondLevelsInWords, isBondLevel } 
 import { Emotion, isEmotion } from '../../../model/story/emotion.js';
 import { PromptMessage } from '../../../service/model-gateway/model-gateway.js';
 import { exchangeUserLine } from '../exchange.js';
+import { PASSED_BY_REPLIES } from '../scene-replies.js';
 import { ReplyPart } from '../turn/reply-parser.js';
 
 /**
@@ -42,9 +43,23 @@ export interface JudgePromptInput {
     bonds: JudgeBond[];
     arcs: JudgeArc[];
     /** `gatesOnly`: the Scene has Bond gates and no condition, so the app alone decides (.scratch/bond-axes/spec.md). */
-    scene: { name: string; moveOnCondition: string; gatesOnly?: boolean } | null;
+    scene: {
+        name: string;
+        moveOnCondition: string;
+        gatesOnly?: boolean;
+        /**
+         * The replies in the Scene, the one being judged included (.scratch/scene-flow/spec.md);
+         * from `PASSED_BY_REPLIES` the Current Scene section adds the passed-by rule. Left out, it never does.
+         */
+        replies?: number;
+    } | null;
     /** The Chat's Time of day; null while the story has not made one clear. Left out, it reads as null. */
     timeOfDay?: TimeOfDay | null;
+    /**
+     * The Chat's Story so far, so a part of a Scene's condition met long before the recent Messages
+     * is in view (.scratch/scene-flow/spec.md, "The Judge's Scene rule"). Null or left out: no section.
+     */
+    storySoFar?: string | null;
     /** The Messages before the exchange, oldest first, as `Name: text` or the AI's `@Name:` text. */
     recent: string[];
     /** The exchange to judge: what the user wrote (null after a Continue) and the AI's reply as `@Name:` text. */
@@ -101,11 +116,12 @@ Arc rules:
 - The core definition is never rewritten; you only add steps. A step can reverse an earlier one.
 
 Scene rule:
-- Judge whether the current Scene's move-on condition has now been met, with the Bonds in view. Be strict: met means it has fully HAPPENED in the story by the end of the latest exchange.
+- Judge whether the current Scene's move-on condition has now been met, with the Bonds and the story so far in view. Be strict about whether it happened, not about its wording: met means it has fully HAPPENED in the story by the end of the latest exchange, in substance, in any words or order.
+- A part of the condition that happened in an earlier exchange still counts.
 - Not met: getting closer, someone about to do it, saying they could or will do it, agreeing to do it later, or the story setting it up.
 - When the condition names who must act (the user or a Character), only that one doing it counts. Someone else revealing or doing it instead does not.
 - When the condition has several parts, every part must have happened.
-- When in doubt, move_on is false. A Scene is meant to last many exchanges.
+- When in doubt, move_on is false.
 - Write the reason first, saying what has and has not happened yet, then decide move_on from it.
 
 Time of day rule:
@@ -114,7 +130,7 @@ Time of day rule:
 Reply with JSON only:
 {"bond_changes":[{"from":"Name","to":"user|Name","label":"...","description":"...","levels":{"trust":0,"affection":0,"desire":0,"tension":0},"cause":"..."}],
  "arc_steps":[{"character":"Name","step":"...","cause":"..."}],
- "scene":{"reason":"...","move_on":false},
+ "scene":{"reason":"...","move_on":false,"passed_by":false},
  "time_of_day":null}
 Empty arrays when nothing changed.`;
 
@@ -132,6 +148,13 @@ const SYSTEM_WITH_EXPRESSIONS = SYSTEM.replace('Reply with JSON only:', `${EXPRE
     ' "time_of_day":null}',
     ' "time_of_day":null,\n "expressions":[{"line":1,"emotion":"joy"}]}',
 );
+
+/**
+ * A Passed-by Scene (.scratch/scene-flow/spec.md, "Passed by"): offered in the Current Scene section
+ * only from `PASSED_BY_REPLIES` replies in the Scene, so the system message stays the same.
+ */
+export const PASSED_BY_RULE =
+    'Passed-by rule: This Scene has gone on a long time. Set "passed_by": true only when the story has clearly gone somewhere the move-on condition can\'t happen soon, and nothing in the latest exchanges is heading back toward it; then the reason must say where the story went. When in doubt, passed_by is false.';
 
 /** The reply as `partsToText` writes it, with each speech line numbered in order: `[1] @Name: …`. */
 export function numberedReplyText(parts: ReplyPart[]): string {
@@ -173,12 +196,12 @@ ${bonds}
 ${arcs}
 
 # Current Scene
-${input.scene ? `${input.scene.name}. Move-on condition: ${input.scene.gatesOnly ? '(gates only)' : input.scene.moveOnCondition || '(none)'}` : 'none'}
+${input.scene ? `${input.scene.name}. Move-on condition: ${input.scene.gatesOnly ? '(gates only)' : input.scene.moveOnCondition || '(none)'}${(input.scene.replies ?? 0) >= PASSED_BY_REPLIES ? `\n${PASSED_BY_RULE}` : ''}` : 'none'}
 
 # Time of day
 ${input.timeOfDay ?? 'not yet known'}
 
-# Recent story (context)
+${input.storySoFar?.trim() ? `# Story so far (earlier events, summarised)\n${input.storySoFar.trim()}\n\n` : ''}# Recent story (context)
 ${input.recent.join('\n\n') || '(start)'}
 
 # LATEST EXCHANGE (judge this)
@@ -212,6 +235,8 @@ export interface JudgedArcStep {
 
 export interface JudgedScene {
     moveOn: boolean;
+    /** The story has passed the Scene by (.scratch/scene-flow/spec.md); the parser always sets it, false when not given. */
+    passedBy?: boolean;
     reason: string;
 }
 
@@ -269,7 +294,7 @@ export function parseJudgement(text: string): Judgement {
             : [],
     );
     const scenes = (Array.isArray(json.scene) ? json.scene : [json.scene]).flatMap((item): JudgedScene[] =>
-        isObject(item) ? [{ moveOn: item.move_on === true, reason: str(item.reason) }] : [],
+        isObject(item) ? [{ moveOn: item.move_on === true, passedBy: item.passed_by === true, reason: str(item.reason) }] : [],
     );
     // Read loosely: an item without a whole `line` or a known emotion (any case) is dropped.
     const expressions = list(json.expressions).flatMap((item): JudgedExpression[] => {

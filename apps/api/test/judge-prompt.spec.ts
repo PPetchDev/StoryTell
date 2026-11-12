@@ -23,10 +23,12 @@ describe('Judge prompt: the Scene rule', () => {
         expect(system).toContain('Not met: getting closer, someone about to do it, saying they could or will do it, agreeing to do it later');
         expect(system).toContain('only that one doing it counts. Someone else revealing or doing it instead does not.');
         expect(system).toContain('every part must have happened');
-        expect(system).toContain('When in doubt, move_on is false. A Scene is meant to last many exchanges.');
+        // .scratch/scene-flow/spec.md: "The rule 'A Scene is meant to last many exchanges' goes."
+        expect(system).toContain('When in doubt, move_on is false.');
         // The reason comes before the verdict, so the model reasons first and decides from it.
         expect(system).toContain('Write the reason first, saying what has and has not happened yet, then decide move_on from it.');
-        expect(system).toContain('"scene":{"reason":"...","move_on":false}');
+        // .scratch/scene-flow/spec.md: "The output gains "passed_by": false next to move_on."
+        expect(system).toContain('"scene":{"reason":"...","move_on":false,"passed_by":false}');
     });
 
     it('still shows the current Scene and its condition to judge', () => {

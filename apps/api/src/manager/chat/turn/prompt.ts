@@ -8,6 +8,7 @@ import { memoryIsAbout } from '../memory/present.js';
 import { renderUser } from '../memory/render-user.js';
 import { documentsBlock, PromptPassage } from '../../document/document-search.js';
 import { loreBlock, PromptLoreEntry } from '../lore/lore-select.js';
+import { LINGERING_REPLIES } from '../scene-replies.js';
 import { estimateTokens } from './prompt-tokens.js';
 
 /**
@@ -49,6 +50,11 @@ export interface PromptScene {
     moveOnCondition: string;
     /** Its Bond gates in words (.scratch/bond-axes/spec.md); none, or left out, and the line is as before. */
     gates?: string[];
+    /**
+     * The replies in the Scene before the one being written (.scratch/scene-flow/spec.md); from
+     * `LINGERING_REPLIES` the line draws the Scene toward its end. Left out, the line is as before.
+     */
+    replies?: number;
 }
 
 export interface PromptStory {
@@ -277,8 +283,9 @@ function castCard(character: PromptCharacter): string {
     return lines.join('\n');
 }
 
-function sceneLayer(scene: PromptScene | null): string {
+function sceneLayer(scene: PromptScene | null, identity: string): string {
     if (!scene) return `${PROMPT_LAYERS.scene}\nNo Scene — the story unfolds freely.`;
+    if ((scene.replies ?? 0) >= LINGERING_REPLIES) return lingeringSceneLayer(scene, identity);
     const moveOn = scene.moveOnCondition.trim()
         ? `\nThis Scene moves on once: ${scene.moveOnCondition.trim().replace(/[.!]+$/, '')}. Let that happen naturally; never force it. Don't hurry toward it: give the Scene room for many exchanges of everyday moments and the Characters' own wants first, and let the user's choices bring it about.`
         : '';
@@ -287,6 +294,24 @@ function sceneLayer(scene: PromptScene | null): string {
         ? scene.moveOnCondition.trim()
             ? ` It also waits for these feelings, which must grow on their own: ${scene.gates.join('; ')}.`
             : `\nThis Scene moves on once these feelings have grown: ${scene.gates.join('; ')}. Let them grow naturally through the story; never force them.`
+        : '';
+    return `${PROMPT_LAYERS.scene}: ${scene.name}\n${scene.situation}${moveOn}${gates}`;
+}
+
+/**
+ * A Lingering Scene (.scratch/scene-flow/spec.md, "The Narrator's Scene line"): the Characters,
+ * in character, open the way toward its condition and toward the feelings its gates wait for, a
+ * little each reply, and never write the user's part. It never mentions numbers.
+ */
+function lingeringSceneLayer(scene: PromptScene, identity: string): string {
+    const condition = scene.moveOnCondition.trim();
+    const moveOn = condition
+        ? `\nThis Scene moves on once: ${condition.replace(/[.!]+$/, '')}. This Scene has gone on a while. Let the Characters, in character, now open the way toward it: they can bring up its subject, offer a reason or a chance, or move the scene toward where it can happen, a little each reply, without abandoning what is happening now. Never write ${identity}'s part of it: what ${identity} must do or say stays ${identity}'s to do.`
+        : '';
+    const gates = scene.gates?.length
+        ? condition
+            ? ` It also waits for these feelings: ${scene.gates.join('; ')}. Give the Characters moments that let those feelings grow.`
+            : `\nThis Scene moves on once these feelings have grown: ${scene.gates.join('; ')}. This Scene has gone on a while. Give the Characters moments, in character, that let those feelings grow, a little each reply, without abandoning what is happening now. Never force them.`
         : '';
     return `${PROMPT_LAYERS.scene}: ${scene.name}\n${scene.situation}${moveOn}${gates}`;
 }
@@ -415,7 +440,7 @@ export function systemPrompt(input: PromptLayersInput): { text: string; memories
         `${PROMPT_LAYERS.identity}\n${identity}: ${input.identity.description}`,
         styleLayer(input.story, identity),
         `${PROMPT_LAYERS.cast}\n${input.story.characters.map(castCard).join('\n\n')}`,
-        sceneLayer(input.scene),
+        sceneLayer(input.scene, identity),
         feelingsLayer(input.bonds, identity),
         arcsLayer(input.arcs),
         memory.text,

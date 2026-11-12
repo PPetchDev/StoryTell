@@ -84,7 +84,8 @@ describe('Sampling through the real gateway', () => {
         });
     });
 
-    it.each<TextCallKind>(['story_draft', 'story_assistant', 'field_rewrite', 'judge', 'memory_extraction', 'story_summary'])(
+    // The Judge left this list for a fixed temperature (.scratch/scene-flow/spec.md, "Judge temperature").
+    it.each<TextCallKind>(['story_draft', 'story_assistant', 'field_rewrite', 'memory_extraction', 'story_summary'])(
         'keeps %s on the host defaults',
         async (kind) => {
             const net = recordedFetch([{ fixture: 'openrouter/chat-json.json' }]);
@@ -99,6 +100,43 @@ describe('Sampling through the real gateway', () => {
             expect(body.provider).toEqual({ only: ['deepinfra'], allow_fallbacks: false });
         },
     );
+
+    // .scratch/scene-flow/spec.md, "Judge temperature": a fixed 0.3, never the user's Sampling.
+    describe('the Judge', () => {
+        it('sends temperature 0.3 alone, whatever Sampling is set, and requires it', async () => {
+            const net = recordedFetch([{ fixture: 'openrouter/chat-json.json' }]);
+            const { gateway } = gatewayUnderTest(net.fetch, {
+                settings: { playModel: 'glm-5.3', samplers: { 'glm-5.3': { temperature: 1.4, topP: 0.9 } } },
+            });
+
+            await gateway.completeText({ kind: 'judge', messages, json: true });
+
+            const body = net.requests[0].body;
+            expect(body.model).toBe('deepseek/deepseek-v4-flash');
+            expect(body.temperature).toBe(0.3);
+            expect(Object.keys(body).filter((key) => SAMPLER_KEYS.includes(key))).toEqual(['temperature']);
+            expect(body.provider).toEqual({ only: ['deepinfra'], allow_fallbacks: false, require_parameters: true });
+        });
+
+        it('sends the same with no Sampling set at all', async () => {
+            const net = recordedFetch([{ fixture: 'openrouter/chat-json.json' }]);
+            const { gateway } = gatewayUnderTest(net.fetch, { settings: { playModel: 'deepseek-v4-pro', samplers: {} } });
+
+            await gateway.completeText({ kind: 'judge', messages, json: true });
+
+            expect(net.requests[0].body).toMatchObject({ temperature: 0.3 });
+        });
+
+        it('a host refusing it is a plain outage that never tells the user to reset Sampling', async () => {
+            const net = recordedFetch([{ status: 404, fixture: 'openrouter/error-no-endpoints.json' }]);
+            const { gateway } = gatewayUnderTest(net.fetch, { settings: { playModel: 'glm-5.3', samplers: {} } });
+
+            const failure = gateway.completeText({ kind: 'judge', messages, json: true });
+
+            await expect(failure).rejects.toBeInstanceOf(ProviderOutageError);
+            await expect(failure).rejects.not.toMatchObject({ message: expect.stringContaining('Sampling') });
+        });
+    });
 
     it('never sends another play model’s values', async () => {
         const net = recordedFetch([{ fixture: 'openrouter/chat-success.json' }]);

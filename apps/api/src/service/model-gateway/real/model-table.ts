@@ -8,6 +8,7 @@ import {
     SnapshotModel,
     SnapshotSize,
     SPEECH_CHARACTER_LIMIT,
+    SamplerValues,
     SpeechModel,
     TEXT_ONLY_SNAPSHOT_MODELS,
     TextCallKind,
@@ -186,6 +187,17 @@ const SAMPLED_KINDS: ReadonlySet<TextCallKind> = new Set<TextCallKind>(['turn', 
 
 export function isSampledKind(kind: TextCallKind): boolean {
     return SAMPLED_KINDS.has(kind);
+}
+
+/**
+ * Fixed values a background kind always sends, never the user's Sampling (.scratch/scene-flow/spec.md,
+ * "Judge temperature"): replayed on real Chats, the Judge gave the same Bond changes call after call
+ * at 0.3, where the host default swung between none and six.
+ */
+const BACKGROUND_SAMPLERS: Partial<Record<TextCallKind, SamplerValues>> = { judge: { temperature: 0.3 } };
+
+export function backgroundSamplers(kind: TextCallKind): SamplerValues | undefined {
+    return BACKGROUND_SAMPLERS[kind];
 }
 
 export interface ImageModelSpec {

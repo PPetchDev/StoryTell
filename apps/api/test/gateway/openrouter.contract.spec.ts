@@ -220,7 +220,8 @@ describe('OpenRouter contract', () => {
 
             expect(net.requests).toHaveLength(3);
             for (const request of net.requests) {
-                expect(request.body.provider).toEqual({ only: ['deepinfra'], allow_fallbacks: false });
+                // The Judge requires its fixed temperature (.scratch/scene-flow/spec.md, "Judge temperature").
+                expect(request.body.provider).toEqual({ only: ['deepinfra'], allow_fallbacks: false, require_parameters: true });
             }
             expect(sleeps).toEqual([1000, 3000]);
             expect(records).toHaveLength(1);

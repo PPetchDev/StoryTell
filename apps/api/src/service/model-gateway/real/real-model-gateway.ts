@@ -14,6 +14,7 @@ import {
     ImageGenerationResult,
     MAX_REFERENCE_IMAGES,
     ModelGateway,
+    isPlayModel,
     PlayModel,
     playModelName,
     PlaySamplers,
@@ -35,6 +36,7 @@ import {
     TranscriptionResult,
 } from '../model-gateway.js';
 import {
+    backgroundSamplers,
     drawnSize,
     EMBEDDING_MODELS,
     IMAGE_MODELS,
@@ -175,7 +177,11 @@ export class RealModelGateway extends ModelGateway {
     private async textCall(request: TextCompletionRequest): Promise<{ modelName: TextModel; chat: OpenRouterChatRequest }> {
         const { messages, maxTokens, json, stop } = request;
         if (!isPlayModelKind(request.kind)) {
-            return { modelName: BACKGROUND_MODEL, chat: { model: TEXT_MODELS[BACKGROUND_MODEL], messages, maxTokens, json, stop } };
+            const samplers = backgroundSamplers(request.kind);
+            return {
+                modelName: BACKGROUND_MODEL,
+                chat: { model: TEXT_MODELS[BACKGROUND_MODEL], messages, maxTokens, json, stop, ...(samplers ? { samplers } : {}) },
+            };
         }
         const settings = await this.deps.settings.current();
         const modelName = settings.playModel;
@@ -379,7 +385,8 @@ export class RealModelGateway extends ModelGateway {
 
 /** A host refusing a Sampling value, worded so the user knows what to do about it. */
 function forUser(error: unknown, modelName: TextModel): unknown {
-    if (!(error instanceof SamplerRefusedError)) return error;
+    // Only a play model runs on the user's Sampling; a background kind's fixed values are not theirs to reset.
+    if (!(error instanceof SamplerRefusedError) || !isPlayModel(modelName)) return error;
     return new ProviderOutageError(
         `DeepInfra no longer takes one of the Sampling values for ${playModelName(modelName)}. Reset Sampling for it in Settings.`,
     );

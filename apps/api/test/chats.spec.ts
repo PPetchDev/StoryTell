@@ -1250,7 +1250,7 @@ describe('Chats through the real gateway', () => {
         await t.http.put('/api/settings').send({ playModel: 'glm-5.3' }).expect(200);
     });
 
-    it('sends the Sampling saved for the play model on a turn, and none on its background calls', async () => {
+    it('sends the Sampling saved for the play model on a turn, and none of it on its background calls', async () => {
         const { storyId, chatId } = await playableChat();
         await t.http.put('/api/settings').send({ playModel: 'deepseek-v4-pro' }).expect(200);
         await t.http.put('/api/settings/samplers/glm-5.3').send({ temperature: 0.3 }).expect(200);
@@ -1270,10 +1270,21 @@ describe('Chats through the real gateway', () => {
             });
             expect(turn.body).not.toHaveProperty('min_p');
             expect(background).toHaveLength(2);
+            const isJudge = (request: (typeof background)[number]): boolean =>
+                JSON.stringify(request.body.messages).includes('You track hidden feelings (Bonds)');
+            const [judge] = background.filter(isJudge);
+            const [extraction] = background.filter((request) => !isJudge(request));
+            expect(judge).toBeDefined();
+            expect(extraction).toBeDefined();
             for (const request of background) {
-                expect(request.body).not.toHaveProperty('temperature');
-                expect(request.body.provider).toEqual({ only: ['deepinfra'], allow_fallbacks: false });
+                expect(request.body).not.toHaveProperty('repetition_penalty');
+                expect(request.body.temperature).not.toBe(1.15);
             }
+            // .scratch/scene-flow/spec.md, "Judge temperature": the Judge's own fixed 0.3, required.
+            expect(judge.body.temperature).toBe(0.3);
+            expect(judge.body.provider).toEqual({ only: ['deepinfra'], allow_fallbacks: false, require_parameters: true });
+            expect(extraction.body).not.toHaveProperty('temperature');
+            expect(extraction.body.provider).toEqual({ only: ['deepinfra'], allow_fallbacks: false });
         } finally {
             await t.http.put('/api/settings/samplers/glm-5.3').send({ temperature: null }).expect(200);
             await t.http

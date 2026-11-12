@@ -43,7 +43,6 @@ import { MemoryModelService } from '../../model/memory/memory.service.js';
 import { PersonaModelService } from '../../model/persona/persona.service.js';
 import { SnapshotModelService } from '../../model/snapshot/snapshot.service.js';
 import { SettingsModelService } from '../../model/settings/settings.service.js';
-import type { SceneEntity } from '../../model/story/entities/scene.entity.js';
 import { StoryEntity } from '../../model/story/entities/story.entity.js';
 import { StoryModelService } from '../../model/story/story.service.js';
 import {
@@ -57,6 +56,7 @@ import { ReadAloudManagerService } from '../read-aloud/read-aloud.service.js';
 import { checkRecording } from './dictation/recording.js';
 import { latestLine } from '../excerpt.js';
 import { exchangeUserText } from './exchange.js';
+import { repliesInScene } from './scene-replies.js';
 import { MissingField, playableStatus } from '../story/playable.js';
 import { WornIdentity, wornIdentity } from './identity.js';
 import { currentBonds, JudgeManagerService, latestJudged, SettledBackground } from './judge/judge.service.js';
@@ -990,7 +990,6 @@ export class ChatManagerService {
                         ? (message.text ?? '')
                         : partsToText(message.parts.map((part) => part.toResponse())),
             }));
-        const scene = story.scenes.find((candidate) => candidate.id === chat.currentSceneId) ?? null;
         const identity: WornIdentity = wornIdentity(story, chat);
         const sittingOut = sittingOutOf(story, chat);
         const [state, memories, held] = await Promise.all([
@@ -1022,7 +1021,7 @@ export class ChatManagerService {
         const prompt = buildTurnPrompt({
             story,
             identity,
-            scene: promptScene(story, scene, identity.name),
+            scene: promptScene(story, chat, state, identity.name),
             ...promptLayers(story, state),
             ...promptMemoryLayer(choice, choiceMemories(story, memories), beliefs),
             storySoFar: promptStorySoFar(chat),
@@ -1132,7 +1131,6 @@ export class ChatManagerService {
      * message reads, all read the way `writeTurn` reads them.
      */
     private async promptLayersFor(story: StoryEntity, chat: ChatEntity): Promise<PromptLayersInput> {
-        const scene = story.scenes.find((candidate) => candidate.id === chat.currentSceneId) ?? null;
         const newest = newestAiMessage(chat);
         const [state, memories, held, query] = await Promise.all([
             this.ledger.state(chat.id),
@@ -1154,7 +1152,7 @@ export class ChatManagerService {
         return {
             story,
             identity,
-            scene: promptScene(story, scene, identity.name),
+            scene: promptScene(story, chat, state, identity.name),
             ...promptLayers(story, state),
             ...promptMemoryLayer(choice, choiceMemories(story, memories), beliefs),
             storySoFar: promptStorySoFar(chat),
@@ -1321,8 +1319,13 @@ function promptHistory(messages: MessageEntity[]): PromptHistoryMessage[] {
 }
 
 /** The Feelings and Arcs layers from the ledger: every current Bond, and each Character's Arc. */
-/** The current Scene as the Narrator reads it, its Bond gates in words (.scratch/bond-axes/spec.md). */
-function promptScene(story: StoryEntity, scene: SceneEntity | null, identityName: string): PromptScene | null {
+/**
+ * The current Scene as the Narrator reads it, its Bond gates in words (.scratch/bond-axes/spec.md),
+ * with the replies in it before the one about to be written (.scratch/scene-flow/spec.md): those
+ * in the Chat's `messages`, which hold everything before that reply.
+ */
+function promptScene(story: StoryEntity, chat: ChatEntity, state: LedgerState, identityName: string): PromptScene | null {
+    const scene = story.scenes.find((candidate) => candidate.id === chat.currentSceneId) ?? null;
     if (!scene) return null;
     const nameOf = (characterId: number | null): string =>
         characterId === null ? identityName : (story.characters.find((character) => character.id === characterId)?.name ?? 'someone');
@@ -1331,6 +1334,7 @@ function promptScene(story: StoryEntity, scene: SceneEntity | null, identityName
         situation: scene.situation,
         moveOnCondition: scene.moveOnCondition,
         gates: (scene.gates ?? []).map((gate) => bondGateInWords(nameOf(gate.fromCharacterId), nameOf(gate.toCharacterId), gate.axis, gate.atLeast)),
+        replies: repliesInScene({ currentSceneId: scene.id, messages: chat.messages, sceneAdvances: state.sceneAdvances }) ?? 0,
     };
 }
 
