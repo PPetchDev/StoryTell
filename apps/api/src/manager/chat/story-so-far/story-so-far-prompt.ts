@@ -27,7 +27,11 @@ export const STORY_SO_FAR_HEADROOM = 4_000;
 export const NEXT_USER_MESSAGE_TOKENS = 300;
 /** Spec: "at most about 500 words". */
 export const STORY_SO_FAR_WORDS = 500;
-export const STORY_SO_FAR_MAX_TOKENS = 1_000;
+/**
+ * The writer's hard cap, well above the 500 words it is asked for (spec: "Length cap"): at
+ * 1,000, half its answers on a long Chat ran past ~730 words and were cut off.
+ */
+export const STORY_SO_FAR_MAX_TOKENS = 2_000;
 /** The newest Messages are always sent word for word. */
 const ALWAYS_UNCOVERED = 2;
 

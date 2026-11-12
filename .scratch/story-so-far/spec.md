@@ -57,6 +57,9 @@ Each Chat gets a **Story so far**: a prose account, in order, of everything that
   - A rejected answer is asked for once more, right away, in the same update. If the second one is rejected too, the update fails with that reason (see Failure).
   - Why: in eight replays of one rewrite, four answers hit the 1,000-token cap and ended mid-sentence, and one opened with `[Story]` and told only the latest scene in the first person.
   - Not caught: an account that tells only part of the story in proper form. Nothing in the text says so for certain, and a length check against the old account would also turn away good, shorter ones.
+- **Length cap (2026-11-12).** The writer's call is capped at 2,000 tokens, up from 1,000. It is still asked for at most about 500 words; the cap is only the hard stop.
+  - Why: on a 97-Message dev Chat, half the answers ran past ~730 words and hit the 1,000 cap, which the output guard then turns away. 2,000 leaves room for about twice that.
+  - The trigger reserves the same cap for the account's growth, so the layer can take up to 2,000 tokens of the turn prompt, and each update covers a little more to leave room for it.
 - **Failure.** A failed or unreadable update keeps the old text and position, records the reason, and never blocks a send. The next turn's check runs it again. Until then, the trimming that already exists leaves out the oldest uncovered Messages.
 - **Edits, Regenerate, Reset.** Any rewind from a position at or before the covered position clears the Story so far. That covers an edited User or AI Message and a Regenerate. The next check writes it again from the remaining Messages when needed. A Reset clears it too. A user-written Story so far cleared this way is lost, because the events it told were rewound away.
 - **Concurrency.** At most one update per Chat runs at a time. A turn never waits for one. An update that finishes after a rewind cleared the Story so far, or after the user saved their own text, is dropped, so it never overwrites either.
@@ -85,6 +88,7 @@ Each Chat gets a **Story so far**: a prose account, in order, of everything that
   - Past the threshold, one call runs. Its input holds every Message through the new position, and the next turn's prompt carries the summary and leaves those Messages out.
   - A second update sends all covered Messages again, not the old summary alone.
 - **User edit.** The PUT stores `writtenBy: user`. The next update's input carries that text with the "corrections win" instruction.
+- **Length cap.** The update's call asks for at most 2,000 tokens.
 - **Writer output guard.**
   - Pure: an answer that used the whole cap is rejected as cut off; one opening with a speaker tag of the Messages is rejected as going on with the story; a tag in the middle, or a bracket that is not a speaker, is fine; a leading `[Account]` label is dropped.
   - API: a cut-off answer followed by a good one stores the good one in the same update, with no failure recorded.

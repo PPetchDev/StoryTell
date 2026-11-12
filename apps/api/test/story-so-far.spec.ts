@@ -217,6 +217,8 @@ describe('Story so far', () => {
 
         const [call] = t.gateway.textCalls('story_summary');
         expect(call.servedFor).toEqual({ storyId, chatId: chat.id });
+        // Spec: "Length cap": the hard stop sits well above the ~500 words asked for.
+        expect(call.maxTokens).toBe(2_000);
         const input = call.messages.map((message) => message.content).join('\n');
         expect(input).toContain('Rain hammers the gallery windows.');
         expect(input).toContain('REPLY-1');
