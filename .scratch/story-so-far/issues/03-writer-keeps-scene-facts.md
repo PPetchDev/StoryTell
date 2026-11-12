@@ -1,9 +1,13 @@
 # The Story so far writer keeps what the Scenes need
 
 Type: task
-Status: done
+Status: wontfix
 Blocked by: 01
 Part of: [Spec: Story so far](../spec.md)
+
+## Reverted (2026-11-12)
+
+Replayed on the same rewrite, four answers each: the old prompt kept the tasting 4 of 4, this one kept it whole once, wrote longer answers that hit the length cap more often, and once wrote a story passage instead of an account. The code is taken back out; see the spec's "Scene goals: tried and dropped" and issue 04.
 
 ## What to build
 

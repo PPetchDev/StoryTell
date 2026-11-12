@@ -1,6 +1,11 @@
 import { ProviderOutageError } from '../src/errors/model-gateway.errors.js';
 import { ChatManagerService } from '../src/manager/chat/chat.service.js';
-import { storySoFarCoverage, storySoFarPromptMessages } from '../src/manager/chat/story-so-far/story-so-far-prompt.js';
+import {
+    parseStorySoFar,
+    STORY_SO_FAR_MAX_TOKENS,
+    storySoFarCoverage,
+    storySoFarRejection,
+} from '../src/manager/chat/story-so-far/story-so-far-prompt.js';
 import { buildTurnPrompt, PROMPT_LAYERS, PromptLayersInput } from '../src/manager/chat/turn/prompt.js';
 import { buildSuggestionsPrompt } from '../src/manager/chat/suggestions/suggestions-prompt.js';
 import { Pov, ReplyLength, Tense } from '../src/model/story/entities/story.entity.js';
@@ -95,39 +100,29 @@ describe('Story so far: prompt (pure)', () => {
     });
 });
 
-// .scratch/story-so-far/spec.md, "Facts the Scenes need".
-describe('Story so far: the writer keeps what the Scenes need (pure)', () => {
-    const base = {
-        identityName: 'Petch',
-        castNames: ['Nara', 'Morra'],
-        messages: [{ speaker: 'Petch', text: 'I drink the milk.' }],
-        corrections: null,
-    };
-    const user = (input: Parameters<typeof storySoFarPromptMessages>[0]): string => storySoFarPromptMessages(input)[1].content;
+describe('Story so far: the writer output guard (pure)', () => {
+    const speakers = ['Story', 'Ash'];
 
-    it('lists the given conditions, asks to keep every event bearing on them, and never to name them', () => {
-        const text = user({
-            ...base,
-            sceneConditions: ['The user tastes the milk and openly asks where the tribe keeps its cows.', 'Tavri lets a clue slip.'],
-        });
-        expect(text).toContain(
-            'Story goals the account must keep track of. Keep every event that bears on them, even a small one: what happened and who did it. Never name or hint at these goals in the account:\n- The user tastes the milk and openly asks where the tribe keeps its cows.\n- Tavri lets a clue slip.',
-        );
-        // After the Messages, before the closing request.
-        expect(text.indexOf('Story goals')).toBeGreaterThan(text.indexOf('I drink the milk.'));
-        expect(text.trimEnd().endsWith('Write the account now.')).toBe(true);
+    it('takes a whole account under the cap', () => {
+        expect(storySoFarRejection('Ash came through the storm.', STORY_SO_FAR_MAX_TOKENS - 1, speakers)).toBeNull();
     });
 
-    it('is exactly as before with no conditions, empty ones, or none given', () => {
-        const before = storySoFarPromptMessages(base);
-        expect(storySoFarPromptMessages({ ...base, sceneConditions: [] })).toEqual(before);
-        expect(storySoFarPromptMessages({ ...base, sceneConditions: ['', '   '] })).toEqual(before);
-        expect(before[1].content).not.toContain('Story goals');
+    it('rejects an answer that used the whole length cap as cut off', () => {
+        expect(storySoFarRejection('Ash came through the storm and Mira', STORY_SO_FAR_MAX_TOKENS, speakers)).toContain('cut off');
     });
 
-    it('trims each condition and leaves out the empty ones', () => {
-        const text = user({ ...base, sceneConditions: ['  Tavri lets a clue slip.  ', ''] });
-        expect(text).toContain('in the account:\n- Tavri lets a clue slip.\n\nWrite the account now.');
+    it('rejects an answer that opens with a speaker tag of the Messages', () => {
+        expect(storySoFarRejection('[Story] The fire settles into embers.', 400, speakers)).toContain('went on with the story');
+        expect(storySoFarRejection('[ash]\nI pick up the lamp.', 400, speakers)).toContain('went on with the story');
+    });
+
+    it('takes a speaker tag mid-text, and a bracket that is no speaker', () => {
+        expect(storySoFarRejection('Ash read the sign, which said [Story] in chalk.', 400, speakers)).toBeNull();
+        expect(storySoFarRejection('[Mira] kept the first watch.', 400, speakers)).toBeNull();
+    });
+
+    it('drops a leading [Account] label like a heading', () => {
+        expect(parseStorySoFar('[Account]\n\nAsh came through the storm.')).toBe('Ash came through the storm.');
     });
 });
 
@@ -242,32 +237,6 @@ describe('Story so far', () => {
         expect(next.messages.slice(1).map((message) => message.content).join('\n')).not.toContain('Rain hammers the gallery windows.');
     });
 
-    // .scratch/story-so-far/spec.md, "Facts the Scenes need".
-    it("gives the writer the current and the next Scene's conditions, and none in free play", async () => {
-        const storyId = await createStory();
-        const scene = (name: string, moveOnCondition: string) =>
-            t.http.post(`/api/stories/${storyId}/scenes`).send({ name, situation: `${name}.`, moveOnCondition }).expect(201);
-        await scene('First Taste', 'Ash tastes the milk and asks where the cows are.');
-        await scene('Three Laps', 'Tavri lets a clue slip.');
-        await scene('The Crescent', 'Mira shows Ash the crescent seal.');
-        const chat = await createChat(storyId);
-
-        await playUntilSummarised(storyId, chat.id, 'Ash tasted the milk.');
-
-        const input = t.gateway.textCalls('story_summary')[0].messages.map((message) => message.content).join('\n');
-        expect(input).toContain('Story goals the account must keep track of.');
-        expect(input).toContain('- Ash tastes the milk and asks where the cows are.\n- Tavri lets a clue slip.');
-        expect(input).not.toContain('crescent seal');
-
-        // Free play: a Story with no Scenes sends the writer no goals.
-        const plain = await createStory();
-        const plainChat = await createChat(plain);
-        t.gateway.reset();
-        await playUntilSummarised(plain, plainChat.id, 'Ash came through the storm.');
-        const plainInput = t.gateway.textCalls('story_summary')[0].messages.map((message) => message.content).join('\n');
-        expect(plainInput).not.toContain('Story goals');
-    });
-
     it("rewrites from every covered Message each time, and keeps the user's corrections in every rewrite", async () => {
         const storyId = await createStory();
         const chat = await createChat(storyId);
@@ -308,6 +277,43 @@ describe('Story so far', () => {
         await send(storyId, chat.id, 'Still here.', longReply('AFTER'));
 
         expect(t.gateway.textCalls('story_summary')).toHaveLength(2);
+        expect(await storySoFar(storyId, chat.id)).toMatchObject({ text: 'Recovered account.', failedReason: null });
+    });
+
+    const cutOff = { text: 'Ash came through the storm and Mira', usage: { promptTokens: 9_000, completionTokens: STORY_SO_FAR_MAX_TOKENS } };
+
+    it('asks once more when the answer was cut off, and keeps the good one', async () => {
+        const storyId = await createStory();
+        const chat = await createChat(storyId);
+        t.gateway.scriptText('story_summary', cutOff);
+
+        await playUntilSummarised(storyId, chat.id, 'Ash came through the storm and Mira took the first watch.');
+
+        const calls = t.gateway.textCalls('story_summary');
+        expect(calls).toHaveLength(2);
+        expect(calls[1].messages).toEqual(calls[0].messages);
+        expect(await storySoFar(storyId, chat.id)).toMatchObject({
+            text: 'Ash came through the storm and Mira took the first watch.',
+            failedReason: null,
+        });
+    });
+
+    it('stores neither of two rejected answers, records why, and tries again after the next turn', async () => {
+        const storyId = await createStory();
+        const chat = await createChat(storyId);
+        t.gateway.scriptText('story_summary', cutOff, '[Story] The lamp gutters and Mira turns.');
+        for (let turn = 1; t.gateway.textCalls('story_summary').length === 0 && turn <= 6; turn++) {
+            await send(storyId, chat.id, `Turn ${turn}.`, longReply(`REPLY-${turn}`));
+        }
+        expect(t.gateway.textCalls('story_summary')).toHaveLength(2);
+        const failed = await storySoFar(storyId, chat.id);
+        expect(failed.text).toBeNull();
+        expect(failed.failedReason).toContain('went on with the story');
+
+        t.gateway.scriptText('story_summary', 'Recovered account.');
+        await send(storyId, chat.id, 'Still here.', longReply('AFTER'));
+
+        expect(t.gateway.textCalls('story_summary')).toHaveLength(3);
         expect(await storySoFar(storyId, chat.id)).toMatchObject({ text: 'Recovered account.', failedReason: null });
     });
 

@@ -12,7 +12,16 @@ import { ModelGateway } from '../../../service/model-gateway/model-gateway.js';
 import { wornIdentity } from '../identity.js';
 import { partsToText } from '../turn/reply-parser.js';
 import { PromptHistoryMessage, PromptLayersInput, PromptStorySoFar } from '../turn/prompt.js';
-import { parseStorySoFar, STORY_SO_FAR_MAX_TOKENS, storySoFarCoverage, storySoFarPromptMessages } from './story-so-far-prompt.js';
+import {
+    parseStorySoFar,
+    STORY_SO_FAR_MAX_TOKENS,
+    storySoFarCoverage,
+    storySoFarPromptMessages,
+    storySoFarRejection,
+} from './story-so-far-prompt.js';
+
+/** Spec: "Writer output guard": a rejected answer is asked for once more before the update fails. */
+const WRITER_ATTEMPTS = 2;
 
 /** The Story so far as the Memory drawer reads it (spec: "API"). */
 export interface StorySoFarView {
@@ -129,23 +138,35 @@ export class StorySoFarManagerService {
 
             const identity = wornIdentity(story, chat);
             const covered = chat.messages.slice(0, next);
-            const result = await this.gateway.completeText({
-                kind: 'story_summary',
+            const messages = covered.map((message) => ({
+                speaker: message.kind === MessageKind.User ? (message.identityName ?? identity.name) : 'Story',
+                text: messageText(message),
+            }));
+            const request = {
+                kind: 'story_summary' as const,
                 messages: storySoFarPromptMessages({
                     identityName: identity.name,
                     castNames: story.characters.map((character) => character.name),
-                    messages: covered.map((message) => ({
-                        speaker: message.kind === MessageKind.User ? (message.identityName ?? identity.name) : 'Story',
-                        text: messageText(message),
-                    })),
+                    messages,
                     corrections: chat.storySoFarCorrections,
-                    sceneConditions: sceneConditions(story, chat.currentSceneId),
                 }),
                 maxTokens: STORY_SO_FAR_MAX_TOKENS,
                 servedFor: { storyId: story.id, chatId },
-            });
-            const text = parseStorySoFar(result.text);
-            if (text === null) throw new UnparseableOutputError('The Story so far writer wrote nothing.');
+            };
+            const speakers = [...new Set(messages.map((message) => message.speaker))];
+            // Spec: "Writer output guard". A cut-off or off-form answer is asked for once more, then fails.
+            let text: string;
+            for (let attempt = 1; ; attempt++) {
+                const result = await this.gateway.completeText(request);
+                const parsed = parseStorySoFar(result.text);
+                const rejection = parsed === null ? 'The Story so far writer wrote nothing.' : storySoFarRejection(parsed, result.usage.completionTokens, speakers);
+                if (parsed !== null && rejection === null) {
+                    text = parsed;
+                    break;
+                }
+                if (attempt >= WRITER_ATTEMPTS) throw new UnparseableOutputError(rejection ?? 'The Story so far writer wrote nothing.');
+                this.logger.warn(`Chat ${chatId}: ${rejection} Asking once more.`);
+            }
             if (this.generationOf(chatId) !== generation) {
                 this.logger.log(`Chat ${chatId}: a Story so far update finished after a rewind or the user's save; dropped`);
                 return;
@@ -186,15 +207,4 @@ function view(chat: ChatEntity): StorySoFarView {
         updatedAt: chat.storySoFarUpdatedAt?.toISOString() ?? null,
         failedReason: chat.storySoFarFailed,
     };
-}
-
-/**
- * The move-on conditions of the Chat's current Scene and the next one in order (spec: "Facts the
- * Scenes need"), as the writer keeps their events. None in free play.
- */
-function sceneConditions(story: StoryEntity, currentSceneId: number | null): string[] {
-    const scenes = [...(story.scenes ?? [])].sort((a, b) => a.position - b.position);
-    const at = scenes.findIndex((scene) => scene.id === currentSceneId);
-    if (at < 0) return [];
-    return scenes.slice(at, at + 2).map((scene) => scene.moveOnCondition);
 }

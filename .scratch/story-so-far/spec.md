@@ -48,9 +48,15 @@ Each Chat gets a **Story so far**: a prose account, in order, of everything that
   - no guessed gender for the worn identity unless the Role or Persona states one;
   - no repeating the Memory list;
   - no new events.
-- **Facts the Scenes need (2026-11-12).** When the Chat is in a Scene, the writer is also given the move-on condition of the current Scene and of the next Scene in order, where they have one. It is told to keep every event that bears on them, even a small one: what happened and who did it. It is also told never to name or hint at the conditions themselves, because the account is read by the storyteller. In free play, or with no conditions, the input is exactly as before.
-  - Why: in a dev Chat, a rewrite from 4,352 to 1,846 characters dropped "Petch tasted the milk", the first half of the current Scene's condition. The Judge then wrote that it had never happened.
-  - The Bond gates are not given; they are levels, not events.
+- **Scene goals: tried and dropped (2026-11-12).** The writer was given the move-on conditions of the current and next Scene, with an instruction to keep every event that bears on them. Replayed on the dev Chat where a rewrite had dropped "Petch tasted the milk" (four answers each, same input), the old prompt kept the tasting 4 times out of 4 and the new one kept it whole once. The new prompt also made the answers longer, so more were cut off at the length cap, and one came back as a new story passage instead of an account. The loss was the writer's variance, not missing input, so the goals are not given.
+- **Writer output guard (2026-11-12).** The writer's answer is not stored when:
+  - it was cut off: it used the whole length cap (the call's `maxTokens`), so its last events are missing;
+  - it goes on with the story instead of telling it: it opens with a speaker tag of the Messages it was given, such as `[Story]` or `[Ash]`.
+  - A leading `[Account]` label is only a heading, and is dropped like "Story so far:".
+  - An empty answer counts as rejected too.
+  - A rejected answer is asked for once more, right away, in the same update. If the second one is rejected too, the update fails with that reason (see Failure).
+  - Why: in eight replays of one rewrite, four answers hit the 1,000-token cap and ended mid-sentence, and one opened with `[Story]` and told only the latest scene in the first person.
+  - Not caught: an account that tells only part of the story in proper form. Nothing in the text says so for certain, and a length check against the old account would also turn away good, shorter ones.
 - **Failure.** A failed or unreadable update keeps the old text and position, records the reason, and never blocks a send. The next turn's check runs it again. Until then, the trimming that already exists leaves out the oldest uncovered Messages.
 - **Edits, Regenerate, Reset.** Any rewind from a position at or before the covered position clears the Story so far. That covers an edited User or AI Message and a Regenerate. The next check writes it again from the remaining Messages when needed. A Reset clears it too. A user-written Story so far cleared this way is lost, because the events it told were rewound away.
 - **Concurrency.** At most one update per Chat runs at a time. A turn never waits for one. An update that finishes after a rewind cleared the Story so far, or after the user saved their own text, is dropped, so it never overwrites either.
@@ -79,10 +85,10 @@ Each Chat gets a **Story so far**: a prose account, in order, of everything that
   - Past the threshold, one call runs. Its input holds every Message through the new position, and the next turn's prompt carries the summary and leaves those Messages out.
   - A second update sends all covered Messages again, not the old summary alone.
 - **User edit.** The PUT stores `writtenBy: user`. The next update's input carries that text with the "corrections win" instruction.
-- **Facts the Scenes need.**
-  - Pure: the given conditions are listed after the Messages and the corrections, trimmed, with the "keep every event" and "never name them" instruction.
-  - Pure: with none given, an empty list or only blank ones, the prompt is exactly as before.
-  - API: in a Chat on the first of three Scenes, the update's input carries the first two conditions and not the third. A Story with no Scenes sends no goals.
+- **Writer output guard.**
+  - Pure: an answer that used the whole cap is rejected as cut off; one opening with a speaker tag of the Messages is rejected as going on with the story; a tag in the middle, or a bracket that is not a speaker, is fine; a leading `[Account]` label is dropped.
+  - API: a cut-off answer followed by a good one stores the good one in the same update, with no failure recorded.
+  - API: two rejected answers keep the old text, record the reason, and the next turn tries again.
 - **Failure.** A failed call leaves the old text and records the reason, a send is not blocked, and the next turn retries.
 - **Rewind.** Editing a covered Message, Regenerate after the covered position is reached by a rewind, and Reset each clear it. An update that lands after a clear is dropped.
 - **e2e.** The drawer shows "Not needed yet" on a short Chat. Seeded with a Story so far, it shows the text and the count, and editing saves.

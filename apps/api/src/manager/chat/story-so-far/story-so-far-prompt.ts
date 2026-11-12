@@ -83,11 +83,6 @@ export interface StorySoFarPromptInput {
     messages: Array<{ speaker: string; text: string }>;
     /** The user's own last text, if they ever wrote one: their corrections win. Null otherwise. */
     corrections: string | null;
-    /**
-     * The move-on conditions of the current Scene and the next one (spec: "Facts the Scenes need"),
-     * whose events the account must keep. Left out, empty or blank: the prompt is as before.
-     */
-    sceneConditions?: string[];
 }
 
 /**
@@ -115,13 +110,6 @@ Reply with the account only.`;
             `The user corrected the previous account to read as below. Where it and the Messages differ, the user's version wins; keep everything it says:\n\n${input.corrections.trim()}`,
         );
     }
-    // A rewrite once dropped half of a Scene's condition, and the Judge then read it as never done.
-    const goals = (input.sceneConditions ?? []).map((condition) => condition.trim()).filter((condition) => condition !== '');
-    if (goals.length > 0) {
-        sections.push(
-            `Story goals the account must keep track of. Keep every event that bears on them, even a small one: what happened and who did it. Never name or hint at these goals in the account:\n${goals.map((goal) => `- ${goal}`).join('\n')}`,
-        );
-    }
     sections.push('Write the account now.');
     return [
         { role: 'system', content: system },
@@ -136,6 +124,21 @@ export function parseStorySoFar(text: string): string | null {
         .replace(/^#+\s*story so far\s*:?\s*/i, '')
         .replace(/^\*\*story so far:?\*\*\s*/i, '')
         .replace(/^story so far:\s*/i, '')
+        .replace(/^\[account\]\s*/i, '')
         .trim();
     return cleaned === '' ? null : cleaned;
+}
+
+/**
+ * Spec: "Writer output guard". Why the writer's answer can't be stored as the account, or null
+ * when it can. `speakers` are the tags the Messages were given to it under.
+ */
+export function storySoFarRejection(text: string, completionTokens: number, speakers: string[], maxTokens = STORY_SO_FAR_MAX_TOKENS): string | null {
+    // Using the whole cap means the model was stopped there: the account's last events are missing.
+    if (completionTokens >= maxTokens) return 'The Story so far writer was cut off at its length cap.';
+    const tag = /^\[([^\]\n]+)\]/.exec(text.trim())?.[1]?.trim().toLowerCase();
+    if (tag !== undefined && speakers.some((speaker) => speaker.trim().toLowerCase() === tag)) {
+        return 'The Story so far writer went on with the story instead of telling it.';
+    }
+    return null;
 }
