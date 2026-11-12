@@ -139,6 +139,7 @@ export class StorySoFarManagerService {
                         text: messageText(message),
                     })),
                     corrections: chat.storySoFarCorrections,
+                    sceneConditions: sceneConditions(story, chat.currentSceneId),
                 }),
                 maxTokens: STORY_SO_FAR_MAX_TOKENS,
                 servedFor: { storyId: story.id, chatId },
@@ -185,4 +186,15 @@ function view(chat: ChatEntity): StorySoFarView {
         updatedAt: chat.storySoFarUpdatedAt?.toISOString() ?? null,
         failedReason: chat.storySoFarFailed,
     };
+}
+
+/**
+ * The move-on conditions of the Chat's current Scene and the next one in order (spec: "Facts the
+ * Scenes need"), as the writer keeps their events. None in free play.
+ */
+function sceneConditions(story: StoryEntity, currentSceneId: number | null): string[] {
+    const scenes = [...(story.scenes ?? [])].sort((a, b) => a.position - b.position);
+    const at = scenes.findIndex((scene) => scene.id === currentSceneId);
+    if (at < 0) return [];
+    return scenes.slice(at, at + 2).map((scene) => scene.moveOnCondition);
 }
