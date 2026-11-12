@@ -17,6 +17,11 @@ const nextConfig: NextConfig = {
     // Playwright sets its own, so E2E can run beside a running `npm run dev`.
     distDir: process.env.NEXT_DIST_DIR ?? '.next',
     turbopack: { root: repoRoot },
+    // `next dev` refuses dev-only requests (the HMR socket among them) from any hostname but
+    // localhost, and a page that can't open the socket sits on "Loading…". Dev is played from a
+    // phone over the tailnet too: the PC's *.ts.net name (Tailscale serve) and its 100.x address.
+    // Dev only; a production build ignores this.
+    allowedDevOrigins: ['**.ts.net', '100.*.*.*'],
     experimental: {
         // E2E turns it off: a dev cache left by the previous run made the first page of the
         // next run reload in a loop ("HMR hash mismatch") until the cache was deleted.
