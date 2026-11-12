@@ -1,5 +1,7 @@
 import { execFileSync, execSync, spawn } from 'node:child_process';
 import { openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -11,7 +13,8 @@ const HEALTH_URL = `http://127.0.0.1:${E2E_API_PORT}/api/health`;
 /** What global setup hands to the test workers, through process.env. */
 interface ApiServerState {
     env: Record<string, string>;
-    pid: number;
+    /** Where global setup takes the tests' requests to stop and start the API (see runApi). */
+    controlUrl: string;
 }
 
 function stateFile(): string {
@@ -80,7 +83,7 @@ export function migrate(env: Record<string, string>): void {
  * Starts the built API with the fake Model Gateway and waits until it answers. Its output
  * goes to `api.log` beside the state file, so a crash mid-run can be read afterwards.
  */
-export async function spawnApi(env: Record<string, string>): Promise<number> {
+async function spawnApi(env: Record<string, string>): Promise<number> {
     const log = openSync(path.join(path.dirname(stateFile()), 'api.log'), 'a');
     const child = spawn(process.execPath, [`${API_BUILD_DIR}/main.js`], {
         cwd: API_DIR,
@@ -92,7 +95,7 @@ export async function spawnApi(env: Record<string, string>): Promise<number> {
     return child.pid!;
 }
 
-export async function killApi(pid: number): Promise<void> {
+async function killApi(pid: number): Promise<void> {
     try {
         process.kill(pid);
     } catch {
@@ -101,18 +104,72 @@ export async function killApi(pid: number): Promise<void> {
     await waitFor(async () => !(await isUp()), 'the API to stop');
 }
 
+/** The API that global setup keeps for the whole run. */
+export interface RunningApi {
+    /** Where tests ask for the API to stop and start (stopApi, startApi). */
+    controlUrl: string;
+    /** Stops the API for good, at the end of the run. */
+    close(): Promise<void>;
+}
+
+/**
+ * Starts the API from global setup and keeps it for the whole run. Tests that stop and start
+ * it (cant-connect.spec) ask for that over a local port rather than spawning it themselves:
+ * Playwright replaces the worker after a failed test, and an API a worker had started died
+ * with that worker, so one failure turned every later test into ECONNREFUSED. Global setup
+ * runs in the Playwright runner, which outlives every worker.
+ */
+export async function runApi(env: Record<string, string>): Promise<RunningApi> {
+    let pid: number | undefined = await spawnApi(env);
+    const actions: Record<string, () => Promise<void>> = {
+        '/stop': async () => {
+            if (pid !== undefined) await killApi(pid);
+            pid = undefined;
+        },
+        '/start': async () => {
+            if (await isUp()) return;
+            // It died on its own: make sure that process is gone before the port is taken again.
+            if (pid !== undefined) await killApi(pid);
+            pid = await spawnApi(env);
+        },
+    };
+    // One request at a time, in order, so a stop and a start never overlap.
+    let queue = Promise.resolve();
+    const server = createServer((request, response) => {
+        const action = request.method === 'POST' ? actions[request.url ?? ''] : undefined;
+        if (!action) {
+            response.writeHead(404).end();
+            return;
+        }
+        queue = queue.then(action).then(
+            () => void response.writeHead(204).end(),
+            (error: unknown) => void response.writeHead(500).end(String(error)),
+        );
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    // Never the thing that keeps the runner alive; teardown closes it as well.
+    server.unref();
+    return {
+        controlUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
+        async close() {
+            server.close();
+            await queue;
+            if (pid !== undefined) await killApi(pid);
+        },
+    };
+}
+
+async function askGlobalSetup(action: 'stop' | 'start'): Promise<void> {
+    const response = await fetch(`${readState().controlUrl}/${action}`, { method: 'POST' });
+    if (!response.ok) throw new Error(`Global setup could not ${action} the API: ${await response.text()}`);
+}
+
 /** Stops the API mid-test, as if its process died. */
 export async function stopApi(): Promise<void> {
-    await killApi(readState().pid);
+    await askGlobalSetup('stop');
 }
 
 /** Starts the API again after stopApi(), against the same database and image folder. */
 export async function startApi(): Promise<void> {
-    if (await isUp()) return;
-    const state = readState();
-    writeState({ ...state, pid: await spawnApi(state.env) });
-}
-
-export function currentApiPid(): number {
-    return readState().pid;
+    await askGlobalSetup('start');
 }
