@@ -4,7 +4,7 @@ import { useId } from 'react';
 
 import { setThemeChoice, THEME_CHOICES, useThemeChoice } from '@/lib/theme';
 
-import styles from './text-size-setting.module.css';
+import { SEGMENT, SEGMENT_INPUT, SEGMENTS } from './text-size-setting';
 
 /** Settings' Theme choice (spec: Chat looks, "Light theme"): it applies at once and only on this device. */
 export function ThemeSetting() {
@@ -14,10 +14,11 @@ export function ThemeSetting() {
         <section className="card">
             <h2 id={headingId}>Theme</h2>
             <p className="muted">Dark, light, or whichever your phone is set to. It is kept on this device only.</p>
-            <div className={styles.segments} role="radiogroup" aria-labelledby={headingId}>
+            <div className={SEGMENTS} role="radiogroup" aria-labelledby={headingId}>
                 {THEME_CHOICES.map((option) => (
-                    <label key={option.value} className={`${styles.segment} ${styles.wide}`}>
+                    <label key={option.value} className={`${SEGMENT} px-3.5`}>
                         <input
+                            className={SEGMENT_INPUT}
                             type="radio"
                             name="theme"
                             value={option.value}

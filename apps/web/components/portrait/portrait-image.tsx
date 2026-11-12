@@ -2,7 +2,6 @@ import { CSSProperties } from 'react';
 
 import type { Portrait } from '@/lib/character-colour';
 
-import styles from './portrait-image.module.css';
 
 /**
  * The square shown until the author picks one: near the top middle, where a full-body
@@ -26,9 +25,10 @@ export function PortraitImage({ portrait, className }: { portrait: Portrait; cla
         top: `${(-crop.y / crop.size) * 100}%`,
     };
     return (
-        <span className={[styles.frame, className].filter(Boolean).join(' ')} aria-hidden="true">
+        <span className={['relative block overflow-hidden rounded-full bg-surface-raised', className].filter(Boolean).join(' ')} aria-hidden="true">
             {/* eslint-disable-next-line @next/next/no-img-element -- served by the API from the image folder */}
-            <img className={styles.cropped} src={src} alt="" style={placed} draggable={false} />
+            {/* The whole image, scaled and shifted so the square fills the frame. */}
+            <img className="absolute h-auto max-w-none" src={src} alt="" style={placed} draggable={false} />
         </span>
     );
 }

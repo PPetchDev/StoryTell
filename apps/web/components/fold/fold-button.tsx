@@ -4,7 +4,7 @@ import { ReactNode } from 'react';
 
 import { setFolded, useFolded } from '@/lib/folds';
 
-import styles from './fold.module.css';
+import { ChevronDownIcon } from '@/components/icons';
 
 interface FoldTitleProps {
     /** The fold's key in the per-device store (lib/folds.ts). */
@@ -39,12 +39,21 @@ export function FoldTitle({ foldKey, controls, as: Heading = 'h3', startsFolded 
     // The stored key means "open" for a fold that starts folded, "folded" otherwise.
     const toggle = () => setFolded(foldKey, startsFolded ? folded : !folded);
     return (
-        <Heading id={id} className={[styles.title, className].filter(Boolean).join(' ')}>
-            <button type="button" className={styles.button} aria-expanded={!folded} aria-controls={controls} onClick={toggle}>
-                <span className={styles.label}>{children}</span>
-                <svg className={styles.chevron} viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-                    <path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+        <Heading id={id} className={['m-0 min-w-0 flex-1 text-[length:inherit]', className].filter(Boolean).join(' ')}>
+            <button
+                type="button"
+                className="group bare-button flex min-h-11 w-full items-center gap-2 rounded-[0.6rem] py-1 font-bold [overflow-wrap:anywhere] text-text [-webkit-tap-highlight-color:transparent] active:bg-surface-raised"
+                aria-expanded={!folded}
+                aria-controls={controls}
+                onClick={toggle}
+            >
+                <span className="flex min-w-0 flex-1 items-center gap-3">{children}</span>
+                {/* Points down while folded (there is more), up while open. */}
+                <ChevronDownIcon
+                    size={20}
+                    strokeWidth={2.2}
+                    className="flex-none rotate-180 text-muted group-aria-[expanded=false]:rotate-0 motion-safe:transition-transform motion-safe:duration-150"
+                />
             </button>
         </Heading>
     );
