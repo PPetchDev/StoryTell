@@ -37,8 +37,8 @@ export class NotOnPeopleListError extends AppError {
 }
 
 /**
- * A first sign-in with email + password claiming a listed email while Supabase sign-ups may be open:
- * anyone could have made that Supabase user. Google proves the email; so does the Owner closing sign-ups.
+ * A first sign-in with email + password claiming a listed email when nothing says Supabase confirmed
+ * it: anyone could have made that Supabase user. Google proves the email; so does SUPABASE_EMAILS_CONFIRMED.
  */
 export class EmailNotProvenError extends AppError {
     constructor() {

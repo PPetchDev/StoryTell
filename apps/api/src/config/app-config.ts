@@ -47,11 +47,12 @@ export abstract class AppConfig {
     /** The Supabase project's anon (publishable) key, public by design: the web app signs in with it. */
     abstract readonly supabaseAnonKey: string | undefined;
     /**
-     * The Owner turned off "Allow new users to sign up" in Supabase, so only people the Owner made
-     * there exist: an email + password sign-in may then claim a listed email. Otherwise only a Google
-     * identity, whose email Google checked, may (.scratch/accounts/spec.md: "Supabase sign-in").
+     * The Owner checked that Supabase gives an email + password user a session only once their email
+     * is confirmed ("Confirm email" on, Supabase's default, or sign-ups off), so such a sign-in may
+     * claim a listed email. Otherwise only a Google identity, whose email Google checked, may
+     * (.scratch/accounts/spec.md: "Supabase sign-in").
      */
-    abstract readonly supabaseSignupsClosed: boolean;
+    abstract readonly supabaseEmailsConfirmed: boolean;
 }
 
 /** Spec: "Sign-in". A shorter password is refused at start-up. */
@@ -139,7 +140,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
         supabaseUrl,
         ownerEmail: env.OWNER_EMAIL || undefined,
         supabaseAnonKey: env.SUPABASE_ANON_KEY || undefined,
-        supabaseSignupsClosed: env.SUPABASE_SIGNUPS_CLOSED === 'true',
+        supabaseEmailsConfirmed: env.SUPABASE_EMAILS_CONFIRMED === 'true',
         databaseUrl: env.DATABASE_URL!,
         imageDir,
         speechDir,

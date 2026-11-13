@@ -88,7 +88,7 @@ export class SignInService {
             // The placeholder Owner email names no one: only OWNER_EMAIL lets the Owner sign in this way.
             if (listed.role === AccountRole.Owner && this.config.ownerEmail === undefined) throw new NotOnPeopleListError();
             // A Supabase user with someone else's email is easy to make while sign-ups are open.
-            if (!identity.googleVerified && !this.config.supabaseSignupsClosed) throw new EmailNotProvenError();
+            if (!identity.googleVerified && !this.config.supabaseEmailsConfirmed) throw new EmailNotProvenError();
             account = await this.accounts.save({ ...listed, supabaseId: identity.sub });
         }
         if (account.removed) throw new NotOnPeopleListError();

@@ -78,7 +78,7 @@ The API reads its environment only through `apps/api/src/config/app-config.ts`:
 | `SUPABASE_ANON_KEY` | with `SUPABASE_URL` | The project's anon (publishable) key. Public by design: the API hands it to the web app's sign-in screen. |
 | `SESSION_SECRET` | with `SUPABASE_URL` | Keys every session cookie, at least 32 random characters. Unset, sessions are keyed from `LOGIN_PASSWORD` as before. Changing it signs every device out. |
 | `OWNER_EMAIL` | no | The Owner Account's email, so the Owner can sign in with Google or email too. Without it the Owner signs in with `LOGIN_PASSWORD` only. |
-| `SUPABASE_SIGNUPS_CLOSED` | no | `true` once "Allow new users to sign up" is off in Supabase and the Owner makes each friend there. Then an email + password sign-in may claim a listed email; otherwise only Google, which checked the address, may. |
+| `SUPABASE_EMAILS_CONFIRMED` | no | `true` once you checked "Confirm email" is on in Supabase (its default), so an email + password user gets a session only after confirming the address. Then such a sign-in may claim a listed email; otherwise only Google, which checked the address, may. Never set it with "Confirm email" off. |
 | `ENV_FILE` | no | Load the variables above from this file at startup |
 
 The frontend reads `API_ORIGIN` (where to proxy `/api`, needed at both `next build` and

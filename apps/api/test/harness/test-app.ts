@@ -59,8 +59,8 @@ export interface TestAppOptions {
     ownerEmail?: string;
     /** What a fetch of the Supabase JWKS goes through. Default: a fetcher that fails every address. */
     authFetch?: FetchLike;
-    /** The Owner says Supabase sign-ups are closed: email + password users may bind by email. */
-    supabaseSignupsClosed?: boolean;
+    /** The Owner says Supabase confirms every email + password user's email: they may bind by email. */
+    supabaseEmailsConfirmed?: boolean;
     /**
      * The speech folder. Default: a fresh temporary folder, removed on close. Without one, every
      * test app would share the default `speech` folder beside their image folders in the system
@@ -113,7 +113,7 @@ export async function startTestApp(options: TestAppOptions = {}): Promise<TestAp
                 supabaseUrl: options.supabaseUrl,
                 ownerEmail: options.ownerEmail,
                 supabaseAnonKey: options.supabaseUrl ? 'anon-key-for-tests' : undefined,
-                supabaseSignupsClosed: options.supabaseSignupsClosed ?? false,
+                supabaseEmailsConfirmed: options.supabaseEmailsConfirmed ?? false,
                 providerKeys: {
                     openRouter: undefined,
                     venice: undefined,

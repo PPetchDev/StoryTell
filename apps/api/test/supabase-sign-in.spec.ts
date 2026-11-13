@@ -125,11 +125,11 @@ describe('Accounts: Supabase sign-in', () => {
         expect(fetched.length - before).toBeLessThanOrEqual(1);
     });
 
-    it('binds an email + password sign-in only once the Owner says Supabase sign-ups are closed', async () => {
+    it('binds an email + password sign-in only once the Owner says Supabase confirms emails', async () => {
         const accounts = t.app.get(AccountModelService);
         await accounts.save({ email: 'pat@example.com', role: AccountRole.Member, monthlyCapUsd: 1 });
         const byPassword = { app_metadata: { provider: 'email', providers: ['email'] } };
-        // Anyone could make a Supabase user with Pat's email while sign-ups are open.
+        // With "Confirm email" off, anyone could make a Supabase user with Pat's email.
         const refused = await signInWith(await token({ sub: randomUUID(), email: 'pat@example.com', ...byPassword }));
         expect(refused.status).toBe(403);
         expect(refused.body.error.code).toBe('403.010.014');
@@ -212,7 +212,7 @@ describe('Accounts: the Owner is bound by email only when OWNER_EMAIL names it',
     });
 });
 
-describe('Accounts: email + password binding with sign-ups closed', () => {
+describe('Accounts: email + password binding when Supabase confirms emails', () => {
     let t: TestApp;
     let keys: Keys;
 
@@ -220,7 +220,7 @@ describe('Accounts: email + password binding with sign-ups closed', () => {
         keys = await generateKeyPair('ES256');
         const published = { keys: [await jwks(keys, 'key-1')] };
         const authFetch: FetchLike = async () => new Response(JSON.stringify(published), { status: 200 });
-        t = await startTestApp({ supabaseUrl: SUPABASE, sessionSecret: SECRET, authFetch, supabaseSignupsClosed: true });
+        t = await startTestApp({ supabaseUrl: SUPABASE, sessionSecret: SECRET, authFetch, supabaseEmailsConfirmed: true });
     });
 
     afterAll(async () => {

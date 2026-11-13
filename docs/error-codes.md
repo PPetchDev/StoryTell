@@ -147,4 +147,4 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | `422.010.011` | `CantChangeOwnerError` | Pausing or removing the Owner through People. |
 | `404.010.012` | `PersonNotFoundError` | A People id that isn't listed (or was removed). |
 | `429.010.013` | `TooManyCallsAtOnceError` | A Member starting a paid call while 4 of theirs still run. Try again when they finish. |
-| `403.010.014` | `EmailNotProvenError` | A first Supabase sign-in by email + password claiming a listed email, while `SUPABASE_SIGNUPS_CLOSED` isn't set: anyone could have made that Supabase user. Signing in with Google proves the email. |
+| `403.010.014` | `EmailNotProvenError` | A first Supabase sign-in by email + password claiming a listed email, while `SUPABASE_EMAILS_CONFIRMED` isn't set: with "Confirm email" off in Supabase, anyone could have made that Supabase user. Signing in with Google proves the email. |
