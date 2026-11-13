@@ -384,8 +384,8 @@ Keep this suite small: behaviour detail belongs in the API tests.
 
 ## The PWA
 
-- The manifest is `apps/web/app/manifest.ts`. The icons are rendered from
-  `apps/web/public/icons/icon.svg` by `node apps/web/scripts/make-icons.mjs`.
+- The manifest is `apps/web/app/manifest.ts`. The icons are rendered from the artwork
+  `apps/web/icon-art/storytell-icon.png` by `node apps/web/scripts/make-icons.mjs`.
 - The app is online-only. Nothing is cached for offline use and nothing is queued, except an autosaved
   edit that was on its way when the API went away: the open tab holds it and Retry sends it first.
 - When an API call can't reach the API, the app swaps the page for the "can't connect" screen.

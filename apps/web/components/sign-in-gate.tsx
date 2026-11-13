@@ -135,8 +135,8 @@ function SignInScreen({ methods, firstError }: { methods: SignInStatus['methods'
             <div className={GLOW} aria-hidden="true" />
             <div className="w-full max-w-sm">
                 <div className="mb-6 flex flex-col items-center text-center">
-                    {/* eslint-disable-next-line @next/next/no-img-element -- the app's own icon, an SVG served as is */}
-                    <img src="/icons/icon.svg" alt="" width={64} height={64} className="mb-4 h-16 w-16 rounded-2xl shadow-lg shadow-shadow-soft" />
+                    {/* eslint-disable-next-line @next/next/no-img-element -- the app's own icon, a PNG served as is */}
+                    <img src="/icons/icon-192.png" alt="" width={64} height={64} className="mb-4 h-16 w-16 rounded-2xl shadow-lg shadow-shadow-soft" />
                     <h1 className="mb-1 text-2xl lg:text-2xl">Sign in to Storytell AI</h1>
                     <p className="m-0 text-muted">Your Stories, waiting where you left them.</p>
                 </div>

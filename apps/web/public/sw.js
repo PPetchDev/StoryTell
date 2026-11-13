@@ -2,7 +2,8 @@
 // queues nothing. Its one job is to show the "can't connect" screen (offline.html) when a
 // page can't be loaded at all, for example when the home PC is off.
 
-const CACHE = 'storytell-shell-v1';
+// v2: the new app icon (icon-192 is cached for the offline page).
+const CACHE = 'storytell-shell-v2';
 const OFFLINE_URL = '/offline.html';
 const OFFLINE_ASSETS = [OFFLINE_URL, '/icons/icon-192.png'];
 

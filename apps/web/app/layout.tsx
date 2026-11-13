@@ -16,7 +16,13 @@ export const metadata: Metadata = {
     title: appName,
     description: 'Roleplay with AI-played Characters inside Stories you write.',
     appleWebApp: { capable: true, title: appName, statusBarStyle: 'black-translucent' },
-    icons: { apple: '/icons/apple-touch-icon.png' },
+    icons: {
+        icon: [
+            { url: '/icons/favicon-32.png', sizes: '32x32', type: 'image/png' },
+            { url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+        ],
+        apple: '/icons/apple-touch-icon.png',
+    },
 };
 
 // The theme colour and colour scheme are not set here: the head script below makes the theme-color
