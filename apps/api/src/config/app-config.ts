@@ -38,10 +38,26 @@ export abstract class AppConfig {
     abstract readonly host: string;
     /** The owner's sign-in password. Unset: sign-in is off, as in dev and tests. */
     abstract readonly loginPassword: string | undefined;
+    /** Keys the session cookie (.scratch/accounts/spec.md: "Session cookie v2"). Unset: derived from `loginPassword`. */
+    abstract readonly sessionSecret: string | undefined;
+    /** The Supabase project, e.g. https://abcd.supabase.co. Set: Members sign in through it. */
+    abstract readonly supabaseUrl: string | undefined;
+    /** The Owner Account's email; renames the placeholder the migration made. */
+    abstract readonly ownerEmail: string | undefined;
+    /** The Supabase project's anon (publishable) key, public by design: the web app signs in with it. */
+    abstract readonly supabaseAnonKey: string | undefined;
+    /**
+     * The Owner turned off "Allow new users to sign up" in Supabase, so only people the Owner made
+     * there exist: an email + password sign-in may then claim a listed email. Otherwise only a Google
+     * identity, whose email Google checked, may (.scratch/accounts/spec.md: "Supabase sign-in").
+     */
+    abstract readonly supabaseSignupsClosed: boolean;
 }
 
 /** Spec: "Sign-in". A shorter password is refused at start-up. */
 export const LOGIN_PASSWORD_MIN = 12;
+/** Spec: "Session cookie v2". */
+export const SESSION_SECRET_MIN = 32;
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', '::1', 'localhost']);
 
 export const DEFAULT_BACKGROUND_WAIT_MS = 8_000;
@@ -99,15 +115,31 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     if (loginPassword !== undefined && loginPassword.length < LOGIN_PASSWORD_MIN) {
         throw new ConfigError(`LOGIN_PASSWORD must be at least ${LOGIN_PASSWORD_MIN} characters.`);
     }
+    const sessionSecret = env.SESSION_SECRET || undefined;
+    if (sessionSecret !== undefined && sessionSecret.length < SESSION_SECRET_MIN) {
+        throw new ConfigError(`SESSION_SECRET must be at least ${SESSION_SECRET_MIN} characters.`);
+    }
+    const supabaseUrl = env.SUPABASE_URL ? env.SUPABASE_URL.replace(/\/+$/, '') : undefined;
+    if (supabaseUrl !== undefined && !/^https?:\/\/[^/]+$/.test(supabaseUrl)) {
+        throw new ConfigError(`SUPABASE_URL must be the project URL, like https://abcd.supabase.co; got "${env.SUPABASE_URL}"`);
+    }
+    if (supabaseUrl !== undefined && sessionSecret === undefined) {
+        throw new ConfigError("SUPABASE_URL needs SESSION_SECRET: Members' sessions are keyed by it.");
+    }
     // Never open on a public address by mistake: every route would answer anyone.
-    if (!LOOPBACK_HOSTS.has(host) && loginPassword === undefined) {
-        throw new ConfigError(`HOST is ${host}, which is not loopback: set LOGIN_PASSWORD so the API needs a sign-in.`);
+    if (!LOOPBACK_HOSTS.has(host) && loginPassword === undefined && supabaseUrl === undefined) {
+        throw new ConfigError(`HOST is ${host}, which is not loopback: set LOGIN_PASSWORD or SUPABASE_URL so the API needs a sign-in.`);
     }
 
     return {
         port,
         host,
         loginPassword,
+        sessionSecret,
+        supabaseUrl,
+        ownerEmail: env.OWNER_EMAIL || undefined,
+        supabaseAnonKey: env.SUPABASE_ANON_KEY || undefined,
+        supabaseSignupsClosed: env.SUPABASE_SIGNUPS_CLOSED === 'true',
         databaseUrl: env.DATABASE_URL!,
         imageDir,
         speechDir,

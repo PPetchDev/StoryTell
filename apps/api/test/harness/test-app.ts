@@ -15,8 +15,10 @@ import { ProviderKeys } from '../../src/config/app-config.js';
 import { FakeModelGateway } from '../../src/service/model-gateway/fake-model-gateway.js';
 import { GATEWAY_FETCH } from '../../src/service/model-gateway/model-gateway.module.js';
 import { ModelGateway } from '../../src/service/model-gateway/model-gateway.js';
+import { uncapped } from '../../src/service/model-gateway/capped-model-gateway.js';
 import { FetchLike } from '../../src/service/model-gateway/real/http.js';
 import { PAGE_FETCH } from '../../src/service/page-fetch/page-fetch.module.js';
+import { AUTH_FETCH } from '../../src/api/auth/supabase-token.js';
 
 export interface TestApp {
     app: INestApplication;
@@ -51,6 +53,14 @@ export interface TestAppOptions {
     backupStatusFile?: string;
     /** The owner's sign-in password (.scratch/sign-in/spec.md). Default: unset, so sign-in is off as in dev. */
     loginPassword?: string;
+    /** .scratch/accounts/spec.md: keys sessions; required with `supabaseUrl`. */
+    sessionSecret?: string;
+    supabaseUrl?: string;
+    ownerEmail?: string;
+    /** What a fetch of the Supabase JWKS goes through. Default: a fetcher that fails every address. */
+    authFetch?: FetchLike;
+    /** The Owner says Supabase sign-ups are closed: email + password users may bind by email. */
+    supabaseSignupsClosed?: boolean;
     /**
      * The speech folder. Default: a fresh temporary folder, removed on close. Without one, every
      * test app would share the default `speech` folder beside their image folders in the system
@@ -99,6 +109,11 @@ export async function startTestApp(options: TestAppOptions = {}): Promise<TestAp
                 backupStatusFile: options.backupStatusFile,
                 host: '127.0.0.1',
                 loginPassword: options.loginPassword,
+                sessionSecret: options.sessionSecret,
+                supabaseUrl: options.supabaseUrl,
+                ownerEmail: options.ownerEmail,
+                supabaseAnonKey: options.supabaseUrl ? 'anon-key-for-tests' : undefined,
+                supabaseSignupsClosed: options.supabaseSignupsClosed ?? false,
                 providerKeys: {
                     openRouter: undefined,
                     venice: undefined,
@@ -112,6 +127,8 @@ export async function startTestApp(options: TestAppOptions = {}): Promise<TestAp
         .useValue(options.fetch ?? noNetwork)
         .overrideProvider(PAGE_FETCH)
         .useValue(options.pageFetch ?? noNetwork)
+        .overrideProvider(AUTH_FETCH)
+        .useValue(options.authFetch ?? noNetwork)
         .compile();
     const app = configureApp(moduleRef.createNestApplication({ logger: false }));
     await app.init();
@@ -119,7 +136,8 @@ export async function startTestApp(options: TestAppOptions = {}): Promise<TestAp
     return {
         app,
         http: request(app.getHttpServer()),
-        gateway: app.get(ModelGateway) as FakeModelGateway,
+        // The scripted fake behind the Monthly cap (.scratch/accounts/spec.md).
+        gateway: uncapped(app.get(ModelGateway)) as FakeModelGateway,
         imageDir,
         speechDir,
         databaseUrl,

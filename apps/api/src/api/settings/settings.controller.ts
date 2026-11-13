@@ -7,6 +7,7 @@ import { SettingsResponse } from '../../model/settings/entities/settings.entity.
 import { SamplersPathDTO, UpdateSamplersRequestBodyDTO, UpdateSettingsRequestBodyDTO } from './dto/settings.request.dto.js';
 import { SNAPSHOT_MODEL_PRICES, SnapshotModel, snapshotSizesOf } from '../../service/model-gateway/model-gateway.js';
 import { ImageModelOptionDTO, SettingsResponseBodyDTO } from './dto/settings.response.dto.js';
+import { OwnerOnly } from '../auth/public.decorator.js';
 
 const IMAGE_MODEL_NAMES: Record<SnapshotModel, string> = {
     'seedream-v4-edit': 'Seedream V4.5 edit',
@@ -31,6 +32,8 @@ export class SettingsApiController {
         return respond(await this.settingsManager.getSettings());
     }
 
+    // The Owner chooses Models, Sampling and credit settings for everyone (.scratch/accounts/spec.md: "Owner-only").
+    @OwnerOnly()
     @Put()
     @ApiOkResponse({ type: SettingsResponseBodyDTO })
     async update(@Body() body: UpdateSettingsRequestBodyDTO): Promise<SettingsResponseBodyDTO> {
@@ -38,6 +41,7 @@ export class SettingsApiController {
     }
 
     /** Sampling for one play model. "Reset to defaults" is this with all four null. */
+    @OwnerOnly()
     @Put('samplers/:playModel')
     @ApiOkResponse({ type: SettingsResponseBodyDTO })
     async updateSamplers(

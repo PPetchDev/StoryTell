@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-import { PoolUsage, UsageSummary } from '../../../manager/usage/usage.service.js';
+import { MonthlyCapUsage, PoolUsage, UsageSummary } from '../../../manager/usage/usage.service.js';
 
 import type { KindSpend } from '../../../model/usage-record/usage-record.service.js';
 import type { CallKind } from '../../../service/model-gateway/model-gateway.js';
@@ -79,10 +79,27 @@ export class UsagePoolsDTO {
     image: PoolUsageDTO;
 }
 
+export class MonthlyCapUsageDTO implements MonthlyCapUsage {
+    @ApiProperty({ description: 'The Member\'s Monthly cap in USD.' })
+    capUsd: number;
+
+    @ApiProperty({ description: 'Spent since the first of this month, UTC.' })
+    spentUsd: number;
+
+    @ApiProperty({ description: 'Whether new sends and pictures are refused until the month turns.' })
+    reached: boolean;
+}
+
 export class UsageResponseBodyDTO implements UsageSummary {
     @ApiProperty({ description: 'The month the spend covers, as YYYY-MM.', example: '2026-11' })
     month: string;
 
-    @ApiProperty({ description: 'Spend, remaining credit and the low-credit state per pool.', type: UsagePoolsDTO })
+    @ApiProperty({
+        description: "Spend, remaining credit and the low-credit state per pool. A Member sees only their own spend, and no remaining credit.",
+        type: UsagePoolsDTO,
+    })
     pools: UsagePoolsDTO;
+
+    @ApiProperty({ description: "A Member's Monthly cap; null for the Owner (.scratch/accounts/spec.md).", type: MonthlyCapUsageDTO, nullable: true })
+    monthlyCap: MonthlyCapUsageDTO | null;
 }

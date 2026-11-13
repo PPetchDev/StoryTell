@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 
+import { AccountModelService } from '../../model/account/account.service.js';
+import { AccountRole } from '../../model/account/entities/account.entity.js';
 import { SettingsModelService } from '../../model/settings/settings.service.js';
+import { startOfMonthUtc } from '../../service/model-gateway/spend-cap.js';
 import { KindSpend, UsageRecordModelService } from '../../model/usage-record/usage-record.service.js';
 import { CreditPool, ModelGateway } from '../../service/model-gateway/model-gateway.js';
 
@@ -19,10 +22,20 @@ export interface PoolUsage {
     lowCredit: boolean;
 }
 
+/** A Member's Monthly cap and how much of it is spent (.scratch/accounts/spec.md). */
+export interface MonthlyCapUsage {
+    capUsd: number;
+    /** Since the first of this month, UTC. */
+    spentUsd: number;
+    reached: boolean;
+}
+
 export interface UsageSummary {
-    /** The month the spend covers, `YYYY-MM`, in the server's local time. */
+    /** The month the spend covers, `YYYY-MM`: in the server's local time for the Owner, UTC for a Member, as their cap counts. */
     month: string;
     pools: Record<CreditPool, PoolUsage>;
+    /** A Member's cap; null for the Owner, who has none. */
+    monthlyCap: MonthlyCapUsage | null;
 }
 
 @Injectable()
@@ -31,15 +44,23 @@ export class UsageManagerService {
         private readonly usageModel: UsageRecordModelService,
         private readonly settingsModel: SettingsModelService,
         private readonly gateway: ModelGateway,
+        private readonly accounts: AccountModelService,
     ) {}
 
+    /**
+     * This month's spend. The Owner sees everyone's and the providers' balances; a Member sees only
+     * their own spend and Monthly cap, never the Owner's balances (.scratch/accounts/spec.md: "Owner-only").
+     */
     async currentUsage(now = new Date()): Promise<UsageSummary> {
-        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-        const [spend, settings, credit] = await Promise.all([
-            this.usageModel.spendSince(monthStart),
+        const account = this.accounts.current();
+        const member = account.role === AccountRole.Member;
+        const monthStart = member ? startOfMonthUtc(now) : new Date(now.getFullYear(), now.getMonth(), 1);
+        const [spend, settings, ownerCredit] = await Promise.all([
+            this.usageModel.spendSince(monthStart, member ? account.id : undefined),
             this.settingsModel.get(),
             this.gateway.remainingCredit(),
         ]);
+        const credit = member ? { text: { remainingUsd: null }, image: { remainingUsd: null } } : ownerCredit;
 
         const pool = (
             name: CreditPool,
@@ -59,12 +80,19 @@ export class UsageManagerService {
         };
 
         return {
-            month: `${monthStart.getFullYear()}-${String(monthStart.getMonth() + 1).padStart(2, '0')}`,
+            month: member
+                ? `${monthStart.getUTCFullYear()}-${String(monthStart.getUTCMonth() + 1).padStart(2, '0')}`
+                : `${monthStart.getFullYear()}-${String(monthStart.getMonth() + 1).padStart(2, '0')}`,
             pools: {
                 text: pool('text', settings.textCreditCapUsd, settings.textLowCreditPercent),
                 image: pool('image', settings.imageCreditCapUsd, settings.imageLowCreditPercent),
             },
+            monthlyCap: member && account.monthlyCapUsd !== null ? this.capUsage(account.monthlyCapUsd, spend.text.spentUsd + spend.image.spentUsd) : null,
         };
+    }
+
+    private capUsage(capUsd: number, spentUsd: number): MonthlyCapUsage {
+        return { capUsd, spentUsd: round(spentUsd), reached: spentUsd >= capUsd };
     }
 }
 

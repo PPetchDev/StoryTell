@@ -3,8 +3,10 @@ import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 
 import { BackupManagerService } from '../../manager/backup/backup.service.js';
 import { BackupStatusResponseBodyDTO } from './dto/backup.response.dto.js';
+import { OwnerOnly } from '../auth/public.decorator.js';
 
 @ApiTags('Backup')
+@OwnerOnly()
 @Controller('backup')
 export class BackupApiController {
     constructor(private readonly backupManager: BackupManagerService) {}

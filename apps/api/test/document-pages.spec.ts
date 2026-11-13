@@ -1,6 +1,6 @@
 import { InvalidPageAddressError } from '../src/errors/story.errors.js';
 import { decodeEntities, htmlToText, pageTitle } from '../src/manager/document/html-to-text.js';
-import { checkPageAddress, isThisPc } from '../src/manager/document/page-address.js';
+import { checkPageAddress, guardedPageFetch, isThisPc } from '../src/manager/document/page-address.js';
 import { FetchLike } from '../src/service/model-gateway/real/http.js';
 import { startTestApp, TestApp } from './harness/test-app.js';
 
@@ -90,6 +90,18 @@ describe('Web pages (pure)', () => {
             ['http://[0:0:0:0:0:0:0:1]/', 'names this PC itself'],
             ['http://[::ffff:127.0.0.1]/', 'names this PC itself'],
             ['http://[::ffff:7f00:1]/', 'names this PC itself'],
+            // Members may fetch pages too (.scratch/accounts/spec.md), so nothing on the server's own networks.
+            ['http://10.0.0.5/', 'names a private network address'],
+            ['http://172.16.3.4/', 'names a private network address'],
+            ['http://192.168.1.1/', 'names a private network address'],
+            ['http://169.254.169.254/opc/v2/instance/', 'names a private network address'],
+            ['http://0.0.0.0:4000/', 'names a private network address'],
+            ['http://100.100.248.12:3001/', 'names a private network address'],
+            ['http://[fd00::1]/', 'names a private network address'],
+            ['http://[fe80::1]/', 'names a private network address'],
+            ['http://[::]/', 'names a private network address'],
+            ['http://[::ffff:10.0.0.1]/', 'names a private network address'],
+            ['http://224.0.0.1/', 'names a private network address'],
             ['not a url', 'is not a web address'],
         ])('refuses %s', (address, reason) => {
             expect(() => checkPageAddress(address)).toThrow(InvalidPageAddressError);
@@ -102,6 +114,22 @@ describe('Web pages (pure)', () => {
                 expect(checkPageAddress(address)).toBeInstanceOf(URL);
             },
         );
+
+        it('refuses a name that resolves to a private address, on the real fetcher', async () => {
+            let fetched = 0;
+            const fetchImpl = async () => {
+                fetched++;
+                return new Response('ok');
+            };
+            const privateDns = guardedPageFetch(fetchImpl, async () => [{ address: '10.1.2.3', family: 4 }]);
+            await expect(privateDns('http://intranet.example/', {})).rejects.toThrow('names a private network address');
+            const metadata = guardedPageFetch(fetchImpl, async () => [{ address: '93.184.216.34', family: 4 }, { address: '169.254.169.254', family: 4 }]);
+            await expect(metadata('http://sneaky.example/', {})).rejects.toThrow('names a private network address');
+            expect(fetched).toBe(0);
+            const publicDns = guardedPageFetch(fetchImpl, async () => [{ address: '93.184.216.34', family: 4 }]);
+            await expect(publicDns('http://example.org/', {})).resolves.toBeInstanceOf(Response);
+            expect(fetched).toBe(1);
+        });
 
         it('checks a redirect resolved against the address before it', () => {
             expect(checkPageAddress('/next', new URL('https://example.org/a/b')).href).toBe('https://example.org/next');

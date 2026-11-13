@@ -1,3 +1,4 @@
+import { AccountEntity } from '../../model/account/entities/account.entity.js';
 import { ChatSittingOutEntity } from '../../model/chat/entities/chat-sitting-out.entity.js';
 import { ChatEntity } from '../../model/chat/entities/chat.entity.js';
 import { MessagePartEntity } from '../../model/chat/entities/message-part.entity.js';
@@ -69,4 +70,5 @@ export const entities = [
     SnapshotCharacterEntity,
     SavedReplyEntity,
     ReplaceRuleEntity,
+    AccountEntity,
 ];

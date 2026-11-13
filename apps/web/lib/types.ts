@@ -127,6 +127,8 @@ export interface PoolUsage {
 export interface UsageResponse {
     month: string;
     pools: Record<CreditPool, PoolUsage>;
+    /** A Member's Monthly cap (.scratch/accounts/spec.md); null for the Owner. */
+    monthlyCap: { capUsd: number; spentUsd: number; reached: boolean } | null;
 }
 
 /** The Venice pool is named for everything it pays for; its id stays `image` (.scratch/dictation/spec.md). */

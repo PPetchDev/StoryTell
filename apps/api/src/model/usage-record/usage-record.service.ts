@@ -4,6 +4,7 @@ import { MoreThanOrEqual, Repository } from 'typeorm';
 
 import { CallKind, CreditPool } from '../../service/model-gateway/model-gateway.js';
 import { NewUsageRecord } from '../../service/model-gateway/real/real-model-gateway.js';
+import { AccountModelService } from '../account/account.service.js';
 import { UsageRecordEntity } from './entities/usage-record.entity.js';
 
 export interface PoolSpend {
@@ -20,24 +21,51 @@ export interface KindSpend extends PoolSpend {
 export class UsageRecordModelService {
     constructor(
         @InjectRepository(UsageRecordEntity) private readonly records: Repository<UsageRecordEntity>,
+        private readonly accounts: AccountModelService,
     ) {}
 
     async record(record: NewUsageRecord): Promise<void> {
-        await this.records.save(this.records.create(record));
+        // The Account of the request that made the call, or of the request that started its background work.
+        await this.records.save(this.records.create({ ...record, userId: this.accounts.currentId() }));
     }
 
     /**
-     * Spend and call count per pool since `from`, over every record, with each pool's spend
+     * What each Account spent since `from`, in USD, by Account id (.scratch/accounts/spec.md:
+     * People, "Monthly cap"). An Account that spent nothing is left out.
+     */
+    async spentByAccountSince(from: Date): Promise<Map<number, number>> {
+        const rows = await this.records
+            .createQueryBuilder('record')
+            .select('record.user_id', 'userId')
+            .addSelect('COALESCE(SUM(record.cost_usd), 0)', 'spentUsd')
+            .where({ createdAt: MoreThanOrEqual(from) })
+            .groupBy('record.user_id')
+            .getRawMany<{ userId: number; spentUsd: string }>();
+        return new Map(rows.map((row) => [Number(row.userId), Number(row.spentUsd)]));
+    }
+
+    /** What one Account spent since `from`, in USD. */
+    async spentSince(userId: number, from: Date): Promise<number> {
+        const row = await this.records
+            .createQueryBuilder('record')
+            .select('COALESCE(SUM(record.cost_usd), 0)', 'spentUsd')
+            .where({ createdAt: MoreThanOrEqual(from), userId })
+            .getRawOne<{ spentUsd: string }>();
+        return Number(row?.spentUsd ?? 0);
+    }
+
+    /**
+     * Spend and call count per pool since `from`, over every record (or one Account's), with each pool's spend
      * per call kind, most spent first.
      */
-    async spendSince(from: Date): Promise<Record<CreditPool, PoolSpend & { byKind: KindSpend[] }>> {
+    async spendSince(from: Date, userId?: number): Promise<Record<CreditPool, PoolSpend & { byKind: KindSpend[] }>> {
         const rows = await this.records
             .createQueryBuilder('record')
             .select('record.pool', 'pool')
             .addSelect('record.kind', 'kind')
             .addSelect('COALESCE(SUM(record.cost_usd), 0)', 'spentUsd')
             .addSelect('COUNT(*)', 'calls')
-            .where({ createdAt: MoreThanOrEqual(from) })
+            .where(userId === undefined ? { createdAt: MoreThanOrEqual(from) } : { createdAt: MoreThanOrEqual(from), userId })
             .groupBy('record.pool')
             .addGroupBy('record.kind')
             .getRawMany<{ pool: CreditPool; kind: CallKind; spentUsd: string; calls: string }>();

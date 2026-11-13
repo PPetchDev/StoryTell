@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, HttpCode, Post, Put } from '@nestjs/comm
 import { ApiExcludeController } from '@nestjs/swagger';
 
 import { Public } from '../api/auth/public.decorator.js';
+import { uncapped } from '../service/model-gateway/capped-model-gateway.js';
 
 import {
     ModelGatewayError,
@@ -107,7 +108,7 @@ export class FakeGatewayControlController {
         gateway: ModelGateway,
         private readonly pages: FakePageFetcher,
     ) {
-        this.fake = gateway as FakeModelGateway;
+        this.fake = uncapped(gateway) as FakeModelGateway;
     }
 
     /** Scripts what the fake page fetcher answers for one address (Documents from a web page). */

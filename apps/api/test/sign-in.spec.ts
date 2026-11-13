@@ -2,6 +2,7 @@ import path from 'node:path';
 
 import { SESSION_COOKIE, SESSION_RENEW_UNDER_MS, sessionKey, signSession } from '../src/api/auth/session.js';
 import { ConfigError, loadConfig } from '../src/config/app-config.js';
+import { AccountModelService } from '../src/model/account/account.service.js';
 import { startTestApp, TestApp } from './harness/test-app.js';
 
 // .scratch/sign-in/spec.md
@@ -50,7 +51,7 @@ describe('Sign-in: off', () => {
     it('lets every route through and says none is needed', async () => {
         await t.http.get('/api/stories').expect(200);
         const { body } = await t.http.get('/api/auth/status').expect(200);
-        expect(body).toEqual({ required: false, signedIn: true });
+        expect(body).toMatchObject({ required: false, signedIn: true });
     });
 });
 
@@ -78,7 +79,7 @@ describe('Sign-in: on', () => {
         expect((await t.http.get('/api/images/stories/1/cover.webp').expect(401)).body.error.code).toBe('401.010.001');
         await t.http.get('/api/health').expect(200);
         const { body } = await t.http.get('/api/auth/status').expect(200);
-        expect(body).toEqual({ required: true, signedIn: false });
+        expect(body).toMatchObject({ required: true, signedIn: false, account: null, methods: { password: true, supabase: null } });
     });
 
     it('refuses a wrong password without a cookie, and the right one opens every route', async () => {
@@ -96,7 +97,7 @@ describe('Sign-in: on', () => {
         const cookie = sessionCookie(header)!;
         await t.http.get('/api/stories').set('Cookie', cookie).expect(200);
         const { body } = await t.http.get('/api/auth/status').set('Cookie', cookie).expect(200);
-        expect(body).toEqual({ required: true, signedIn: true });
+        expect(body).toMatchObject({ required: true, signedIn: true });
     });
 
     it('marks the cookie Secure when the request came over HTTPS through the proxy', async () => {
@@ -109,8 +110,9 @@ describe('Sign-in: on', () => {
         const key = sessionKey(PASSWORD);
         const valid = (await signIn()).split('=')[1];
         const forged = `${valid.slice(0, -2)}${valid.endsWith('AA') ? 'BB' : 'AA'}`;
-        const expired = signSession(key, Date.now() - 1_000);
-        const otherPassword = signSession(sessionKey('another-password-entirely'), Date.now() + DAY);
+        const owner = t.app.get(AccountModelService).owner.id;
+        const expired = signSession(key, owner, Date.now() - 1_000);
+        const otherPassword = signSession(sessionKey('another-password-entirely'), owner, Date.now() + DAY);
         for (const value of [forged, expired, otherPassword, 'garbage']) {
             const refused = await t.http.get('/api/stories').set('Cookie', `${SESSION_COOKIE}=${value}`).expect(401);
             expect(refused.body.error.code).toBe('401.010.001');
@@ -119,7 +121,7 @@ describe('Sign-in: on', () => {
 
     it('renews a session that has under 30 days left, and leaves a fresh one alone', async () => {
         const key = sessionKey(PASSWORD);
-        const old = signSession(key, Date.now() + SESSION_RENEW_UNDER_MS - DAY);
+        const old = signSession(key, t.app.get(AccountModelService).owner.id, Date.now() + SESSION_RENEW_UNDER_MS - DAY);
         const renewed = await t.http.get('/api/stories').set('Cookie', `${SESSION_COOKIE}=${old}`).expect(200);
         expect(sessionCookie(renewed.headers['set-cookie'])).toBeDefined();
 

@@ -213,3 +213,21 @@ _Avoid_: TTS voice, audio voice
 **Character profile**:
 What a tap on a Character's Portrait in a Chat opens: their whole Reference image, name, Appearance, Personality, Voice and Background, but never their Secrets or Arc directions, which would give the story away.
 _Avoid_: Bio, character card
+
+## Accounts
+
+**Account**:
+One person who can sign in to this Storytell. Everything they make (Stories and all inside them, Personas, app-wide Saved replies and Replace rules) belongs to their Account and is invisible to every other Account.
+_Avoid_: User (in the glossary "the user" is whoever is playing), profile, login
+
+**Owner**:
+The one Account that runs this Storytell: it pays the provider credit, chooses the Models and Sampling for everyone, adds and removes Members, and sees everyone's spending.
+_Avoid_: Admin, host
+
+**Member**:
+An Account the Owner added by email, playing on the Owner's credit within a Monthly cap. A Member can't see or change Models, Sampling, credit settings or other people's spending.
+_Avoid_: Guest, friend, user
+
+**Monthly cap**:
+The most a Member may spend in one calendar month (UTC), in US dollars, set by the Owner. Once reached, a new send or picture is refused until the month turns or the Owner raises it; what a turn already started still finishes.
+_Avoid_: Quota, limit, budget

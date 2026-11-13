@@ -15,6 +15,7 @@ import { SceneEntity } from './entities/scene.entity.js';
 import { StartingBeliefEntity } from './entities/starting-belief.entity.js';
 import { StartingBondEntity } from './entities/starting-bond.entity.js';
 import { CoverFocus, StoryEntity } from './entities/story.entity.js';
+import { AccountModelService } from '../account/account.service.js';
 
 // Relations are opted into here only; nothing on the entities auto-loads.
 const FULL_RELATIONS = {
@@ -77,30 +78,37 @@ export class StoryModelService {
         @InjectRepository(SceneEntity) private readonly scenes: Repository<SceneEntity>,
         @InjectRepository(LoreEntryEntity) private readonly lore: Repository<LoreEntryEntity>,
         @InjectRepository(CharacterExpressionEntity) private readonly expressions: Repository<CharacterExpressionEntity>,
+        private readonly accounts: AccountModelService,
     ) {}
 
-    /** Every Story with its relations, most recently saved first. */
+    /** Every Story of the current Account with its relations, most recently saved first. */
     async findAllFull(): Promise<StoryEntity[]> {
         const stories = await this.stories.find({
+            where: { userId: this.accounts.currentId() },
             relations: FULL_RELATIONS,
             order: { updatedAt: 'DESC', id: 'DESC' },
         });
         return stories.map(sorted);
     }
 
+    /**
+     * Whether the Story exists for the current Account. Another Account's Story doesn't, so its id
+     * answers exactly as a missing one would.
+     */
     exists(id: number): Promise<boolean> {
-        return this.stories.existsBy({ id });
+        return this.stories.existsBy({ id, userId: this.accounts.currentId() });
     }
 
+    /** The Story with its relations, when it is the current Account's. */
     async findFull(id: number): Promise<StoryEntity | null> {
-        const story = await this.stories.findOne({ where: { id }, relations: FULL_RELATIONS });
+        const story = await this.stories.findOne({ where: { id, userId: this.accounts.currentId() }, relations: FULL_RELATIONS });
         return story && sorted(story);
     }
 
     /** A Story is born with its Role, so "exactly one Role" holds from the first read. */
     async createWithRole(title: string): Promise<number> {
         return this.dataSource.transaction(async (manager) => {
-            const story = await manager.save(manager.create(StoryEntity, { title }));
+            const story = await manager.save(manager.create(StoryEntity, { title, userId: this.accounts.currentId() }));
             await manager.save(manager.create(RoleEntity, { storyId: story.id }));
             return story.id;
         });
@@ -116,7 +124,7 @@ export class StoryModelService {
         return this.dataSource.transaction(async (manager) => {
             const { setting, opening, pov, tense, replyLength, imageStyle, narrationVoice, backdrop } = source;
             const story = await manager.save(
-                manager.create(StoryEntity, { title, setting, opening, pov, tense, replyLength, imageStyle, narrationVoice, backdrop }),
+                manager.create(StoryEntity, { title, setting, opening, pov, tense, replyLength, imageStyle, narrationVoice, backdrop, userId: this.accounts.currentId() }),
             );
             await manager.save(
                 manager.create(RoleEntity, { storyId: story.id, name: source.role.name, description: source.role.description }),
@@ -187,12 +195,12 @@ export class StoryModelService {
             await copyDocuments(manager, source.id, story.id);
             // Saved replies go with the Story (.scratch/saved-replies-and-replace-rules/spec.md).
             for (const line of source.savedReplies) {
-                await manager.save(manager.create(SavedReplyEntity, { storyId: story.id, text: line.text, position: line.position }));
+                await manager.save(manager.create(SavedReplyEntity, { storyId: story.id, text: line.text, position: line.position, userId: story.userId }));
             }
             // So do its Replace rules, so the copy reads the same.
             for (const rule of source.replaceRules) {
                 const { id: _id, ...fields } = rule.toResponse();
-                await manager.save(manager.create(ReplaceRuleEntity, { ...fields, storyId: story.id, position: rule.position }));
+                await manager.save(manager.create(ReplaceRuleEntity, { ...fields, storyId: story.id, position: rule.position, userId: story.userId }));
             }
             return { storyId: story.id, characterIds };
         });

@@ -11,7 +11,9 @@ import { SamplingFold } from '@/components/settings/sampling-fold';
 import { AppSavedRepliesCard } from '@/components/saved-replies/app-saved-replies-card';
 import { AppReplaceRulesCard } from '@/components/replace-rules/app-replace-rules-card';
 import { SaveStatus } from '@/components/story-editor/save-status';
+import { PeopleCard } from '@/components/settings/people-card';
 import { SignOutSetting } from '@/components/sign-in-gate';
+import { useAccount } from '@/lib/account';
 import { TextSizeSetting } from '@/components/text-size-setting';
 import { ThemeSetting } from '@/components/theme-setting';
 import { apiSend } from '@/lib/api';
@@ -169,6 +171,7 @@ function NumberField({
 
 /** Every setting saves as it changes, with the status in the page header. */
 function SettingsForm({ initial, autosave }: { initial: SettingsResponse; autosave: Autosave }) {
+    const { isOwner } = useAccount();
     // The play model when the page opened: a different one now is a Drift risk.
     const [loadedPlayModel] = useState(initial.settings.playModel);
     const [models, setModels] = useState<Record<ModelKey, string>>({
@@ -210,72 +213,79 @@ function SettingsForm({ initial, autosave }: { initial: SettingsResponse; autosa
 
     return (
         <>
-            <section className="card">
-                <h2>Models</h2>
-                <ModelSelect
-                    id="play-model"
-                    label="Play model"
-                    value={models.playModel}
-                    options={initial.playModels}
-                    note={playOption && priceLine(playOption)}
-                    onChange={(value) => changeModel('playModel', value)}
-                />
-                {models.playModel !== loadedPlayModel && (
-                    <p role="alert" className="warning">
-                        <strong>Drift warning.</strong> A different model plays Characters
-                        differently. Chats whose last reply came from the old model will show a
-                        Drift notice before the next send.
-                    </p>
-                )}
-                {playOption && <SamplingFold option={playOption} initial={initial.settings.samplers} autosave={autosave} />}
-                <ModelSelect
-                    id="image-model"
-                    label="Snapshot model"
-                    value={models.imageModel}
-                    options={initial.imageModels}
-                    onChange={(value) => changeModel('imageModel', value)}
-                />
-                <div className="field">
-                    <label htmlFor="snapshot-size">Snapshot size</label>
-                    <select
-                        id="snapshot-size"
-                        value={snapshotSize}
-                        aria-describedby={imageOption && imageOption.sizes.length < 2 ? 'snapshot-size-note' : undefined}
-                        onChange={(event) => changeSnapshot(models.imageModel, event.target.value as SnapshotSize)}
-                    >
-                        {(imageOption?.sizes ?? [{ size: snapshotSize, priceUsd: 0 }]).map((entry) => (
-                            <option key={entry.size} value={entry.size}>
-                                {`${entry.size} · $${entry.priceUsd.toFixed(2)}`}
-                            </option>
-                        ))}
-                    </select>
-                    {imageOption && imageOption.sizes.length < 2 && (
-                        <p id="snapshot-size-note" className="muted">
-                            This model draws at 1K only.
+            {/* The Owner chooses the Models, Sampling and credit settings for everyone (.scratch/accounts/spec.md). */}
+            {isOwner && (
+                <section className="card">
+                    <h2>Models</h2>
+                    <ModelSelect
+                        id="play-model"
+                        label="Play model"
+                        value={models.playModel}
+                        options={initial.playModels}
+                        note={playOption && priceLine(playOption)}
+                        onChange={(value) => changeModel('playModel', value)}
+                    />
+                    {models.playModel !== loadedPlayModel && (
+                        <p role="alert" className="warning">
+                            <strong>Drift warning.</strong> A different model plays Characters
+                            differently. Chats whose last reply came from the old model will show a
+                            Drift notice before the next send.
                         </p>
                     )}
-                </div>
-            </section>
+                    {playOption && <SamplingFold option={playOption} initial={initial.settings.samplers} autosave={autosave} />}
+                    <ModelSelect
+                        id="image-model"
+                        label="Snapshot model"
+                        value={models.imageModel}
+                        options={initial.imageModels}
+                        onChange={(value) => changeModel('imageModel', value)}
+                    />
+                    <div className="field">
+                        <label htmlFor="snapshot-size">Snapshot size</label>
+                        <select
+                            id="snapshot-size"
+                            value={snapshotSize}
+                            aria-describedby={imageOption && imageOption.sizes.length < 2 ? 'snapshot-size-note' : undefined}
+                            onChange={(event) => changeSnapshot(models.imageModel, event.target.value as SnapshotSize)}
+                        >
+                            {(imageOption?.sizes ?? [{ size: snapshotSize, priceUsd: 0 }]).map((entry) => (
+                                <option key={entry.size} value={entry.size}>
+                                    {`${entry.size} · $${entry.priceUsd.toFixed(2)}`}
+                                </option>
+                            ))}
+                        </select>
+                        {imageOption && imageOption.sizes.length < 2 && (
+                            <p id="snapshot-size-note" className="muted">
+                                This model draws at 1K only.
+                            </p>
+                        )}
+                    </div>
+                </section>
+            )}
 
             <AppSavedRepliesCard autosave={autosave} />
             <AppReplaceRulesCard autosave={autosave} />
 
-            <section className="card">
-                <h2>Credit</h2>
-                <p className="muted">
-                    Warn when a pool&apos;s remaining credit is at or below this share of what it
-                    holds when topped up.
-                </p>
-                {/* The boxes of a row line up whatever their labels' lengths (audit L22). */}
-                <div className="field-row mb-3 items-end">
-                    {numberField('textCreditCapUsd', 'text-cap', 'Text pool (USD)', 'usd')}
-                    {numberField('textLowCreditPercent', 'text-threshold', 'Text warning (%)', 'percent')}
-                </div>
-                <div className="field-row items-end">
-                    {numberField('imageCreditCapUsd', 'image-cap', 'Images and audio (Venice) pool (USD)', 'usd')}
-                    {numberField('imageLowCreditPercent', 'image-threshold', 'Images and audio (Venice) warning (%)', 'percent')}
-                </div>
-            </section>
+            {isOwner && <PeopleCard />}
+
+            {isOwner && (
+                <section className="card">
+                    <h2>Credit</h2>
+                    <p className="muted">
+                        Warn when a pool&apos;s remaining credit is at or below this share of what it
+                        holds when topped up.
+                    </p>
+                    {/* The boxes of a row line up whatever their labels' lengths (audit L22). */}
+                    <div className="field-row mb-3 items-end">
+                        {numberField('textCreditCapUsd', 'text-cap', 'Text pool (USD)', 'usd')}
+                        {numberField('textLowCreditPercent', 'text-threshold', 'Text warning (%)', 'percent')}
+                    </div>
+                    <div className="field-row items-end">
+                        {numberField('imageCreditCapUsd', 'image-cap', 'Images and audio (Venice) pool (USD)', 'usd')}
+                        {numberField('imageLowCreditPercent', 'image-threshold', 'Images and audio (Venice) warning (%)', 'percent')}
+                    </div>
+                </section>
+            )}
         </>
     );
 }

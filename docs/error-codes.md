@@ -137,3 +137,14 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | `401.010.001` | `SignInRequiredError` | Sign-in is on (`LOGIN_PASSWORD` set) and the request has no valid session cookie: none, forged, expired, or signed for an older password. Every route but health and `/api/auth/*` answers it. The web app shows the sign-in screen. |
 | `401.010.002` | `WrongPasswordError` | `POST /api/auth/login` with the wrong password. No cookie is set; it counts toward the lockout. |
 | `429.010.003` | `TooManySignInTriesError` | Ten wrong passwords within 15 minutes: every sign-in, the right password too, is refused until 15 minutes after the tenth. The message says how many minutes are left. |
+| `401.010.004` | `SupabaseTokenInvalidError` | `POST /api/auth/supabase` with an access token that doesn't verify: wrong signature or key, another project (issuer), another audience, not `authenticated`, anonymous, expired, or malformed (`.scratch/accounts/spec.md`). No cookie is set. |
+| `403.010.005` | `NotOnPeopleListError` | A Supabase sign-in by an email that isn't on People, was removed, or is already bound to another Supabase user. The message tells them to ask the Owner. |
+| `403.010.006` | `AccountDisabledError` | A Supabase sign-in by an Account the Owner paused. (A paused Account's existing cookie answers `401.010.001`.) |
+| `403.010.007` | `OwnerOnlyError` | A Member at an Owner-only route: People, changing Settings, the backup status. |
+| `409.010.008` | `EmailAlreadyListedError` | `POST /api/people` with an email already on People. |
+| `402.010.009` | `MonthlyCapReachedError` | A paid call by a Member who has spent their Monthly cap this calendar month (UTC): a send, Snapshot, suggestion, Write for me, picture, reading aloud. A turn already sent still finishes its own background calls. The message names the cap and the day it starts again. A `ModelGatewayError`, so a turn shows it like out-of-credit. |
+| `404.010.010` | `SupabaseNotSetUpError` | `POST /api/auth/supabase` on an API without `SUPABASE_URL`. |
+| `422.010.011` | `CantChangeOwnerError` | Pausing or removing the Owner through People. |
+| `404.010.012` | `PersonNotFoundError` | A People id that isn't listed (or was removed). |
+| `429.010.013` | `TooManyCallsAtOnceError` | A Member starting a paid call while 4 of theirs still run. Try again when they finish. |
+| `403.010.014` | `EmailNotProvenError` | A first Supabase sign-in by email + password claiming a listed email, while `SUPABASE_SIGNUPS_CLOSED` isn't set: anyone could have made that Supabase user. Signing in with Google proves the email. |

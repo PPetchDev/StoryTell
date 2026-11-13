@@ -18,6 +18,7 @@ import {
     TurnInProgressError,
 } from '../../errors/chat.errors.js';
 import { OutOfCreditError } from '../../errors/model-gateway.errors.js';
+import { SpendCap } from '../../service/model-gateway/spend-cap.js';
 import { PersonaNotFoundError } from '../../errors/persona.errors.js';
 import { CharacterNotFoundError, StoryNotFoundError } from '../../errors/story.errors.js';
 import { BranchModelService } from '../../model/branch/branch.service.js';
@@ -305,6 +306,7 @@ export class ChatManagerService {
         private readonly storySoFar: StorySoFarManagerService,
         private readonly documentSearch: DocumentSearchManagerService,
         private readonly gateway: ModelGateway,
+        private readonly spendCap: SpendCap,
     ) {}
 
     async listChats(storyId: number): Promise<ChatListItem[]> {
@@ -1190,6 +1192,8 @@ export class ChatManagerService {
     private async requireSendable(story: StoryEntity, chat: ChatEntity): Promise<ChatEntity> {
         this.requirePlayable(story);
         if (await this.textCreditOut()) throw new OutOfCreditError('text');
+        // Before anything is saved, so a refused send leaves the Chat as it was (.scratch/accounts/spec.md).
+        await this.spendCap.assertUnderCap();
         if (this.inFlight.has(chat.id)) throw new TurnInProgressError();
         const settled = await this.settleBackground(chat);
         if (settled.pending) throw new BackgroundStillSavingError();

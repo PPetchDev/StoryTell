@@ -1,7 +1,9 @@
 import { Global, Module } from '@nestjs/common';
+import { lookup } from 'node:dns/promises';
 
 import { AppConfig } from '../../config/app-config.js';
 import { FetchLike } from '../model-gateway/real/http.js';
+import { guardedPageFetch } from '../../manager/document/page-address.js';
 import { FakePageFetcher } from './fake-page-fetcher.js';
 
 /**
@@ -19,7 +21,10 @@ export const PAGE_FETCH = Symbol('PAGE_FETCH');
             provide: PAGE_FETCH,
             inject: [AppConfig, FakePageFetcher],
             useFactory: (config: AppConfig, fake: FakePageFetcher): FetchLike =>
-                config.modelGateway === 'fake' ? fake.fetch : (globalThis.fetch.bind(globalThis) as FetchLike),
+                config.modelGateway === 'fake'
+                    ? fake.fetch
+                    : // Every hop's name is resolved and checked first (.scratch/accounts/spec.md: Members fetch pages too).
+                      guardedPageFetch(globalThis.fetch.bind(globalThis) as FetchLike, (host) => lookup(host, { all: true })),
         },
     ],
     exports: [PAGE_FETCH, FakePageFetcher],

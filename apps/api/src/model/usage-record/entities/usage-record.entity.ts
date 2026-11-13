@@ -14,6 +14,10 @@ export class UsageRecordEntity {
     @PrimaryGeneratedColumn()
     id: number;
 
+    /** The Account it belongs to (.scratch/accounts/spec.md: "Ownership"). */
+    @Column({ name: 'user_id', type: 'integer' })
+    userId: number;
+
     @Index()
     @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
     createdAt: Date;

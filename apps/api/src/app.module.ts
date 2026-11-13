@@ -1,6 +1,7 @@
 import { DynamicModule, Module } from '@nestjs/common';
 
 import { ApiModule } from './api/api.module.js';
+import { AccountModelModule } from './model/account/account.module.js';
 import { AppConfig } from './config/app-config.js';
 import { ConfigModule } from './config/config.module.js';
 import { ModelGatewayModule } from './service/model-gateway/model-gateway.module.js';
@@ -16,6 +17,7 @@ export class AppModule {
             imports: [
                 ConfigModule.forRoot(config),
                 DbModule,
+                AccountModelModule,
                 ModelGatewayModule.forRoot(),
                 PageFetchModule,
                 ApiModule,

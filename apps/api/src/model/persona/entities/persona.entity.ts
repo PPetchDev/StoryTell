@@ -17,6 +17,10 @@ export class PersonaEntity {
     @PrimaryGeneratedColumn()
     id: number;
 
+    /** The Account it belongs to (.scratch/accounts/spec.md: "Ownership"). */
+    @Column({ name: 'user_id', type: 'integer' })
+    userId: number;
+
     @Column({ type: 'text' })
     name: string;
 

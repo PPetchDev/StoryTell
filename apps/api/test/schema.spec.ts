@@ -12,11 +12,12 @@ import { CharacterExpressionEntity } from '../src/model/story/entities/character
 import { BeliefChangeEntity } from '../src/model/ledger/entities/belief-change.entity.js';
 import { BeliefEntity } from '../src/model/memory/entities/belief.entity.js';
 import { StartingBeliefEntity } from '../src/model/story/entities/starting-belief.entity.js';
+import { AccountEntity } from '../src/model/account/entities/account.entity.js';
 
 import { startTestApp, TestApp } from './harness/test-app.js';
 
-// The tailnet is the only lock (spec: "No auth layer"). This guards the migrated schema
-// against an auth table creeping in.
+// Accounts (.scratch/accounts/spec.md) are the one auth table: sessions are stateless cookies,
+// and sign-in itself is Supabase's. This guards against any other creeping in.
 describe('Database schema', () => {
     let t: TestApp;
 
@@ -28,7 +29,7 @@ describe('Database schema', () => {
         await t.close();
     });
 
-    it('has no user, account or session tables', async () => {
+    it('has the Account table and no other user, account or session table', async () => {
         const client = new pg.Client({ connectionString: t.databaseUrl });
         await client.connect();
         const { rows } = await client.query<{ table_name: string }>(
@@ -38,12 +39,12 @@ describe('Database schema', () => {
 
         const tables = rows.map((row) => row.table_name);
         expect(tables).toContain('story');
-        expect(tables.filter((name) => /user|account|session|login/i.test(name))).toEqual([]);
+        expect(tables.filter((name) => /user|account|session|login/i.test(name))).toEqual(['app_user']);
     });
 
     // Older migrations name their constraints their own way, so the whole schema can't be diffed
     // against the entities. Newer tables are checked column by column instead.
-    it.each([DocumentEntity, DocumentPassageEntity, ThaiReadingEntity, SavedReplyEntity, ReplaceRuleEntity, UsageRecordEntity, CharacterExpressionEntity, BeliefEntity, BeliefChangeEntity, StartingBeliefEntity])('migrates every column %o declares, with its type and nullability', async (entity) => {
+    it.each([DocumentEntity, DocumentPassageEntity, ThaiReadingEntity, SavedReplyEntity, ReplaceRuleEntity, UsageRecordEntity, CharacterExpressionEntity, BeliefEntity, BeliefChangeEntity, StartingBeliefEntity, AccountEntity])('migrates every column %o declares, with its type and nullability', async (entity) => {
         const metadata = t.app.get(DataSource).getMetadata(entity);
         const client = new pg.Client({ connectionString: t.databaseUrl });
         await client.connect();

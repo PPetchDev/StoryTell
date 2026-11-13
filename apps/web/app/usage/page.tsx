@@ -3,6 +3,7 @@
 import Link from 'next/link';
 
 import { BackupBanner } from '@/components/backup-banner';
+import { useAccount } from '@/lib/account';
 import { useApiQuery } from '@/components/connection';
 import { ErrorState, Loading } from '@/components/query-state';
 import { CALL_KIND_LABEL, CreditPool, POOL_LABEL, PoolUsage, UsageResponse, usd } from '@/lib/types';
@@ -49,7 +50,31 @@ function CreditBar({ pool, usage }: { pool: CreditPool; usage: PoolUsage }) {
     );
 }
 
-function PoolCard({ pool, usage }: { pool: CreditPool; usage: PoolUsage }) {
+/** A Member's Monthly cap: what they may spend this month and what is left (.scratch/accounts/spec.md). */
+function MonthlyCapCard({ cap }: { cap: NonNullable<UsageResponse['monthlyCap']> }) {
+    const left = Math.max(0, cap.capUsd - cap.spentUsd);
+    return (
+        <section className="card" aria-labelledby="monthly-cap">
+            <h2 id="monthly-cap">Your Monthly cap</h2>
+            <dl className={FACTS}>
+                <dt>Spent this month</dt>
+                <dd>
+                    {usd(cap.spentUsd)} of {usd(cap.capUsd)}
+                </dd>
+                <dt>Left</dt>
+                <dd>
+                    {cap.reached ? (
+                        <strong className="text-caution-text">None: new sends and pictures wait for next month, or ask the Owner to raise it.</strong>
+                    ) : (
+                        usd(left)
+                    )}
+                </dd>
+            </dl>
+        </section>
+    );
+}
+
+function PoolCard({ pool, usage, member }: { pool: CreditPool; usage: PoolUsage; member: boolean }) {
     // The Venice pool's label already names its provider.
     const provider = pool === 'text' ? 'OpenRouter' : null;
     return (
@@ -74,50 +99,58 @@ function PoolCard({ pool, usage }: { pool: CreditPool; usage: PoolUsage }) {
                         </ul>
                     )}
                 </dd>
-                <dt>Remaining credit</dt>
-                <dd>
-                    {usage.remainingUsd === null ? (
-                        <span className="muted">
-                            unknown
-                            {pool === 'image' && (
-                                // Where to fix it, not just why (audit L24): the key is the API's setting.
+                {!member && (
+                    <>
+                        <dt>Remaining credit</dt>
+                        <dd>
+                            {usage.remainingUsd === null ? (
+                                <span className="muted">
+                                    unknown
+                                    {pool === 'image' && (
+                                        // Where to fix it, not just why (audit L24): the key is the API's setting.
+                                        <>
+                                            {' '}
+                                            (reading it needs a Venice Admin key: set <code>VENICE_ADMIN_KEY</code> where the API
+                                            runs)
+                                        </>
+                                    )}
+                                </span>
+                            ) : (
                                 <>
-                                    {' '}
-                                    (reading it needs a Venice Admin key: set <code>VENICE_ADMIN_KEY</code> where the API
-                                    runs)
+                                    {usd(usage.remainingUsd)} of {usd(usage.capUsd)}
+                                    <CreditBar pool={pool} usage={usage} />
                                 </>
                             )}
-                        </span>
-                    ) : (
-                        <>
-                            {usd(usage.remainingUsd)} of {usd(usage.capUsd)}
-                            <CreditBar pool={pool} usage={usage} />
-                        </>
-                    )}
-                </dd>
-                <dt>Low-credit warning</dt>
-                <dd>
-                    {usage.lowCredit ? (
-                        <strong className="text-caution-text">
-                            Low: at or below {usage.lowCreditPercent}% of {usd(usage.capUsd)}
-                        </strong>
-                    ) : (
-                        <>
-                            below {usage.lowCreditPercent}% of {usd(usage.capUsd)}
-                        </>
-                    )}
-                </dd>
+                        </dd>
+                        <dt>Low-credit warning</dt>
+                        <dd>
+                            {usage.lowCredit ? (
+                                <strong className="text-caution-text">
+                                    Low: at or below {usage.lowCreditPercent}% of {usd(usage.capUsd)}
+                                </strong>
+                            ) : (
+                                <>
+                                    below {usage.lowCreditPercent}% of {usd(usage.capUsd)}
+                                </>
+                            )}
+                        </dd>
+                    </>
+                )}
             </dl>
-            <p className="mt-3 mb-0 text-md">
-                <Link href="/settings" className="inline-flex min-h-11 items-center">
-                    Change the pool size and warning in Settings
-                </Link>
-            </p>
+            {/* The pools' sizes and the providers' balances are the Owner's (.scratch/accounts/spec.md). */}
+            {!member && (
+                <p className="mt-3 mb-0 text-md">
+                    <Link href="/settings" className="inline-flex min-h-11 items-center">
+                        Change the pool size and warning in Settings
+                    </Link>
+                </p>
+            )}
         </section>
     );
 }
 
 export default function UsagePage() {
+    const { isOwner } = useAccount();
     const usage = useApiQuery<UsageResponse>('/usage');
 
     return (
@@ -128,13 +161,14 @@ export default function UsagePage() {
             {usage.status === 'ready' && (
                 <>
                     <p className="muted">{monthName(usage.data.month)}</p>
+                    {usage.data.monthlyCap && <MonthlyCapCard cap={usage.data.monthlyCap} />}
                     {POOLS.map((pool) => (
-                        <PoolCard key={pool} pool={pool} usage={usage.data.pools[pool]} />
+                        <PoolCard key={pool} pool={pool} usage={usage.data.pools[pool]} member={usage.data.monthlyCap !== null} />
                     ))}
                 </>
             )}
             {/* Last, so a banner that arrives late pushes nothing down (audit M38). */}
-            <BackupBanner />
+            {isOwner && <BackupBanner />}
         </main>
     );
 }
