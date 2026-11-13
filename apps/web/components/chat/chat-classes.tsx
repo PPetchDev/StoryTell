@@ -32,8 +32,23 @@ export const ACTION = [
 export const ACTION_ICON = 'shrink-0 text-text';
 
 /**
- * A round icon button (the top bar's ‹ and ⋯, the composer's tools, 🎤): 44px (audit H28), a quiet
- * tint while pressed, the faint colour when it can't be used.
+ * A composer tool: an icon and a short label side by side, 44px tall (docs/ui-audit-2026-11-13.md,
+ * M3: four bare icons gave no hint what they did on a phone). The label is the start of the
+ * button's name, so voice control finds it by what it shows.
+ */
+export const TOOL_CHIP = [
+    'bare-button inline-flex shrink-0 items-center gap-1',
+    'min-h-11 rounded-full px-2.5 text-xs font-semibold',
+    'text-muted',
+    'cursor-pointer press focus-ring',
+    'active:bg-surface-raised',
+    'aria-pressed:bg-accent-soft aria-pressed:text-accent',
+    'disabled:cursor-not-allowed disabled:text-faint aria-disabled:cursor-not-allowed aria-disabled:text-faint',
+].join(' ');
+
+/**
+ * A round icon button (the top bar's ‹ and ⋯, Undo, 🎤): 44px (audit H28), a quiet tint while
+ * pressed, the faint colour when it can't be used.
  */
 export const ICON_BUTTON = [
     'bare-button grid shrink-0 place-items-center',

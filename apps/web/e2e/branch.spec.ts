@@ -156,7 +156,8 @@ test('the Chat menu\'s "Branched from" line leads back to the Message, the Chat 
         await page.goto(`/stories/${played.storyId}/chats/${branchId}`);
         await page.getByRole('button', { name: 'Chat menu' }).tap();
         const menu = page.getByRole('dialog', { name: 'Chat menu' });
-        const back = menu.getByRole('link').first();
+        // Under the "Go to" tiles (docs/ui-audit-2026-11-13.md, M5).
+        const back = menu.getByRole('navigation', { name: 'Go to' }).getByRole('link', { name: /^Branched from/ });
         await expect(back).toContainText('Branched from Chat 1');
         await back.tap();
 

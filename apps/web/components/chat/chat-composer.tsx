@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { FormEvent, ReactNode, RefObject, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 
-import { COLUMN, ICON_BUTTON, LABEL_CAPS, PANEL_NOTE, SEND_BUTTON } from '@/components/chat/chat-classes';
+import { COLUMN, LABEL_CAPS, PANEL_NOTE, SEND_BUTTON, TOOL_CHIP } from '@/components/chat/chat-classes';
 import { useConnection } from '@/components/connection';
 import { PencilIcon, PlayIcon, StopIcon, UndoIcon } from '@/components/icons';
 import { ApiUnreachableError } from '@/lib/api';
@@ -538,12 +538,16 @@ export function ChatComposer({
                 <div className="empty:hidden" data-band="characters">
                     {characterRow?.(writingForMe || dictating)}
                 </div>
-                {/* Band 3: round tools, 44px and 8px apart (audit H28), and at the right end who the box writes as (L14). */}
-                <div className="flex min-w-0 items-center gap-2" role="toolbar" aria-label="Composer tools">
+                {/*
+                 * Band 3: the tools as 44px chips with a word each (audit H28; docs/ui-audit-2026-11-13.md M3),
+                 * and at the right end Undo. Who the box writes as is its placeholder and name (L14); the label
+                 * stays for screen readers but no longer squeezes beside the chips.
+                 */}
+                <div className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-1" role="toolbar" aria-label="Composer tools">
                     {/* Spec: "Suggested replies". Asks only when tapped, so they never spend credit unasked. */}
                     <button
                         type="button"
-                        className={ICON_BUTTON}
+                        className={TOOL_CHIP}
                         aria-label="Suggest replies"
                         title="Suggest replies"
                         aria-pressed={suggestions.shown.status !== 'closed'}
@@ -555,14 +559,15 @@ export function ChatComposer({
                             void suggestions.toggle();
                         }}
                     >
-                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
                             <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />
                         </svg>
+                        <span>Suggest</span>
                     </button>
                     {/* .scratch/write-for-me/spec.md: the draft, Thai or notes or nothing, becomes the worn identity's next Message. A second tap cancels. */}
                     <button
                         type="button"
-                        className={ICON_BUTTON}
+                        className={TOOL_CHIP}
                         aria-label="Write for me"
                         title="Write for me"
                         aria-pressed={writingForMe}
@@ -573,12 +578,13 @@ export function ChatComposer({
                             void writer.toggle();
                         }}
                     >
-                        <PencilIcon size={20} />
+                        <PencilIcon size={18} />
+                        <span>Write</span>
                     </button>
                     {/* .scratch/saved-replies-and-replace-rules/spec.md: lines kept for this Story or all; opening it closes ⚡'s cards. */}
                     <button
                         type="button"
-                        className={ICON_BUTTON}
+                        className={TOOL_CHIP}
                         aria-label="Saved replies"
                         title="Saved replies"
                         aria-pressed={tray.open}
@@ -591,14 +597,15 @@ export function ChatComposer({
                             tray.setOpen(!tray.open);
                         }}
                     >
-                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
                             <path d="M6 3.5h12a1 1 0 0 1 1 1V21l-7-4.5L5 21V4.5a1 1 0 0 1 1-1z" />
                         </svg>
+                        <span>Saved</span>
                     </button>
                     {/* Wraps the selection in *…* (an action, shown in italics), or opens an empty pair at the caret. */}
                     <button
                         type="button"
-                        className={ICON_BUTTON}
+                        className={TOOL_CHIP}
                         aria-label="Write an action"
                         title="Action: *like this*"
                         disabled={writing || blocked || writingForMe || dictating}
@@ -615,9 +622,10 @@ export function ChatComposer({
                             });
                         }}
                     >
-                        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
                             <path d="M12 4v16M5.1 8l13.8 8M5.1 16l13.8-8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                         </svg>
+                        <span>Action</span>
                     </button>
                     <span className="ml-auto flex min-w-0 items-center gap-2" data-slot="tools-end">
                         {/* Only while the box holds exactly what ✍️ wrote; puts the draft back, empty included. */}
@@ -632,7 +640,7 @@ export function ChatComposer({
                             </button>
                         )}
                         {!dictation.recording && (
-                            <label htmlFor={boxId} className="truncate text-xs text-muted">
+                            <label htmlFor={boxId} className="sr-only">
                                 Write as {chat.identityName}
                             </label>
                         )}

@@ -1,11 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent, ReactNode, Ref, useEffect, useState } from 'react';
+import { FormEvent, ReactNode, Ref, useEffect, useId, useState } from 'react';
 
 import { COLUMN, TEXT_BOX } from '@/components/chat/chat-classes';
 import { useApiQuery } from '@/components/connection';
-import { ChevronLeftIcon, MoreIcon } from '@/components/icons';
+import { ChevronLeftIcon, ChevronRightIcon, MoreIcon } from '@/components/icons';
 import { CharacterPortrait } from '@/components/portrait/character-portrait';
 import { ConfirmDialog } from '@/components/sheet/confirm-dialog';
 import { Sheet } from '@/components/sheet/sheet';
@@ -15,11 +15,22 @@ import { PersonaList } from '@/lib/persona';
 
 const RESET_QUESTION = 'Clear every Message and start this Chat over from the Opening?';
 
-/** A round 44px icon button in the bar: ‹ back, the Visual novel view, ⋯. */
+/** A round 44px icon button in the bar: ‹ back and ⋯. */
 const BAR_ICON = [
     'bare-button grid size-11 shrink-0 place-items-center rounded-full text-text',
     'cursor-pointer press focus-ring active:bg-surface-raised',
     'aria-pressed:text-accent',
+].join(' ');
+
+/**
+ * The Visual novel view's toggle: its icon and the word "Novel", 44px tall
+ * (docs/ui-audit-2026-11-13.md, M2: the figure alone did not say what it did).
+ */
+const BAR_TOGGLE = [
+    'bare-button inline-flex min-h-11 shrink-0 items-center gap-1 rounded-full px-2.5',
+    'text-xs font-semibold text-text',
+    'cursor-pointer press focus-ring active:bg-surface-raised',
+    'aria-pressed:bg-accent-soft aria-pressed:text-accent',
 ].join(' ');
 
 /** A row of the ⋯ menu, a link or a button: 44px, its ring inside (the sheet's edge would clip one outside). */
@@ -296,6 +307,73 @@ function MenuButton({ onClick, disabled, danger, title, children }: MenuButtonPr
 /** A link row of the ⋯ menu. */
 const LINK_ITEM = `${ITEM} flex-col items-start text-text`;
 
+/** A group's small heading in the ⋯ menu (docs/ui-audit-2026-11-13.md, M5: Go to, This Chat). */
+const GROUP_LABEL = 'm-0 px-3 text-xs font-semibold tracking-wide text-muted uppercase';
+
+/** A "Go to" tile: an icon over its word, a third of the sheet wide and 64px tall. */
+const TILE = [
+    'bare-button flex min-h-16 flex-col items-center justify-center gap-1 rounded-md',
+    'border border-line bg-surface px-1 py-2',
+    'text-sm font-semibold text-text no-underline',
+    'cursor-pointer press focus-ring-inset active:bg-surface-raised',
+].join(' ');
+
+/** A switch's track and knob, inside an ITEM (its `group`): 3:1 when off, the accent when on (like Show Bonds). */
+const SWITCH_TRACK =
+    'relative h-6 w-10 shrink-0 rounded-full border border-field-line bg-quiet-fill group-aria-checked:border-accent-fill group-aria-checked:bg-accent-fill motion-safe:transition-colors motion-safe:duration-base';
+const SWITCH_KNOB =
+    'absolute top-0.5 left-0.5 size-4 rounded-full bg-text group-aria-checked:translate-x-4 group-aria-checked:bg-accent-text motion-safe:transition-transform motion-safe:duration-base';
+
+/** The tiles' 22px line icons. */
+function Glyph({ children }: { children: ReactNode }) {
+    return (
+        <svg
+            viewBox="0 0 24 24"
+            width="22"
+            height="22"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            className="text-accent"
+        >
+            {children}
+        </svg>
+    );
+}
+
+/** Memory: a page with lines. */
+function MemoryGlyph() {
+    return (
+        <Glyph>
+            <path d="M6 3h9l3 3v15H6z" />
+            <path d="M9 10h6M9 14h6M9 18h4" />
+        </Glyph>
+    );
+}
+
+/** Dashboard: three bars. */
+function DashboardGlyph() {
+    return (
+        <Glyph>
+            <path d="M5 20v-8M12 20V5M19 20v-6" />
+        </Glyph>
+    );
+}
+
+/** Gallery: a picture with a hill and a sun. */
+function GalleryGlyph() {
+    return (
+        <Glyph>
+            <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+            <circle cx="9" cy="10" r="1.6" />
+            <path d="m4 18 5-5 4 4 2.5-2.5L20 18" />
+        </Glyph>
+    );
+}
+
 interface ChatTopBarProps {
     chat: Chat;
     /** The Story's Character ids in cast order, which pick each Character's colour. */
@@ -373,6 +451,7 @@ export function ChatTopBar({
     };
     const note = noteSummary(chat.authorsNote);
     const sittingOut = sittingOutSummary(sittingOutNames);
+    const thisChatId = useId();
 
     return (
         <>
@@ -391,12 +470,12 @@ export function ChatTopBar({
                     </span>
                 </div>
                 {onToggleNovel && (
-                    <button ref={novelToggleRef} type="button" className={BAR_ICON} aria-label="Visual novel view" aria-pressed={novel} onClick={onToggleNovel}>
+                    <button ref={novelToggleRef} type="button" className={BAR_TOGGLE} aria-label="Visual novel view" aria-pressed={novel} onClick={onToggleNovel}>
                         {/* A figure over a text box: the speaker large, their words below. */}
                         <svg
                             viewBox="0 0 24 24"
-                            width="22"
-                            height="22"
+                            width="20"
+                            height="20"
                             aria-hidden="true"
                             fill={novel ? 'currentColor' : 'none'}
                             stroke="currentColor"
@@ -408,6 +487,7 @@ export function ChatTopBar({
                             <path d="M7.5 14c.6-2.4 2.3-3.8 4.5-3.8s3.9 1.4 4.5 3.8" fill="none" />
                             <rect x="3" y="15" width="18" height="6" rx="1.5" />
                         </svg>
+                        <span>Novel</span>
                     </button>
                 )}
                 <button
@@ -464,75 +544,94 @@ export function ChatTopBar({
                             onSave={onSetSittingOut}
                         />
                     ) : (
-                        <div className="grid gap-0.5">
-                            {chat.branchedFrom && (
-                                // A Branch leads back to where the two Chats part (.scratch/branch/spec.md).
-                                <Link
-                                    href={
-                                        chat.branchedFrom.messageId === null
-                                            ? `/stories/${chat.storyId}/chats/${chat.branchedFrom.chatId}`
-                                            : messageHref(chat.storyId, chat.branchedFrom.chatId, chat.branchedFrom.messageId)
-                                    }
-                                    className={LINK_ITEM}
-                                >
-                                    <MenuText label={`Branched from ${chat.branchedFrom.title}`} sub="Back to where the two Chats part" />
-                                </Link>
-                            )}
-                            <MenuButton onClick={choose(onOpenMemory)}>
-                                <MenuText label="Memory" sub="What the story remembers" />
-                            </MenuButton>
-                            <Link href={`/stories/${chat.storyId}/chats/${chat.id}/dashboard`} className={LINK_ITEM}>
-                                <MenuText label="Dashboard" sub="The Scene and how the Characters feel" />
-                            </Link>
-                            <Link href={`/stories/${chat.storyId}/gallery?chat=${chat.id}`} className={LINK_ITEM}>
-                                <MenuText label="Gallery" sub="Every Snapshot of this Chat" />
-                            </Link>
-                            {/* A plain link: the API answers it as an attachment, so the page stays put. */}
-                            <a
-                                href={`/api/stories/${chat.storyId}/chats/${chat.id}/transcript`}
-                                className={LINK_ITEM}
-                                download
-                                onClick={close}
-                            >
-                                <MenuText label="Download as text" sub="The whole Chat as a .txt file" />
-                            </a>
-                            <MenuButton onClick={() => setMenu('rename')} disabled={busy} title={chat.title}>
-                                <MenuText label="Rename" sub={chat.title} />
-                            </MenuButton>
-                            <IdentitySwap chat={chat} disabled={busy} onSwap={onSwapIdentity} />
-                            {stripHidden && (
-                                <MenuButton onClick={choose(onShowStrip)}>
-                                    <MenuText label="Show Scene strip" sub="The current Scene and its goal" />
+                        <div className="grid gap-3">
+                            {/* Other places for this Chat, as three tiles, then where a Branch came from. */}
+                            <nav aria-label="Go to" className="grid gap-1">
+                                <h2 className={GROUP_LABEL} aria-hidden="true">
+                                    Go to
+                                </h2>
+                                <div className="grid grid-cols-3 gap-2">
+                                    <button type="button" className={TILE} onClick={choose(onOpenMemory)}>
+                                        <MemoryGlyph />
+                                        Memory
+                                    </button>
+                                    <Link href={`/stories/${chat.storyId}/chats/${chat.id}/dashboard`} className={TILE}>
+                                        <DashboardGlyph />
+                                        Dashboard
+                                    </Link>
+                                    <Link href={`/stories/${chat.storyId}/gallery?chat=${chat.id}`} className={TILE}>
+                                        <GalleryGlyph />
+                                        Gallery
+                                    </Link>
+                                </div>
+                                {chat.branchedFrom && (
+                                    // A Branch leads back to where the two Chats part (.scratch/branch/spec.md).
+                                    <Link
+                                        href={
+                                            chat.branchedFrom.messageId === null
+                                                ? `/stories/${chat.storyId}/chats/${chat.branchedFrom.chatId}`
+                                                : messageHref(chat.storyId, chat.branchedFrom.chatId, chat.branchedFrom.messageId)
+                                        }
+                                        className={`${ITEM} flex-row items-center gap-2 text-text`}
+                                    >
+                                        <span className="flex min-w-0 flex-1 flex-col items-start">
+                                            <MenuText label={`Branched from ${chat.branchedFrom.title}`} sub="Back to where the two Chats part" />
+                                        </span>
+                                        <ChevronRightIcon size={18} className="shrink-0 text-muted" />
+                                    </Link>
+                                )}
+                            </nav>
+                            {/* Its name and its text, then how it plays; Read replies aloud stays the last row before Reset. */}
+                            <section aria-labelledby={thisChatId} className="grid gap-0.5">
+                                <h2 id={thisChatId} className={GROUP_LABEL}>
+                                    This Chat
+                                </h2>
+                                <MenuButton onClick={() => setMenu('rename')} disabled={busy} title={chat.title}>
+                                    <MenuText label="Rename" sub={chat.title} />
                                 </MenuButton>
-                            )}
-                            {/* The first of the new rows (.scratch/sillytavern-gaps/integration.md). */}
-                            <MenuButton onClick={() => setMenu('note')} disabled={busy} title={note}>
-                                <MenuText label="Author's note" sub={note} />
-                            </MenuButton>
-                            {/* After Author's note (.scratch/sillytavern-gaps/integration.md), whatever the cast size. */}
-                            <MenuButton onClick={() => setMenu('who')} title={sittingOut}>
-                                <MenuText label="Who's in this Chat" sub={sittingOut} />
-                            </MenuButton>
-                            {/* The last of the new rows (.scratch/sillytavern-gaps/integration.md). The menu stays open. */}
-                            <button
-                                type="button"
-                                role="switch"
-                                aria-checked={chat.autoRead}
-                                className={`${ITEM} flex-row items-center gap-3 text-text`}
-                                disabled={busy}
-                                onClick={() => onSetAutoRead(!chat.autoRead)}
-                            >
-                                <span className="flex min-w-0 flex-1 flex-col items-start">
-                                    <MenuText label="Read replies aloud" sub="New replies play by themselves" />
-                                </span>
-                                <span className={`shrink-0 rounded-full border px-2.5 py-0.5 text-sm ${chat.autoRead ? PILL_ON : PILL_OFF}`} aria-hidden="true">
-                                    {chat.autoRead ? 'On' : 'Off'}
-                                </span>
-                            </button>
-                            <hr className="my-1 border-0 border-t border-line" />
-                            <MenuButton danger onClick={choose(() => setConfirming(true))} disabled={busy || !chat.playable}>
-                                <MenuText label="Reset Chat" sub="Start again from the Opening" danger />
-                            </MenuButton>
+                                {/* A plain link: the API answers it as an attachment, so the page stays put. */}
+                                <a
+                                    href={`/api/stories/${chat.storyId}/chats/${chat.id}/transcript`}
+                                    className={LINK_ITEM}
+                                    download
+                                    onClick={close}
+                                >
+                                    <MenuText label="Download as text" sub="The whole Chat as a .txt file" />
+                                </a>
+                                <IdentitySwap chat={chat} disabled={busy} onSwap={onSwapIdentity} />
+                                {stripHidden && (
+                                    <MenuButton onClick={choose(onShowStrip)}>
+                                        <MenuText label="Show Scene strip" sub="The current Scene and its goal" />
+                                    </MenuButton>
+                                )}
+                                <MenuButton onClick={() => setMenu('note')} disabled={busy} title={note}>
+                                    <MenuText label="Author's note" sub={note} />
+                                </MenuButton>
+                                <MenuButton onClick={() => setMenu('who')} title={sittingOut}>
+                                    <MenuText label="Who's in this Chat" sub={sittingOut} />
+                                </MenuButton>
+                                {/* A real switch (M5): a track and a knob, not a pill. The menu stays open. */}
+                                <button
+                                    type="button"
+                                    role="switch"
+                                    aria-checked={chat.autoRead}
+                                    className={`${ITEM} flex-row items-center gap-3 text-text`}
+                                    disabled={busy}
+                                    onClick={() => onSetAutoRead(!chat.autoRead)}
+                                >
+                                    <span className="flex min-w-0 flex-1 flex-col items-start">
+                                        <MenuText label="Read replies aloud" sub="New replies play by themselves" />
+                                    </span>
+                                    <span aria-hidden="true" className={SWITCH_TRACK}>
+                                        <span className={SWITCH_KNOB} />
+                                    </span>
+                                </button>
+                            </section>
+                            <div className="border-t border-line pt-1">
+                                <MenuButton danger onClick={choose(() => setConfirming(true))} disabled={busy || !chat.playable}>
+                                    <MenuText label="Reset Chat" sub="Start again from the Opening" danger />
+                                </MenuButton>
+                            </div>
                         </div>
                     )}
                 </Sheet>

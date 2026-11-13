@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useId, useRef, useState } from 'react';
 
 import { useConnection } from '@/components/connection';
-import { BranchIcon } from '@/components/icons';
+import { BranchIcon, ChevronRightIcon } from '@/components/icons';
 import { ConfirmButton } from '@/components/story-editor/fields';
 import { ApiError, ApiUnreachableError } from '@/lib/api';
 import { chatApi, ChatListItem, formatWhen } from '@/lib/chat';
@@ -137,8 +137,15 @@ export function ChatList({ storyId, initial, emptyFocus }: { storyId: number; in
                                 }}
                             />
                         ) : (
-                            <Link href={`/stories/${storyId}/chats/${chat.id}`} className="grid gap-1 rounded-sm pt-1.5 pb-3 text-text no-underline">
-                                <span className="font-semibold">{chat.title}</span>
+                            // The whole card above the buttons opens the Chat, and says so with a › (docs/ui-audit-2026-11-13.md, M1).
+                            <Link
+                                href={`/stories/${storyId}/chats/${chat.id}`}
+                                className="-mx-2 grid gap-1 rounded-md px-2 pt-1.5 pb-3 text-text no-underline press active:bg-surface-raised"
+                            >
+                                <span className="flex items-start justify-between gap-3">
+                                    <span className="font-semibold">{chat.title}</span>
+                                    <ChevronRightIcon size={20} className="mt-0.5 shrink-0 text-muted" />
+                                </span>
                                 {chat.branchedFrom && (
                                     <span className="flex items-center gap-1 text-sm text-muted italic">
                                         <BranchIcon size={14} />
@@ -152,11 +159,12 @@ export function ChatList({ storyId, initial, emptyFocus }: { storyId: number; in
                                 </span>
                             </Link>
                         )}
+                        {/* Small and quiet, so the card reads before them (M1); Delete still asks first. */}
                         <div className="toolbar">
                             <button
                                 type="button"
                                 data-rename
-                                className="button button-quiet"
+                                className="button button-quiet button-small"
                                 onClick={() => setRenaming(chat.id)}
                                 aria-label={`Rename ${chat.title}`}
                                 disabled={renaming === chat.id}
@@ -166,7 +174,7 @@ export function ChatList({ storyId, initial, emptyFocus }: { storyId: number; in
                             <ConfirmButton
                                 label="Delete"
                                 ariaLabel={`Delete ${chat.title}`}
-                                danger
+                                className="button-small text-danger"
                                 question={`Delete "${chat.title}" and everything in it?`}
                                 confirmLabel="Delete"
                                 onConfirm={() => remove(chat.id)}

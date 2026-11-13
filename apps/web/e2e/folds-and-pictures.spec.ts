@@ -127,7 +127,7 @@ test.describe('on a phone', () => {
         }
     });
 
-    test('the Dashboard shows each Character\'s picture or initial, and their feelings fold and stay folded', async ({ page, request }) => {
+    test('the Dashboard shows each Character\'s picture or initial, and their feelings start folded to one line and stay open once opened', async ({ page, request }) => {
         const { storyId, chatId } = await createStory(request);
         try {
             await page.goto(`/stories/${storyId}/chats/${chatId}/dashboard`);
@@ -138,19 +138,30 @@ test.describe('on a phone', () => {
             await expect(jonah.locator(REFERENCE)).toHaveCount(0);
             await expect(jonah.getByText('J', { exact: true })).toBeVisible();
 
+            // Folded at first (docs/ui-audit-2026-11-13.md, M6): one line says how they feel, the Bonds stay shut.
             const fold = jonah.getByRole('button', { name: 'Jonah', exact: true });
-            await expect(jonah.getByText('A stranger to everyone so far.')).toBeVisible();
-            await fold.click();
+            const body = jonah.locator(`[id="${await fold.getAttribute('aria-controls')}"]`);
             await expect(fold).toHaveAttribute('aria-expanded', 'false');
-            await expect(jonah.getByText('A stranger to everyone so far.')).toBeHidden();
+            await expect(body).toBeHidden();
+            await expect(jonah.getByText('A stranger to everyone so far.').filter({ visible: true })).toHaveCount(1);
+            await fold.click();
+            await expect(fold).toHaveAttribute('aria-expanded', 'true');
+            await expect(body).toBeVisible();
+            await expect(body.getByText('A stranger to everyone so far.')).toBeVisible();
+            // Open, the one line goes: only the body says it.
+            await expect(jonah.getByText('A stranger to everyone so far.')).toHaveCount(1);
 
             await page.reload();
             const reloaded = page.getByRole('region', { name: 'How the Characters feel' });
             await expect(reloaded.getByRole('region', { name: 'Jonah' }).getByRole('button', { name: 'Jonah', exact: true })).toHaveAttribute(
                 'aria-expanded',
+                'true',
+            );
+            await expect(reloaded.getByRole('region', { name: 'Mira' }).getByRole('button', { name: 'Mira', exact: true })).toHaveAttribute(
+                'aria-expanded',
                 'false',
             );
-            await expect(reloaded.getByRole('region', { name: 'Mira' }).getByText('A stranger to everyone so far.')).toBeVisible();
+            await expect(reloaded.getByRole('region', { name: 'Mira' }).getByText('A stranger to everyone so far.').filter({ visible: true })).toHaveCount(1);
         } finally {
             await request.delete(`/api/stories/${storyId}`);
         }

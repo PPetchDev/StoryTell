@@ -1,5 +1,7 @@
 import { APIRequestContext, expect, test } from '@playwright/test';
 
+import { openCard } from './harness/editor';
+
 // The Bond chart on the Dashboard (.scratch/bond-axes/issues/03-bond-chart-on-the-dashboard.md),
 // read on a phone: 390px wide, with touch.
 test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
@@ -67,7 +69,7 @@ test('a Bond charts its axes in words with no digit, a pin opens its event and M
         await page.goto(`/stories/${storyId}/chats/${chatId}/dashboard`);
         const feel = page.getByRole('region', { name: 'How the Characters feel' });
 
-        const bond = feel.getByRole('region', { name: 'Mira' }).getByRole('group', { name: 'Mira toward Ash' });
+        const bond = (await openCard(feel, 'Mira')).getByRole('group', { name: 'Mira toward Ash' });
         await bond.locator('summary').click();
         const chart = bond.getByRole('group', { name: 'How Mira feels toward Ash over the Chat' });
         await expect(chart).toBeVisible();
@@ -109,7 +111,7 @@ test('a Bond charts its axes in words with no digit, a pin opens its event and M
 
         // Kai's Bond toward Mira has no levels: words instead of a chart.
         await page.goto(`/stories/${storyId}/chats/${chatId}/dashboard`);
-        const kai = page.getByRole('region', { name: 'How the Characters feel' }).getByRole('region', { name: 'Kai' }).getByRole('group', { name: 'Kai toward Mira' });
+        const kai = (await openCard(page.getByRole('region', { name: 'How the Characters feel' }), 'Kai')).getByRole('group', { name: 'Kai toward Mira' });
         await kai.locator('summary').click();
         await expect(kai).toContainText('Not measured yet');
         await expect(kai.getByRole('group', { name: /over the Chat$/ })).toHaveCount(0);

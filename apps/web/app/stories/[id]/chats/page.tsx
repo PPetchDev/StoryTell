@@ -6,11 +6,14 @@ import { use, useId, useRef, useState } from 'react';
 
 import { ChatList } from '@/components/chat/chat-list';
 import { useApiQuery, useConnection } from '@/components/connection';
-import { ArrowLeftIcon } from '@/components/icons';
+import { ArrowLeftIcon, PencilIcon } from '@/components/icons';
 import { ErrorState, Loading } from '@/components/query-state';
 import { ApiError, ApiUnreachableError } from '@/lib/api';
 import { chatApi, ChatListItem } from '@/lib/chat';
 import { Story, storyTitle } from '@/lib/story';
+
+/** Gallery and Edit Story in the header: an outlined pill, 44px tall, the text colour. */
+const PLACE_LINK = 'rounded-full border border-line px-3 text-sm font-semibold !text-text focus-ring';
 
 /** A Story's Chats (spec: user stories 49–51, 78). */
 export default function ChatsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -65,13 +68,39 @@ export default function ChatsPage({ params }: { params: Promise<{ id: string }> 
     const playable = story.data.playable;
     return (
         <main>
+            {/*
+             * Back on the left; the Story's other places on the right as small outlined links, so
+             * "Gallery" no longer sits in the middle like the page's name (docs/ui-audit-2026-11-13.md, M8).
+             */}
             <nav className="breadcrumbs" aria-label="Breadcrumb">
                 <Link href="/">
                     <ArrowLeftIcon size={18} />
                     Stories
                 </Link>
-                <Link href={`/stories/${storyId}/gallery`}>Gallery</Link>
-                <Link href={`/stories/${storyId}`}>Edit Story</Link>
+                <span className="flex items-center gap-2">
+                    <Link href={`/stories/${storyId}/gallery`} className={PLACE_LINK}>
+                        <svg
+                            viewBox="0 0 24 24"
+                            width="16"
+                            height="16"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                        >
+                            <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+                            <circle cx="9" cy="10" r="1.6" />
+                            <path d="m4 18 5-5 4 4 2.5-2.5L20 18" />
+                        </svg>
+                        Gallery
+                    </Link>
+                    <Link href={`/stories/${storyId}`} className={PLACE_LINK}>
+                        <PencilIcon size={16} />
+                        Edit Story
+                    </Link>
+                </span>
             </nav>
             <div className="page-header">
                 <h1 ref={heading} tabIndex={-1}>

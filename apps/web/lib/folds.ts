@@ -4,11 +4,12 @@ import { useSyncExternalStore } from 'react';
  * Which folds the user has turned from their starting state on this device (a per-device
  * preference, like the List / Graph switch). Only those keys are kept, together under one key as
  * a list. Almost every fold starts unfolded, so its key records that it is folded: `storySoFar`,
- * `character:<id>`, `bonds:<characterId>`, `scene:<id>`, `lore:<id>`, `feelings:<characterId>`,
+ * `character:<id>`, `bonds:<characterId>`, `scene:<id>`, `lore:<id>`,
  * and in the Gallery `galleryStory:<storyId>` and `galleryChat:<storyId>:<chatId or "deleted">`.
  * A Lore card's More triggers fold starts folded, so its key, `loreMoreOpen:<id>`, records the
  * opposite: that it is open (FoldTitle's `startsFolded`). So does a Character's Arc changes fold
- * on the Dashboard, `arcChanges:<characterId>`, the Story editor's Status box list, `statusOpen:<storyId>`,
+ * on the Dashboard, `arcChanges:<characterId>`, a Character's feelings there, `feelingsOpen:<characterId>`
+ * (the old `feelings:<characterId>` means nothing now), the Story editor's Status box list, `statusOpen:<storyId>`,
  * and every Story editor card since they start folded: `open:character:<id>`, `open:scene:<id>`,
  * `open:lore:<id>`, `open:bonds:<characterId>`, … (components/story-editor/folding-card.tsx).
  * The old editor keys (`character:<id>` without `open:`) mean nothing now and are left as they are.

@@ -1,5 +1,7 @@
 import { APIRequestContext, expect, Page, test } from '@playwright/test';
 
+import { openCard } from './harness/editor';
+
 const OPENING = 'The lamp went out an hour ago.\n\n@Mira: Boots off, keeper.';
 const NO_CHANGE = '{"bond_changes":[],"arc_steps":[],"scene":{"move_on":false}}';
 const NO_OPS = '{"operations":[]}';
@@ -63,9 +65,21 @@ async function createJudgedChat(
     return { storyId, chatId };
 }
 
-/** The Updates row of one reply, e.g. "Reply 2". */
+/** The Updates row of one reply, e.g. "Reply 2". Up-to-date replies sit in a fold (M6): see openUpToDate. */
 function updateOf(page: Page, reply: string) {
     return page.getByRole('region', { name: 'Updates' }).getByRole('listitem').filter({ hasText: reply });
+}
+
+/** The Updates' one line, "All 3 replies are up to date" (docs/ui-audit-2026-11-13.md, M6). */
+function upToDateLine(page: Page) {
+    return page.getByRole('region', { name: 'Updates' }).locator('summary');
+}
+
+/** Opens the Updates' one line to show each of the up-to-date replies. */
+async function openUpToDate(page: Page) {
+    const fold = page.getByRole('region', { name: 'Updates' }).locator('details');
+    if ((await fold.getAttribute('open')) === null) await fold.locator('summary').click();
+    await expect(fold).toHaveAttribute('open', '');
 }
 
 /** None of the app's internal words shows as visible text on the Dashboard page. */
@@ -94,7 +108,9 @@ test('shows a scripted Bond change with its event on the dashboard, and editing 
 
         // The sections say what they show, in plain words.
         const feel = page.getByRole('region', { name: 'How the Characters feel' });
-        const bond = feel.getByRole('region', { name: 'Mira' }).getByRole('group', { name: 'Mira toward Ash' });
+        // Folded, each Character's feelings read as one line of labels (docs/ui-audit-2026-11-13.md, M6).
+        await expect(feel.getByRole('region', { name: 'Mira' })).toContainText('Ash: Curious');
+        const bond = (await openCard(feel, 'Mira')).getByRole('group', { name: 'Mira toward Ash' });
         await expect(bond).toContainText('→ Ash');
         await expect(bond).toContainText('Curious');
         await expect(bond).toContainText('She wonders why a keeper would come in a storm.');
@@ -102,6 +118,10 @@ test('shows a scripted Bond change with its event on the dashboard, and editing 
         const changed = page.getByRole('region', { name: "How they've changed" });
         await expect(changed.getByRole('region', { name: 'Mira' })).toContainText("Hasn't changed yet");
         await expect(page.getByRole('region', { name: 'Where the story is' })).toContainText('Free play');
+        // All up to date, the Updates say so in one line, each reply a tap away (M6).
+        await expect(upToDateLine(page)).toHaveText(/^All \d+ repl(y is|ies are) up to date$/);
+        await expect(updateOf(page, 'Reply 2')).toHaveCount(0);
+        await openUpToDate(page);
         await expect(updateOf(page, 'Reply 2')).toContainText('Up to date');
         await expectNoInternalWords(page);
 
@@ -140,9 +160,14 @@ test("a reply whose update failed reads Couldn't update, and Retry brings it up 
         await page.goto(`/stories/${storyId}/chats/${chatId}/dashboard`);
         const reply = updateOf(page, 'Reply 2');
         await expect(reply).toContainText("Couldn't update — Retry");
+        // A failed reply stays in sight, outside the folded up-to-date ones.
+        await expect(reply).toBeVisible();
         await expectNoInternalWords(page);
 
         await reply.getByRole('button', { name: 'Retry' }).click();
+        // Up to date now, it joins the others in the one line.
+        await expect(upToDateLine(page)).toHaveText(/^All \d+ repl(y is|ies are) up to date$/);
+        await openUpToDate(page);
         await expect(reply).toContainText('Up to date');
         await expect(reply.getByRole('button', { name: 'Retry' })).toHaveCount(0);
         await expectNoInternalWords(page);

@@ -16,7 +16,8 @@ async function expand(toggle: Locator): Promise<void> {
 /**
  * Story editor cards start folded (docs/ui-audit-2026-11-13.md, H2; .scratch/desktop-and-folds/spec.md):
  * opens the card named `name` (its section's label, e.g. "Character 1", "Starting Bonds from Mira",
- * "Lore 1", "Saved replies") when it is folded, and returns it.
+ * "Lore 1", "Saved replies") when it is folded, and returns it. A Character's feelings on the Dashboard
+ * fold the same way and start folded too (docs/ui-audit-2026-11-13.md, M6): `openCard(feel, "Mira")`.
  */
 export async function openCard(scope: Page | Locator, name: string | RegExp): Promise<Locator> {
     const card = scope.getByRole('region', { name, exact: typeof name === 'string' }).first();

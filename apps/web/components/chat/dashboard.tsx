@@ -22,7 +22,6 @@ import {
     formatWhen,
     messageHref,
 } from '@/lib/chat';
-import { useFolded } from '@/lib/folds';
 
 /** A paragraph on the Dashboard: no top margin, a little under. */
 const P = 'mt-0 mb-1.5';
@@ -62,12 +61,15 @@ function BondHistory({ dashboard, history }: { dashboard: ChatDashboard; history
     );
 }
 
-/** One Bond: its label and why on the summary, with a chevron that says it opens (audit H21), and its chart and history inside. */
+/**
+ * One Bond: its label and why on the summary, and its chart and history inside. The summary ends in
+ * "History" rather than a second chevron under the Character's own (docs/ui-audit-2026-11-13.md, M7).
+ */
 function BondView({ dashboard, bond, from }: { dashboard: ChatDashboard; bond: DashboardBond; from: string }) {
     const latest = bond.history[0];
     return (
         <details className="group mt-2 border-t border-line py-3" aria-label={`${from} toward ${bond.toward.name}`}>
-            <Summary top>
+            <Summary top cue={<HistoryCue />}>
                 <span className="grid gap-0.5">
                     <span>
                         <span className="text-sm text-muted">→ {bond.toward.name}</span> <span className={LABEL}>{bond.label}</span>
@@ -79,6 +81,16 @@ function BondView({ dashboard, bond, from }: { dashboard: ChatDashboard; bond: D
             <BondChart dashboard={dashboard} bond={bond} from={from} />
             <BondHistory dashboard={dashboard} history={bond.history} />
         </details>
+    );
+}
+
+/** The Bond summary's cue: "History ›" while shut, "Hide" while open. */
+function HistoryCue() {
+    return (
+        <span className="mt-0.5 inline-flex flex-none items-center text-sm font-semibold text-accent" aria-hidden="true">
+            <span className="group-open:hidden">History ›</span>
+            <span className="hidden group-open:inline">Hide</span>
+        </span>
     );
 }
 
@@ -110,9 +122,16 @@ function personClass(index: number): string {
 /** A Character's name and picture in a row 44px tall. */
 const PERSON_HEAD = 'flex min-h-11 items-center gap-3';
 
+/** A Character's Bonds in one line: "Ash: Curious · Kai: Fond", or that they are a stranger. */
+function bondsLine(character: DashboardCharacter): string {
+    if (character.bonds.length === 0) return 'A stranger to everyone so far.';
+    return character.bonds.map((bond) => `${bond.toward.name}: ${bond.label}`).join(' · ');
+}
+
 /**
- * One Character's Bonds, under "How the Characters feel", with their picture. They fold, and
- * stay folded on this device in every Chat of the Story until unfolded.
+ * One Character's Bonds, under "How the Characters feel", with their picture. They start folded
+ * to one line of labels (docs/ui-audit-2026-11-13.md, M6), and stay open on this device in every
+ * Chat of the Story once opened.
  */
 function CharacterBonds({
     dashboard,
@@ -127,16 +146,17 @@ function CharacterBonds({
 }) {
     const bodyId = useId();
     const titleId = useId();
-    const foldKey = `feelings:${character.id}`;
-    const folded = useFolded(foldKey);
+    const foldKey = `feelingsOpen:${character.id}`;
+    const folded = useFoldedState(foldKey, true);
     return (
         <section className={personClass(index)} aria-labelledby={titleId}>
             <div className={PERSON_HEAD}>
-                <FoldTitle foldKey={foldKey} controls={bodyId} id={titleId}>
+                <FoldTitle foldKey={foldKey} controls={bodyId} id={titleId} startsFolded>
                     <Portrait character={character} pictures={pictures} />
                     {character.name}
                 </FoldTitle>
             </div>
+            {folded && <p className="mt-0 mb-1 pl-13 text-sm text-muted">{bondsLine(character)}</p>}
             <div id={bodyId} hidden={folded} className="mt-2 py-1">
                 {character.bonds.length === 0 ? (
                     <p className={`${P} text-muted`}>A stranger to everyone so far.</p>
@@ -217,6 +237,43 @@ function updateStatusOf(entry: DashboardBackground): UpdateStatus {
     return 'upToDate';
 }
 
+/** "Reply 2: Up to date", with Retry when it failed. */
+function UpdateRow({
+    dashboard,
+    entry,
+    retrying,
+    onRetry,
+}: {
+    dashboard: ChatDashboard;
+    entry: DashboardBackground;
+    retrying: number | null;
+    onRetry(entry: DashboardBackground): void;
+}) {
+    const status = updateStatusOf(entry);
+    return (
+        <li>
+            <Link href={messageHref(dashboard.storyId, dashboard.chatId, entry.messageId)}>Reply {entry.position}</Link>
+            {': '}
+            {status !== 'failed' && UPDATE_WORDS[status]}
+            {status === 'failed' && (
+                <>
+                    <span className="turn-error">{UPDATE_WORDS.failed}</span>
+                    {' — '}
+                    <button
+                        type="button"
+                        className="button button-quiet button-small ml-2"
+                        disabled={retrying !== null}
+                        aria-busy={retrying === entry.messageId || undefined}
+                        onClick={() => onRetry(entry)}
+                    >
+                        {retrying === entry.messageId ? 'Retrying…' : 'Retry'}
+                    </button>
+                </>
+            )}
+        </li>
+    );
+}
+
 /** How often the Dashboard reads itself again while a reply is still updating (audit M55). */
 const UPDATING_POLL_MS = 3000;
 
@@ -237,10 +294,10 @@ function Section({ title, className = SECTION, children }: { title: string; clas
 const PEOPLE_SECTION = `${SECTION} lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-10`;
 
 /**
- * The read-only dashboard (spec: "Dashboard"), in plain words: how the Characters feel (their
- * Bonds with history), how they've changed (the events that changed them, never the plan),
- * where the story is (the current Scene and the event that moved it on), and whether each
- * recent reply's updates finished, with Retry. Nothing here is editable; every item links to
+ * The read-only dashboard (spec: "Dashboard"), in plain words: where the story is (the current
+ * Scene and the event that moved it on), how the Characters feel (their Bonds with history), how
+ * they've changed (the events that changed them, never the plan), and whether each recent reply's
+ * updates finished, with Retry. Nothing here is editable; every item links to
  * the Message that caused it, which is where a bad change is rewound.
  */
 export function Dashboard({ initial, cast = [], portraits = {} }: { initial: ChatDashboard; cast?: Cast; portraits?: Portraits }) {
@@ -250,6 +307,8 @@ export function Dashboard({ initial, cast = [], portraits = {} }: { initial: Cha
     const [retrying, setRetrying] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
     const updating = dashboard.background.some((entry) => updateStatusOf(entry) === 'updating');
+    const done = dashboard.background.filter((entry) => updateStatusOf(entry) === 'upToDate');
+    const pending = dashboard.background.filter((entry) => updateStatusOf(entry) !== 'upToDate');
 
     // "Updating…" turns into what happened without a reload: read again every few seconds until nothing is running.
     useEffect(() => {
@@ -301,18 +360,6 @@ export function Dashboard({ initial, cast = [], portraits = {} }: { initial: Cha
                 edit the Message that caused it.
             </p>
 
-            <Section title="How the Characters feel" className={PEOPLE_SECTION}>
-                {dashboard.characters.map((character, index) => (
-                    <CharacterBonds key={character.id} dashboard={dashboard} character={character} pictures={pictures} index={index} />
-                ))}
-            </Section>
-
-            <Section title="How they've changed" className={PEOPLE_SECTION}>
-                {dashboard.characters.map((character, index) => (
-                    <CharacterArc key={character.id} dashboard={dashboard} character={character} pictures={pictures} index={index} />
-                ))}
-            </Section>
-
             <Section title="Where the story is">
                 <p className={`${P} whitespace-pre-wrap`}>{dashboard.scene.current ? dashboard.scene.current.name : 'Free play'}</p>
                 {dashboard.scene.advance ? (
@@ -334,39 +381,50 @@ export function Dashboard({ initial, cast = [], portraits = {} }: { initial: Cha
                 )}
             </Section>
 
+            <Section title="How the Characters feel" className={PEOPLE_SECTION}>
+                {dashboard.characters.map((character, index) => (
+                    <CharacterBonds key={character.id} dashboard={dashboard} character={character} pictures={pictures} index={index} />
+                ))}
+            </Section>
+
+            <Section title="How they've changed" className={PEOPLE_SECTION}>
+                {dashboard.characters.map((character, index) => (
+                    <CharacterArc key={character.id} dashboard={dashboard} character={character} pictures={pictures} index={index} />
+                ))}
+            </Section>
+
             <Section title="Updates">
                 <p className={`${P} text-sm text-muted`}>After each reply, the feelings, changes, Scene and Memories above are brought up to date.</p>
                 {dashboard.background.length === 0 ? (
                     <p className={`${P} text-muted`}>No replies yet.</p>
                 ) : (
                     // Polite: when "Updating…" turns into the result, it is said.
-                    <ul className={LIST} aria-live="polite">
-                        {dashboard.background.map((entry) => {
-                            const status = updateStatusOf(entry);
-                            return (
-                                <li key={entry.messageId}>
-                                    <Link href={messageHref(dashboard.storyId, dashboard.chatId, entry.messageId)}>Reply {entry.position}</Link>
-                                    {': '}
-                                    {status !== 'failed' && UPDATE_WORDS[status]}
-                                    {status === 'failed' && (
-                                        <>
-                                            <span className="turn-error">{UPDATE_WORDS.failed}</span>
-                                            {' — '}
-                                            <button
-                                                type="button"
-                                                className="button button-quiet button-small ml-2"
-                                                disabled={retrying !== null}
-                                                aria-busy={retrying === entry.messageId || undefined}
-                                                onClick={() => void retry(entry)}
-                                            >
-                                                {retrying === entry.messageId ? 'Retrying…' : 'Retry'}
-                                            </button>
-                                        </>
-                                    )}
-                                </li>
-                            );
-                        })}
-                    </ul>
+                    <div aria-live="polite">
+                        {/* Replies still updating or that failed stay in sight, each with its Retry. */}
+                        {pending.length > 0 && (
+                            <ul className={LIST}>
+                                {pending.map((entry) => (
+                                    <UpdateRow key={entry.messageId} dashboard={dashboard} entry={entry} retrying={retrying} onRetry={(e) => void retry(e)} />
+                                ))}
+                            </ul>
+                        )}
+                        {/* The rest in one line (M6), each reply a tap away. */}
+                        {done.length > 0 && (
+                            <details className="group mt-3">
+                                <Summary>
+                                    <span>
+                                        {pending.length === 0 ? 'All' : 'The other'} {done.length} {done.length === 1 ? 'reply is' : 'replies are'} up
+                                        to date
+                                    </span>
+                                </Summary>
+                                <ul className={LIST}>
+                                    {done.map((entry) => (
+                                        <UpdateRow key={entry.messageId} dashboard={dashboard} entry={entry} retrying={retrying} onRetry={(e) => void retry(e)} />
+                                    ))}
+                                </ul>
+                            </details>
+                        )}
+                    </div>
                 )}
                 {error && (
                     <p role="alert" className="turn-error mt-2 mb-0">

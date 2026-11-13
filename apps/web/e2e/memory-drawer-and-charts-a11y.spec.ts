@@ -1,5 +1,7 @@
 import { APIRequestContext, expect, Page, test } from '@playwright/test';
 
+import { openCard } from './harness/editor';
+
 // The Memory drawer as a dialog below 1024px, the Bond chart in words, the Memory graph's 44px
 // taps and its one Tab stop, and the Chats list's Rename (docs/ui-audit.md: H4, H17, H18, H19,
 // M52, M54, M55).
@@ -181,7 +183,8 @@ test.describe('on a phone', () => {
             .toBe('done');
         try {
             await page.goto(`/stories/${storyId}/chats/${playedId}/dashboard`);
-            const bond = page.getByRole('group', { name: 'Mira toward Ash' });
+            const feel = page.getByRole('region', { name: 'How the Characters feel' });
+            const bond = (await openCard(feel, 'Mira')).getByRole('group', { name: 'Mira toward Ash' });
             await bond.locator('summary').click();
             const chart = bond.getByRole('group', { name: 'How Mira feels toward Ash over the Chat' });
             await expect(chart).toHaveAccessibleDescription(

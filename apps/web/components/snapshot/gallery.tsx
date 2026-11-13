@@ -229,8 +229,12 @@ function StorySection({ story, onOpen }: { story: StoryGroup; onOpen: Open }) {
     );
 }
 
-/** A tile: the whole image on the viewer's black, never cropped, every tile the same size. */
-const THUMB = 'bare-button block aspect-[2/3] w-full overflow-hidden rounded-sm border border-line bg-viewer-stage';
+/**
+ * A tile: the whole image, never cropped, every tile the same size. Until the picture loads, and
+ * round a picture of another shape, the tile shows the raised surface of the theme, not the
+ * viewer's black, so a loading tile does not read as a broken one (docs/ui-audit-2026-11-13.md, M17).
+ */
+const THUMB = 'bare-button block aspect-[2/3] w-full overflow-hidden rounded-sm border border-line bg-surface-raised';
 
 /** One Chat's Snapshots: its title and count, folding, then the grid. */
 function ChatSection({ chat, level, onOpen }: { chat: ChatGroup; level: 'h2' | 'h3'; onOpen: Open }) {
