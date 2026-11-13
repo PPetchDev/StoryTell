@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { APIRequestContext, expect, Page, test } from '@playwright/test';
 
 import { cardFixture, cardFixtureJson, chunkTypes, jsonFile, pngCard, pngImage, v2Card } from '../../api/test/harness/card-files';
+import { openCard } from './harness/editor';
 
 // Character cards (CONTEXT.md: "Character card") on a phone: 390px wide, with touch.
 test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
@@ -134,7 +135,8 @@ test('a PNG card shows its picture in the panel, and becomes the Portrait and th
         // The Cover banner shows the Reference image at once.
         await expect(page.getByRole('button', { name: 'Change the Cover' })).toHaveAttribute('style', new RegExp(imagePath));
         await page.getByRole('tab', { name: 'Characters' }).tap();
-        const image = page.getByRole('region', { name: 'Character 1' }).getByRole('img', { name: 'Reference image of Mira' });
+        // Character cards start folded.
+        const image = (await openCard(page, 'Character 1')).getByRole('img', { name: 'Reference image of Mira' });
         await expect.poll(() => image.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBe(64);
 
         await page.goto('/');
@@ -232,7 +234,8 @@ test.describe('Export as Character card (desktop: the file downloads)', () => {
     /** Taps Export on the first Character's card and answers the downloaded file. */
     async function exportFirstCharacter(page: Page, storyId: number): Promise<{ name: string; bytes: Buffer }> {
         await page.goto(`/stories/${storyId}?tab=characters`);
-        const character = page.getByRole('region', { name: 'Character 1' });
+        // Character cards start folded.
+        const character = await openCard(page, 'Character 1');
         const downloading = page.waitForEvent('download');
         await character.getByRole('button', { name: 'Export as Character card' }).click();
         const download = await downloading;

@@ -1,5 +1,7 @@
 import { APIRequestContext, expect, test } from '@playwright/test';
 
+import { openCard } from './harness/editor';
+
 /** The fake gateway's control routes, reached through the Next.js /api proxy. */
 const FAKE = '/api/testing/fake-gateway';
 
@@ -70,18 +72,18 @@ test('drafts a playable Story from an idea after one failed try, then rewrites a
     await page.getByRole('tab', { name: 'Role' }).click();
     await expect(page.getByRole('region', { name: 'Role' }).getByLabel('Name')).toHaveValue('The new keeper');
     await page.getByRole('tab', { name: 'Characters' }).click();
-    const mira = page.getByRole('region', { name: 'Character 1' });
+    // Editor cards start folded.
+    const mira = await openCard(page, 'Character 1');
     await expect(mira.getByLabel('Name', { exact: true })).toHaveValue('Mira');
     await expect(mira.getByLabel('Secrets')).toHaveValue('She put the lamp out herself.');
     await page.getByRole('tab', { name: 'Bonds' }).click();
     await expect(
-        page
-            .getByRole('region', { name: 'Starting Bonds from Mira' })
+        (await openCard(page, 'Starting Bonds from Mira'))
             .getByRole('group', { name: 'Bond toward The new keeper (the Role)' })
             .getByLabel('Label'),
     ).toHaveValue('wary');
     await page.getByRole('tab', { name: 'Scenes' }).click();
-    await expect(page.getByRole('region', { name: 'Scene 1' }).getByLabel('Name')).toHaveValue('Arrival');
+    await expect((await openCard(page, 'Scene 1')).getByLabel('Name')).toHaveValue('Arrival');
     await page.getByRole('tab', { name: 'Story' }).click();
 
     // Both draft calls carried the idea, as story_draft calls in JSON mode.

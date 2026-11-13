@@ -1,5 +1,7 @@
 import { APIRequestContext, expect, Page, test } from '@playwright/test';
 
+import { openCard } from './harness/editor';
+
 // The Story editor's audit fixes (docs/ui-audit.md): one-tap removals that undo or ask (H3), an Add
 // Document sheet that can always be closed (H6, M18), and async changes said out loud (H11, H12, M16).
 // On a phone: 390px wide, with touch.
@@ -48,7 +50,8 @@ test('one-tap removals act at once with an Undo, and removing a Bond asks first'
     try {
         // An example line: gone at once, focus on Undo, said; Undo puts it back and saves it.
         await page.goto(`/stories/${storyId}?tab=characters`);
-        const mira = page.getByRole('region', { name: 'Character 1' });
+        // Editor cards start folded.
+        const mira = await openCard(page, 'Character 1');
         const lines = mira.getByRole('group', { name: 'Example lines' });
         await lines.getByRole('button', { name: 'Remove example line 1' }).tap();
         await expect(lines.getByRole('textbox')).toHaveCount(1);
@@ -65,7 +68,7 @@ test('one-tap removals act at once with an Undo, and removing a Bond asks first'
 
         // A Bond gate: the same.
         await page.getByRole('tab', { name: /^Scenes/ }).tap();
-        const scene = page.getByRole('region', { name: 'Scene 1' });
+        const scene = await openCard(page, 'Scene 1');
         await scene.getByRole('group', { name: 'Bond gate 1' }).getByRole('button', { name: 'Remove gate' }).tap();
         await expect(scene.getByRole('group', { name: 'Bond gate 1' })).toHaveCount(0);
         await expect.poll(async () => (await stored(request, storyId)).scenes[0].gates).toEqual([]);
@@ -75,7 +78,7 @@ test('one-tap removals act at once with an Undo, and removing a Bond asks first'
 
         // A Belief: the same.
         await page.getByRole('tab', { name: /^Bonds/ }).tap();
-        const beliefs = page.getByRole('region', { name: 'Starting Beliefs' });
+        const beliefs = await openCard(page, 'Starting Beliefs');
         await beliefs.getByRole('button', { name: 'Remove Starting Belief 1' }).tap();
         await expect(beliefs.getByRole('group', { name: 'Starting Belief 1' })).toHaveCount(0);
         await beliefs.getByRole('button', { name: 'Undo' }).tap();
@@ -83,7 +86,7 @@ test('one-tap removals act at once with an Undo, and removing a Bond asks first'
         await expect.poll(async () => (await stored(request, storyId)).startingBeliefs).toHaveLength(1);
 
         // A Bond holds what was written about it, so it asks first; Cancel keeps it, focus back on Remove.
-        const bonds = page.getByRole('region', { name: 'Starting Bonds from Mira' });
+        const bonds = await openCard(page, 'Starting Bonds from Mira');
         const removeBond = bonds.getByRole('button', { name: 'Remove Bond toward Ash (the Role)' });
         await removeBond.tap();
         const question = bonds.getByRole('group', { name: 'Remove the Bond toward Ash (the Role)?' });
@@ -187,7 +190,7 @@ test('async changes are said: a rewrite, the Story turning playable, new candida
         // A round of candidates is said, and focus lands on the first (H12).
         await request.post(`${FAKE}/image`, { data: { kind: 'reference_image', replies: [{}, {}, {}] } });
         await page.getByRole('tab', { name: 'Characters', exact: true }).tap();
-        await page.getByRole('region', { name: 'Character 1' }).getByRole('button', { name: 'Generate Reference image' }).tap();
+        await (await openCard(page, 'Character 1')).getByRole('button', { name: 'Generate Reference image' }).tap();
         await expect(page.getByRole('button', { name: 'Use candidate 1' })).toBeFocused();
         await expect(said(page, '3 candidates ready. Pick one.')).toHaveCount(1);
     } finally {

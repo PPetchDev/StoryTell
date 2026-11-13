@@ -143,7 +143,7 @@ Every route answers the whole Story, as every editor write does. All routes sit 
 
 ### In the Story editor
 
-- On each Character card, after the Reference image and Chat picture rows, an "Expressions" section with seven rows. Each row has a small round thumbnail (empty until there is one) and the label, then:
+- On each Character card, after the Reference image and Chat picture rows, an "Expressions" section: a grid of seven tiles, four to a row on a phone and one row from 640px. Each tile is the small round thumbnail (an empty dashed circle with "+" until there is one) and the label. Tapping a tile opens its actions in a full row under it, and tapping it again, or another tile, closes them; a tile that is drawing or failed keeps its row open. (Changed 2026-11-13 from seven stacked rows of buttons, about 1,500px per Character: docs/ui-audit-2026-11-13.md, H2.) The actions:
   - "Draw · $0.05" (the Settings Snapshot model's 1K price), "Draw again" after a confirm, or nothing while there is no Reference image, with a hint "Add a Reference image to draw Expressions";
   - "Upload";
   - "Pick the face" (the existing Portrait cropper on the Expression's picture), and "Reset" when it has its own square;

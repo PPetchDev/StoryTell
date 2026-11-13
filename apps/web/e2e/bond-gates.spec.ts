@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 
+import { openCard } from './harness/editor';
+
 // Bond gates (.scratch/bond-axes/issues/04-bond-gates.md), set and read on a phone: 390px wide, with touch.
 test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
@@ -31,7 +33,8 @@ test('the Scene editor adds a Bond gate by its word, which makes the Scene playa
         await status.getByRole('button', { name: /to fill in/ }).click();
         await expect(status).toContainText('Arrival: Move-on condition');
 
-        const arrival = page.getByRole('region', { name: 'Scene 1' });
+        // Scene cards start folded.
+        const arrival = await openCard(page, 'Scene 1');
         await arrival.getByRole('button', { name: 'Add Bond gate' }).click();
         const gate = arrival.getByRole('group', { name: 'Bond gate 1' });
         await gate.getByLabel('Character').selectOption({ label: 'Nara' });

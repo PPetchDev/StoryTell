@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 
+import { openCard } from './harness/editor';
+
 // Starting Bond levels (.scratch/bond-axes/issues/02-starting-bond-levels.md) are set on a phone:
 // 390px wide, with touch.
 test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
@@ -19,7 +21,8 @@ test('a Starting Bond picks its levels by their words, starting in the middle, a
         });
 
         await page.goto(`/stories/${storyId}?tab=bonds`);
-        const bond = page.getByRole('region', { name: 'Starting Bonds from Mira' }).getByRole('group', { name: 'Bond toward Ash (the Role)' });
+        // The card starts folded.
+        const bond = (await openCard(page, 'Starting Bonds from Mira')).getByRole('group', { name: 'Bond toward Ash (the Role)' });
         const trust = bond.getByLabel('Trust');
         // Every picker starts in the middle, named by its word.
         await expect(trust.locator('option:checked')).toHaveText('unsure');

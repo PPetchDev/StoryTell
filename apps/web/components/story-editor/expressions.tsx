@@ -71,15 +71,18 @@ export function Expressions({ storyId, character, commit, flush, onDrawn }: Expr
     const heading = character.name.trim() === '' ? 'this Character' : character.name;
     const byEmotion = new Map(character.expressions.map((expression) => [expression.emotion, expression]));
     const price = useDrawPrice();
+    /** The one emotion whose actions show; the rest are a tile each (docs/ui-audit-2026-11-13.md, H2). */
+    const [open, setOpen] = useState<ExpressionEmotion | null>(null);
     return (
         <fieldset className={`${SUBSECTION} lg:col-span-2`}>
             <legend className={SUBSECTION_LEGEND}>Expressions</legend>
             <p className={`${FIELD_HINT} mb-2`}>
                 A picture for each feeling. In a Chat, a line that shows one has this picture in place of the Portrait; the
-                others keep the Portrait.
+                others keep the Portrait. Tap a feeling to draw, upload or change it.
             </p>
             {character.referenceImagePath === null && <p className={`${FIELD_HINT} mb-2`}>Add a Reference image to draw Expressions.</p>}
-            <ul className="m-0 mt-2 flex list-none flex-col gap-3 p-0">
+            {/* Dense, so an open feeling's actions take a whole row under it and the tiles after it close the gap. */}
+            <ul className="m-0 mt-2 grid list-none grid-flow-row-dense grid-cols-4 gap-2 p-0 sm:grid-cols-7">
                 {EXPRESSION_EMOTIONS.map((emotion) => (
                     <ExpressionRow
                         key={emotion}
@@ -92,6 +95,8 @@ export function Expressions({ storyId, character, commit, flush, onDrawn }: Expr
                         commit={commit}
                         flush={flush}
                         onDrawn={onDrawn}
+                        open={open === emotion}
+                        onToggle={() => setOpen((current) => (current === emotion ? null : emotion))}
                     />
                 ))}
             </ul>
@@ -105,9 +110,12 @@ interface ExpressionRowProps extends Omit<ExpressionsProps, 'character'> {
     emotion: ExpressionEmotion;
     expression: Expression | undefined;
     price: number | null;
+    /** Its actions show, in a row of their own under its tile. */
+    open: boolean;
+    onToggle(): void;
 }
 
-function ExpressionRow({ storyId, character, heading, emotion, expression, price, commit, flush, onDrawn }: ExpressionRowProps) {
+function ExpressionRow({ storyId, character, heading, emotion, expression, price, commit, flush, onDrawn, open, onToggle }: ExpressionRowProps) {
     const { reportUnreachable } = useConnection();
     const [busy, setBusy] = useState<string | null>(null);
     /** Shown in the row as it is. */
@@ -189,14 +197,36 @@ function ExpressionRow({ storyId, character, heading, emotion, expression, price
         });
     };
 
+    // A write that runs or failed keeps its actions in view, so its status and error stay readable.
+    const shown = open || busy !== null || error !== null;
+    const panelId = `expression-${character.id}-${emotion}`;
+
     return (
+        <>
         <li>
-        <div ref={row} className="flex flex-wrap items-center gap-x-2.5 gap-y-2" role="group" aria-label={`${label} Expression`}>
-            {src ? (
-                <PortraitImage portrait={{ src, crop: expression!.crop ?? character.portraitCrop }} className="size-11 flex-none" />
-            ) : (
-                <span className="block size-11 flex-none rounded-full border border-dashed border-faint" aria-hidden="true" />
-            )}
+            <button
+                type="button"
+                className={[
+                    'bare-button flex min-h-11 w-full flex-col items-center gap-1 rounded-lg px-1 py-1.5 text-sm',
+                    shown ? 'bg-surface-raised outline-2 outline-accent' : 'active:bg-surface-raised',
+                ].join(' ')}
+                aria-expanded={shown}
+                aria-controls={panelId}
+                aria-label={`${label} Expression${expression ? '' : ', none yet'}`}
+                onClick={onToggle}
+            >
+                {src ? (
+                    <PortraitImage portrait={{ src, crop: expression!.crop ?? character.portraitCrop }} className="size-12 flex-none" />
+                ) : (
+                    <span className="grid size-12 flex-none place-items-center rounded-full border border-dashed border-faint text-lg text-muted" aria-hidden="true">
+                        +
+                    </span>
+                )}
+                <span className="max-w-full truncate">{busy ? '…' : label}</span>
+            </button>
+        </li>
+        <li id={panelId} hidden={!shown} className="col-span-full">
+        <div ref={row} className="flex flex-wrap items-center gap-x-2.5 gap-y-2 rounded-lg bg-surface-raised p-3" role="group" aria-label={`${label} Expression`}>
             <div className="flex min-w-24 flex-1 flex-col gap-0.5">
                 <span className="font-semibold">{label}</span>
                 {busy && (
@@ -308,5 +338,6 @@ function ExpressionRow({ storyId, character, heading, emotion, expression, price
             )}
         </div>
         </li>
+        </>
     );
 }

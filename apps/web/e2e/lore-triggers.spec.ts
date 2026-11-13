@@ -1,7 +1,10 @@
 import { APIRequestContext, expect, Locator, Page, test } from '@playwright/test';
 
+import { openCard } from './harness/editor';
+
 // Lore triggers (.scratch/lore-triggers/spec.md): the More triggers fold on a Lore card, and what
-// the Memory drawer's Lore in play says, on a phone: 390px wide, with touch.
+// the Memory drawer's Lore in play says, on a phone: 390px wide, with touch. Lore cards start folded,
+// and open when tapped or just added; the device remembers the ones opened.
 test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
 const OPENING = 'Dust rises over the market.\n\n@Nara: Welcome, traveller.';
@@ -42,7 +45,7 @@ test('More triggers is closed on a new card; second keywords and "Unless one of"
         const card = panel.getByRole('region', { name: 'Lore 1' });
         await card.getByRole('textbox', { name: 'Name' }).fill('Festival');
 
-        // Nothing stored on this device: the card is unfolded and More triggers is closed.
+        // Just added, the card is open; More triggers is closed.
         await expect(card.getByRole('textbox', { name: 'Name' })).toBeVisible();
         await expect(moreTriggers(card)).toHaveAttribute('aria-expanded', 'false');
         await expect(moreTriggers(card)).toHaveText('More triggersNone');
@@ -84,7 +87,7 @@ test('a broken pattern shows its error under Patterns, opening the fold; fixed, 
     try {
         await request.post(`/api/stories/${storyId}/lore`, { data: { name: 'Moon', text: 'Two moons.' } });
         const panel = await openLoreTab(page, storyId);
-        const card = panel.getByRole('region', { name: 'Lore 1' });
+        const card = await openCard(panel, 'Lore 1');
         await moreTriggers(card).tap();
         const patterns = card.getByRole('textbox', { name: 'Patterns' });
         await patterns.fill('(luna');
@@ -118,7 +121,7 @@ test('switching "Brought in by other entries" to No autosaves, survives a reload
     try {
         await request.post(`/api/stories/${storyId}/lore`, { data: { name: 'Khan', text: 'The Khan is old.' } });
         const panel = await openLoreTab(page, storyId);
-        const card = panel.getByRole('region', { name: 'Lore 1' });
+        const card = await openCard(panel, 'Lore 1');
         await moreTriggers(card).tap();
         const field = card.getByRole('radiogroup', { name: 'Brought in by other entries' });
         await expect(field.getByRole('radio', { name: 'Yes' })).toBeChecked();
@@ -165,7 +168,7 @@ test('Stays for 4 autosaves and shows in the header; after a turn that mentions 
     try {
         await request.post(`/api/stories/${storyId}/lore`, { data: { name: 'Well', text: 'The well is deep.' } });
         const panel = await openLoreTab(page, storyId);
-        const card = panel.getByRole('region', { name: 'Lore 1' });
+        const card = await openCard(panel, 'Lore 1');
         await moreTriggers(card).tap();
         await card.getByRole('spinbutton', { name: 'Stays for' }).fill('4');
         await saved(page);
@@ -225,10 +228,10 @@ test("the header words every setting as the Story assistant reads them: the spec
         });
         const panel = await openLoreTab(page, storyId);
 
-        await expect(moreTriggers(panel.getByRole('region', { name: 'Lore 1' }))).toHaveText(
+        await expect(moreTriggers(await openCard(panel, 'Lore 1'))).toHaveText(
             'More triggersAlso needs: night · 1 pattern · Stays 4 · Rests 6 · Waits 10 · 50% · Group: weather · Not from other entries',
         );
-        await expect(moreTriggers(panel.getByRole('region', { name: 'Lore 2' }))).toHaveText('More triggersUnless: last year, old · 3 patterns');
+        await expect(moreTriggers(await openCard(panel, 'Lore 2'))).toHaveText('More triggersUnless: last year, old · 3 patterns');
     } finally {
         await request.delete(`/api/stories/${storyId}`);
     }
@@ -239,7 +242,7 @@ test('Chance 40 autosaves, survives a reload and shows "40%" in the header', asy
     try {
         await request.post(`/api/stories/${storyId}/lore`, { data: { name: 'Rumour', text: 'A rumour runs.' } });
         const panel = await openLoreTab(page, storyId);
-        const card = panel.getByRole('region', { name: 'Lore 1' });
+        const card = await openCard(panel, 'Lore 1');
         await moreTriggers(card).tap();
         await expect(card.getByRole('spinbutton', { name: 'Chance' })).toHaveValue('100');
         await card.getByRole('spinbutton', { name: 'Chance' }).fill('40');
@@ -264,12 +267,12 @@ test('two entries of one group, both mentioned in a turn: one is in play, the ot
         await request.post(`/api/stories/${storyId}/lore`, { data: { name: 'Dry season', keywords: ['dry'], text: 'Dust everywhere.' } });
         await request.post(`/api/stories/${storyId}/lore`, { data: { name: 'Rains', keywords: ['rain'], text: 'Mud everywhere.', group: 'weather', delay: 1 } });
         const panel = await openLoreTab(page, storyId);
-        const card = panel.getByRole('region', { name: 'Lore 1' });
+        const card = await openCard(panel, 'Lore 1');
         await moreTriggers(card).tap();
         await card.getByRole('textbox', { name: 'Group' }).fill('weather');
         await saved(page);
         await expect(moreTriggers(card)).toHaveText('More triggersGroup: weather');
-        await expect(moreTriggers(panel.getByRole('region', { name: 'Lore 2' }))).toHaveText('More triggersWaits 1 · Group: weather');
+        await expect(moreTriggers(await openCard(panel, 'Lore 2'))).toHaveText('More triggersWaits 1 · Group: weather');
 
         const chatId = (await (await request.post(`/api/stories/${storyId}/chats`)).json()).id as number;
         await page.goto(`/stories/${storyId}/chats/${chatId}`);

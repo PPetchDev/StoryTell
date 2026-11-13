@@ -156,7 +156,7 @@ test.describe('on a phone', () => {
         }
     });
 
-    test('Story editor cards fold and remember; a missing field\'s link unfolds its card', async ({ page, request }) => {
+    test('Story editor cards start folded and remember being opened; a missing field\'s link opens its card', async ({ page, request }) => {
         const { storyId, jonahId } = await createStory(request);
         // Jonah loses his Voice, which a Story needs to be played.
         await request.patch(`/api/stories/${storyId}/characters/${jonahId}`, { data: { voice: '' } });
@@ -164,10 +164,39 @@ test.describe('on a phone', () => {
             await page.goto(`/stories/${storyId}?tab=characters`);
             const mira = page.getByRole('region', { name: 'Character 1' });
             const jonah = page.getByRole('region', { name: 'Character 2' });
+            const miraFold = mira.getByRole('button', { name: 'Mira', exact: true });
+            const jonahFold = jonah.getByRole('button', { name: 'Jonah', exact: true });
             await expect(mira.getByRole('heading', { name: 'Mira' }).locator(REFERENCE)).toHaveCount(1);
             await expect(jonah.getByRole('heading', { name: 'Jonah' }).getByText('J', { exact: true })).toBeVisible();
 
-            await mira.getByRole('button', { name: 'Mira', exact: true }).click();
+            // Both start folded, to their header (docs/ui-audit-2026-11-13.md, H2).
+            await expect(miraFold).toHaveAttribute('aria-expanded', 'false');
+            await expect(jonahFold).toHaveAttribute('aria-expanded', 'false');
+            await expect(mira.getByLabel('Name')).toBeHidden();
+            await expect(jonah.getByLabel('Name')).toBeHidden();
+            // Folded, Jonah's card says it needs filling in; Mira's, with nothing missing, doesn't.
+            await expect(jonah.getByText('Needs filling in')).toBeVisible();
+            await expect(mira.getByText('Needs filling in')).toHaveCount(0);
+
+            // Opened, Mira's card stays open after a reload; Jonah's stays folded.
+            await miraFold.click();
+            await expect(miraFold).toHaveAttribute('aria-expanded', 'true');
+            await expect(mira.getByLabel('Name')).toBeVisible();
+            await page.reload();
+            await expect(page.getByRole('region', { name: 'Character 1' }).getByRole('button', { name: 'Mira', exact: true })).toHaveAttribute(
+                'aria-expanded',
+                'true',
+            );
+            await expect(page.getByRole('region', { name: 'Character 1' }).getByLabel('Name')).toBeVisible();
+            await expect(page.getByRole('region', { name: 'Character 2' }).getByRole('button', { name: 'Jonah', exact: true })).toHaveAttribute(
+                'aria-expanded',
+                'false',
+            );
+            await expect(page.getByRole('region', { name: 'Character 2' }).getByLabel('Name')).toBeHidden();
+
+            // Folded again, it stays folded after a reload.
+            await miraFold.click();
+            await expect(miraFold).toHaveAttribute('aria-expanded', 'false');
             await expect(mira.getByLabel('Name')).toBeHidden();
             await page.reload();
             await expect(page.getByRole('region', { name: 'Character 1' }).getByRole('button', { name: 'Mira', exact: true })).toHaveAttribute(
@@ -175,17 +204,22 @@ test.describe('on a phone', () => {
                 'false',
             );
             await expect(page.getByRole('region', { name: 'Character 1' }).getByLabel('Name')).toBeHidden();
-            await expect(page.getByRole('region', { name: 'Character 2' }).getByLabel('Name')).toBeVisible();
 
-            // Folded, Jonah's card says it needs filling in; the missing item's link opens it on the field.
-            await jonah.getByRole('button', { name: 'Jonah', exact: true }).click();
+            // The missing item's link opens Jonah's folded card on the field.
             await expect(jonah.getByText('Needs filling in')).toBeVisible();
             // The list starts folded to its count (audit M47).
             await page.getByRole('region', { name: 'Playable status' }).getByRole('button', { name: /to fill in/ }).click();
             await page.getByRole('region', { name: 'Playable status' }).getByRole('button', { name: /Jonah: Voice/ }).click();
-            await expect(jonah.getByRole('button', { name: 'Jonah', exact: true })).toHaveAttribute('aria-expanded', 'true');
+            await expect(jonahFold).toHaveAttribute('aria-expanded', 'true');
             await expect(jonah.getByLabel('Voice', { exact: true })).toBeFocused();
             await expect(jonah.getByText('Needs filling in')).toHaveCount(0);
+            // Opened by the link, it is remembered as open too.
+            await page.reload();
+            await expect(page.getByRole('region', { name: 'Character 2' }).getByRole('button', { name: 'Jonah', exact: true })).toHaveAttribute(
+                'aria-expanded',
+                'true',
+            );
+            await expect(page.getByRole('region', { name: 'Character 2' }).getByLabel('Voice', { exact: true })).toBeVisible();
         } finally {
             await request.delete(`/api/stories/${storyId}`);
         }

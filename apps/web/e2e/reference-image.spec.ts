@@ -1,5 +1,7 @@
 import { APIRequestContext, expect, test } from '@playwright/test';
 
+import { openCard } from './harness/editor';
+
 /** The fake gateway's control routes, reached through the Next.js /api proxy. */
 const FAKE = '/api/testing/fake-gateway';
 
@@ -39,7 +41,8 @@ test('generates 3 candidates, picks one, and sees the Reference image on the Cha
 
     try {
         await page.goto(`/stories/${storyId}?tab=characters`);
-        const mira = page.getByRole('region', { name: 'Character 1' });
+        // Character cards start folded.
+        const mira = await openCard(page, 'Character 1');
         await expect(mira.getByRole('img', { name: 'Reference image of Mira' })).toHaveCount(0);
 
         await mira.getByRole('button', { name: 'Generate Reference image' }).click();
@@ -127,6 +130,8 @@ test('picks the face for the chat picture, which the Chat then shows, and Reset 
 
     try {
         await page.goto(`/stories/${storyId}?tab=characters`);
+        // Character cards start folded.
+        await openCard(page, 'Character 1');
         const picture = page.getByRole('group', { name: 'Chat picture of Mira' });
         await expect(picture).toContainText('A guess at the face');
         await picture.getByRole('button', { name: 'Pick the face' }).click();

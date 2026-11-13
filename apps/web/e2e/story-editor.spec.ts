@@ -1,5 +1,7 @@
 import { expect, Page, test } from '@playwright/test';
 
+import { openCard } from './harness/editor';
+
 async function expectSaved(page: Page) {
     await expect(page.getByRole('status').filter({ hasText: /Saved|Saving/ })).toHaveText('Saved');
 }
@@ -74,7 +76,8 @@ test('writes a Story by hand, sees it become playable, and the edits survive a r
 
     // Starting Bonds have a tab of their own.
     await openTab(page, 'Bonds');
-    const miraBonds = page.getByRole('region', { name: 'Starting Bonds from Mira' });
+    // Editor cards start folded; Character and Scene cards open when just added.
+    const miraBonds = await openCard(page, 'Starting Bonds from Mira');
     await miraBonds.getByRole('button', { name: 'Add Bond' }).click();
     const bond = miraBonds.getByRole('group', { name: 'Bond toward The new keeper (the Role)' });
     await bond.getByLabel('Label').fill('wary');

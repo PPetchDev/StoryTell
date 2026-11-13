@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 
+import { openCard } from './harness/editor';
+
 // Starting Beliefs (.scratch/memory-by-meaning/issues/05-starting-beliefs.md) on a phone: 390px wide,
 // with touch. The people are adults in a hill-tribe Story where Petch hides that he is a Marquis.
 test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
@@ -21,7 +23,8 @@ test('a Starting Belief added in the Story editor beside the Starting Bonds is i
         await page.goto(`/stories/${storyId}?tab=bonds`);
         const bonds = page.getByRole('region', { name: 'Bonds' });
         await expect(bonds.getByRole('region', { name: 'Starting Bonds from Nara' })).toBeVisible();
-        const card = bonds.getByRole('region', { name: 'Starting Beliefs' });
+        // The card starts folded.
+        const card = await openCard(bonds, 'Starting Beliefs');
         await card.getByRole('button', { name: 'Add Belief' }).tap();
         const belief = card.getByRole('group', { name: 'Starting Belief 1' });
         await belief.getByLabel('Who believes it').selectOption({ label: 'Nara' });

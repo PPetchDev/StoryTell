@@ -12,7 +12,7 @@ import { ApiUnreachableError } from '@/lib/api';
 import type { BondAxis } from '@/lib/bonds';
 import { FROM_CARD_PARAM, tidyMessage } from '@/lib/character-card';
 import { characterColour, portraitsOf } from '@/lib/character-colour';
-import { isFolded, setFolded } from '@/lib/folds';
+
 import { AppliedChange } from '@/lib/story-assistant';
 import { DEFAULT_NARRATION_VOICE, useVoices, voiceName } from '@/lib/voices';
 import {
@@ -55,7 +55,7 @@ import { ConfirmButton, SegmentedField, TextField } from './fields';
 import { OpeningPreview } from './opening-preview';
 import { fieldDomId, FieldRewrites, rewritableField, rewriteKey, RewriteStates } from './rewrite';
 import { LoreCard } from './lore-card';
-import { EDITOR_CARD, FoldingCard, NOTE } from './folding-card';
+import { EDITOR_CARD, FoldingCard, isCardFolded, NOTE, openAdded, openCard } from './folding-card';
 import { SavedReplyList } from '@/components/saved-replies/saved-reply-list';
 import { storySavedReplies } from '@/lib/saved-replies';
 import { ReplaceRuleList } from '@/components/replace-rules/replace-rule-list';
@@ -271,7 +271,7 @@ export function StoryEditor({ initial }: { initial: Story }) {
         if (!target) return;
         // A field in a folded card: unfold it now, so there is something to scroll to and focus.
         const foldKey = target.closest<HTMLElement>('[data-fold-key]')?.dataset.foldKey;
-        if (foldKey && isFolded(foldKey)) flushSync(() => setFolded(foldKey, false));
+        if (foldKey && isCardFolded(foldKey)) flushSync(() => openCard(foldKey));
         target.scrollIntoView({
             block: fitsInView(target) ? 'center' : 'start',
             behavior: prefersReducedMotion() ? 'auto' : 'smooth',
@@ -752,7 +752,10 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                     className={ADD_BUTTON}
                                     data-flash={flashed === ADD_CHARACTER_ID || undefined}
                                     disabled={story.characters.length >= MAX_CHARACTERS}
-                                    onClick={() => void commit(() => storyApi.addCharacter(storyId), applyWhole)}
+                                    onClick={() => void commit(() => storyApi.addCharacter(storyId), (saved) => {
+                                        openAdded('character', story.characters, saved.characters);
+                                        applyWhole(saved);
+                                    })}
                                 >
                                     + Add Character
                                 </button>
@@ -812,7 +815,10 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                         onRemove={() => commit(() => storyApi.removeScene(storyId, scene.id), applyWhole)}
                                     />
                                 ))}
-                                <button type="button" className={ADD_BUTTON} onClick={() => void commit(() => storyApi.addScene(storyId), applyWhole)}>
+                                <button type="button" className={ADD_BUTTON} onClick={() => void commit(() => storyApi.addScene(storyId), (saved) => {
+                                    openAdded('scene', story.scenes, saved.scenes);
+                                    applyWhole(saved);
+                                })}>
                                     + Add Scene
                                 </button>
                             </section>
@@ -841,7 +847,10 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                         onRemove={() => commit(() => storyApi.removeLoreEntry(storyId, entry.id), applyWhole)}
                                     />
                                 ))}
-                                <button type="button" className={ADD_BUTTON} onClick={() => void commit(() => storyApi.addLoreEntry(storyId), applyWhole)}>
+                                <button type="button" className={ADD_BUTTON} onClick={() => void commit(() => storyApi.addLoreEntry(storyId), (saved) => {
+                                    openAdded('lore', story.lore, saved.lore);
+                                    applyWhole(saved);
+                                })}>
                                     + Add Lore entry
                                 </button>
                                 <DocumentsSection

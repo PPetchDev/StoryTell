@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 
 import { APIRequestContext, expect, Locator, Page, test } from '@playwright/test';
 
+import { openCard } from './harness/editor';
+
 // Replace rules (.scratch/saved-replies-and-replace-rules/spec.md), on a phone: 390px wide, with touch.
 test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
@@ -150,7 +152,8 @@ test.describe('Replace rules', () => {
         try {
             await page.goto(`/stories/${storyId}?tab=style`);
             await expect(page.getByRole('tablist', { name: 'Story sections' }).getByRole('tab')).toHaveCount(7);
-            const list = page.getByRole('region', { name: 'Replace rules', exact: true });
+            // The card starts folded; opened, it stays open on this device.
+            const list = await openCard(page, 'Replace rules');
             await list.getByRole('button', { name: '+ Add replace rule' }).tap();
             await rule(list, 1).find.fill('colour');
             await rule(list, 1).replace.fill('color');

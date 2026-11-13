@@ -1,5 +1,7 @@
 import { APIRequestContext, expect, Locator, Page, test } from '@playwright/test';
 
+import { openCard } from './harness/editor';
+
 // Saved replies (.scratch/saved-replies-and-replace-rules/spec.md), on a phone: 390px wide, with touch.
 test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
@@ -83,7 +85,8 @@ test.describe('managing Saved replies', () => {
             await page.goto(`/stories/${storyId}?tab=style`);
             // Still seven tabs: the Story's Saved replies live in the Style tab.
             await expect(page.getByRole('tablist', { name: 'Story sections' }).getByRole('tab')).toHaveCount(7);
-            const card = page.getByRole('region', { name: 'Saved replies' });
+            // The card starts folded; opened, it stays open on this device.
+            const card = await openCard(page, 'Saved replies');
             await addLine(card, 1, 'I haggle over the price.');
             await addLine(card, 2, 'Where is the well?');
             await saved(page);

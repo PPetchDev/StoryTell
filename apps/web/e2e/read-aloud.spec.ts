@@ -1,5 +1,7 @@
 import { APIRequestContext, expect, Locator, Page, test } from '@playwright/test';
 
+import { openCard } from './harness/editor';
+
 // Read aloud (.scratch/read-aloud/spec.md, "Testing Decisions"): 390px wide, with the fake
 // gateway. Chromium plays without a gesture (playwright.config.ts), so these tests follow the
 // player's states rather than real sound.
@@ -63,6 +65,8 @@ test.describe('voices in the Story editor', () => {
         await expectSaved(page);
 
         await page.getByRole('tab', { name: /^Characters/ }).click();
+        // The Speaking voice is in the Character's card, which starts folded.
+        await openCard(page, 'Character 1');
         const speaking = page.getByLabel('Speaking voice', { exact: true });
         await expect(speaking.locator('option:checked')).toHaveText('Same as narration');
         await speaking.selectOption({ label: 'Emma' });
@@ -104,6 +108,8 @@ test.describe('voices in the Story editor', () => {
 
         // "Same as narration" samples the Narration voice: kept, so no call either.
         await page.getByRole('tab', { name: /^Characters/ }).click();
+        // The Speaking voice is in the Character's card, which starts folded.
+        await openCard(page, 'Character 1');
         await page.getByRole('button', { name: 'Sample Speaking voice' }).click();
         await expect(page.getByRole('button', { name: 'Sample Speaking voice' })).toHaveText('Sample');
         expect(await speechCalls(request)).toHaveLength(1);

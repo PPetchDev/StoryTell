@@ -1,5 +1,7 @@
 import { APIRequestContext, expect, Page, test } from '@playwright/test';
 
+import { expressionTile, openCard, openExpression } from './harness/editor';
+
 // .scratch/expressions/spec.md: Expressions are made in the Story editor and shown in a Chat, on a phone.
 test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
@@ -50,30 +52,40 @@ test('uploads a Happy picture, which fills its row and survives a reload, and Re
     const { storyId } = await createStoryWithMira(request);
 
     await page.goto(`/stories/${storyId}?tab=characters`);
-    const mira = page.getByRole('region', { name: 'Character 1' });
+    // Character cards start folded; the Expressions are a tile each, whose actions show once tapped.
+    const mira = await openCard(page, 'Character 1');
     const expressions = mira.getByRole('group', { name: 'Expressions' });
-    await expect(expressions.getByRole('group', { name: /Expression$/ })).toHaveCount(7);
-    const happy = expressions.getByRole('group', { name: 'Happy Expression' });
-    await expect(happy.locator('img')).toHaveCount(0);
+    await expect(expressions.getByRole('button', { name: /^\w+ Expression, none yet$/ })).toHaveCount(7);
+    await expect(expressions.getByRole('group', { name: /Expression$/, includeHidden: true })).toHaveCount(7);
+    const happyTile = expressionTile(mira, 'Happy');
+    await expect(happyTile).toHaveAccessibleName('Happy Expression, none yet');
+    await expect(happyTile.locator('img')).toHaveCount(0);
+    const happy = await openExpression(page, 'Character 1', 'Happy');
+    await expect(happy).toBeVisible();
     await expect(happy.getByRole('button', { name: 'Remove' })).toHaveCount(0);
 
     await happy.getByLabel('Picture for Happy').setInputFiles({ name: 'happy.png', mimeType: 'image/png', buffer: await picture(page, '#ffc46b') });
 
-    const thumbnail = happy.locator('img');
+    // The thumbnail is in the tile.
+    const thumbnail = happyTile.locator('img');
     await expect(thumbnail).toHaveAttribute('src', /^\/api\/images\/expressions\/story-\d+\/character-\d+-joy-[0-9a-f]+\.(jpg|png)$/);
     await expect.poll(() => thumbnail.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+    await expect(happyTile).toHaveAccessibleName('Happy Expression');
     expect((await expressionsOf(request, storyId)).map((expression) => expression.emotion)).toEqual(['joy']);
     // The other rows stay empty.
-    await expect(expressions.getByRole('group', { name: 'Sad Expression' }).locator('img')).toHaveCount(0);
+    await expect(expressionTile(mira, 'Sad')).toHaveAccessibleName('Sad Expression, none yet');
+    await expect(expressionTile(mira, 'Sad').locator('img')).toHaveCount(0);
 
     await page.reload();
-    const again = page.getByRole('region', { name: 'Character 1' }).getByRole('group', { name: 'Happy Expression' });
-    await expect(again.locator('img')).toHaveAttribute('src', /expressions\/story-\d+\/character-\d+-joy-/);
+    const again = await openExpression(page, 'Character 1', 'Happy');
+    const againTile = expressionTile(page.getByRole('region', { name: 'Character 1' }), 'Happy');
+    await expect(againTile.locator('img')).toHaveAttribute('src', /expressions\/story-\d+\/character-\d+-joy-/);
 
     await again.getByRole('button', { name: 'Remove' }).tap();
     const confirm = again.getByRole('group', { name: 'Remove the Happy Expression?' });
     await confirm.getByRole('button', { name: 'Remove' }).tap();
-    await expect(again.locator('img')).toHaveCount(0);
+    await expect(againTile.locator('img')).toHaveCount(0);
+    await expect(againTile).toHaveAccessibleName('Happy Expression, none yet');
     await expect.poll(async () => (await expressionsOf(request, storyId)).length).toBe(0);
 });
 
@@ -81,10 +93,12 @@ test("picks an Expression's own square, which Reset gives back to the Portrait's
     const { storyId } = await createStoryWithMira(request);
 
     await page.goto(`/stories/${storyId}?tab=characters`);
-    const happy = page.getByRole('region', { name: 'Character 1' }).getByRole('group', { name: 'Happy Expression' });
+    const happy = await openExpression(page, 'Character 1', 'Happy');
+    await expect(happy).toBeVisible();
     await expect(happy.getByRole('button', { name: 'Pick the face' })).toHaveCount(0);
     await happy.getByLabel('Picture for Happy').setInputFiles({ name: 'happy.png', mimeType: 'image/png', buffer: await picture(page, '#5fd0c5') });
-    await expect(happy.locator('img')).toHaveCount(1);
+    // The thumbnail is in the tile.
+    await expect(expressionTile(page.getByRole('region', { name: 'Character 1' }), 'Happy').locator('img')).toHaveCount(1);
     await expect(happy.getByRole('button', { name: 'Reset' })).toHaveCount(0);
 
     await happy.getByRole('button', { name: 'Pick the face' }).tap();
@@ -125,15 +139,16 @@ test('draws a Happy Expression from the Reference image, showing its price first
     const { storyId, characterId } = await createStoryWithMira(request);
 
     await page.goto(`/stories/${storyId}?tab=characters`);
-    const mira = page.getByRole('region', { name: 'Character 1' });
+    const mira = await openCard(page, 'Character 1');
     const expressions = mira.getByRole('group', { name: 'Expressions' });
-    // Without a Reference image there is nothing to draw from.
+    // Without a Reference image there is nothing to draw from, in any row, shown or not.
     await expect(expressions).toContainText('Add a Reference image to draw Expressions');
-    await expect(expressions.getByRole('button', { name: /^Draw/ })).toHaveCount(0);
+    await expect(expressions.getByRole('button', { name: /^Draw/, includeHidden: true })).toHaveCount(0);
 
     await giveReferenceImage(request, storyId, characterId);
     await page.reload();
-    const happy = page.getByRole('region', { name: 'Character 1' }).getByRole('group', { name: 'Happy Expression' });
+    const happy = await openExpression(page, 'Character 1', 'Happy');
+    const happyTile = expressionTile(page.getByRole('region', { name: 'Character 1' }), 'Happy');
     // The Settings Snapshot model's 1K price: Seedream V4 edit by default.
     const drawButton = happy.getByRole('button', { name: 'Draw · $0.05' });
     await expect(drawButton).toBeVisible();
@@ -142,10 +157,16 @@ test('draws a Happy Expression from the Reference image, showing its price first
     await request.post(`${FAKE}/image`, { data: { kind: 'expression_image', replies: [{ delayMs: 1_500 }, {}] } });
     await drawButton.tap();
     await expect(happy.getByRole('status')).toHaveText('Drawing…');
-    // Other rows stay usable while one draws.
-    await expect(page.getByRole('region', { name: 'Character 1' }).getByRole('group', { name: 'Sad Expression' }).getByRole('button', { name: 'Draw · $0.05' })).toBeEnabled();
-    const thumbnail = happy.locator('img');
+    // Other rows stay usable while one draws, and the drawing row stays in view.
+    const sad = await openExpression(page, 'Character 1', 'Sad');
+    await expect(sad.getByRole('button', { name: 'Draw · $0.05' })).toBeEnabled();
+    await expect(happy.getByRole('status')).toBeVisible();
+    const thumbnail = happyTile.locator('img');
     await expect(thumbnail).toHaveAttribute('src', /expressions\/story-\d+\/character-\d+-joy-[0-9a-f]+\.png$/);
+    // Drawn, its row folds back into the tile (Sad is the open one); a tap opens it again.
+    await expect(happyTile).toHaveAttribute('aria-expanded', 'false');
+    await openExpression(page, 'Character 1', 'Happy');
+    await expect(happy).toBeVisible();
     await expect(happy.getByRole('status')).toHaveCount(0);
     const first = await thumbnail.getAttribute('src');
 
@@ -171,9 +192,7 @@ test('draws a Happy Expression from the Reference image, showing its price first
     // A new Reference image makes the drawn one outdated.
     await giveReferenceImage(request, storyId, characterId);
     await page.reload();
-    await expect(page.getByRole('region', { name: 'Character 1' }).getByRole('group', { name: 'Happy Expression' })).toContainText(
-        'Drawn from an earlier Reference image',
-    );
+    await expect((await openExpression(page, 'Character 1', 'Happy')).getByText('Drawn from an earlier Reference image')).toBeVisible();
 });
 
 test('a draw that fails says why in its row, out of image credit in the Reference image\'s words', async ({ page, request }) => {
@@ -182,13 +201,14 @@ test('a draw that fails says why in its row, out of image credit in the Referenc
     await request.post(`${FAKE}/image`, { data: { kind: 'expression_image', replies: [{ error: 'out_of_credit', pool: 'image' }] } });
 
     await page.goto(`/stories/${storyId}?tab=characters`);
-    const angry = page.getByRole('region', { name: 'Character 1' }).getByRole('group', { name: 'Angry Expression' });
+    const angry = await openExpression(page, 'Character 1', 'Angry');
     await angry.getByRole('button', { name: 'Draw · $0.05' }).tap();
 
     await expect(angry.getByRole('alert')).toHaveText(
         'Out of image credit, so no Expression can be drawn until it is topped up. Play is unaffected.',
     );
-    await expect(angry.locator('img')).toHaveCount(0);
+    // No thumbnail in its tile.
+    await expect(expressionTile(page.getByRole('region', { name: 'Character 1' }), 'Angry').locator('img')).toHaveCount(0);
 });
 
 // A real draw on Venice often takes longer than half a minute. The web's /api proxy used to cut
@@ -201,11 +221,16 @@ test('a draw that takes longer than half a minute still arrives in its row', asy
     await request.post(`${FAKE}/image`, { data: { kind: 'expression_image', replies: [{ delayMs: 40_000 }] } });
 
     await page.goto(`/stories/${storyId}?tab=characters`);
-    const fear = page.getByRole('region', { name: 'Character 1' }).getByRole('group', { name: 'Scared Expression' });
+    const fear = await openExpression(page, 'Character 1', 'Scared');
     await fear.getByRole('button', { name: 'Draw · $0.05' }).tap();
     await expect(fear.getByRole('status')).toHaveText('Drawing…');
 
-    await expect(fear.locator('img')).toHaveAttribute('src', /character-\d+-fear-[0-9a-f]+\.png$/, { timeout: 60_000 });
+    // The thumbnail is in the tile.
+    await expect(expressionTile(page.getByRole('region', { name: 'Character 1' }), 'Scared').locator('img')).toHaveAttribute(
+        'src',
+        /character-\d+-fear-[0-9a-f]+\.png$/,
+        { timeout: 60_000 },
+    );
     await expect(fear.getByRole('alert')).toHaveCount(0);
     expect(await expressionCalls(request)).toHaveLength(1);
 });
