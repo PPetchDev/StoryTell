@@ -61,6 +61,31 @@ export function SignInGate({ children }: { children: ReactNode }) {
     return <AccountContext.Provider value={status}>{children}</AccountContext.Provider>;
 }
 
+/** The sign-in screen fills the viewport and centres its column, clear of the notch and the home bar. */
+const SCREEN = 'relative isolate flex min-h-dvh items-center justify-center px-4 pt-[max(2.5rem,env(safe-area-inset-top))] pb-[max(2.5rem,env(safe-area-inset-bottom))]';
+/** A soft wash of the accent behind the top of the screen, from the app's own token, in both themes. */
+const GLOW = 'pointer-events-none absolute inset-x-0 top-0 -z-10 h-[28rem] bg-[radial-gradient(70%_60%_at_50%_0%,var(--accent-soft),transparent)]';
+const CARD = 'rounded-2xl border border-line bg-surface p-5 shadow-lg shadow-shadow-soft sm:p-6';
+/** Google's sign-in button: a light, outlined button with its "G", as Google's branding asks, in both themes. */
+const GOOGLE = [
+    'button w-full border border-field-line bg-surface-raised text-text',
+    'disabled:border-line',
+].join(' ');
+/** A text-sized button that reads as a link: underlined, 44px tall for a finger. */
+const QUIET_LINK = 'inline-flex min-h-11 items-center px-2 text-sm text-muted underline underline-offset-4 hover:text-text';
+
+/** Google's "G", in Google's own colours (its sign-in branding), whatever the theme. */
+function GoogleMark() {
+    return (
+        <svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true" focusable="false">
+            <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+            <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+            <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+            <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+        </svg>
+    );
+}
+
 function SignInScreen({ methods, firstError }: { methods: SignInStatus['methods']; firstError: string | null }) {
     const id = useId();
     const supabase = methods.supabase;
@@ -98,76 +123,104 @@ function SignInScreen({ methods, firstError }: { methods: SignInStatus['methods'
         </p>
     );
 
+    const switchTo = (owner: boolean) => {
+        setOwnerPassword(owner);
+        setPassword('');
+        setError(null);
+    };
+
     return (
-        <main className="page">
-            <h1>Sign in</h1>
-            {supabase && !ownerPassword && (
-                <>
-                    {/* Google leaves the page, so it never reloads it here. */}
-                    <button type="button" className="button mb-6 w-full" onClick={() => void run('google', () => continueWithGoogle(supabase), false)} disabled={busy !== null} aria-busy={busy === 'google'}>
-                        {busy === 'google' ? 'Opening Google…' : 'Continue with Google'}
-                    </button>
-                    <form onSubmit={submitEmail}>
-                        <div className="field">
-                            <label htmlFor={`${id}-email`}>Email</label>
-                            <input id={`${id}-email`} type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
-                        </div>
-                        <div className="field">
-                            <label htmlFor={`${id}-password`}>Password</label>
-                            <input
-                                id={`${id}-password`}
-                                type="password"
-                                autoComplete="current-password"
-                                value={password}
-                                onChange={(event) => setPassword(event.target.value)}
-                                aria-invalid={error !== null}
-                                aria-describedby={error !== null ? `${id}-error` : undefined}
-                                required
-                            />
-                            {errorLine}
-                        </div>
-                        <button type="submit" className="button" disabled={busy !== null || email === '' || password === ''} aria-busy={busy === 'email'}>
-                            {busy === 'email' ? 'Signing in…' : 'Sign in'}
+        // A screen of its own: no nav, the card centred on the page, the app's book mark above it.
+        <main className={SCREEN}>
+            <div className={GLOW} aria-hidden="true" />
+            <div className="w-full max-w-sm">
+                <div className="mb-6 flex flex-col items-center text-center">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- the app's own icon, an SVG served as is */}
+                    <img src="/icons/icon.svg" alt="" width={64} height={64} className="mb-4 h-16 w-16 rounded-2xl shadow-lg shadow-shadow-soft" />
+                    <h1 className="mb-1 text-2xl lg:text-2xl">Sign in to Storytell AI</h1>
+                    <p className="m-0 text-muted">Your Stories, waiting where you left them.</p>
+                </div>
+
+                <div className={CARD}>
+                    {supabase && !ownerPassword && (
+                        <>
+                            {/* Google leaves the page, so it never reloads it here. */}
+                            <button
+                                type="button"
+                                className={GOOGLE}
+                                onClick={() => void run('google', () => continueWithGoogle(supabase), false)}
+                                disabled={busy !== null}
+                                aria-busy={busy === 'google'}
+                            >
+                                <GoogleMark />
+                                {busy === 'google' ? 'Opening Google…' : 'Continue with Google'}
+                            </button>
+
+                            <div className="my-5 flex items-center gap-3 text-sm text-muted" aria-hidden="true">
+                                <span className="h-px flex-1 bg-line" />
+                                or
+                                <span className="h-px flex-1 bg-line" />
+                            </div>
+
+                            <form onSubmit={submitEmail} aria-label="Email sign-in">
+                                <div className="field mt-0">
+                                    <label htmlFor={`${id}-email`}>Email</label>
+                                    <input id={`${id}-email`} type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+                                </div>
+                                <div className="field">
+                                    <label htmlFor={`${id}-password`}>Password</label>
+                                    <input
+                                        id={`${id}-password`}
+                                        type="password"
+                                        autoComplete="current-password"
+                                        value={password}
+                                        onChange={(event) => setPassword(event.target.value)}
+                                        aria-invalid={error !== null}
+                                        aria-describedby={error !== null ? `${id}-error` : undefined}
+                                        required
+                                    />
+                                    {errorLine}
+                                </div>
+                                <button type="submit" className="button mt-2 w-full" disabled={busy !== null || email === '' || password === ''} aria-busy={busy === 'email'}>
+                                    {busy === 'email' ? 'Signing in…' : 'Sign in'}
+                                </button>
+                            </form>
+                        </>
+                    )}
+
+                    {(!supabase || ownerPassword) && (
+                        <form onSubmit={submitOwner} aria-label="Owner sign-in">
+                            <div className="field mt-0">
+                                <label htmlFor={`${id}-owner-password`}>{supabase ? 'Owner password' : 'Password'}</label>
+                                <input
+                                    id={`${id}-owner-password`}
+                                    type="password"
+                                    autoComplete="current-password"
+                                    value={password}
+                                    onChange={(event) => setPassword(event.target.value)}
+                                    aria-invalid={error !== null}
+                                    aria-describedby={error !== null ? `${id}-error` : undefined}
+                                    required
+                                    autoFocus
+                                />
+                                {errorLine}
+                            </div>
+                            <button type="submit" className="button mt-2 w-full" disabled={busy !== null || password === ''} aria-busy={busy === 'owner'}>
+                                {busy === 'owner' ? 'Signing in…' : 'Sign in'}
+                            </button>
+                        </form>
+                    )}
+                </div>
+
+                {/* The owner's way in stays quiet: most people never need it. */}
+                {supabase && (ownerPassword || methods.password) && (
+                    <p className="mt-4 mb-0 text-center">
+                        <button type="button" className={QUIET_LINK} onClick={() => switchTo(!ownerPassword)}>
+                            {ownerPassword ? 'Google or email' : 'Owner password'}
                         </button>
-                    </form>
-                    {methods.password && (
-                        <p className="mt-6 mb-0">
-                            <button type="button" className="button button-quiet button-small" onClick={() => { setOwnerPassword(true); setPassword(''); setError(null); }}>
-                                Owner password
-                            </button>
-                        </p>
-                    )}
-                </>
-            )}
-            {(!supabase || ownerPassword) && (
-                <form onSubmit={submitOwner}>
-                    <div className="field">
-                        <label htmlFor={`${id}-owner-password`}>{supabase ? 'Owner password' : 'Password'}</label>
-                        <input
-                            id={`${id}-owner-password`}
-                            type="password"
-                            autoComplete="current-password"
-                            value={password}
-                            onChange={(event) => setPassword(event.target.value)}
-                            aria-invalid={error !== null}
-                            aria-describedby={error !== null ? `${id}-error` : undefined}
-                            required
-                            autoFocus
-                        />
-                        {errorLine}
-                    </div>
-                    <button type="submit" className="button" disabled={busy !== null || password === ''} aria-busy={busy === 'owner'}>
-                        {busy === 'owner' ? 'Signing in…' : 'Sign in'}
-                    </button>
-                    {supabase && (
-                        <p className="mt-6 mb-0">
-                            <button type="button" className="button button-quiet button-small" onClick={() => { setOwnerPassword(false); setPassword(''); setError(null); }}>
-                                Google or email
-                            </button>
-                        </p>
-                    )}
-                </form>
-            )}
+                    </p>
+                )}
+            </div>
         </main>
     );
 }
