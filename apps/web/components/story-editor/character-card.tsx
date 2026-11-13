@@ -11,7 +11,7 @@ import { ADD_CHARACTER_ID } from './editor-tabs';
 import { useFieldMarks } from './field-marks';
 import { ExportCardButton } from './export-card';
 import { Expressions } from './expressions';
-import { ChangedMark, ConfirmButton, FIELD_FLASH, FIELD_HINT, FIELD_INPUT, OrderButtons, TextField, Toolbar } from './fields';
+import { ChangedMark, ConfirmButton, FIELD_FLASH, FIELD_HINT, FIELD_INPUT, OrderButtons, TextField, Toolbar, WrappingLine } from './fields';
 import { cardToggle, FoldingCard, SUBSECTION, SUBSECTION_LEGEND } from './folding-card';
 import { ReferenceImage } from './reference-image';
 import { VoiceField } from './voice-field';
@@ -179,18 +179,19 @@ export function CharacterCard(props: CharacterCardProps) {
             <fieldset id={linesId} className={[SUBSECTION, 'lg:col-span-2', linesFlashed && FIELD_FLASH].filter(Boolean).join(' ')}>
                 <legend className={SUBSECTION_LEGEND}>Example lines {linesChanged && <ChangedMark />}</legend>
                 <p className={`${FIELD_HINT} mb-2`}>Optional. A few lines in their voice, in order.</p>
-                <ol ref={lineList} className="m-0 mb-2 grid list-none gap-2 p-0">
+                <ol ref={lineList} className="m-0 mb-2 grid list-none gap-4 p-0">
                     {character.exampleLines.map((line, lineIndex) => (
-                        <li key={lineIndex} className="flex items-center gap-2">
-                            <input
-                                type="text"
-                                className={`${FIELD_INPUT} flex-1`}
+                        // The line has the whole width and wraps, its buttons in a row under it: beside it they left
+                        // the line ~130px on a phone (docs/ui-audit-2026-11-13.md, M9).
+                        <li key={lineIndex} className="grid gap-1">
+                            <WrappingLine
+                                className={FIELD_INPUT}
                                 aria-label={`Example line ${lineIndex + 1}`}
                                 value={line}
-                                onChange={(event) => setLine(lineIndex, event.target.value)}
+                                onChange={(value) => setLine(lineIndex, value)}
                             />
-                            {/* One row of three 44px buttons, 8px apart, that never wraps under the line. */}
-                            <div className="flex flex-none gap-2">
+                            {/* Three 44px buttons, 8px apart, at the line's end. */}
+                            <div className="flex justify-end gap-2">
                                 <OrderButtons
                                     index={lineIndex}
                                     count={character.exampleLines.length}

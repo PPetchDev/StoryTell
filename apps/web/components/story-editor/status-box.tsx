@@ -52,9 +52,15 @@ export function StatusBox({ playable, missing, onGo, foldKey }: StatusBoxProps) 
     const open = useFolded(foldKey);
     useSayPlayable(playable);
     if (playable) {
+        // One small badge, not a box over every tab: nothing to do here but tap Play (docs/ui-audit-2026-11-13.md, M12).
         return (
-            <section className="mb-3 rounded-lg border border-status-ok-line bg-status-ok-surface text-status-ok-text" aria-label="Playable status">
-                <p className="m-0 px-3.5 py-2.5 text-md">Playable. Tap Play to start a Chat.</p>
+            <section className="mb-3" aria-label="Playable status">
+                <p className="m-0 inline-flex items-center gap-1.5 rounded-full border border-status-ok-line bg-status-ok-surface px-3 py-1 text-sm text-status-ok-text">
+                    <span aria-hidden="true">✓</span>
+                    <span>
+                        <strong>Playable</strong> · tap Play to start a Chat
+                    </span>
+                </p>
             </section>
         );
     }

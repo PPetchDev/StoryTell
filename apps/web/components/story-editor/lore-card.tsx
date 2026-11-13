@@ -138,6 +138,7 @@ export function LoreCard({ entry, index, rewrites, onText, onKeywords, onAlwaysO
             <TextField
                 label="Keywords"
                 value={keywordText}
+                wrap
                 hint="Other words that bring it up, separated by commas: other names, plurals, Thai words."
                 placeholder="yurt, tents, กระโจม"
                 onChange={(v) => {
@@ -168,6 +169,7 @@ export function LoreCard({ entry, index, rewrites, onText, onKeywords, onAlwaysO
                 <TextField
                     label="Second keywords"
                     value={secondaryText}
+                    wrap
                     hint="Separated by commas, matched like Keywords. They never bring the entry up; they only decide whether it goes in when it comes up."
                     placeholder="night, storm"
                     onChange={(v) => {

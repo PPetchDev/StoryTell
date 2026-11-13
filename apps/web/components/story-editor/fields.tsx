@@ -1,6 +1,6 @@
 'use client';
 
-import { HTMLAttributes, KeyboardEvent, ReactNode, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { HTMLAttributes, KeyboardEvent, ReactNode, TextareaHTMLAttributes, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 
 import { announce } from '@/components/announcer';
 import { ArrowDownIcon, ArrowUpIcon } from '@/components/icons';
@@ -81,6 +81,39 @@ function useAutoGrow(value: string) {
     return ref;
 }
 
+/**
+ * A one-line value in a box that wraps its long text onto more lines instead of running off the
+ * edge (docs/ui-audit-2026-11-13.md, M9, M10): one line tall, it grows with its text, and Enter
+ * adds no line break, nor does a paste (one becomes a space).
+ */
+const oneLine = {
+    onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+        if (event.key === 'Enter' && !event.nativeEvent.isComposing) event.preventDefault();
+    },
+    text: (value: string) => value.replace(/\r?\n/g, ' '),
+};
+
+type WrappingLineProps = Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'onChange' | 'rows'> & {
+    value: string;
+    onChange(value: string): void;
+};
+
+/** A list item's one line (an example line) that wraps and grows: see oneLine. */
+export function WrappingLine({ value, onChange, className, ...rest }: WrappingLineProps) {
+    const grow = useAutoGrow(value);
+    return (
+        <textarea
+            {...rest}
+            ref={grow}
+            rows={1}
+            value={value}
+            className={classes(className, 'resize-none overflow-hidden')}
+            onKeyDown={oneLine.onKeyDown}
+            onChange={(event) => onChange(oneLine.text(event.target.value))}
+        />
+    );
+}
+
 /** The mark on a field the assistant changed. Text, so it reads without colour. */
 export function ChangedMark() {
     return <span className="text-xs font-semibold tracking-wide text-accent uppercase">changed by the assistant</span>;
@@ -145,6 +178,11 @@ interface TextFieldProps {
     value: string;
     onChange(value: string): void;
     multiline?: boolean;
+    /**
+     * A one-line value that may run long (an Image style, Keywords): its box wraps it onto more
+     * lines rather than cutting it off (M10), and Enter adds no line. See oneLine.
+     */
+    wrap?: boolean;
     /** The height of an empty multiline box, in lines; it grows with its text. */
     rows?: number;
     /** One plain line on what the field is for (spec: story 61). */
@@ -180,6 +218,7 @@ export function TextField({
     value,
     onChange,
     multiline,
+    wrap,
     rows,
     hint,
     placeholder,
@@ -220,7 +259,7 @@ export function TextField({
         spellCheck,
         autoCapitalize,
         autoComplete,
-        className: classes(INPUT_BOX, 'w-full', inputEdge({ needed, highlighted }), multiline && 'resize-none overflow-hidden', busy && 'opacity-60'),
+        className: classes(INPUT_BOX, 'w-full', inputEdge({ needed, highlighted }), (multiline || wrap) && 'resize-none overflow-hidden', busy && 'opacity-60'),
     };
     return (
         <div className={classes(FIELD, flashed && FIELD_FLASH)}>
@@ -235,6 +274,14 @@ export function TextField({
             </div>
             {multiline ? (
                 <textarea {...shared} ref={grow} rows={rows ?? 2} onChange={(event) => onChange(event.target.value)} />
+            ) : wrap ? (
+                <textarea
+                    {...shared}
+                    ref={grow}
+                    rows={1}
+                    onKeyDown={oneLine.onKeyDown}
+                    onChange={(event) => onChange(oneLine.text(event.target.value))}
+                />
             ) : (
                 <input {...shared} type={type} onChange={(event) => onChange(event.target.value)} />
             )}
@@ -437,7 +484,9 @@ export function ConfirmButton({
             <button
                 ref={trigger}
                 type="button"
-                className={classes(danger ? 'button button-danger' : 'button button-quiet', className)}
+                // Asking is quiet even for a destructive action, in the danger colour; the danger fill waits for
+                // the step that does it (docs/ui-audit-2026-11-13.md, M13: Remove outshone everything but Play).
+                className={classes('button button-quiet', danger && 'text-danger', className)}
                 onClick={working ? undefined : () => setAsking(true)}
                 disabled={disabled}
                 aria-disabled={working || undefined}

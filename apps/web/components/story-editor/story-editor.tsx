@@ -12,6 +12,7 @@ import { ApiUnreachableError } from '@/lib/api';
 import type { BondAxis } from '@/lib/bonds';
 import { FROM_CARD_PARAM, tidyMessage } from '@/lib/character-card';
 import { characterColour, portraitsOf } from '@/lib/character-colour';
+import { SCROLL_FADES, useScrollFade } from '@/lib/scroll-fade';
 
 import { AppliedChange } from '@/lib/story-assistant';
 import { DEFAULT_NARRATION_VOICE, useVoices, voiceName } from '@/lib/voices';
@@ -197,12 +198,15 @@ export function StoryEditor({ initial }: { initial: Story }) {
         window.history.replaceState(null, '', url);
     }, []);
 
-    // The tab bar scrolls sideways on a phone: keep the selected tab in sight, e.g. after a jump.
+    // The tab bar scrolls sideways on a phone: keep the selected tab in sight, e.g. after a jump,
+    // in the middle rather than under an end's fade (docs/ui-audit-2026-11-13.md, M11).
     useEffect(() => {
         tabList.current
             ?.querySelector('[aria-selected="true"]')
-            ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+            ?.scrollIntoView({ block: 'nearest', inline: 'center' });
     }, [tab]);
+    // An end that hides tabs fades out, so Scenes and Lore off the edge are seen to be there (M11).
+    const tabFade = useScrollFade(tabList);
 
     /** A field save: keep what the author typed, take the status from the API. */
     const applyStatus = useCallback((saved: Story) => {
@@ -501,7 +505,8 @@ export function StoryEditor({ initial }: { initial: Story }) {
                 </div>
                 <div
                     ref={tabList}
-                    className={TAB_LIST}
+                    className={`${TAB_LIST} ${SCROLL_FADES[tabFade]}`}
+                    data-fade={tabFade}
                     role="tablist"
                     aria-label="Story sections"
                     aria-orientation={sideTabs ? 'vertical' : 'horizontal'}
@@ -535,7 +540,8 @@ export function StoryEditor({ initial }: { initial: Story }) {
                 </div>
             </div>
             <div className="min-w-0 lg:col-start-2">
-                <CoverBanner story={story} onOpen={() => setCoverOpen(true)} />
+                {/* The cover heads the Story tab only: on the others it pushed the fields a quarter of the screen down (M12). */}
+                {tab === 'story' && <CoverBanner story={story} onOpen={() => setCoverOpen(true)} />}
                 {fromCard && (
                     <section className={`${EDITOR_CARD} border border-accent-line`} aria-label="Made from a Character card">
                         <p className="mt-0 mb-3">Made from a Character card. Fill in what&apos;s marked, or ask the Story assistant to tidy it.</p>
@@ -643,6 +649,7 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                     <TextField
                                         label="Image style"
                                         value={story.style.imageStyle}
+                                        wrap
                                         placeholder='e.g. "anime, soft colours"'
                                         hint="Optional. One look for every Snapshot and Reference image."
                                         onChange={(v) => setStyle('imageStyle', v)}
