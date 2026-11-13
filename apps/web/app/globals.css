@@ -811,6 +811,12 @@
         font-size: 1rem;
     }
 
+    /* A card's own title one level down, under a group's heading (Settings), the size of a card's h2. */
+    .card .card-title {
+        font-size: 1.125rem;
+        margin: 0 0 0.5rem;
+    }
+
     .warning {
         background: var(--banner-surface);
         border: 1px solid var(--banner-line);

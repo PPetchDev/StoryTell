@@ -193,6 +193,7 @@ test('the Usage page lists what Write for me and Thai readings spent, each under
 
     await page.goto('/usage');
 
-    const kinds = page.getByRole('list', { name: 'Text spend by kind' }).getByRole('listitem');
-    await expect(kinds).toHaveText(['Write for me: $0.05 (3 calls)', 'Thai readings: $0.02 (4 calls)']);
+    const kinds = page.getByRole('table', { name: 'Text spend by kind' });
+    await expect(kinds.getByRole('rowheader')).toHaveText(['Write for me', 'Thai readings']);
+    await expect(kinds.getByRole('cell')).toHaveText(['$0.05', '3', '$0.02', '4']);
 });

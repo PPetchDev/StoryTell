@@ -63,7 +63,7 @@ export function PeopleCard() {
 
     return (
         <section className="card" aria-labelledby={`${id}-heading`}>
-            <h2 id={`${id}-heading`}>People</h2>
+            <h3 id={`${id}-heading`} className="card-title">People</h3>
             <p className="muted">
                 Who may sign in with Google or email. Each Member plays on your credit up to their Monthly cap, counted from the first of the month (UTC).
                 Their Stories are their own.

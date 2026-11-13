@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { ReactNode, useState } from 'react';
 
 import { BackupBannerView, useBackupStatus } from '@/components/backup-banner';
 import { useApiQuery } from '@/components/connection';
@@ -169,6 +169,25 @@ function NumberField({
     );
 }
 
+/** A group's heading: small capitals over its cards, so whose a setting is reads at a glance (audit M14). */
+const GROUP_HEADING = 'm-0 mb-1 px-1 text-xs font-semibold tracking-wide text-muted uppercase';
+
+/**
+ * A group of Settings cards under one heading (docs/ui-audit-2026-11-13.md, M14): this device, your
+ * writing, the Owner's for everyone, your account. Cards' titles sit a level under it.
+ */
+function SettingsGroup({ id, title, note, children }: { id: string; title: string; note?: string; children: ReactNode }) {
+    return (
+        <section aria-labelledby={id} className="mb-6">
+            <h2 id={id} className={GROUP_HEADING}>
+                {title}
+            </h2>
+            {note && <p className="mt-0 mb-2 px-1 text-sm text-muted">{note}</p>}
+            {children}
+        </section>
+    );
+}
+
 /** Every setting saves as it changes, with the status in the page header. */
 function SettingsForm({ initial, autosave }: { initial: SettingsResponse; autosave: Autosave }) {
     const { isOwner } = useAccount();
@@ -213,78 +232,80 @@ function SettingsForm({ initial, autosave }: { initial: SettingsResponse; autosa
 
     return (
         <>
+            <SettingsGroup id="settings-writing" title="Your writing" note="For every Story you play, wherever you sign in.">
+                <AppSavedRepliesCard autosave={autosave} />
+                <AppReplaceRulesCard autosave={autosave} />
+            </SettingsGroup>
+
             {/* The Owner chooses the Models, Sampling and credit settings for everyone (.scratch/accounts/spec.md). */}
             {isOwner && (
-                <section className="card">
-                    <h2>Models</h2>
-                    <ModelSelect
-                        id="play-model"
-                        label="Play model"
-                        value={models.playModel}
-                        options={initial.playModels}
-                        note={playOption && priceLine(playOption)}
-                        onChange={(value) => changeModel('playModel', value)}
-                    />
-                    {models.playModel !== loadedPlayModel && (
-                        <p role="alert" className="warning">
-                            <strong>Drift warning.</strong> A different model plays Characters
-                            differently. Chats whose last reply came from the old model will show a
-                            Drift notice before the next send.
-                        </p>
-                    )}
-                    {playOption && <SamplingFold option={playOption} initial={initial.settings.samplers} autosave={autosave} />}
-                    <ModelSelect
-                        id="image-model"
-                        label="Snapshot model"
-                        value={models.imageModel}
-                        options={initial.imageModels}
-                        onChange={(value) => changeModel('imageModel', value)}
-                    />
-                    <div className="field">
-                        <label htmlFor="snapshot-size">Snapshot size</label>
-                        <select
-                            id="snapshot-size"
-                            value={snapshotSize}
-                            aria-describedby={imageOption && imageOption.sizes.length < 2 ? 'snapshot-size-note' : undefined}
-                            onChange={(event) => changeSnapshot(models.imageModel, event.target.value as SnapshotSize)}
-                        >
-                            {(imageOption?.sizes ?? [{ size: snapshotSize, priceUsd: 0 }]).map((entry) => (
-                                <option key={entry.size} value={entry.size}>
-                                    {`${entry.size} · $${entry.priceUsd.toFixed(2)}`}
-                                </option>
-                            ))}
-                        </select>
-                        {imageOption && imageOption.sizes.length < 2 && (
-                            <p id="snapshot-size-note" className="muted">
-                                This model draws at 1K only.
+                <SettingsGroup id="settings-owner" title="Owner · for everyone" note="Only you, the Owner, can change these. They apply to everyone who plays.">
+                    <section className="card">
+                        <h3 className="card-title">Models</h3>
+                        <ModelSelect
+                            id="play-model"
+                            label="Play model"
+                            value={models.playModel}
+                            options={initial.playModels}
+                            note={playOption && priceLine(playOption)}
+                            onChange={(value) => changeModel('playModel', value)}
+                        />
+                        {models.playModel !== loadedPlayModel && (
+                            <p role="alert" className="warning">
+                                <strong>Drift warning.</strong> A different model plays Characters
+                                differently. Chats whose last reply came from the old model will show a
+                                Drift notice before the next send.
                             </p>
                         )}
-                    </div>
-                </section>
-            )}
+                        {playOption && <SamplingFold option={playOption} initial={initial.settings.samplers} autosave={autosave} />}
+                        <ModelSelect
+                            id="image-model"
+                            label="Snapshot model"
+                            value={models.imageModel}
+                            options={initial.imageModels}
+                            onChange={(value) => changeModel('imageModel', value)}
+                        />
+                        <div className="field">
+                            <label htmlFor="snapshot-size">Snapshot size</label>
+                            <select
+                                id="snapshot-size"
+                                value={snapshotSize}
+                                aria-describedby={imageOption && imageOption.sizes.length < 2 ? 'snapshot-size-note' : undefined}
+                                onChange={(event) => changeSnapshot(models.imageModel, event.target.value as SnapshotSize)}
+                            >
+                                {(imageOption?.sizes ?? [{ size: snapshotSize, priceUsd: 0 }]).map((entry) => (
+                                    <option key={entry.size} value={entry.size}>
+                                        {`${entry.size} · $${entry.priceUsd.toFixed(2)}`}
+                                    </option>
+                                ))}
+                            </select>
+                            {imageOption && imageOption.sizes.length < 2 && (
+                                <p id="snapshot-size-note" className="muted">
+                                    This model draws at 1K only.
+                                </p>
+                            )}
+                        </div>
+                    </section>
 
-            <AppSavedRepliesCard autosave={autosave} />
-            <AppReplaceRulesCard autosave={autosave} />
+                    <PeopleCard />
 
-            {isOwner && <PeopleCard />}
-
-            {isOwner && (
-                <section className="card">
-                    <h2>Credit</h2>
-                    <p className="muted">
-                        Warn when a pool&apos;s remaining credit is at or below this share of what it
-                        holds when topped up.
-                    </p>
-                    {/* The boxes of a row line up whatever their labels' lengths (audit L22). */}
-                    <div className="field-row mb-3 items-end">
-                        {numberField('textCreditCapUsd', 'text-cap', 'Text pool (USD)', 'usd')}
-                        {numberField('textLowCreditPercent', 'text-threshold', 'Text warning (%)', 'percent')}
-                    </div>
-                    <div className="field-row items-end">
-                        {numberField('imageCreditCapUsd', 'image-cap', 'Images and audio (Venice) pool (USD)', 'usd')}
-                        {numberField('imageLowCreditPercent', 'image-threshold', 'Images and audio (Venice) warning (%)', 'percent')}
-                    </div>
-                </section>
+                    <section className="card">
+                        <h3 className="card-title">Credit</h3>
+                        <p className="muted">
+                            Warn when a pool&apos;s remaining credit is at or below this share of what it
+                            holds when topped up.
+                        </p>
+                        {/* The boxes of a row line up whatever their labels' lengths (audit L22). */}
+                        <div className="field-row mb-3 items-end">
+                            {numberField('textCreditCapUsd', 'text-cap', 'Text pool (USD)', 'usd')}
+                            {numberField('textLowCreditPercent', 'text-threshold', 'Text warning (%)', 'percent')}
+                        </div>
+                        <div className="field-row items-end">
+                            {numberField('imageCreditCapUsd', 'image-cap', 'Images and audio (Venice) pool (USD)', 'usd')}
+                            {numberField('imageLowCreditPercent', 'image-threshold', 'Images and audio (Venice) warning (%)', 'percent')}
+                        </div>
+                    </section>
+                </SettingsGroup>
             )}
         </>
     );
@@ -294,6 +315,9 @@ export default function SettingsPage() {
     const settings = useApiQuery<SettingsResponse>('/settings');
     const autosave = useAutosave();
     const backup = useBackupStatus();
+    const { status } = useAccount();
+    // The rest has arrived (or failed): Account goes under it, so nothing lands on top of Sign out.
+    const settled = settings.status === 'error' || (settings.status === 'ready' && backup !== undefined);
 
     return (
         <main>
@@ -309,16 +333,24 @@ export default function SettingsPage() {
              * This device's settings come first: they are there at once, so nothing that loads after
              * them (the form, the backup banner) pushes them down under a finger. The banner and the
              * form wait for each other, so neither arrives above the other once it shows (audit M38).
+             * Then your writing, the Owner's settings for everyone, and your Account (audit M14).
              */}
-            <ThemeSetting />
-            <TextSizeSetting />
-            <SignOutSetting />
+            <SettingsGroup id="settings-device" title="This device">
+                <ThemeSetting />
+                <TextSizeSetting />
+            </SettingsGroup>
             {(settings.status === 'loading' || backup === undefined) && settings.status !== 'error' && (
                 <Loading label="Loading Settings…" className="card" />
             )}
             {backup !== undefined && settings.status !== 'loading' && <BackupBannerView status={backup} />}
             {settings.status === 'error' && <ErrorState title="Couldn't load Settings." error={settings.error} onRetry={settings.retry} />}
             {settings.status === 'ready' && backup !== undefined && <SettingsForm initial={settings.data} autosave={autosave} />}
+            {/* Last: signing out is the rarest thing done here (audit M14). */}
+            {settled && status?.required && status.account && (
+                <SettingsGroup id="settings-account" title="Account">
+                    <SignOutSetting />
+                </SettingsGroup>
+            )}
         </main>
     );
 }

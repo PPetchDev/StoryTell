@@ -82,12 +82,14 @@ function TryIt({ fields, runnable }: { fields: ReplaceRuleFields; runnable: bool
  * and a save the API refuses shows its reason under Find, keeping what is typed while the last
  * saved version stays in force.
  */
-export function ReplaceRuleList({ initial, store, autosave, saveKey }: {
+export function ReplaceRuleList({ initial, store, autosave, saveKey, ruleHeading: RuleHeading = 'h3' }: {
     initial: ReplaceRule[];
     store: ReplaceRuleStore;
     autosave: Autosave;
     /** Prefixes this list's autosave keys, so two lists on a page never replace each other's edits. */
     saveKey: string;
+    /** Each rule's heading level: one under the card's title (Settings' cards sit under a group's h2, so h4). */
+    ruleHeading?: 'h3' | 'h4';
 }) {
     const [cards, setCards] = useState<Card[]>(() => initial.map((rule) => ({ key: `rule-${rule.id}`, fields: fieldsOf(rule), error: null })));
     /** Each card's id once saved, read when its next save runs, so a draft is added once and then edited. */
@@ -190,7 +192,7 @@ export function ReplaceRuleList({ initial, store, autosave, saveKey }: {
                         aria-label={`Replace rule ${number}`}
                     >
                         <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-                            <h3 className="m-0 text-note">Rule {number}</h3>
+                            <RuleHeading className="m-0 text-note">Rule {number}</RuleHeading>
                             <div className="toolbar">
                                 <OrderButtons index={index} count={cards.length} what={`rule ${number}`} onMove={(direction) => move(index, direction)} />
                                 {/* Asks first, as every other delete does (audit H3), and says which rule (M11). */}

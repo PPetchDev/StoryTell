@@ -114,7 +114,8 @@ test('the Usage page lists what Suggested replies spent, in plain words', async 
     await page.goto('/usage');
 
     const text = page.getByRole('region', { name: /Text/ });
-    const kinds = text.getByRole('list', { name: 'Text spend by kind' }).getByRole('listitem');
-    await expect(kinds).toHaveText(['Turns: $0.42 (120 calls)', 'Suggested replies: $0.01 (3 calls)']);
-    await expect(page.getByRole('list', { name: 'Images and audio (Venice) spend by kind' })).toHaveCount(0);
+    const kinds = text.getByRole('table', { name: 'Text spend by kind' });
+    await expect(kinds.getByRole('rowheader')).toHaveText(['Turns', 'Suggested replies']);
+    await expect(kinds.getByRole('cell')).toHaveText(['$0.42', '120', '$0.01', '3']);
+    await expect(page.getByRole('table', { name: 'Images and audio (Venice) spend by kind' })).toHaveCount(0);
 });

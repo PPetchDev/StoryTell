@@ -248,8 +248,9 @@ test('the Usage page lists Expression pictures under "Images and audio (Venice)"
 
     await page.goto('/usage');
 
-    const kinds = page.getByRole('list', { name: 'Images and audio (Venice) spend by kind' }).getByRole('listitem');
-    await expect(kinds).toHaveText(['Expression pictures: $0.10 (2 calls)']);
+    const kinds = page.getByRole('table', { name: 'Images and audio (Venice) spend by kind' });
+    await expect(kinds.getByRole('rowheader')).toHaveText(['Expression pictures']);
+    await expect(kinds.getByRole('cell')).toHaveText(['$0.10', '2']);
 });
 
 test.describe('in a Chat', () => {

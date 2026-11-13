@@ -243,7 +243,7 @@ export function SignOutSetting() {
 
     return (
         <section className="card">
-            <h2>Signed in</h2>
+            <h3 className="card-title">Signed in</h3>
             <p className="muted">
                 As {status.account.email}
                 {status.account.role === 'owner' ? ', the Owner' : ''}. This device stays signed in for 90 days after its last use.

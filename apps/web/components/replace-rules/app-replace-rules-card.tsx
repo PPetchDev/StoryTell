@@ -11,7 +11,7 @@ export function AppReplaceRulesCard({ autosave }: { autosave: Autosave }) {
     const rules = useApiQuery<ReplaceRuleListAnswer>('/replace-rules');
     return (
         <section className="card" aria-label="Replace rules">
-            <h2>Replace rules</h2>
+            <h3 className="card-title">Replace rules</h3>
             <p className="muted">
                 Find and replace, for every Story. On AI Messages changes how replies read, never what is stored: the AI keeps
                 reading the original. On my Messages fixes what you send before it is sent. These run before a Story&apos;s own.
@@ -19,7 +19,7 @@ export function AppReplaceRulesCard({ autosave }: { autosave: Autosave }) {
             {rules.status === 'loading' && <Loading label="Loading Replace rules…" lines={2} />}
             {rules.status === 'error' && <ErrorState title="Couldn't load the Replace rules." error={rules.error} onRetry={rules.retry} />}
             {rules.status === 'ready' && (
-                <ReplaceRuleList initial={rules.data.replaceRules} store={appReplaceRules} autosave={autosave} saveKey="replaceRules.app" />
+                <ReplaceRuleList initial={rules.data.replaceRules} store={appReplaceRules} autosave={autosave} saveKey="replaceRules.app" ruleHeading="h4" />
             )}
         </section>
     );

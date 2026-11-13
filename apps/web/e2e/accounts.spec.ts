@@ -66,6 +66,9 @@ test('the Owner adds a Member, who signs in to an empty Story list and never see
     const ownerStoryId = (await created.json()).id as number;
     // The files after this one expect the Owner's Story list empty.
     try {
+        // Signing out is the last group, under the Owner's settings for everyone (audit M14).
+        await expect(page.getByRole('heading', { level: 2 })).toHaveText(['This device', 'Your writing', 'Owner · for everyone', 'Account']);
+        await expect(page.getByRole('region', { name: 'Account' }).getByRole('button', { name: 'Sign out' })).toBeVisible();
 
         const people = page.getByRole('list', { name: 'People' });
         await expect(people.getByRole('listitem', { name: 'owner@example.com' })).toContainText('Owner');
@@ -93,11 +96,13 @@ test('the Owner adds a Member, who signs in to an empty Story list and never see
         await expect(member.getByRole('heading', { name: 'Models' })).toHaveCount(0);
         await expect(member.getByRole('heading', { name: 'People' })).toHaveCount(0);
         await expect(member.getByRole('heading', { name: 'Credit' })).toHaveCount(0);
+        await expect(member.getByRole('heading', { level: 2 })).toHaveText(['This device', 'Your writing', 'Account']);
 
         await member.goto('/usage');
         await expect(member.getByRole('heading', { name: 'Your Monthly cap' })).toBeVisible();
         await expect(member.getByText('$0.00 of $2.50')).toBeVisible();
         await expect(member.getByText('Remaining credit')).toHaveCount(0);
+        await expect(member.getByRole('link', { name: /in Settings$/ })).toHaveCount(0);
 
         // Back on the Owner's device, the Member shows as signed in.
         await page.reload();

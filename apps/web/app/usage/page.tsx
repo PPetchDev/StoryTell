@@ -8,8 +8,12 @@ import { useApiQuery } from '@/components/connection';
 import { ErrorState, Loading } from '@/components/query-state';
 import { CALL_KIND_LABEL, CreditPool, POOL_LABEL, PoolUsage, UsageResponse, usd } from '@/lib/types';
 
-/** Label and value side by side; the label muted. */
-const FACTS = 'm-0 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1.5 [&>dd]:m-0 [&>dt]:text-muted';
+/**
+ * Label and value, the label muted: the label over its value on a phone, so the value has the
+ * card's width (docs/ui-audit-2026-11-13.md, M15), side by side from 480px.
+ */
+const FACTS =
+    'm-0 grid grid-cols-1 gap-x-4 min-[30rem]:grid-cols-[max-content_1fr] min-[30rem]:gap-y-1.5 [&>dd]:m-0 [&>dt]:text-muted [&>dt:not(:first-child)]:mt-3 min-[30rem]:[&>dt:not(:first-child)]:mt-0';
 
 const POOLS: CreditPool[] = ['text', 'image'];
 
@@ -74,6 +78,39 @@ function MonthlyCapCard({ cap }: { cap: NonNullable<UsageResponse['monthlyCap']>
     );
 }
 
+/** This month's spend by kind (M15): a row each, the amounts and counts in their own columns. */
+function KindTable({ pool, usage }: { pool: CreditPool; usage: PoolUsage }) {
+    const cell = 'py-1.5 text-right align-top';
+    return (
+        <table className="mt-4 w-full border-collapse text-md tabular-nums" aria-label={`${POOL_LABEL[pool]} spend by kind`}>
+            <thead>
+                <tr className="text-sm text-muted">
+                    <th scope="col" className="pb-1 text-left font-normal">
+                        Spent on
+                    </th>
+                    <th scope="col" className="pb-1 text-right font-normal">
+                        Amount
+                    </th>
+                    <th scope="col" className="pb-1 pl-4 text-right font-normal">
+                        Calls
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+                {usage.byKind.map((kind) => (
+                    <tr key={kind.kind} className="border-t border-line">
+                        <th scope="row" className="py-1.5 pr-2 text-left align-top font-normal">
+                            {CALL_KIND_LABEL[kind.kind]}
+                        </th>
+                        <td className={cell}>{usd(kind.spentUsd)}</td>
+                        <td className={`${cell} pl-4 text-muted`}>{kind.calls}</td>
+                    </tr>
+                ))}
+            </tbody>
+        </table>
+    );
+}
+
 function PoolCard({ pool, usage, member }: { pool: CreditPool; usage: PoolUsage; member: boolean }) {
     // The Venice pool's label already names its provider.
     const provider = pool === 'text' ? 'OpenRouter' : null;
@@ -86,18 +123,7 @@ function PoolCard({ pool, usage, member }: { pool: CreditPool; usage: PoolUsage;
             <dl className={FACTS}>
                 <dt>Spent this month</dt>
                 <dd>
-                    {usd(usage.spentUsd)}{' '}
-                    <span className="muted">({callCount(usage.calls)})</span>
-                    {usage.byKind.length > 0 && (
-                        <ul className="mt-1.5 mb-0 flex list-none flex-col gap-0.5 p-0 text-md" aria-label={`${POOL_LABEL[pool]} spend by kind`}>
-                            {usage.byKind.map((kind) => (
-                                <li key={kind.kind}>
-                                    {CALL_KIND_LABEL[kind.kind]}: {usd(kind.spentUsd)}{' '}
-                                    <span className="muted">({callCount(kind.calls)})</span>
-                                </li>
-                            ))}
-                        </ul>
-                    )}
+                    {usd(usage.spentUsd)} <span className="muted">· {callCount(usage.calls)}</span>
                 </dd>
                 {!member && (
                     <>
@@ -105,14 +131,10 @@ function PoolCard({ pool, usage, member }: { pool: CreditPool; usage: PoolUsage;
                         <dd>
                             {usage.remainingUsd === null ? (
                                 <span className="muted">
-                                    unknown
+                                    Unknown
                                     {pool === 'image' && (
-                                        // Where to fix it, not just why (audit L24): the key is the API's setting.
-                                        <>
-                                            {' '}
-                                            (reading it needs a Venice Admin key: set <code>VENICE_ADMIN_KEY</code> where the API
-                                            runs)
-                                        </>
+                                        // Why, in words (M15): the setting's name is in README, for whoever runs the server.
+                                        <>. Venice tells its balance only to an admin key, and the server has none set up.</>
                                     )}
                                 </span>
                             ) : (
@@ -137,14 +159,7 @@ function PoolCard({ pool, usage, member }: { pool: CreditPool; usage: PoolUsage;
                     </>
                 )}
             </dl>
-            {/* The pools' sizes and the providers' balances are the Owner's (.scratch/accounts/spec.md). */}
-            {!member && (
-                <p className="mt-3 mb-0 text-md">
-                    <Link href="/settings" className="inline-flex min-h-11 items-center">
-                        Change the pool size and warning in Settings
-                    </Link>
-                </p>
-            )}
+            {usage.byKind.length > 0 && <KindTable pool={pool} usage={usage} />}
         </section>
     );
 }
@@ -165,6 +180,14 @@ export default function UsagePage() {
                     {POOLS.map((pool) => (
                         <PoolCard key={pool} pool={pool} usage={usage.data.pools[pool]} member={usage.data.monthlyCap !== null} />
                     ))}
+                    {/* Once for both pools, not under each (M15). Their sizes are the Owner's (.scratch/accounts/spec.md). */}
+                    {usage.data.monthlyCap === null && (
+                        <p className="mt-0 text-md">
+                            <Link href="/settings" className="inline-flex min-h-11 items-center">
+                                Change the pools&apos; sizes and warnings in Settings
+                            </Link>
+                        </p>
+                    )}
                 </>
             )}
             {/* Last, so a banner that arrives late pushes nothing down (audit M38). */}

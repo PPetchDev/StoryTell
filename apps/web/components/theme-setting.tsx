@@ -12,7 +12,7 @@ export function ThemeSetting() {
     const headingId = useId();
     return (
         <section className="card">
-            <h2 id={headingId}>Theme</h2>
+            <h3 id={headingId} className="card-title">Theme</h3>
             <p className="muted">Dark, light, or whichever your phone is set to. It is kept on this device only.</p>
             <div className={SEGMENTS} role="radiogroup" aria-labelledby={headingId}>
                 {THEME_CHOICES.map((option) => (

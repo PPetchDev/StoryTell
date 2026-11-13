@@ -11,7 +11,7 @@ export function AppSavedRepliesCard({ autosave }: { autosave: Autosave }) {
     const lines = useApiQuery<SavedReplyListAnswer>('/saved-replies');
     return (
         <section className="card" aria-label="Saved replies">
-            <h2>Saved replies</h2>
+            <h3 className="card-title">Saved replies</h3>
             <p className="muted">
                 Lines you send often, for every Story. Tap one in the composer&apos;s Saved replies tray to put it in the box;{' '}
                 <code>{'{user}'}</code> becomes the name you wear in that Chat.

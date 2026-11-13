@@ -618,8 +618,9 @@ test('the Usage page lists Dictation under "Images and audio (Venice)", and Sett
 
     await page.goto('/usage');
     await expect(page.getByRole('heading', { name: 'Images and audio (Venice)', exact: true })).toBeVisible();
-    const kinds = page.getByRole('list', { name: 'Images and audio (Venice) spend by kind' }).getByRole('listitem');
-    await expect(kinds).toHaveText(['Snapshots: $0.05 (1 call)', 'Dictation: <$0.01 (1 call)']);
+    const kinds = page.getByRole('table', { name: 'Images and audio (Venice) spend by kind' });
+    await expect(kinds.getByRole('rowheader')).toHaveText(['Snapshots', 'Dictation']);
+    await expect(kinds.getByRole('cell')).toHaveText(['$0.05', '1', '<$0.01', '1']);
 
     await page.goto('/settings');
     await expect(page.getByLabel('Images and audio (Venice) pool (USD)')).toBeVisible();

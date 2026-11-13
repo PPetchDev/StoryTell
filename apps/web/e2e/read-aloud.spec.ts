@@ -440,12 +440,9 @@ test('the Usage page lists Read aloud and Voice samples under "Images and audio 
 
     await page.goto('/usage');
     await expect(page.getByRole('heading', { name: 'Images and audio (Venice)', exact: true })).toBeVisible();
-    const kinds = page.getByRole('list', { name: 'Images and audio (Venice) spend by kind' }).getByRole('listitem');
-    await expect(kinds).toHaveText([
-        'Snapshots: $0.05 (1 call)',
-        'Read aloud: <$0.01 (4 calls)',
-        'Voice samples: <$0.01 (1 call)',
-    ]);
+    const kinds = page.getByRole('table', { name: 'Images and audio (Venice) spend by kind' });
+    await expect(kinds.getByRole('rowheader')).toHaveText(['Snapshots', 'Read aloud', 'Voice samples']);
+    await expect(kinds.getByRole('cell')).toHaveText(['$0.05', '1', '<$0.01', '4', '<$0.01', '1']);
 
     await page.goto('/settings');
     await expect(page.getByLabel('Images and audio (Venice) pool (USD)')).toBeVisible();

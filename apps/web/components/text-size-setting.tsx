@@ -25,7 +25,7 @@ export function TextSizeSetting() {
     const headingId = useId();
     return (
         <section className="card">
-            <h2 id={headingId}>Text size</h2>
+            <h3 id={headingId} className="card-title">Text size</h3>
             <p className="muted">The size of the story in a Chat. It is kept on this device only.</p>
             <div className={SEGMENTS} role="radiogroup" aria-labelledby={headingId}>
                 {TEXT_SIZES.map((option) => (

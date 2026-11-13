@@ -154,7 +154,7 @@ export function SamplingFold({
     // Between the Play model and the Snapshot model: kept apart from the next field.
     return (
         <div className="mt-1 mb-5 border-b border-line pb-4">
-            <FoldTitle foldKey={FOLD_KEY} controls="sampling-body" startsFolded>
+            <FoldTitle foldKey={FOLD_KEY} controls="sampling-body" as="h4" startsFolded>
                 Sampling
             </FoldTitle>
             <div id="sampling-body" hidden={folded}>
