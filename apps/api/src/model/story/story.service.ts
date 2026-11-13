@@ -18,6 +18,11 @@ import { CoverFocus, StoryEntity } from './entities/story.entity.js';
 import { AccountModelService } from '../account/account.service.js';
 
 // Relations are opted into here only; nothing on the entities auto-loads.
+/**
+ * Everything a Story holds. Read with `relationLoadStrategy: 'query'`, one query per relation: joined in
+ * one query they multiplied (Characters × Expressions × Scenes × Lore …), about 25,700 rows for one
+ * real Story, and every page that read a Story waited seconds (docs/ui-audit-2026-11-13.md, H1).
+ */
 const FULL_RELATIONS = {
     role: true,
     characters: { expressions: true },
@@ -86,6 +91,7 @@ export class StoryModelService {
         const stories = await this.stories.find({
             where: { userId: this.accounts.currentId() },
             relations: FULL_RELATIONS,
+            relationLoadStrategy: 'query',
             order: { updatedAt: 'DESC', id: 'DESC' },
         });
         return stories.map(sorted);
@@ -101,7 +107,7 @@ export class StoryModelService {
 
     /** The Story with its relations, when it is the current Account's. */
     async findFull(id: number): Promise<StoryEntity | null> {
-        const story = await this.stories.findOne({ where: { id, userId: this.accounts.currentId() }, relations: FULL_RELATIONS });
+        const story = await this.stories.findOne({ where: { id, userId: this.accounts.currentId() }, relations: FULL_RELATIONS, relationLoadStrategy: 'query' });
         return story && sorted(story);
     }
 
