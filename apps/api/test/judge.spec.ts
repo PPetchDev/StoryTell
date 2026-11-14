@@ -337,6 +337,8 @@ The user plays Ash (refer to them as "user").
 
 # Current Scene
 Arrival. Move-on condition: Mira lets Ash up the stairs.
+What this Scene is about: Reach the lamp room.
+Read the condition as part of what this Scene is about: something that only fits its words, about another matter, does not meet it.
 
 # Time of day
 not yet known

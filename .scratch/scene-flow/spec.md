@@ -63,8 +63,13 @@ The user has no Move on button and never sees the reply counts.
   - Met means what the condition describes has happened in substance by the end of the latest exchange, in any words. A part met in an earlier exchange still counts, and the Bonds and the story so far are in view.
   - These rules stay: "getting closer, about to, agreeing to later doesn't count", "when the condition names who must act, only that one counts", and "when in doubt, false".
   - The rule "A Scene is meant to last many exchanges" goes.
+  - (Added 2026-11-14) The Current Scene section also shows the Scene's situation, as "What this Scene is about: …", when it has one. When the Scene also has a written condition, it adds that the condition is read as part of what the Scene is about: something that only fits its words, about another matter, does not meet it. Seen in dev Chat 2: "The user catches a real clue" in "Three Laps, No Cows", which is the hunt for the herd, was met by Tavri's hint about where to find river-stones for a gift. A Scene with no situation gets the section as before.
 - **Passed by:**
   - From the passed-by threshold on, and only then, the Judge prompt's Current Scene section adds the passed-by rule.
+  - (Added 2026-11-14) With the rule come two more lines:
+    - A private interlude (a love scene, a night together, a meal, a bath, a rest) is not the story going somewhere else: the story comes back from it.
+    - Where passing by goes. On a Scene with a next Scene, this shows the next Scene's name and situation, and says to set `passed_by` only when that Scene can begin from where the story is now, not when it needs a place, a season or an event the story has not reached. On the last Scene, it says passing by goes on in free play.
+    - Seen in live Chat 2 on 2026-11-13/14: Breaking Camp, What the Keeper Would Lose and Toll at the River Bridge were passed by one after another, during the wedding night and the morning after. Each next Scene needed a road the story never took, so the Chat landed in the winter tithe barn while the story stayed at the summer market.
   - The output gains `"passed_by": false` and `"went_to": null` next to `move_on`.
   - `passed_by: true` means the story has clearly gone somewhere the condition can't happen soon, and nothing in the latest exchanges is heading back toward it. Then `went_to` must say, in one short sentence, where the story went instead, and nothing about what has or hasn't happened. (Changed 2026-11-12, see Further Notes; it was "the reason must say where the story went".)
   - `apply-judgement`:

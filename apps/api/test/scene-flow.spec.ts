@@ -235,6 +235,33 @@ describe('The Judge prompt\'s passed-by rule', () => {
         }
     });
 
+    // Seen in live Chat 2 on 2026-11-13/14: three Scenes in a row were passed by during the wedding
+    // night and the morning after, each "went to" the camp, so the Chat landed in a winter barn while
+    // the story stayed at the summer market.
+    it('from the threshold, says a private interlude is not the story going elsewhere', () => {
+        expect(currentScene(withReplies(PASSED_BY_REPLIES))).toContain(
+            'A private interlude (a love scene, a night together, a meal, a bath, a rest) is not the story going somewhere else: the story comes back from it.',
+        );
+        expect(currentScene(withReplies(PASSED_BY_REPLIES - 1))).not.toContain('private interlude');
+    });
+
+    it('from the threshold, shows the next Scene and allows passing by only when it can begin from where the story is', () => {
+        const next = { name: 'Toll at the River Bridge', situation: 'Five days south, the road meets the river.' };
+        const section = currentScene({ ...JUDGE_INPUT, scene: { ...JUDGE_INPUT.scene!, replies: PASSED_BY_REPLIES, next } });
+        expect(section).toContain('Passed by, the story goes on to the next Scene: Toll at the River Bridge. Five days south, the road meets the river.');
+        expect(section).toContain(
+            'Set passed_by only when that Scene can begin from where the story is now, not when it needs a place, a season or an event the story has not reached.',
+        );
+        // Under the threshold the next Scene is not shown.
+        expect(currentScene({ ...JUDGE_INPUT, scene: { ...JUDGE_INPUT.scene!, replies: 3, next } })).not.toContain('Toll at the River Bridge');
+    });
+
+    it('from the threshold on the last Scene, says passing by ends in free play', () => {
+        const section = currentScene({ ...JUDGE_INPUT, scene: { ...JUDGE_INPUT.scene!, replies: PASSED_BY_REPLIES, next: null } });
+        expect(section).toContain('Passed by, the story goes on in free play: this is the last Scene.');
+        expect(section).not.toContain('can begin from where the story is now');
+    });
+
     it('is never given in free play', () => {
         expect(buildJudgePrompt({ ...JUDGE_INPUT, scene: null }).messages[1].content).not.toContain('Passed-by rule');
     });

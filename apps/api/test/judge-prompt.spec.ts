@@ -35,4 +35,27 @@ describe('Judge prompt: the Scene rule', () => {
         const user = buildJudgePrompt(input()).messages[1].content;
         expect(user).toContain('A Name Said Like That. Move-on condition: Tavri tells the truth in her own words to someone she chose.');
     });
+
+    // Seen in dev Chat 2 on 2026-11-12: "The user catches a real clue" was met by a hint about where
+    // to find river-stones for a gift, because the Judge never saw that the Scene is the hunt for the herd.
+    it('shows what the Scene is about, and reads the condition as part of it', () => {
+        const scene = {
+            name: 'Three Laps, No Cows',
+            situation: 'The user looks around the camp for the herd. The tribe deflects warmly.',
+            moveOnCondition: 'The user catches a real clue, most likely Tavri letting something slip.',
+        };
+        const user = buildJudgePrompt(input({ scene })).messages[1].content;
+        const section = user.slice(user.indexOf('# Current Scene'), user.indexOf('# Time of day'));
+        expect(section).toContain('Three Laps, No Cows. Move-on condition: The user catches a real clue, most likely Tavri letting something slip.');
+        expect(section).toContain('What this Scene is about: The user looks around the camp for the herd. The tribe deflects warmly.');
+        expect(section).toContain(
+            'Read the condition as part of what this Scene is about: something that only fits its words, about another matter, does not meet it.',
+        );
+    });
+
+    it('leaves the section as it was for a Scene with no situation', () => {
+        const user = buildJudgePrompt(input({ scene: { name: 'A Name Said Like That', situation: '  ', moveOnCondition: 'Tavri tells the truth.' } }))
+            .messages[1].content;
+        expect(user).toContain('# Current Scene\nA Name Said Like That. Move-on condition: Tavri tells the truth.\n\n# Time of day');
+    });
 });

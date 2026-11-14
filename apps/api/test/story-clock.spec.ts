@@ -178,7 +178,7 @@ describe('Story clock: the judge, the ledger and the Chat', () => {
         const judge = lastCall('judge');
         expect(judge.messages[0].content).toContain('"time_of_day":null');
         expect(judge.messages[0].content).toContain('"dawn", "morning", "noon", "afternoon", "evening" or "night"');
-        expect(judge.messages[1].content).toContain('# Current Scene\nArrival. Move-on condition: (none)\n\n# Time of day\nnot yet known\n\n# Recent story');
+        expect(judge.messages[1].content).toContain('# Current Scene\nArrival. Move-on condition: (none)\nWhat this Scene is about: Reach the lamp room.\n\n# Time of day\nnot yet known\n\n# Recent story');
         expect((await getChat(story.id, chat.id)).timeOfDay).toBeNull();
         expect(await timeChanges(chat.id)).toEqual([]);
     });

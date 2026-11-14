@@ -45,6 +45,11 @@ export interface JudgePromptInput {
     /** `gatesOnly`: the Scene has Bond gates and no condition, so the app alone decides (.scratch/bond-axes/spec.md). */
     scene: {
         name: string;
+        /**
+         * What the Scene is about, as the author wrote it, so the condition is read as part of it: a
+         * "real clue" is one about what the Scene is about. Blank or left out: no line, the section as before.
+         */
+        situation?: string;
         moveOnCondition: string;
         gatesOnly?: boolean;
         /**
@@ -52,6 +57,11 @@ export interface JudgePromptInput {
          * from `PASSED_BY_REPLIES` the Current Scene section adds the passed-by rule. Left out, it never does.
          */
         replies?: number;
+        /**
+         * Where a passed-by Scene goes, shown with the passed-by rule: the next Scene in order, or null
+         * on the last Scene (free play). Left out: no line.
+         */
+        next?: { name: string; situation: string } | null;
     } | null;
     /** The Chat's Time of day; null while the story has not made one clear. Left out, it reads as null. */
     timeOfDay?: TimeOfDay | null;
@@ -158,6 +168,41 @@ const SYSTEM_WITH_EXPRESSIONS = SYSTEM.replace('Reply with JSON only:', `${EXPRE
 export const PASSED_BY_RULE =
     'Passed-by rule: This Scene has gone on a long time. Set "passed_by": true only when the story has clearly gone somewhere the move-on condition can\'t happen soon, and nothing in the latest exchanges is heading back toward it; then also give "went_to": one short sentence saying where the story went instead, never what has or hasn\'t happened. When in doubt, passed_by is false.';
 
+/**
+ * The passed-by rule, then where passing by goes. Seen in live Chat 2: three Scenes in a row were
+ * passed by during the wedding night and the morning after, and each next Scene needed a road the
+ * story never took, so the Chat landed in a winter barn while the story stayed at the summer market.
+ */
+function passedByRule(next: { name: string; situation: string } | null | undefined): string {
+    const lines = [
+        PASSED_BY_RULE,
+        'A private interlude (a love scene, a night together, a meal, a bath, a rest) is not the story going somewhere else: the story comes back from it.',
+    ];
+    if (next === null) lines.push('Passed by, the story goes on in free play: this is the last Scene.');
+    if (next) {
+        lines.push(
+            `Passed by, the story goes on to the next Scene: ${next.name}.${next.situation.trim() ? ` ${next.situation.trim()}` : ''}`,
+            'Set passed_by only when that Scene can begin from where the story is now, not when it needs a place, a season or an event the story has not reached.',
+        );
+    }
+    return `\n${lines.join('\n')}`;
+}
+
+/**
+ * What the Scene is about, and that its condition is read as part of it; nothing for a Scene with no
+ * situation, so its section is as before. Seen in dev Chat 2: "The user catches a real clue" in the
+ * hunt for the herd was met by a hint about river-stones for a gift.
+ */
+function sceneSituation(scene: { situation?: string; moveOnCondition: string; gatesOnly?: boolean }): string {
+    const situation = scene.situation?.trim();
+    if (!situation) return '';
+    // Only a written condition is read: none, or gates only, has no words to fit.
+    const rule = scene.gatesOnly || scene.moveOnCondition.trim() === ''
+        ? ''
+        : '\nRead the condition as part of what this Scene is about: something that only fits its words, about another matter, does not meet it.';
+    return `\nWhat this Scene is about: ${situation}${rule}`;
+}
+
 /** The reply as `partsToText` writes it, with each speech line numbered in order: `[1] @Name: …`. */
 export function numberedReplyText(parts: ReplyPart[]): string {
     let line = 0;
@@ -198,7 +243,7 @@ ${bonds}
 ${arcs}
 
 # Current Scene
-${input.scene ? `${input.scene.name}. Move-on condition: ${input.scene.gatesOnly ? '(gates only)' : input.scene.moveOnCondition || '(none)'}${(input.scene.replies ?? 0) >= PASSED_BY_REPLIES ? `\n${PASSED_BY_RULE}` : ''}` : 'none'}
+${input.scene ? `${input.scene.name}. Move-on condition: ${input.scene.gatesOnly ? '(gates only)' : input.scene.moveOnCondition || '(none)'}${sceneSituation(input.scene)}${(input.scene.replies ?? 0) >= PASSED_BY_REPLIES ? passedByRule(input.scene.next) : ''}` : 'none'}
 
 # Time of day
 ${input.timeOfDay ?? 'not yet known'}

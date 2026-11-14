@@ -125,6 +125,7 @@ export class JudgeManagerService {
             const state = await this.ledger.state(chat.id);
             const bonds = currentBonds(state.bondChanges);
             const scene = story.scenes.find((candidate) => candidate.id === chat.currentSceneId) ?? null;
+            const nextScene = scene ? (story.scenes[story.scenes.indexOf(scene) + 1] ?? null) : null;
             // Up to and including the judged reply (.scratch/scene-flow/spec.md); null in free play.
             const replies = repliesInScene({
                 currentSceneId: scene?.id ?? null,
@@ -159,9 +160,12 @@ export class JudgeManagerService {
                 scene: scene
                     ? {
                           name: scene.name,
+                          situation: scene.situation,
                           moveOnCondition: scene.moveOnCondition,
                           ...((scene.gates ?? []).length > 0 && scene.moveOnCondition.trim() === '' ? { gatesOnly: true } : {}),
                           replies: replies ?? 0,
+                          // Where passing by goes, as apply-judgement moves it: the next Scene in order, or free play.
+                          next: nextScene ? { name: nextScene.name, situation: nextScene.situation } : null,
                       }
                     : null,
                 timeOfDay: chat.timeOfDay,
