@@ -1,11 +1,19 @@
 /*
- * The Memory graph's SVG, and the Chat making room for the docked Memory drawer.
+ * The Memory graph's SVG, and the Chat making room for the docked Memory drawer and the glance panel.
  * Owner: the Chats list / Dashboard / Memory session.
  * The rest of the drawer is utilities in components/chat/memory-drawer.tsx. What stays here is
  * what utilities can't say (docs/adr/0004-tailwind-css.md, "What may stay plain CSS"): SVG
  * fill, stroke and paint-order, states on <g>, and a :has() across components.
  */
 @layer components {
+    /* From 1280px the Dashboard at a glance sits right of the Chat, which narrows to leave it room (components/chat/chat-glance.tsx). */
+    /* 80rem, the same as useWide in chat-glance.tsx; the app defines no breakpoint past lg. */
+    @media (width >= 80rem) {
+        .page:has(.chat-glance) {
+            margin-right: 18rem;
+        }
+    }
+
     /* Desktop: the drawer docks beside the Chat, which narrows to leave it room, instead of covering it. */
     .page:has(.memory-drawer) {
         @variant lg {

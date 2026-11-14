@@ -110,7 +110,8 @@ test('generates 3 candidates, picks one, and sees the Reference image on the Cha
         const opening = page.getByRole('article', { name: 'Opening' });
         await expect(opening).toContainText('The lamp went out an hour ago.');
         await expect(opening.getByRole('group', { name: 'Mira' }).locator('img[src*="reference-images"]')).toHaveCount(1);
-        await expect(page.locator('img[src*="reference-images"]')).toHaveCount(1);
+        // Beside the Dashboard at a glance's own Portrait of her on a wide screen, nowhere else.
+        await expect(page.locator('img[src*="reference-images"]:not(.chat-glance img)')).toHaveCount(1);
         await expect(page.getByRole('img', { name: /Reference image/ })).toHaveCount(0);
     } finally {
         // Leaves the shared e2e database as it was found, Chats and the image file included.

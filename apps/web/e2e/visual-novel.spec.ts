@@ -308,8 +308,10 @@ test.describe('on a PC', () => {
 
         const stage = (await vn.root.locator('[data-stage]').boundingBox())!;
         expect(stage.width).toBeLessThanOrEqual(768);
+        // Centred between the rail and the Dashboard at a glance (18rem) on the right.
         const rail = 104;
-        expect(Math.abs(stage.x + stage.width / 2 - (rail + (1440 - rail) / 2))).toBeLessThan(2);
+        const glance = 288;
+        expect(Math.abs(stage.x + stage.width / 2 - (rail + (1440 - rail - glance) / 2))).toBeLessThan(2);
 
         await page.getByRole('button', { name: 'Chat menu' }).click();
         await page.getByRole('dialog', { name: 'Chat menu' }).getByRole('button', { name: /^Memory/ }).click();

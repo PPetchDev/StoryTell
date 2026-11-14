@@ -7,6 +7,9 @@ import { ConfirmButton, TextField } from '@/components/story-editor/fields';
 import { SavedReply, SavedReplyStore } from '@/lib/saved-replies';
 import { ADD_BUTTON } from './list-parts';
 
+/** The focus key that sends focus to Add, once the last card is removed. */
+const ADD_FOCUS = '__add';
+
 interface Card {
     /** Stable for the card's life, so a draft keeps its box when it gets its id. */
     key: string;
@@ -41,7 +44,8 @@ export function SavedReplyList({ initial, store, autosave, saveKey }: {
 
     useEffect(() => {
         if (focusKey === null) return;
-        list.current?.querySelector<HTMLElement>(`[data-card="${focusKey}"] textarea`)?.focus();
+        if (focusKey === ADD_FOCUS) addButton.current?.focus();
+        else list.current?.querySelector<HTMLElement>(`[data-card="${focusKey}"] textarea`)?.focus();
         setFocusKey(null);
     }, [focusKey]);
 
@@ -74,8 +78,12 @@ export function SavedReplyList({ initial, store, autosave, saveKey }: {
     };
 
     // After pending edits, so a draft whose first save is still on its way is removed once it has its id.
-    const remove = (key: string) =>
-        autosave.commit<SavedReply[] | null>(
+    const remove = (key: string) => {
+        // Where focus lands once it is gone, chosen now and moved once the card has left the page:
+        // a frame after the remove may still find it there (a flaky focus, 2026-11-14).
+        const index = cards.findIndex((card) => card.key === key);
+        const after = cards[index + 1] ?? cards[index - 1];
+        return autosave.commit<SavedReply[] | null>(
             async () => {
                 const id = ids.current.get(key);
                 return id === undefined ? null : store.remove(id);
@@ -83,13 +91,16 @@ export function SavedReplyList({ initial, store, autosave, saveKey }: {
             () => {
                 ids.current.delete(key);
                 setCards((current) => current.filter((card) => card.key !== key));
+                setFocusKey(after ? after.key : ADD_FOCUS);
             },
         );
+    };
 
     /** Where focus goes once a line is removed: the next line's box, the one before it, or Add (audit M50). */
     const focusAfterRemove = (index: number) => () => {
         // Still there: the remove failed, and focus goes back to its button.
         if (list.current?.querySelector(`[data-card="${cards[index].key}"]`)) return null;
+        // Gone already: the list moves focus itself once it has re-rendered (remove), so this lands the same.
         const next = cards[index + 1] ?? cards[index - 1];
         return (next && list.current?.querySelector<HTMLElement>(`[data-card="${next.key}"] textarea`)) || addButton.current;
     };

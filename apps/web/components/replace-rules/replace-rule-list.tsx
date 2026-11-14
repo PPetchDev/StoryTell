@@ -9,6 +9,9 @@ import { regexCompileError, ReplaceRule, ReplaceRuleFields, ReplaceRuleStore } f
 import { useSettled } from '@/lib/use-settled';
 import { useTryRule } from './use-try-rule';
 
+/** The focus key that sends focus to Add, once the last card is removed. */
+const ADD_FOCUS = '__add';
+
 interface Card {
     /** Stable for the card's life, so a draft keeps its fields when it gets its id. */
     key: string;
@@ -106,7 +109,8 @@ export function ReplaceRuleList({ initial, store, autosave, saveKey, ruleHeading
 
     useEffect(() => {
         if (focusKey === null) return;
-        list.current?.querySelector<HTMLElement>(`[data-card="${focusKey}"] textarea`)?.focus();
+        if (focusKey === ADD_FOCUS) addButton.current?.focus();
+        else list.current?.querySelector<HTMLElement>(`[data-card="${focusKey}"] textarea`)?.focus();
         setFocusKey(null);
     }, [focusKey]);
 
@@ -144,8 +148,12 @@ export function ReplaceRuleList({ initial, store, autosave, saveKey, ruleHeading
     };
 
     // After pending edits, so a draft whose first save is still on its way is removed once it has its id.
-    const remove = (key: string) =>
-        autosave.commit<ReplaceRule[] | null>(
+    const remove = (key: string) => {
+        // Where focus lands once it is gone, chosen now and moved once the card has left the page:
+        // a frame after the remove may still find it there (a flaky focus, 2026-11-14).
+        const index = cards.findIndex((card) => card.key === key);
+        const after = cards[index + 1] ?? cards[index - 1];
+        return autosave.commit<ReplaceRule[] | null>(
             async () => {
                 const id = ids.current.get(key);
                 return id === undefined ? null : store.remove(id);
@@ -153,13 +161,16 @@ export function ReplaceRuleList({ initial, store, autosave, saveKey, ruleHeading
             () => {
                 ids.current.delete(key);
                 setCards((current) => current.filter((card) => card.key !== key));
+                setFocusKey(after ? after.key : ADD_FOCUS);
             },
         );
+    };
 
     /** Where focus goes once a rule is removed: the next rule's Find, the one before it, or Add (audit H2). */
     const focusAfterRemove = (index: number) => () => {
         // Still there: the remove failed, and focus goes back to its button.
         if (list.current?.querySelector(`[data-card="${cards[index].key}"]`)) return null;
+        // Gone already: the list moves focus itself once it has re-rendered (remove), so this lands the same.
         const next = cards[index + 1] ?? cards[index - 1];
         return (next && list.current?.querySelector<HTMLElement>(`[data-card="${next.key}"] textarea`)) || addButton.current;
     };

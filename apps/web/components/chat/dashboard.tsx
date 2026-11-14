@@ -123,7 +123,7 @@ function personClass(index: number): string {
 const PERSON_HEAD = 'flex min-h-11 items-center gap-3';
 
 /** A Character's Bonds in one line: "Ash: Curious · Kai: Fond", or that they are a stranger. */
-function bondsLine(character: DashboardCharacter): string {
+export function bondsLine(character: DashboardCharacter): string {
     if (character.bonds.length === 0) return 'A stranger to everyone so far.';
     return character.bonds.map((bond) => `${bond.toward.name}: ${bond.label}`).join(' · ');
 }

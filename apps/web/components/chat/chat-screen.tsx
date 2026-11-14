@@ -8,6 +8,7 @@ import { CharacterRow } from '@/components/chat/character-row';
 import { ChatComposer } from '@/components/chat/chat-composer';
 import { ChatThread, OpenAt, PendingLine } from '@/components/chat/chat-thread';
 import { ChatTopBar } from '@/components/chat/chat-top-bar';
+import { ChatGlance } from '@/components/chat/chat-glance';
 import { MemoryDrawer } from '@/components/chat/memory-drawer';
 import { NovelRequest, NovelView } from '@/components/chat/novel-view';
 import { SceneStrip } from '@/components/chat/scene-strip';
@@ -711,6 +712,11 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                     }
                 />
             )}
+            {/*
+             * The room right of the Chat on a wide screen: the Memory drawer while open, else the
+             * Dashboard at a glance. Last in the page, so Tab reaches it after the composer.
+             */}
+            {!drawer.open && <ChatGlance chat={chat} cast={cast} portraits={portraits} />}
         </main>
     );
 }

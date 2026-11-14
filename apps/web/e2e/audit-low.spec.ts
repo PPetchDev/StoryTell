@@ -71,10 +71,11 @@ test('the Story Gallery is titled "Gallery", the Story under it; the Dashboard h
     const { storyId, chatId } = await createChat(request);
     try {
         await page.goto(`/stories/${storyId}/gallery`);
+        // The Story's title first: the page shows a plain "Gallery" heading while it loads, then its own.
+        await expect(page.getByText(TITLE, { exact: true })).toBeVisible();
         const heading = page.getByRole('heading', { level: 1 });
         await expect(heading).toHaveText('Gallery');
         expect(await lines(heading)).toBe(1);
-        await expect(page.getByText(TITLE, { exact: true })).toBeVisible();
 
         await page.goto(`/stories/${storyId}/chats/${chatId}/dashboard`);
         await expect(page.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible();
