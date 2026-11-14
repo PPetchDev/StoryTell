@@ -89,6 +89,17 @@ export function isChatScreen(pathname: string): boolean {
     return CHAT_SCREEN.test(pathname);
 }
 
+/**
+ * A Chat's Dashboard reads as part of its Chat, so it goes without the bar on a phone too, its
+ * way back the button at its top (audit Low, Dashboard).
+ */
+const CHAT_DASHBOARD = /^\/stories\/[^/]+\/chats\/[^/]+\/dashboard\/?$/;
+
+/** Whether the phone's bottom bar is left off `pathname`: the Chat screen and its Dashboard. */
+export function hidesBottomNav(pathname: string): boolean {
+    return CHAT_SCREEN.test(pathname) || CHAT_DASHBOARD.test(pathname);
+}
+
 /** A Story's own Gallery counts as the Gallery in the menu, not as Stories. */
 const STORY_GALLERY = /^\/stories\/[^/]+\/gallery\/?$/;
 
@@ -106,7 +117,7 @@ function isCurrent(href: string, pathname: string): boolean {
  */
 export function BottomNav() {
     const pathname = usePathname();
-    const onChat = CHAT_SCREEN.test(pathname);
+    const onChat = hidesBottomNav(pathname);
 
     return (
         <>

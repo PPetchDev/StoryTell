@@ -102,6 +102,18 @@ export const SparkleIcon = icon(
     { filled: true },
 );
 
+/**
+ * The Story assistant: a speech bubble with a small sparkle, so it is not taken for a field's
+ * Rewrite, which is the sparkle alone (audit Low, Editor).
+ */
+export const AssistantIcon = icon(
+    'AssistantIcon',
+    <>
+        <path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-4.5 4v-4A2.5 2.5 0 0 1 4 13.5z" />
+        <path d="M12 7.2l.75 1.8 1.8.75-1.8.75L12 12.3l-.75-1.8-1.8-.75 1.8-.75z" fill="currentColor" stroke="none" />
+    </>,
+);
+
 /** 📍 Where: the current Scene. */
 export const PinIcon = icon(
     'PinIcon',

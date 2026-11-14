@@ -40,7 +40,9 @@ function GalleryPage({ storyId }: { storyId: number }) {
     return (
         <main className="wide">
             <Breadcrumbs storyId={storyId} />
-            <h1>Gallery · {storyTitle(story.data)}</h1>
+            {/* "Gallery" as the main Gallery has it, the Story under it: a long title no longer breaks the heading (audit Low, Story Gallery). */}
+            <h1 className="mb-0">Gallery</h1>
+            <p className="mt-1 mb-5 text-muted [overflow-wrap:anywhere]">{storyTitle(story.data)}</p>
             <Gallery
                 stories={[{ id: storyId, title: story.data.title }]}
                 initialChatId={chatParam ? Number(chatParam) : null}

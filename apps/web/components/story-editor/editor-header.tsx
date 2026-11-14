@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ChevronLeftIcon } from '@/components/icons';
 import { SaveState } from './autosave';
 import { SaveStatus } from './save-status';
-import { SparkleIcon } from './sparkle-icon';
+import { AssistantIcon } from '@/components/icons';
 
 interface EditorHeaderProps {
     title: string;
@@ -63,7 +63,7 @@ export function EditorHeader({ title, save, playable, missingCount, onAssistant,
                 <SaveStatus state={save} className="text-sm" />
             </div>
             <button type="button" className={ICON_BUTTON} aria-label="Assistant" title="Story assistant" onClick={onAssistant}>
-                <SparkleIcon size={22} />
+                <AssistantIcon size={22} />
             </button>
             <div className="relative flex-none">
                 {/* aria-disabled, not disabled, so a tap or long-press can still say why. 44px tall (H26). */}

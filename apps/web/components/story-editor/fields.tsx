@@ -19,8 +19,11 @@ function classes(...names: Array<string | false | null | undefined>): string {
  * a label row (label, marks, ✨), the box, then a one-line hint. Exported for the selects and
  * pickers beside TextField (VoiceField, BondLevelField, the gate pickers), so they all line up.
  */
-/** A field: its label row, its box and its hint. A flash lights it for a moment and fades. */
-export const FIELD = 'mb-4 grid min-w-0 gap-1 rounded-md last:mb-0 motion-safe:transition-[box-shadow,background-color] motion-safe:duration-base';
+/**
+ * A field: its label row, its box and its hint. A flash lights it for a moment and fades. At
+ * most 44rem wide: on a desktop a Setting line ran to ~110 characters (audit Low, Desktop).
+ */
+export const FIELD = 'mb-4 grid min-w-0 max-w-[44rem] gap-1 rounded-md last:mb-0 motion-safe:transition-[box-shadow,background-color] motion-safe:duration-base';
 /** Lit for a moment after a jump to it or a rewrite of it. */
 export const FIELD_FLASH = 'bg-accent-soft ring-6 ring-accent-line';
 export const FIELD_HEAD = 'flex min-h-8 items-center gap-2';

@@ -83,7 +83,7 @@ export function FoldingCard({ foldKey, label, title, fieldPrefixes, tools, bodyC
     return (
         <section className="mb-4 rounded-xl bg-surface px-4.5 py-1.5 lg:px-7 lg:py-2" aria-label={label}>
             <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-                <FoldTitle foldKey={openKey(foldKey)} startsFolded controls={bodyId} as="h2" className="basis-32">
+                <FoldTitle foldKey={openKey(foldKey)} startsFolded controls={bodyId} as="h2" className="basis-32" chevronFirst>
                     {title}
                 </FoldTitle>
                 {needsFilling && (

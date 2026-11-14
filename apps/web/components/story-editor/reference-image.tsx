@@ -18,8 +18,8 @@ import { UndoNotice, useUndo } from './undo-notice';
  * stays in view under the sticky header as the fields scroll by.
  */
 const DESKTOP_COLUMN = 'lg:sticky lg:top-[calc(var(--editor-top,0px)+--spacing(4))] lg:col-start-1 lg:row-span-full lg:m-0';
-/** A picture of the Character: 2:3, rounded, on the page colour while it loads; lazy, so a folded card loads none (M31). */
-const PICTURE = 'block aspect-[2/3] h-auto w-full rounded-sm bg-bg object-cover';
+/** A picture of the Character: 2:3, rounded, on the raised surface of the theme while it loads (not a black box, audit Low, Editor); lazy, so a folded card loads none (M31). */
+const PICTURE = 'block aspect-[2/3] h-auto w-full rounded-sm bg-surface-raised object-cover';
 
 /** The error code of an image pool that is used up (docs/error-codes.md). */
 const OUT_OF_IMAGE_CREDIT = '402.001.004';

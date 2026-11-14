@@ -43,6 +43,11 @@ export function PeopleCard() {
 
     const add = async (event: FormEvent) => {
         event.preventDefault();
+        // Said here, not by a greyed-out Add that never says why (audit Low, People).
+        if (!/^[^s@]+@[^s@]+$/.test(email.trim())) {
+            setError('Enter the email they sign in with.');
+            return;
+        }
         const capUsd = readCap(cap);
         if (capUsd === null) {
             setError('Enter a cap from 0 to 1,000 dollars, to the cent.');
@@ -77,15 +82,25 @@ export function PeopleCard() {
                     ))}
                 </ul>
             )}
-            <form onSubmit={add} aria-label="Add a person">
-                <div className="field-row items-end">
+            <form onSubmit={add} aria-label="Add a person" noValidate>
+                <div className="field-row items-start">
                     <div className="field my-0 min-w-0 flex-1">
                         <label htmlFor={`${id}-email`}>Email</label>
-                        <input id={`${id}-email`} type="email" autoComplete="off" value={email} onChange={(event) => setEmail(event.target.value)} required />
+                        <input
+                            id={`${id}-email`}
+                            type="email"
+                            autoComplete="off"
+                            value={email}
+                            aria-describedby={`${id}-email-hint`}
+                            onChange={(event) => setEmail(event.target.value)}
+                        />
+                        <p id={`${id}-email-hint`} className="m-0 text-sm text-muted">
+                            Their Google account, or the email login you made for them.
+                        </p>
                     </div>
-                    <div className="field my-0 w-28">
-                        <label htmlFor={`${id}-cap`}>Cap (USD)</label>
-                        <input id={`${id}-cap`} inputMode="decimal" value={cap} onChange={(event) => setCap(event.target.value)} required />
+                    <div className="field my-0 w-36">
+                        <label htmlFor={`${id}-cap`}>Monthly cap (USD)</label>
+                        <input id={`${id}-cap`} inputMode="decimal" value={cap} onChange={(event) => setCap(event.target.value)} />
                     </div>
                 </div>
                 {error !== null && (
@@ -93,7 +108,7 @@ export function PeopleCard() {
                         {error}
                     </p>
                 )}
-                <button type="submit" className="button mt-3" disabled={busy || email.trim() === ''} aria-busy={busy}>
+                <button type="submit" className="button mt-3" disabled={busy} aria-busy={busy}>
                     {busy ? 'Adding…' : 'Add'}
                 </button>
             </form>
@@ -140,8 +155,8 @@ function PersonRow({ person, onChanged }: { person: Person; onChanged: () => voi
             </p>
             {!owner && (
                 <div className="flex flex-wrap items-end gap-2">
-                    <div className="field my-0 w-28">
-                        <label htmlFor={`${id}-cap`}>Cap (USD)</label>
+                    <div className="field my-0 w-36">
+                        <label htmlFor={`${id}-cap`}>Monthly cap (USD)</label>
                         <input id={`${id}-cap`} inputMode="decimal" value={cap} onChange={(event) => setCap(event.target.value)} onBlur={saveCap} disabled={busy} />
                     </div>
                     <button

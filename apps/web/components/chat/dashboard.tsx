@@ -348,10 +348,11 @@ export function Dashboard({ initial, cast = [], portraits = {} }: { initial: Cha
 
     return (
         <main className="wide">
-            <nav className="breadcrumbs" aria-label="Breadcrumb">
-                <Link href={`/stories/${dashboard.storyId}/chats/${dashboard.chatId}`}>
-                    <ArrowLeftIcon size={18} />
-                    {dashboard.title}
+            {/* The one way back on a phone, which has no bottom bar here: a button, not a small link (audit Low, Dashboard). */}
+            <nav className="mb-3" aria-label="Breadcrumb">
+                <Link href={`/stories/${dashboard.storyId}/chats/${dashboard.chatId}`} className="button button-quiet max-w-full">
+                    <ArrowLeftIcon size={18} className="flex-none" />
+                    <span className="min-w-0 truncate">Back to {dashboard.title}</span>
                 </Link>
             </nav>
             <h1>Dashboard</h1>

@@ -44,7 +44,7 @@ test('the home screen lists no Stories on a fresh install, and offers nothing to
 
     await expect(page.getByRole('heading', { name: 'Stories' })).toBeVisible();
     await expect(page.getByText('No Stories yet.')).toBeVisible();
-    await expect(page.getByRole('link', { name: /Continue where you left off/ })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: /^Continue/ })).toHaveCount(0);
 });
 
 test('the Continue row opens the newest-played Chat, and the Chat screen has no bottom nav', async ({ page, request }) => {
@@ -60,7 +60,7 @@ test('the Continue row opens the newest-played Chat, and the Chat screen has no 
 
     try {
         await page.goto('/');
-        const row = page.getByRole('link', { name: /Continue where you left off/ });
+        const row = page.getByRole('link', { name: /^Continue/ });
         await expect(row).toContainText('The Lighthouse');
         await expect(row).toContainText('The lamp room');
 

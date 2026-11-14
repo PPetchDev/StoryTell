@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
-import { isChatScreen } from '@/components/bottom-nav/bottom-nav';
+import { hidesBottomNav, isChatScreen } from '@/components/bottom-nav/bottom-nav';
 import { CloseIcon } from '@/components/icons';
 import { apiFetch } from '@/lib/api';
 import { CreditPool, POOL_LABEL, UsageResponse, usd } from '@/lib/types';
@@ -84,6 +84,9 @@ const STICK = [
     'lg:bottom-4',
 ].join(' ');
 
+/** At the foot of the window where the phone has no bar (a Chat's Dashboard). */
+const STICK_NO_BAR = 'sticky bottom-[calc(1rem+env(safe-area-inset-bottom))] z-sticky';
+
 /**
  * Shown on every page but the Chat screen while a credit pool is low. It arrives after the page,
  * so it never goes above it: it comes last in the page and sticks to the foot of the window, over
@@ -97,7 +100,7 @@ export function LowCreditBanner() {
 
     // The status region is always there, so what appears in it is read out once.
     return (
-        <div role="status" className={STICK}>
+        <div role="status" className={hidesBottomNav(pathname) ? STICK_NO_BAR : STICK}>
             {onPage && (
                 <div className="banner mt-4 mb-0 flex flex-wrap items-start gap-x-3 shadow-lg shadow-shadow-soft">
                     <div className="min-w-0 flex-1">

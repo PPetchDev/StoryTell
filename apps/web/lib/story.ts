@@ -202,7 +202,7 @@ export interface StoryCover {
 /** What sits behind a Story's Chats: nothing, its Cover, or the Chat's newest Snapshot (mirrors the API). */
 export type Backdrop = 'none' | 'cover' | 'snapshot';
 
-export const BACKDROP_LABELS: Record<Backdrop, string> = { none: 'None', cover: 'Cover', snapshot: 'Newest Snapshot' };
+export const BACKDROP_LABELS: Record<Backdrop, string> = { none: 'None', cover: 'Cover', snapshot: 'Snapshot' };
 
 export interface Story {
     id: number;

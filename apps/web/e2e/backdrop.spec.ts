@@ -52,7 +52,7 @@ const backdrop = (page: Page): Locator => page.locator('[data-backdrop]');
 const picture = (page: Page): Locator => backdrop(page).locator('img');
 
 /** Chooses the Chat backdrop on the editor's Style tab, and waits for the save. */
-async function chooseBackdrop(page: Page, storyId: number, label: 'None' | 'Cover' | 'Newest Snapshot'): Promise<void> {
+async function chooseBackdrop(page: Page, storyId: number, label: 'None' | 'Cover' | 'Snapshot'): Promise<void> {
     await page.goto(`/stories/${storyId}`);
     await page.getByRole('tab', { name: 'Style' }).tap();
     const choice = page.getByRole('radiogroup', { name: 'Chat backdrop' });
@@ -74,7 +74,7 @@ test('the Chat backdrop on the Style tab: None by default; Cover shows the Cover
         await page.getByRole('tab', { name: 'Style' }).tap();
         const choice = page.getByRole('radiogroup', { name: 'Chat backdrop' });
         await expect(choice.getByRole('radio', { name: 'None' })).toHaveAttribute('aria-checked', 'true');
-        await expect(page.getByText('Dimmed behind the Messages. Without a Snapshot yet, the Cover shows.')).toBeVisible();
+        await expect(page.getByText("Dimmed behind the Messages. Snapshot is the Chat's newest; without one yet, the Cover shows.")).toBeVisible();
         await page.goto(`/stories/${storyId}/chats/${chatId}`);
         await expect(page.getByRole('article', { name: 'Opening' })).toContainText('Boots off, keeper.');
         await expect(backdrop(page)).toHaveCount(0);

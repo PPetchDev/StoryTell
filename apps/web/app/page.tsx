@@ -93,8 +93,14 @@ export default function HomePage() {
         <main className="wide">
             <div className="page-header">
                 <h1>Stories</h1>
+                {/* Quiet beside the Continue row's Play, so one purple button asks to be tapped; the main one with nothing to continue (audit Low, Home). */}
                 {!panelOpen && (
-                    <button ref={newStoryButton} type="button" className="button" onClick={() => setNewStory({ kind: 'open' })}>
+                    <button
+                        ref={newStoryButton}
+                        type="button"
+                        className={continuable ? 'button button-quiet' : 'button'}
+                        onClick={() => setNewStory({ kind: 'open' })}
+                    >
                         New Story
                     </button>
                 )}

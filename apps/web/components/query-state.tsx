@@ -21,7 +21,7 @@ export function Loading({ label = 'Loading…', lines = 3, className }: LoadingP
         <div role="status" className={className}>
             <div aria-hidden="true" className="grid gap-2 py-1 motion-safe:animate-pulse-soft">
                 {Array.from({ length: lines }, (_, line) => (
-                    <div key={line} className={`h-4 rounded-sm bg-surface-raised ${line === lines - 1 ? 'w-3/5' : 'w-full'}`} />
+                    <div key={line} className={`h-4 rounded-sm bg-line ${line === lines - 1 ? 'w-3/5' : 'w-full'}`} />
                 ))}
             </div>
             <p className="mt-2 mb-0 text-sm text-muted">{label}</p>

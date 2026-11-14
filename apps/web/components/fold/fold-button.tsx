@@ -20,6 +20,11 @@ interface FoldTitleProps {
     startsFolded?: boolean;
     id?: string;
     className?: string;
+    /**
+     * The chevron before the title, not after it: the editor's cards, whose tools (order, Remove)
+     * follow the title or not, so the chevron stays in one place on every card (audit Low, Editor).
+     */
+    chevronFirst?: boolean;
     children: ReactNode;
 }
 
@@ -34,10 +39,18 @@ export function useFoldedState(foldKey: string, startsFolded = false): boolean {
  * and unfolds the body named by `controls`. The heading keeps the title's text as its name; a
  * picture in it (a Character's Portrait) is decorative and part of what can be tapped.
  */
-export function FoldTitle({ foldKey, controls, as: Heading = 'h3', startsFolded = false, id, className, children }: FoldTitleProps) {
+export function FoldTitle({ foldKey, controls, as: Heading = 'h3', startsFolded = false, id, className, chevronFirst = false, children }: FoldTitleProps) {
     const folded = useFoldedState(foldKey, startsFolded);
     // The stored key means "open" for a fold that starts folded, "folded" otherwise.
     const toggle = () => setFolded(foldKey, startsFolded ? folded : !folded);
+    // Points down while folded (there is more), up while open.
+    const chevron = (
+        <ChevronDownIcon
+            size={20}
+            strokeWidth={2.2}
+            className="flex-none rotate-180 text-muted group-aria-[expanded=false]:rotate-0 motion-safe:transition-transform motion-safe:duration-150"
+        />
+    );
     return (
         <Heading id={id} className={['m-0 min-w-0 flex-1 text-[length:inherit]', className].filter(Boolean).join(' ')}>
             <button
@@ -47,13 +60,9 @@ export function FoldTitle({ foldKey, controls, as: Heading = 'h3', startsFolded 
                 aria-controls={controls}
                 onClick={toggle}
             >
+                {chevronFirst && chevron}
                 <span className="flex min-w-0 flex-1 items-center gap-3">{children}</span>
-                {/* Points down while folded (there is more), up while open. */}
-                <ChevronDownIcon
-                    size={20}
-                    strokeWidth={2.2}
-                    className="flex-none rotate-180 text-muted group-aria-[expanded=false]:rotate-0 motion-safe:transition-transform motion-safe:duration-150"
-                />
+                {!chevronFirst && chevron}
             </button>
         </Heading>
     );

@@ -28,6 +28,33 @@ export class MemoryModelService {
         return this.memories.find({ where: { chatId }, relations: { knownBy: true }, order: { id: 'ASC' } });
     }
 
+    /**
+     * The same, without each Memory's vector, for the Memory list: only choosing Memories for a
+     * turn reads it, and a Chat's few hundred vectors, repeated per Known-by row by the join,
+     * took most of the list's half a second (docs/ui-audit-2026-11-13.md). `embedding` is null.
+     */
+    async findByChatWithoutVectors(chatId: number): Promise<MemoryEntity[]> {
+        const memories = await this.memories.find({
+            select: {
+                id: true,
+                chatId: true,
+                text: true,
+                writtenBy: true,
+                locked: true,
+                archived: true,
+                messageId: true,
+                createdAt: true,
+                embeddingModel: true,
+                knownBy: { memoryId: true, characterId: true },
+            },
+            where: { chatId },
+            relations: { knownBy: true },
+            order: { id: 'ASC' },
+        });
+        for (const memory of memories) memory.embedding = null;
+        return memories;
+    }
+
     findOne(chatId: number, memoryId: number): Promise<MemoryEntity | null> {
         return this.memories.findOne({ where: { id: memoryId, chatId }, relations: { knownBy: true } });
     }

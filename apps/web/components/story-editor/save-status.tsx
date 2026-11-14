@@ -39,10 +39,13 @@ function useSpokenSaveState(state: SaveState): string {
  * edits once more (audit H1); it sits outside the status line, so the line reads the same.
  *
  * The line keeps its status role but is not live: what is said goes through a quieter region of
- * its own (M16). A failure shows in the warning colour.
+ * its own (M16). A failure shows in the warning colour. Nothing shows until something has been
+ * edited: "Saved" on a page just opened says nothing true (audit Low, "Saved").
  */
 export function SaveStatus({ state, className }: { state: SaveState; className?: string }) {
     const spoken = useSpokenSaveState(state);
+    const [edited, setEdited] = useState(false);
+    if (state.kind !== 'saved' && !edited) setEdited(true);
     return (
         <>
             <p
@@ -57,7 +60,7 @@ export function SaveStatus({ state, className }: { state: SaveState; className?:
                 aria-live="off"
                 data-state={state.kind}
             >
-                {SAVE_LABELS[state.kind]}
+                {edited && SAVE_LABELS[state.kind]}
                 {state.kind === 'error' && `: ${state.message}`}
             </p>
             <span className="sr-only" aria-live="polite" aria-atomic="true">

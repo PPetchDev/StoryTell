@@ -234,7 +234,11 @@ function StorySection({ story, onOpen }: { story: StoryGroup; onOpen: Open }) {
  * round a picture of another shape, the tile shows the raised surface of the theme, not the
  * viewer's black, so a loading tile does not read as a broken one (docs/ui-audit-2026-11-13.md, M17).
  */
-const THUMB = 'bare-button block aspect-[2/3] w-full overflow-hidden rounded-sm border border-line bg-surface-raised';
+const THUMB = 'bare-button relative block aspect-[2/3] w-full overflow-hidden rounded-sm border border-line bg-surface-raised';
+
+/** "Earlier version" on the tile itself, so a marked tile's row is as tall as the rest (audit Low, Story Gallery). */
+const EARLIER_BADGE =
+    'pointer-events-none absolute inset-x-1 bottom-1 rounded-sm border border-line bg-surface px-1.5 py-0.5 text-xs font-semibold text-earlier-text';
 
 /** One Chat's Snapshots: its title and count, folding, then the grid. */
 function ChatSection({ chat, level, onOpen }: { chat: ChatGroup; level: 'h2' | 'h3'; onOpen: Open }) {
@@ -268,8 +272,13 @@ function ChatSection({ chat, level, onOpen }: { chat: ChatGroup; level: 'h2' | '
                                     decoding="async"
                                     className="block size-full object-contain"
                                 />
+                                {item.messageId === null && (
+                                    <span className={EARLIER_BADGE}>
+                                        <span aria-hidden="true">Earlier version</span>
+                                        <span className="sr-only">{EARLIER_VERSION}</span>
+                                    </span>
+                                )}
                             </button>
-                            {item.messageId === null && <span className="text-sm text-earlier-text">{EARLIER_VERSION}</span>}
                         </li>
                     ))}
             </ul>

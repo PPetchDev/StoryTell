@@ -131,7 +131,8 @@ export class MemoryManagerService {
     }
 
     private async listOf(story: StoryEntity, chat: ChatEntity): Promise<MemoryList> {
-        const [memories, beliefs] = await Promise.all([this.memoryModel.findByChat(chat.id), this.beliefModel.findByChat(chat.id)]);
+        // Without the vectors: nothing here reads them (lockedOverHalf counts text, not meaning).
+        const [memories, beliefs] = await Promise.all([this.memoryModel.findByChatWithoutVectors(chat.id), this.beliefModel.findByChat(chat.id)]);
         return {
             chatId: chat.id,
             storyId: story.id,
