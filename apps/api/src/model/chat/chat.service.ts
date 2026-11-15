@@ -163,7 +163,13 @@ export class ChatModelService {
     }
 
     /** Stores a User Message with the worn identity as a reference and a stamped name. */
-    addUserMessage(chatId: number, position: number, text: string, identity: StampedIdentity): Promise<MessageEntity> {
+    addUserMessage(
+        chatId: number,
+        position: number,
+        text: string,
+        identity: StampedIdentity,
+        roll: { value: number; target: number } | null = null,
+    ): Promise<MessageEntity> {
         return this.messages.save(
             this.messages.create({
                 chatId,
@@ -172,6 +178,8 @@ export class ChatModelService {
                 text,
                 identityName: identity.name,
                 personaId: identity.personaId,
+                roll: roll?.value ?? null,
+                rollTarget: roll?.target ?? null,
             }),
         );
     }

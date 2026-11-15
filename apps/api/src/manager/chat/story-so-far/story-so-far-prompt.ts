@@ -1,4 +1,6 @@
 import { PromptMessage } from '../../../service/model-gateway/model-gateway.js';
+import { ROLL_RESERVE_TOKENS } from '../roll.js';
+import { SUDDEN_EVENT_RESERVE_TOKENS } from '../sudden-event/sudden-event.js';
 import {
     authorsNoteBlock,
     estimateTokens,
@@ -64,6 +66,9 @@ export function storySoFarCoverage(layers: PromptLayersInput, history: PromptHis
         NUDGE_RESERVE_TOKENS +
         // And a Cue (CONTEXT.md): room for the longest one.
         CUE_RESERVE_TOKENS +
+        // A Roll may ride on it too (.scratch/roll/spec.md), and a Sudden event's block where the Story has one.
+        ROLL_RESERVE_TOKENS +
+        (layers.hasSuddenEvents ? SUDDEN_EVENT_RESERVE_TOKENS : 0) +
         // The Author's note, as the Chat holds it when the check runs.
         estimateTokens(authorsNoteBlock(layers.authorsNote, layers.identity.name) ?? '') +
         estimateTokens(`${reminder}

@@ -16,6 +16,7 @@ import { BondChangeEntity } from './entities/bond-change.entity.js';
 import { ChatArcDirectionEntity } from './entities/chat-arc-direction.entity.js';
 import { MemoryChangeEntity, MemoryChangeKind } from './entities/memory-change.entity.js';
 import { SceneAdvanceEntity } from './entities/scene-advance.entity.js';
+import { SuddenEventStepEntity, SuddenEventStepKind } from './entities/sudden-event-step.entity.js';
 import { TimeChangeEntity } from './entities/time-change.entity.js';
 
 /** A StartingBond as it is seeded into a Chat: no event, no causing Message. */
@@ -69,6 +70,15 @@ export interface NewTimeChange {
     toTime: TimeOfDay;
 }
 
+/** What a judged reply did to a Sudden event (.scratch/sudden-events/spec.md), after the apply rules. */
+export interface NewSuddenEventStep {
+    suddenEventId: number;
+    kind: SuddenEventStepKind;
+    gauge: number;
+    turnsLeft: number;
+    reason: string;
+}
+
 /** The emotion the judge tagged one speech part of the judged Message with (.scratch/expressions/spec.md). */
 export interface PartEmotion {
     partId: number;
@@ -82,6 +92,8 @@ export interface MessageChanges {
     scene: NewSceneAdvance | null;
     /** The Time of day moving on; null or left out when it stayed. */
     time?: NewTimeChange | null;
+    /** The Sudden event step this reply made; null or left out when it made none. */
+    suddenEvent?: NewSuddenEventStep | null;
     /**
      * The emotion of each tagged speech part of the Message; every other part of it is cleared. Not
      * ledger rows: nothing rolls them back, since whatever undoes a judgement replaces the parts.
@@ -115,6 +127,8 @@ export interface LedgerState {
     arcSteps: ArcStepEntity[];
     sceneAdvances: SceneAdvanceEntity[];
     arcDirections: ChatArcDirectionEntity[];
+    /** Every Sudden event step of the Chat (.scratch/sudden-events/spec.md): its event state is read from them. */
+    suddenEventSteps: SuddenEventStepEntity[];
 }
 
 /** Counts by kind for the rollback notice (spec: "3 Memories rolled back"). */
@@ -140,6 +154,7 @@ export class LedgerModelService {
         @InjectRepository(ArcStepEntity) private readonly arcSteps: Repository<ArcStepEntity>,
         @InjectRepository(SceneAdvanceEntity) private readonly sceneAdvances: Repository<SceneAdvanceEntity>,
         @InjectRepository(ChatArcDirectionEntity) private readonly arcDirections: Repository<ChatArcDirectionEntity>,
+        @InjectRepository(SuddenEventStepEntity) private readonly suddenEventSteps: Repository<SuddenEventStepEntity>,
     ) {}
 
     /**
@@ -210,13 +225,19 @@ export class LedgerModelService {
     }
 
     async state(chatId: number): Promise<LedgerState> {
-        const [bondChanges, arcSteps, sceneAdvances, arcDirections] = await Promise.all([
+        const [bondChanges, arcSteps, sceneAdvances, arcDirections, suddenEventSteps] = await Promise.all([
             this.bondChanges.find({ where: { chatId }, order: { id: 'ASC' } }),
             this.arcSteps.find({ where: { chatId }, order: { id: 'ASC' } }),
             this.sceneAdvances.find({ where: { chatId }, order: { id: 'ASC' } }),
             this.arcDirections.find({ where: { chatId }, order: { id: 'ASC' } }),
+            this.suddenEventStepsOf(chatId),
         ]);
-        return { bondChanges, arcSteps, sceneAdvances, arcDirections };
+        return { bondChanges, arcSteps, sceneAdvances, arcDirections, suddenEventSteps };
+    }
+
+    /** The Chat's Sudden event steps alone, oldest first: what its event state is read from. */
+    suddenEventStepsOf(chatId: number): Promise<SuddenEventStepEntity[]> {
+        return this.suddenEventSteps.find({ where: { chatId }, order: { id: 'ASC' } });
     }
 
     /** The Chat's BondChanges alone, oldest first: what the current Bonds are read from. */
@@ -265,6 +286,9 @@ export class LedgerModelService {
             if (changes.time) {
                 await manager.save(manager.create(TimeChangeEntity, { chatId, messageId, ...changes.time }));
                 await manager.update(ChatEntity, { id: chatId }, { timeOfDay: changes.time.toTime });
+            }
+            if (changes.suddenEvent) {
+                await manager.save(manager.create(SuddenEventStepEntity, { chatId, messageId, ...changes.suddenEvent }));
             }
             if (changes.emotions) {
                 // One statement: each tagged part gets its emotion, every other part of the Message none.
@@ -404,6 +428,8 @@ export class LedgerModelService {
                 await manager.update(ChatEntity, { id: chatId }, { timeOfDay: time.fromTime });
                 await manager.delete(TimeChangeEntity, { id: time.id });
             }
+            // Not counted either: a Sudden event's steps hold their own state, so taking them away is the whole undo.
+            await manager.delete(SuddenEventStepEntity, { messageId: In(ids) });
             const arcs = newestFirst(await manager.find(ArcStepEntity, { where: { messageId: In(ids) } }));
             for (const arc of arcs) {
                 await manager.delete(ArcStepEntity, { id: arc.id });
@@ -427,6 +453,7 @@ export class LedgerModelService {
         return this.dataSource.transaction(async (manager: EntityManager) => {
             await manager.delete(TimeChangeEntity, { chatId });
             await manager.update(ChatEntity, { id: chatId }, { timeOfDay: null });
+            await manager.delete(SuddenEventStepEntity, { chatId });
             await manager.delete(BeliefChangeEntity, { chatId });
             await manager.delete(BeliefEntity, { chatId });
             await manager.delete(MemoryChangeEntity, { chatId });

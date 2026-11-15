@@ -4,6 +4,7 @@ import { ApiModule } from './api/api.module.js';
 import { AccountModelModule } from './model/account/account.module.js';
 import { AppConfig } from './config/app-config.js';
 import { ConfigModule } from './config/config.module.js';
+import { DiceModule } from './service/dice/dice.js';
 import { ModelGatewayModule } from './service/model-gateway/model-gateway.module.js';
 import { PageFetchModule } from './service/page-fetch/page-fetch.module.js';
 import { DbModule } from './store/db/db.module.js';
@@ -19,6 +20,7 @@ export class AppModule {
                 DbModule,
                 AccountModelModule,
                 ModelGatewayModule.forRoot(),
+                DiceModule,
                 PageFetchModule,
                 ApiModule,
             ],

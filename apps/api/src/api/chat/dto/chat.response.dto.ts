@@ -15,7 +15,9 @@ import {
 import { ChatSummary, TimeOfDay, TIMES_OF_DAY } from '../../../model/chat/entities/chat.entity.js';
 import { EMOTIONS } from '../../../model/story/emotion.js';
 import type { Emotion } from '../../../model/story/emotion.js';
-import { BackgroundCallResponse, BackgroundStatus, MemoriesUsed, ReplyVersionsResponse } from '../../../model/chat/entities/message.entity.js';
+import { BackgroundCallResponse, BackgroundStatus, MemoriesUsed, MessageRoll, ReplyVersionsResponse } from '../../../model/chat/entities/message.entity.js';
+import { GaugeDirection } from '../../../model/story/entities/sudden-event.entity.js';
+import type { SuddenEventView } from '../../../manager/chat/sudden-event/sudden-event.js';
 import { BeliefDTO } from '../../memory/dto/belief.response.dto.js';
 import { BondLevels } from '../../../model/ledger/bond-axes.js';
 import { BondChangeResponse } from '../../../model/ledger/entities/bond-change.entity.js';
@@ -116,6 +118,54 @@ export class ReplyVersionsDTO implements ReplyVersionsResponse {
     count: number;
 }
 
+/** A User Message's Roll (.scratch/roll/spec.md). */
+export class MessageRollDTO implements MessageRoll {
+    @ApiProperty({ description: 'What the d20 showed, 1 to 20.' })
+    value: number;
+
+    @ApiProperty({ description: 'The number it had to reach.' })
+    target: number;
+
+    @ApiProperty({ enum: ['critical_success', 'success', 'failure', 'critical_failure'], description: 'A 20 and a 1 are critical; otherwise reaching the number succeeds.' })
+    outcome: MessageRoll['outcome'];
+}
+
+/** The Chat's Sudden event as the Chat screen shows it (.scratch/sudden-events/spec.md). */
+export class ChatSuddenEventDTO implements SuddenEventView {
+    @ApiProperty()
+    id: number;
+
+    @ApiProperty()
+    name: string;
+
+    @ApiProperty({ description: 'What the Gauge measures.' })
+    gauge: string;
+
+    @ApiProperty({ enum: GaugeDirection })
+    direction: GaugeDirection;
+
+    @ApiProperty({ enum: ['active', 'success', 'failure'], description: 'Under way, or how it ended with the newest reply.' })
+    status: SuddenEventView['status'];
+
+    @ApiProperty({ description: 'The Gauge now, 0 to 100.' })
+    value: number;
+
+    @ApiProperty({ description: 'Where the Gauge started.' })
+    start: number;
+
+    @ApiProperty({ description: 'The Gauge the user must reach.' })
+    goal: number;
+
+    @ApiProperty({ description: 'The end of the Gauge that fails at once.' })
+    fail: number;
+
+    @ApiProperty({ description: 'The replies the user still has; 0 once it has ended.' })
+    turnsLeft: number;
+
+    @ApiProperty({ description: 'Why the Gauge last moved, or why the event began; may be empty.' })
+    reason: string;
+}
+
 export class MessageDTO {
     @ApiProperty()
     id: number;
@@ -135,6 +185,9 @@ export class MessageDTO {
         description: 'User Message only: the Persona worn; null for the Role and once that Persona is deleted.',
     })
     personaId?: number | null;
+
+    @ApiPropertyOptional({ type: MessageRollDTO, nullable: true, description: 'User Message only: the Roll it was sent with; null without one.' })
+    roll?: MessageRollDTO | null;
 
     @ApiPropertyOptional({ description: 'AI Message only: the model that wrote it, or "author" for the Opening.' })
     model?: string;
@@ -242,6 +295,12 @@ export class ChatResponseBodyDTO extends ChatSummaryDTO implements Omit<ChatDeta
 
     @ApiProperty({ enum: TIMES_OF_DAY, nullable: true, description: 'The Time of day in the story; null until the story makes one clear.' })
     timeOfDay: TimeOfDay | null;
+
+    @ApiProperty({ type: ChatSuddenEventDTO, nullable: true, description: 'The Sudden event under way, or the one that ended with the newest reply; null otherwise.' })
+    suddenEvent: ChatSuddenEventDTO | null;
+
+    @ApiProperty({ description: "The number a Roll sent now must reach, from the Story's Difficulty." })
+    rollTarget: number;
 
     @ApiProperty({ description: 'The worn identity, under which the next User Message shows.' })
     identityName: string;

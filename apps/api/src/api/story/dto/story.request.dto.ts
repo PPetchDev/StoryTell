@@ -25,6 +25,7 @@ import {
     SceneBondGateFields,
     SceneFields,
     StartingBondFields,
+    SuddenEventFields,
     StoryFields,
 } from '../../../manager/story/story.service.js';
 import { BOND_AXES, BOND_AXIS_RANGE } from '../../../model/ledger/bond-axes.js';
@@ -32,9 +33,12 @@ import type { BondAxis } from '../../../model/ledger/bond-axes.js';
 import { LORE_GROUP_MAX, LORE_SECONDARY_MODES, LORE_TIMED_MAX } from '../../../model/story/entities/lore-entry.entity.js';
 import type { LoreSecondaryMode } from '../../../model/story/entities/lore-entry.entity.js';
 import { Backdrop, Balance, Difficulty, Pacing, Pov, ReplyLength, Tense } from '../../../model/story/entities/story.entity.js';
+import { GaugeDirection, SUDDEN_EVENT_TURNS } from '../../../model/story/entities/sudden-event.entity.js';
 
 // Long enough for any passage an author writes, short enough to refuse a runaway client.
 const TEXT_MAX = 20_000;
+// A Gauge's name is a word or two, shown on the Chat screen.
+const SUDDEN_EVENT_GAUGE_MAX = 40;
 // Far longer than any Kokoro voice id ("af_sky"); the voice list decides what is known.
 const VOICE_ID_MAX = 100;
 
@@ -276,6 +280,51 @@ export class NewStartingBondRequestBodyDTO extends StartingBondRequestBodyDTO im
     @ValidateIf((_, value) => value !== null)
     @IsInt()
     toCharacterId: number | null;
+}
+
+/** A Sudden event's fields (.scratch/sudden-events/spec.md). Every field is optional, so autosave can send one at a time. */
+export class SuddenEventRequestBodyDTO implements SuddenEventFields {
+    @ApiPropertyOptional()
+    @IsOptional()
+    @IsString()
+    @MaxLength(TEXT_MAX)
+    name?: string;
+
+    @ApiPropertyOptional({ description: 'When it starts, in plain language.' })
+    @IsOptional()
+    @IsString()
+    @MaxLength(TEXT_MAX)
+    trigger?: string;
+
+    @ApiPropertyOptional({ description: 'What the Gauge measures, e.g. "Suspicion".' })
+    @IsOptional()
+    @IsString()
+    @MaxLength(SUDDEN_EVENT_GAUGE_MAX)
+    gauge?: string;
+
+    @ApiPropertyOptional({ enum: GaugeDirection, description: 'Whether the user must bring the Gauge down or up.' })
+    @IsOptional()
+    @IsEnum(GaugeDirection)
+    direction?: GaugeDirection;
+
+    @ApiPropertyOptional({ minimum: SUDDEN_EVENT_TURNS.min, maximum: SUDDEN_EVENT_TURNS.max, description: 'How many replies the user has.' })
+    @IsOptional()
+    @IsInt()
+    @Min(SUDDEN_EVENT_TURNS.min)
+    @Max(SUDDEN_EVENT_TURNS.max)
+    turns?: number;
+
+    @ApiPropertyOptional({ description: 'What follows a success, for the Narrator.' })
+    @IsOptional()
+    @IsString()
+    @MaxLength(TEXT_MAX)
+    success?: string;
+
+    @ApiPropertyOptional({ description: 'What follows a failure, for the Narrator.' })
+    @IsOptional()
+    @IsString()
+    @MaxLength(TEXT_MAX)
+    failure?: string;
 }
 
 export class SceneRequestBodyDTO implements SceneFields {

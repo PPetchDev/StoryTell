@@ -27,6 +27,7 @@ import {
     StartingBeliefsRequestBodyDTO,
     StartingBondRequestBodyDTO,
     StoryRequestBodyDTO,
+    SuddenEventRequestBodyDTO,
 } from './dto/story.request.dto.js';
 import { OpeningPreviewResponseBodyDTO } from './dto/opening.response.dto.js';
 import { ListStoriesResponseBodyDTO, StoryResponseBodyDTO } from './dto/story.response.dto.js';
@@ -221,6 +222,29 @@ export class StoryApiController {
         @Id('sceneId') sceneId: number,
     ): Promise<StoryResponseBodyDTO> {
         return this.storyManager.removeScene(storyId, sceneId);
+    }
+
+    /** .scratch/sudden-events/spec.md: a Story's Sudden events. */
+    @Post(':storyId/sudden-events')
+    @ApiCreatedResponse({ type: StoryResponseBodyDTO })
+    addSuddenEvent(@Id('storyId') storyId: number, @Body() body: SuddenEventRequestBodyDTO): Promise<StoryResponseBodyDTO> {
+        return this.storyManager.addSuddenEvent(storyId, body);
+    }
+
+    @Patch(':storyId/sudden-events/:eventId')
+    @ApiOkResponse({ type: StoryResponseBodyDTO })
+    updateSuddenEvent(
+        @Id('storyId') storyId: number,
+        @Id('eventId') eventId: number,
+        @Body() body: SuddenEventRequestBodyDTO,
+    ): Promise<StoryResponseBodyDTO> {
+        return this.storyManager.updateSuddenEvent(storyId, eventId, body);
+    }
+
+    @Delete(':storyId/sudden-events/:eventId')
+    @ApiOkResponse({ type: StoryResponseBodyDTO })
+    removeSuddenEvent(@Id('storyId') storyId: number, @Id('eventId') eventId: number): Promise<StoryResponseBodyDTO> {
+        return this.storyManager.removeSuddenEvent(storyId, eventId);
     }
 
     @Post(':storyId/lore')

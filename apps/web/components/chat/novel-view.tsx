@@ -5,7 +5,7 @@ import { CSSProperties, KeyboardEvent, MouseEvent, PointerEvent, ReactNode, useE
 import { useCastCharacter, useCharacterProfile } from '@/components/chat/character-profile';
 import { ACTION, ACTION_ICON, COLUMN } from '@/components/chat/chat-classes';
 import { VersionSwitch, WritingLine } from '@/components/chat/chat-thread';
-import { withActions } from '@/components/chat/message-body';
+import { RollLine, withActions } from '@/components/chat/message-body';
 import { ReadAloudControls, useReadAloud } from '@/components/chat/read-aloud';
 import { useShownText } from '@/components/chat/shown-text';
 import { CameraIcon, ChevronLeftIcon, ChevronRightIcon, PencilIcon, PlayIcon, UndoIcon } from '@/components/icons';
@@ -54,7 +54,7 @@ export interface NovelRequest {
 interface NovelViewProps {
     messages: Message[];
     cast: Cast;
-    pending: { identityName: string; text: string } | null;
+    pending: { identityName: string; text: string; roll?: boolean } | null;
     writing: boolean;
     replySoFar: MessagePart[] | null;
     replacing: number | null;
@@ -385,6 +385,7 @@ function StepText({ step, cast }: { step: Exclude<NovelStep, { kind: 'snapshot' 
             <p className={STEP_TEXT} data-line="">
                 {withActions(step.text)}
             </p>
+            {step.kind === 'user' && step.roll && <RollLine roll={step.roll} />}
         </>
     );
 }

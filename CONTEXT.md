@@ -28,6 +28,14 @@ _Avoid_: Skipped Scene, forced advance
 A condition on a Scene that one Bond has reached at least a given level on one Bond axis ("Nara toward the user: Trust at least *close*"). A Scene moves on only when all its gates hold, as well as its move-on condition when it has one.
 _Avoid_: Bond requirement, unlock, threshold
 
+**Sudden event**:
+An optional, author-written moment of pressure in a Story: a trigger in plain language, a Gauge, a number of replies, and what follows a success and a failure. It begins in a Chat when its trigger happens there, runs once per Chat, and ends in success or failure; unlike a Scene it is not a stage of the plot and can begin at any point.
+_Avoid_: Quest, challenge, encounter, mini-game, skill check
+
+**Gauge**:
+What a Sudden event measures, named by the author ("Suspicion", "Nerve"): a number from 0 to 100 that each reply moves by how the user played it, with a sentence saying why. The user must bring it down, or up, to its goal before their replies run out; its far end fails at once. The user sees it as a number, unlike a Bond's levels.
+_Avoid_: Meter, stat, score, bar, HP
+
 **Lore**:
 A Story's notes about its world, each a **Lore entry**: a name, keywords and a short text about a place, people, custom or object. An entry reaches the Narrator only when its triggers come up in the latest exchange or in another entry already chosen, for a few Messages after that when it is set to stay, or on every turn when it is set to always be included; the Setting stays the short core sent on every turn. Lore is common knowledge in the world, so every Character knows it; a Character's secrets stay on their card. It belongs to the Story and is shared by all its Chats, where a Memory belongs to one Chat.
 _Avoid_: Lorebook, world info, codex, wiki
@@ -65,7 +73,7 @@ The picture the author chooses for a Story, shown on its card on Home and at the
 _Avoid_: Thumbnail, banner, key art
 
 **Duplicate**:
-Making a new Story, "<title> (copy)", from everything the author wrote in another: its text, style, Narration voice and Backdrop choice, Role, Characters with their Reference images, Portraits, Expressions and Speaking voices, Scenes, Starting Bonds, Lore, Documents, its own Saved replies and Replace rules, and Cover, each image in a file of its own. No Chats or Snapshots come along, so a Cover that is a Snapshot is dropped.
+Making a new Story, "<title> (copy)", from everything the author wrote in another: its text, style, Narration voice and Backdrop choice, Role, Characters with their Reference images, Portraits, Expressions and Speaking voices, Scenes, Sudden events, Starting Bonds, Lore, Documents, its own Saved replies and Replace rules, and Cover, each image in a file of its own. No Chats or Snapshots come along, so a Cover that is a Snapshot is dropped.
 _Avoid_: Clone, fork, template
 
 ## Playing
@@ -79,7 +87,7 @@ One entry in a Chat's history: either what the user wrote, shown under the Role 
 _Avoid_: Post, reply, bubble, entry
 
 **Branch**:
-A new Chat copied from another up to one of its Messages, with everything that Chat knew at that Message — Memory, Bonds, Arcs, Scene, Time of day — so the story can go another way while the original stays as it was. A Branch remembers which Chat it came from.
+A new Chat copied from another up to one of its Messages, with everything that Chat knew at that Message — Memory, Bonds, Arcs, Scene, Time of day, a Sudden event under way — so the story can go another way while the original stays as it was. A Branch remembers which Chat it came from.
 _Avoid_: Fork, checkpoint, clone, copy
 
 **Author's note**:
@@ -93,6 +101,10 @@ _Avoid_: Force talk, mention, ping
 **Cue**:
 A few words from the user to the Narrator for the next reply only ("make her angrier", "skip to the next morning"), given with a Message, a Continue or a Regenerate. It steers that one reply; it is never a Message, a fact or a standing direction, and nothing keeps it.
 _Avoid_: Instruction, direction, hint, OOC, prompt
+
+**Roll**:
+A d20 the app throws for one Message the user sends, when they ask for it, to decide whether what they attempt in it works: it succeeds on the number the Story's Difficulty sets or more, and a 20 and a 1 are critical. The Roll stays with its Message, so every reply written to that Message reads the same one; the Narrator writes the outcome and never names the dice.
+_Avoid_: Dice event, check, skill check, save, RNG
 
 **Sitting out**:
 A Character the user keeps out of a Chat's turns until bringing them back; the Narrator doesn't write them, but their Memories and Bonds stay as they were.

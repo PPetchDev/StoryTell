@@ -5,7 +5,7 @@ import { FormEvent, ReactNode, RefObject, useEffect, useId, useLayoutEffect, use
 
 import { COLUMN, ICON_BUTTON, LABEL_CAPS, PANEL_NOTE, SEND_BUTTON, TOOL_CHIP } from '@/components/chat/chat-classes';
 import { useConnection } from '@/components/connection';
-import { CloseIcon, PencilIcon, PlayIcon, StopIcon, UndoIcon } from '@/components/icons';
+import { CloseIcon, DiceIcon, PencilIcon, PlayIcon, StopIcon, UndoIcon } from '@/components/icons';
 import { ApiUnreachableError } from '@/lib/api';
 import { backgroundNotice, Chat, chatApi, SuggestedReply } from '@/lib/chat';
 import { insertSavedReply, SavedReply, TraySavedReply } from '@/lib/saved-replies';
@@ -355,6 +355,9 @@ interface ChatComposerProps {
     /** Opens the Cue sheet. */
     onCue(): void;
     onClearCue(): void;
+    /** Whether the next Message is sent with a Roll (CONTEXT.md, "Roll"). */
+    roll: boolean;
+    onRoll(next: boolean): void;
 }
 
 /**
@@ -382,6 +385,8 @@ export function ChatComposer({
     cue,
     onCue,
     onClearCue,
+    roll,
+    onRoll,
 }: ChatComposerProps) {
     const box = useAutoGrow(draft);
     const boxId = useId();
@@ -562,6 +567,16 @@ export function ChatComposer({
                         </button>
                     </div>
                 )}
+                {/* The Roll armed for the next Message (CONTEXT.md, "Roll"): what it will need, in sight until it is sent or turned off. */}
+                {roll && (
+                    <p className="m-0 flex min-w-0 items-center gap-1.5 rounded-md bg-accent-soft px-3 py-1.5 text-sm" data-band="roll">
+                        <DiceIcon size={16} className="shrink-0 text-rewrite-text" />
+                        <span className="min-w-0">
+                            <span className="font-semibold text-rewrite-text">Roll</span> The dice decide your next message: {chat.rollTarget} or more
+                            succeeds.
+                        </span>
+                    </p>
+                )}
                 {/*
                  * Band 3: the tools as 44px chips with a word each (audit H28; docs/ui-audit-2026-11-13.md M3),
                  * and at the right end Undo. Who the box writes as is its placeholder and name (L14); the label
@@ -714,6 +729,19 @@ export function ChatComposer({
                                 event.currentTarget.form?.requestSubmit();
                             }}
                         />
+                        {/* CONTEXT.md, "Roll": arms the dice for the Message about to be sent; the app throws them, never the browser. */}
+                        <button
+                            type="button"
+                            className={ICON_BUTTON}
+                            aria-label="Roll the dice for this message"
+                            title={`Roll the dice for this message (${chat.rollTarget} or more succeeds)`}
+                            aria-pressed={roll}
+                            disabled={writing || busy || blocked || writingForMe || dictating}
+                            onPointerDown={keepFocus}
+                            onClick={() => onRoll(!roll)}
+                        >
+                            <DiceIcon size={20} />
+                        </button>
                         {/* .scratch/dictation/spec.md: only where the browser can record. */}
                         {dictation.supported && <DictateButton ref={micRef} dictation={dictation} disabledReason={micDisabledReason} />}
                         {writing ? (

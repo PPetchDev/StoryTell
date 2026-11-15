@@ -1,4 +1,4 @@
-import type { Message, MessagePart } from './chat';
+import type { Message, MessagePart, MessageRoll } from './chat';
 import type { Emotion } from './expressions';
 import type { Snapshot } from './snapshot';
 
@@ -7,7 +7,15 @@ import type { Snapshot } from './snapshot';
  * part at a time, from the same data the thread renders. Pure, so the view and its tests agree.
  */
 export type NovelStep =
-    | { kind: 'user'; key: string; messageId: number | null; identityName: string; text: string }
+    | {
+          kind: 'user';
+          key: string;
+          messageId: number | null;
+          identityName: string;
+          text: string;
+          /** The Roll it was sent with (CONTEXT.md, "Roll"), or `'pending'` while it is being sent; left out without one. */
+          roll?: MessageRoll | 'pending';
+      }
     | { kind: 'narration'; key: string; messageId: number | null; partIndex: number; paragraph: number; text: string }
     | {
           kind: 'speech';
@@ -24,7 +32,7 @@ export type NovelStep =
 export interface NovelInput {
     messages: readonly Message[];
     /** The line just sent, before the API stored it. */
-    pending: { identityName: string; text: string } | null;
+    pending: { identityName: string; text: string; roll?: boolean } | null;
     /** The reply so far while a turn streams. */
     replySoFar: readonly MessagePart[] | null;
     /** The reply ↺ Again is replacing: left out, as the thread hides it. */
@@ -82,7 +90,14 @@ export function novelSteps({ messages, pending, replySoFar, replacing, snapshots
     for (const message of messages) {
         if (message.id === replacing) continue;
         if (message.kind === 'user') {
-            steps.push({ kind: 'user', key: `m${message.id}:u`, messageId: message.id, identityName: message.identityName, text: message.text });
+            steps.push({
+                kind: 'user',
+                key: `m${message.id}:u`,
+                messageId: message.id,
+                identityName: message.identityName,
+                text: message.text,
+                ...(message.roll ? { roll: message.roll } : {}),
+            });
             continue;
         }
         steps.push(...partSteps(message.parts, shown, message.id, (rest) => `m${message.id}:${rest}`));
@@ -90,7 +105,16 @@ export function novelSteps({ messages, pending, replySoFar, replacing, snapshots
             if (snapshot.messageId === message.id) steps.push({ kind: 'snapshot', key: `s${snapshot.id}`, messageId: message.id, snapshot });
         }
     }
-    if (pending) steps.push({ kind: 'user', key: PENDING_KEY, messageId: null, identityName: pending.identityName, text: pending.text });
+    if (pending) {
+        steps.push({
+            kind: 'user',
+            key: PENDING_KEY,
+            messageId: null,
+            identityName: pending.identityName,
+            text: pending.text,
+            ...(pending.roll ? { roll: 'pending' as const } : {}),
+        });
+    }
     if (replySoFar) steps.push(...partSteps(replySoFar, shown, null, (rest) => `${LIVE_PREFIX}${rest}`));
     return steps;
 }

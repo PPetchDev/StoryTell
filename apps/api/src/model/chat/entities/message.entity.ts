@@ -59,7 +59,16 @@ export interface UserMessageResponse {
     identityName: string;
     /** The Persona worn when writing it; null for the Role and once that Persona is deleted. */
     personaId: number | null;
+    /** The Roll it was sent with (.scratch/roll/spec.md); null without one. */
+    roll: MessageRoll | null;
     createdAt: string;
+}
+
+/** A User Message's Roll: what the d20 showed, the number to reach, and how it came out. */
+export interface MessageRoll {
+    value: number;
+    target: number;
+    outcome: 'critical_success' | 'success' | 'failure' | 'critical_failure';
 }
 
 /** Where the shown Reply version stands among the newest AI Message's versions: the n and m of ‹ n/m ›. */
@@ -126,6 +135,17 @@ export class MessageEntity {
 
     @Column({ type: 'text', nullable: true })
     model: string | null;
+
+    /**
+     * The Roll a User Message was sent with (.scratch/roll/spec.md): what the d20 showed, 1 to 20,
+     * and the number it had to reach. Both NULL without a Roll. Thrown once, on the send: an edit
+     * of the Message keeps it, and every reply written to the Message reads it.
+     */
+    @Column({ type: 'smallint', nullable: true })
+    roll: number | null;
+
+    @Column({ name: 'roll_target', type: 'smallint', nullable: true })
+    rollTarget: number | null;
 
     // The judge's status on an AI Message a model wrote; NULL on User Messages and the Opening.
     @Column({
@@ -205,6 +225,13 @@ export class MessageEntity {
         return { current: order.indexOf(this.versionOrdinal ?? 1) + 1, count: order.length };
     }
 
+    /** The Message's Roll with its outcome: a 20 and a 1 are critical, otherwise reaching the number succeeds. */
+    rollResponse(): MessageRoll | null {
+        if (this.roll === null || this.roll === undefined || this.rollTarget === null || this.rollTarget === undefined) return null;
+        const outcome = this.roll >= 20 ? 'critical_success' : this.roll <= 1 ? 'critical_failure' : this.roll >= this.rollTarget ? 'success' : 'failure';
+        return { value: this.roll, target: this.rollTarget, outcome };
+    }
+
     /** An AI Message needs its parts loaded (ChatModelService.findWithMessages). */
     toResponse(): MessageResponse {
         if (this.kind === MessageKind.User) {
@@ -214,6 +241,7 @@ export class MessageEntity {
                 text: this.text ?? '',
                 identityName: this.identityName ?? '',
                 personaId: this.personaId,
+                roll: this.rollResponse(),
                 createdAt: this.createdAt.toISOString(),
             };
         }

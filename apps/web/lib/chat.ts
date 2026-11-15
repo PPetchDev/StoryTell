@@ -45,9 +45,49 @@ export interface UserMessage {
     identityName: string;
     /** The Persona worn; null for the Role and once that Persona is deleted. */
     personaId: number | null;
+    /** The Roll it was sent with (CONTEXT.md, "Roll"); null without one. */
+    roll: MessageRoll | null;
     createdAt: string;
     /** Its Thai reading for the text as it stands; null when none was made (.scratch/write-for-me/spec.md). */
     thaiReading: string | null;
+}
+
+export type RollOutcome = 'critical_success' | 'success' | 'failure' | 'critical_failure';
+
+/** A User Message's Roll: what the d20 showed, the number to reach, and how it came out. */
+export interface MessageRoll {
+    value: number;
+    target: number;
+    outcome: RollOutcome;
+}
+
+export const ROLL_OUTCOME_LABELS: Record<RollOutcome, string> = {
+    critical_success: 'Critical success',
+    success: 'Success',
+    failure: 'Failure',
+    critical_failure: 'Critical failure',
+};
+
+/** The Chat's Sudden event as the Chat screen shows it (mirrors ChatSuddenEventDTO). */
+export interface ChatSuddenEvent {
+    id: number;
+    name: string;
+    /** What the Gauge measures. */
+    gauge: string;
+    direction: 'lower' | 'raise';
+    /** Under way, or how it ended with the newest reply. */
+    status: 'active' | 'success' | 'failure';
+    /** The Gauge now, 0 to 100. */
+    value: number;
+    start: number;
+    /** The Gauge the user must reach. */
+    goal: number;
+    /** The end of the Gauge that fails at once. */
+    fail: number;
+    /** The replies the user still has; 0 once it has ended. */
+    turnsLeft: number;
+    /** Why the Gauge last moved, or why the event began; may be empty. */
+    reason: string;
 }
 
 export type BackgroundStatus = 'pending' | 'done' | 'failed';
@@ -90,6 +130,10 @@ export interface Chat extends ChatSummary {
     currentScene: { id: number; name: string } | null;
     /** null until the story makes the time of day clear. */
     timeOfDay: TimeOfDay | null;
+    /** The Sudden event under way, or the one that ended with the newest reply; null otherwise. */
+    suddenEvent: ChatSuddenEvent | null;
+    /** The number a Roll sent now must reach, from the Story's Difficulty. */
+    rollTarget: number;
     /** The worn identity, under which the next User Message shows. */
     identityName: string;
     /** The worn Persona; null while the Chat wears its Story's Role. */
@@ -277,12 +321,14 @@ function turn<T>(method: 'POST' | 'PATCH', path: string, body: object | undefine
 /** The longest Cue the API takes (mirrors CUE_MAX in apps/api/src/manager/chat/turn/prompt.ts). */
 export const CUE_MAX = 300;
 
-/** What may ride on one turn besides its text: a Nudge and a Cue. Neither is stored. */
+/** What may ride on one turn besides its text: a Nudge and a Cue, neither stored, and on a send a Roll. */
 export interface TurnExtras {
     /** The Character nudged for this turn (.scratch/speaker-controls/spec.md, "Nudge"). */
     nudge?: number | null;
     /** The Cue for this turn (CONTEXT.md, "Cue"): a few words to the Narrator for this one reply. */
     cue?: string | null;
+    /** A send only (CONTEXT.md, "Roll"): the app throws the dice for what this Message attempts. */
+    roll?: boolean;
 }
 
 /**
@@ -320,7 +366,7 @@ export const chatApi = {
         apiSend<Chat>('PUT', `/stories/${storyId}/chats/${chatId}/sitting-out`, { characterIds }),
     remove: (storyId: number, chatId: number) => apiSend<void>('DELETE', `/stories/${storyId}/chats/${chatId}`),
     send: (storyId: number, chatId: number, text: string, stream?: TurnStream, extras?: TurnExtras) =>
-        turn<Chat>('POST', `/stories/${storyId}/chats/${chatId}/messages`, withExtras({ text }, extras), stream),
+        turn<Chat>('POST', `/stories/${storyId}/chats/${chatId}/messages`, withExtras(extras?.roll ? { text, roll: true } : { text }, extras), stream),
     retry: (storyId: number, chatId: number, stream?: TurnStream, extras?: TurnExtras) =>
         turn<Chat>('POST', `/stories/${storyId}/chats/${chatId}/retry`, withExtras(undefined, extras), stream),
     /** Lets the story go on without a line from the user: the Narrator writes the next reply. */

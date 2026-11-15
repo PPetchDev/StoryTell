@@ -31,6 +31,7 @@ import {
     TextCallKind,
     TextCompletionResult,
 } from '../service/model-gateway/model-gateway.js';
+import { Dice } from '../service/dice/dice.js';
 import { FakePage, FakePageFetcher } from '../service/page-fetch/fake-page-fetcher.js';
 
 /** A scripted error, as JSON. `pool` applies to `out_of_credit` only. */
@@ -107,6 +108,7 @@ export class FakeGatewayControlController {
     constructor(
         gateway: ModelGateway,
         private readonly pages: FakePageFetcher,
+        private readonly dice: Dice,
     ) {
         this.fake = uncapped(gateway) as FakeModelGateway;
     }
@@ -117,6 +119,13 @@ export class FakeGatewayControlController {
     scriptPage(@Body() body: ScriptPageBody): void {
         const { url, ...page } = body;
         this.pages.script(url, page);
+    }
+
+    /** Scripts the next throws of the app's dice (.scratch/roll/spec.md), in order. */
+    @Post('dice')
+    @HttpCode(204)
+    scriptDice(@Body() body: { rolls: number[] }): void {
+        this.dice.script(...body.rolls);
     }
 
     @Post('text')
@@ -207,5 +216,6 @@ export class FakeGatewayControlController {
     reset(): void {
         this.fake.reset();
         this.pages.reset();
+        this.dice.reset();
     }
 }

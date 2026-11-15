@@ -190,6 +190,20 @@ export const CameraIcon = icon(
         <circle cx="12" cy="13" r="3.5" />
     </>,
 );
+/** 🎲 A Roll: a die showing five. */
+export const DiceIcon = icon(
+    'DiceIcon',
+    <>
+        <rect x="4" y="4" width="16" height="16" rx="3" />
+        <circle cx="8.6" cy="8.6" r="0.9" fill="currentColor" />
+        <circle cx="15.4" cy="8.6" r="0.9" fill="currentColor" />
+        <circle cx="12" cy="12" r="0.9" fill="currentColor" />
+        <circle cx="8.6" cy="15.4" r="0.9" fill="currentColor" />
+        <circle cx="15.4" cy="15.4" r="0.9" fill="currentColor" />
+    </>,
+);
+/** ⚡ A Sudden event: a bolt. */
+export const BoltIcon = icon('BoltIcon', <path d="M13 2.5 4.5 13.5H11l-1 8 8.5-11H12z" />);
 /** 🔒 Locked: a padlock. */
 export const LockIcon = icon(
     'LockIcon',

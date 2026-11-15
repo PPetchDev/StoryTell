@@ -12,6 +12,7 @@ import { LoreEntryEntity } from './entities/lore-entry.entity.js';
 import { RoleEntity } from './entities/role.entity.js';
 import { SceneBondGateEntity } from './entities/scene-bond-gate.entity.js';
 import { SceneEntity } from './entities/scene.entity.js';
+import { SuddenEventEntity } from './entities/sudden-event.entity.js';
 import { StartingBeliefEntity } from './entities/starting-belief.entity.js';
 import { StartingBondEntity } from './entities/starting-bond.entity.js';
 import { CoverFocus, StoryEntity } from './entities/story.entity.js';
@@ -29,6 +30,7 @@ const FULL_RELATIONS = {
     startingBonds: true,
     startingBeliefs: true,
     scenes: { gates: true },
+    suddenEvents: true,
     lore: true,
     documents: true,
     savedReplies: true,
@@ -62,6 +64,7 @@ function sorted(story: StoryEntity): StoryEntity {
     story.characters = byPosition(story.characters);
     story.scenes = byPosition(story.scenes);
     for (const scene of story.scenes) scene.gates = [...(scene.gates ?? [])].sort((a, b) => a.id - b.id);
+    story.suddenEvents = byPosition(story.suddenEvents ?? []);
     story.lore = byPosition(story.lore);
     story.documents = byPosition(story.documents);
     story.savedReplies = byPosition(story.savedReplies);
@@ -81,6 +84,7 @@ export class StoryModelService {
         @InjectRepository(CharacterEntity) private readonly characters: Repository<CharacterEntity>,
         @InjectRepository(StartingBondEntity) private readonly bonds: Repository<StartingBondEntity>,
         @InjectRepository(SceneEntity) private readonly scenes: Repository<SceneEntity>,
+        @InjectRepository(SuddenEventEntity) private readonly suddenEvents: Repository<SuddenEventEntity>,
         @InjectRepository(LoreEntryEntity) private readonly lore: Repository<LoreEntryEntity>,
         @InjectRepository(CharacterExpressionEntity) private readonly expressions: Repository<CharacterExpressionEntity>,
         private readonly accounts: AccountModelService,
@@ -205,6 +209,11 @@ export class StoryModelService {
                         }),
                     );
                 }
+            }
+            // Sudden events (.scratch/sudden-events/spec.md): everything the author wrote of each, in order.
+            for (const event of source.suddenEvents ?? []) {
+                const { id: _id, ...fields } = event.toResponse();
+                await manager.save(manager.create(SuddenEventEntity, { ...fields, storyId: story.id, position: event.position }));
             }
             for (const entry of source.lore) {
                 // Every field the entry answers with, its trigger settings included (.scratch/lore-triggers/spec.md).
@@ -390,6 +399,19 @@ export class StoryModelService {
                 await manager.update(SceneEntity, { id }, { position });
             }
         });
+    }
+
+    createSuddenEvent(fields: Partial<SuddenEventEntity>): SuddenEventEntity {
+        return this.suddenEvents.create(fields);
+    }
+
+    saveSuddenEvent(event: SuddenEventEntity): Promise<SuddenEventEntity> {
+        return this.suddenEvents.save(event);
+    }
+
+    /** Its steps in every Chat go with it (ON DELETE CASCADE), so one under way simply ends. */
+    async removeSuddenEvent(event: SuddenEventEntity): Promise<void> {
+        await this.suddenEvents.delete({ id: event.id });
     }
 
     createLoreEntry(fields: Partial<LoreEntryEntity>): LoreEntryEntity {

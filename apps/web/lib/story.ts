@@ -112,6 +112,29 @@ export interface Scene {
     gates: SceneBondGate[];
 }
 
+/** Which way the user must move a Sudden event's Gauge (mirrors the API's GaugeDirection). */
+export type GaugeDirection = 'lower' | 'raise';
+
+/**
+ * A Sudden event (CONTEXT.md): a moment of pressure the author writes, which starts in a Chat when
+ * its trigger happens and gives the user a few replies to move its Gauge (mirrors SuddenEventDTO).
+ */
+export interface SuddenEvent {
+    id: number;
+    name: string;
+    /** When it starts, in plain language. */
+    trigger: string;
+    /** What the Gauge measures, e.g. "Suspicion". */
+    gauge: string;
+    direction: GaugeDirection;
+    /** How many replies the user has. */
+    turns: number;
+    /** What follows a success, for the Narrator. */
+    success: string;
+    /** What follows a failure, for the Narrator. */
+    failure: string;
+}
+
 /** One Bond at least a level on one axis (CONTEXT.md: "Bond gate"); the editor shows the level only as its word. */
 export interface SceneBondGate {
     fromCharacterId: number;
@@ -223,6 +246,8 @@ export interface Story {
     /** In the author's order; every new Chat and Reset begins with them as Beliefs. */
     startingBeliefs: StartingBelief[];
     scenes: Scene[];
+    /** Its Sudden events, in the author's order. */
+    suddenEvents: SuddenEvent[];
     /** In add order. */
     lore: LoreEntry[];
     /** In add order. */
@@ -246,6 +271,7 @@ export interface Story {
 export type StoryFields = Partial<Pick<Story, 'title' | 'setting' | 'opening' | 'narrationVoice' | 'backdrop'> & Style>;
 export type CharacterFields = Partial<Omit<Character, 'id' | 'referenceImagePath' | 'portraitCrop' | 'expressions'>>;
 export type SceneFields = Partial<Omit<Scene, 'id' | 'gates'>>;
+export type SuddenEventFields = Partial<Omit<SuddenEvent, 'id'>>;
 export type StartingBondFields = Partial<Pick<StartingBond, 'label' | 'description'> & BondLevels>;
 export type LoreEntryFields = Partial<Omit<LoreEntry, 'id'>>;
 
@@ -263,6 +289,20 @@ export const REPLY_LENGTH_LABELS: Record<ReplyLength, string> = {
 export const PACING_LABELS: Record<Pacing, string> = { fast: 'Fast', natural: 'Natural', slow: 'Slow burn' };
 export const BALANCE_LABELS: Record<Balance, string> = { dialogue: 'More dialogue', balanced: 'Balanced', action: 'More action' };
 export const DIFFICULTY_LABELS: Record<Difficulty, string> = { easy: 'Easy', normal: 'Normal', hard: 'Hard' };
+
+export const GAUGE_DIRECTION_LABELS: Record<GaugeDirection, string> = { lower: 'Bring it down', raise: 'Bring it up' };
+/** Where a Gauge starts, the goal and the end that fails at once (mirrors GAUGE_RULES in the API). */
+export const GAUGE_RULES: Record<GaugeDirection, { start: number; goal: number; fail: number }> = {
+    lower: { start: 60, goal: 20, fail: 100 },
+    raise: { start: 40, goal: 80, fail: 0 },
+};
+/** "20 or lower" / "80 or higher". */
+export function gaugeGoalInWords(direction: GaugeDirection): string {
+    return direction === 'lower' ? `${GAUGE_RULES.lower.goal} or lower` : `${GAUGE_RULES.raise.goal} or higher`;
+}
+/** The replies a Sudden event can give, as the editor's choices (mirrors SUDDEN_EVENT_TURNS: 2 to 8). */
+export const SUDDEN_EVENT_TURN_LABELS: Record<string, string> = { 2: '2', 3: '3', 4: '4', 5: '5', 6: '6', 7: '7', 8: '8' };
+export const MAX_SUDDEN_EVENTS = 8;
 
 export const MAX_CHARACTERS = 6;
 
@@ -359,6 +399,13 @@ export const storyApi = {
     /** The whole list of Starting Beliefs, in order; it replaces the Story's. */
     setStartingBeliefs: (storyId: number, beliefs: Array<{ characterId: number; text: string }>) =>
         apiSend<Story>('PUT', `/stories/${storyId}/starting-beliefs`, { startingBeliefs: beliefs }),
+
+    addSuddenEvent: (storyId: number, fields: SuddenEventFields = {}) =>
+        apiSend<Story>('POST', `/stories/${storyId}/sudden-events`, fields),
+    updateSuddenEvent: (storyId: number, eventId: number, fields: SuddenEventFields) =>
+        apiSend<Story>('PATCH', `/stories/${storyId}/sudden-events/${eventId}`, fields),
+    removeSuddenEvent: (storyId: number, eventId: number) =>
+        apiSend<Story>('DELETE', `/stories/${storyId}/sudden-events/${eventId}`),
 
     addScene: (storyId: number, fields: SceneFields = {}) =>
         apiSend<Story>('POST', `/stories/${storyId}/scenes`, fields),

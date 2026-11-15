@@ -4,7 +4,8 @@ import { MessageTabStop } from '@/components/chat/chat-classes';
 import { useCastCharacter, useCharacterProfile } from '@/components/chat/character-profile';
 import { CharacterPortrait } from '@/components/portrait/character-portrait';
 import { Cast, characterColour, Portrait, Portraits } from '@/lib/character-colour';
-import { Message, MessagePart } from '@/lib/chat';
+import { DiceIcon } from '@/components/icons';
+import { Message, MessagePart, MessageRoll, ROLL_OUTCOME_LABELS } from '@/lib/chat';
 import { linePicture } from '@/lib/expressions';
 
 import { useShownText } from './shown-text';
@@ -48,7 +49,30 @@ function Avatar({ name, colour, portrait, light = false }: { name: string; colou
 }
 
 /** What the user wrote, under the identity they wore: a purple bubble on the right. */
-export function UserLine({ identityName, text }: { identityName: string; text: string }) {
+/**
+ * A User Message's Roll under its bubble (CONTEXT.md, "Roll"): what the d20 showed, the number it
+ * needed and how it came out, in words, never by colour alone. `'pending'` while the Message is
+ * being sent: the dice are thrown by the app, so there is no number yet.
+ */
+export function RollLine({ roll }: { roll: MessageRoll | 'pending' }) {
+    return (
+        <p className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-surface-raised px-2.5 py-1 text-xs text-text" data-roll>
+            <DiceIcon size={14} className="shrink-0" />
+            {roll === 'pending' ? (
+                'Rolling…'
+            ) : (
+                <>
+                    <span className="sr-only">Roll: </span>
+                    <strong className="font-semibold">{roll.value}</strong>
+                    <span className="text-muted">needed {roll.target}</span>
+                    <strong className="font-semibold">{ROLL_OUTCOME_LABELS[roll.outcome]}</strong>
+                </>
+            )}
+        </p>
+    );
+}
+
+export function UserLine({ identityName, text, roll = null }: { identityName: string; text: string; roll?: MessageRoll | 'pending' | null }) {
     return (
         <div className={`flex items-start justify-end gap-2 ${STORY_SIZE}`}>
             <div className="flex max-w-[calc(100%_-_2.75rem)] min-w-0 flex-col items-end">
@@ -56,6 +80,7 @@ export function UserLine({ identityName, text }: { identityName: string; text: s
                 <p className={`${BUBBLE} rounded-xl rounded-tr-[0.3rem] bg-accent-fill text-accent-text`} lang={langOf(text)}>
                     {withActions(text)}
                 </p>
+                {roll && <RollLine roll={roll} />}
             </div>
             <Avatar name={identityName} colour="var(--accent-fill)" light />
         </div>
@@ -167,7 +192,7 @@ export interface ReadingNow {
  * its speaker's bubble; a User Message as a bubble on the right.
  */
 export function MessageBody({ message, cast, portraits = {}, readingNow = null }: MessageBodyProps) {
-    if (message.kind === 'user') return <UserLine identityName={message.identityName} text={message.text} />;
+    if (message.kind === 'user') return <UserLine identityName={message.identityName} text={message.text} roll={message.roll} />;
     return <AiMessageParts parts={message.parts} cast={cast} portraits={portraits} readingNow={readingNow} />;
 }
 

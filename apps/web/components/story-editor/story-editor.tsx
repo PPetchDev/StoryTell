@@ -23,6 +23,7 @@ import {
     LoreEntry,
     LoreEntryFields,
     MAX_CHARACTERS,
+    MAX_SUDDEN_EVENTS,
     MissingField,
     PACING_LABELS,
     POV_LABELS,
@@ -33,6 +34,7 @@ import {
     Story,
     storyApi,
     storyTitle,
+    SuddenEventFields,
     TENSE_LABELS,
 } from '@/lib/story';
 import { ADD_BUTTON, ADD_BUTTON_IN_CARD } from './add-button';
@@ -65,6 +67,7 @@ import { storySavedReplies } from '@/lib/saved-replies';
 import { ReplaceRuleList } from '@/components/replace-rules/replace-rule-list';
 import { storyReplaceRules } from '@/lib/replace-rules';
 import { SceneCard } from './scene-card';
+import { SuddenEventCard } from './sudden-event-card';
 import { StartingBeliefsCard } from './starting-beliefs-card';
 import { StartingBondsCard } from './starting-bonds-card';
 import { StatusBox } from './status-box';
@@ -404,6 +407,16 @@ export function StoryEditor({ initial }: { initial: Story }) {
             scenes: current.scenes.map((s) => (s.id === sceneId ? { ...s, [field]: value } : s)),
         }));
         queue(`scene.${sceneId}.${field}`, () => storyApi.updateScene(storyId, sceneId, { [field]: value }), applyStatus);
+    };
+    /** One field of a Sudden event (.scratch/sudden-events/spec.md): shown at once, saved like any other field. */
+    const setSuddenEventField = (eventId: number, fields: SuddenEventFields) => {
+        setStory((current) => ({
+            ...current,
+            suddenEvents: (current.suddenEvents ?? []).map((event) => (event.id === eventId ? { ...event, ...fields } : event)),
+        }));
+        for (const field of Object.keys(fields)) {
+            queue(`suddenEvent.${eventId}.${field}`, () => storyApi.updateSuddenEvent(storyId, eventId, fields), applyStatus);
+        }
     };
     const setSceneGates = (sceneId: number, gates: SceneBondGate[]) => {
         setStory((current) => ({
@@ -859,6 +872,40 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                 })}>
                                     + Add Scene
                                 </button>
+                                {/* Sudden events (.scratch/sudden-events/spec.md): beside the Scenes, since both shape where the plot goes. */}
+                                <section aria-labelledby="sudden-events-heading" className="mt-6">
+                                    <h2 id="sudden-events-heading" className="mt-0 mb-1 text-lg font-semibold">
+                                        Sudden events
+                                    </h2>
+                                    <p className={NOTE}>
+                                        Optional. A moment of pressure with a Gauge: when its trigger happens in a Chat, you get a few replies to
+                                        move the Gauge to its goal. It works with or without Scenes, and each one happens once in a Chat.
+                                    </p>
+                                    {(story.suddenEvents ?? []).map((event, index) => (
+                                        <SuddenEventCard
+                                            key={event.id}
+                                            event={event}
+                                            index={index}
+                                            onText={(field, value) => setSuddenEventField(event.id, { [field]: value })}
+                                            onDirection={(direction) => setSuddenEventField(event.id, { direction })}
+                                            onTurns={(turns) => setSuddenEventField(event.id, { turns })}
+                                            onRemove={() => commit(() => storyApi.removeSuddenEvent(storyId, event.id), applyWhole)}
+                                        />
+                                    ))}
+                                    <button
+                                        type="button"
+                                        className={ADD_BUTTON}
+                                        disabled={(story.suddenEvents ?? []).length >= MAX_SUDDEN_EVENTS}
+                                        onClick={() =>
+                                            void commit(() => storyApi.addSuddenEvent(storyId), (saved) => {
+                                                openAdded('suddenEvent', story.suddenEvents ?? [], saved.suddenEvents ?? []);
+                                                applyWhole(saved);
+                                            })
+                                        }
+                                    >
+                                        + Add Sudden event
+                                    </button>
+                                </section>
                             </section>
                         )}
 

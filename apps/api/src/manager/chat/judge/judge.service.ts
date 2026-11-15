@@ -12,6 +12,7 @@ import { ModelGateway } from '../../../service/model-gateway/model-gateway.js';
 import { exchangeUserText } from '../exchange.js';
 import { exchangeIdentityName } from '../identity.js';
 import { repliesInScene } from '../scene-replies.js';
+import { applySuddenEvent, eventState, judgeSuddenEventSection } from '../sudden-event/sudden-event.js';
 import { Attempt, BackgroundRuns } from '../background-runs.js';
 import { partsToText } from '../turn/reply-parser.js';
 import { applyJudgement, emotionsOfParts } from './apply-judgement.js';
@@ -134,6 +135,11 @@ export class JudgeManagerService {
             });
             // Read with the Chat as it is now, like the Scene: who sits out when the judge runs.
             const sittingOut = chat.sittingOutIds();
+            // The Chat's Sudden events before this reply (.scratch/sudden-events/spec.md): a step of its own, left by a judgement run before, is not counted.
+            const events = eventState(
+                story.suddenEvents ?? [],
+                state.suddenEventSteps.filter((step) => step.messageId !== message.id),
+            );
             const replyParts = message.parts.map((part) => part.toResponse());
             // Lines are tagged only where a tag can show (.scratch/expressions/spec.md): otherwise the prompt is as before.
             const tagLines = story.characters.some((character) => (character.expressions ?? []).length > 0);
@@ -174,6 +180,7 @@ export class JudgeManagerService {
                 userText,
                 aiText: partsToText(replyParts),
                 ...(tagLines ? { expressionParts: replyParts } : {}),
+                suddenEventSection: judgeSuddenEventSection(events),
             });
 
             const result = await this.gateway.completeText({
@@ -208,7 +215,8 @@ export class JudgeManagerService {
                 },
                 judgement,
             );
-            for (const reason of applied.rejected) {
+            const stepped = applySuddenEvent(events, judgement.suddenEvent ?? null);
+            for (const reason of [...applied.rejected, ...stepped.rejected]) {
                 this.logger.log(`Chat ${chat.id}, Message ${message.id}: judge item dropped: ${reason}`);
             }
             if (applied.passedBy !== null && applied.scene) {
@@ -219,7 +227,7 @@ export class JudgeManagerService {
             // Written with the rest of the judgement, in its one transaction, never after it. Without
             // Expressions the parts are not touched, so the record is exactly as before.
             const emotions = tagLines ? emotionsOfParts(message.parts, judgement.expressions) : undefined;
-            await this.ledger.record(chat.id, message.id, { ...applied, ...(emotions ? { emotions } : {}) });
+            await this.ledger.record(chat.id, message.id, { ...applied, suddenEvent: stepped.step, ...(emotions ? { emotions } : {}) });
             return { ok: true };
         } catch (error) {
             const reason = error instanceof AppError ? error.message : `Unexpected error: ${String(error)}`;

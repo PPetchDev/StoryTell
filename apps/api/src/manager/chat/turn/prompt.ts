@@ -8,7 +8,9 @@ import { memoryIsAbout } from '../memory/present.js';
 import { renderUser } from '../memory/render-user.js';
 import { documentsBlock, PromptPassage } from '../../document/document-search.js';
 import { loreBlock, PromptLoreEntry } from '../lore/lore-select.js';
+import { Roll, rollBlock } from '../roll.js';
 import { LINGERING_REPLIES } from '../scene-replies.js';
+import { PromptSuddenEvent, suddenEventBlock } from '../sudden-event/sudden-event.js';
 import { estimateTokens } from './prompt-tokens.js';
 
 /**
@@ -156,6 +158,15 @@ export interface TurnPromptInput {
      * reply; null, empty or left out for none. Turn-only: never one of the shared layers.
      */
     cue?: string | null;
+    /**
+     * The Chat's Sudden event as this reply reads it (.scratch/sudden-events/spec.md): the one under
+     * way, or the one that has just ended; null or left out for none. Turn-only.
+     */
+    suddenEvent?: PromptSuddenEvent | null;
+    /** The Roll the user's message was sent with (.scratch/roll/spec.md); null or left out for none. Turn-only. */
+    roll?: Roll | null;
+    /** Whether the Story has a Sudden event that can run: the Story so far then reserves room for its block. */
+    hasSuddenEvents?: boolean;
     /** Total prompt budget in tokens; recent Messages are trimmed from the oldest to fit. */
     tokenBudget?: number;
     /**
@@ -467,7 +478,7 @@ export function continueInstruction(identity: string): string {
 }
 
 /** The layers a prompt is built on: everything of a turn's input but the Messages. */
-export type PromptLayersInput = Omit<TurnPromptInput, 'history' | 'userText' | 'tokenBudget' | 'nudge' | 'cue'>;
+export type PromptLayersInput = Omit<TurnPromptInput, 'history' | 'userText' | 'tokenBudget' | 'nudge' | 'cue' | 'suddenEvent' | 'roll'>;
 
 /**
  * Layers 1–9 as the one system message, shared by the turn and by Suggested replies so they
@@ -617,13 +628,20 @@ export function buildTurnPrompt(input: TurnPromptInput): TurnPrompt {
     const userText = input.userText ?? continueInstruction(identity);
     const system = systemPrompt(input);
     const lore = loreBlock(input.chosenLore ?? []);
-    // One order (.scratch/sillytavern-gaps/integration.md): Lore, Documents, Author's note, Where things stand, Nudge, Cue, the final instruction.
+    // One order (.scratch/sillytavern-gaps/integration.md): Lore, Documents, Author's note, Where things stand, Sudden event, Roll, Nudge, Cue, the final instruction.
     const finalInstruction = joinBlocks([
         lore,
         documentsBlock(input.documentPassages ?? []),
         authorsNoteBlock(input.authorsNote, identity),
-        // Without a nudge or a cue, exactly the reminder and the final instruction as before.
-        [stateReminder(input), input.nudge ? nudgeLine(input.nudge) : null, cueBlock(input.cue, identity), turnFinalInstruction(identity)]
+        // With none of the turn's own lines, exactly the reminder and the final instruction as before.
+        [
+            stateReminder(input),
+            suddenEventBlock(input.suddenEvent, identity),
+            rollBlock(input.roll, identity),
+            input.nudge ? nudgeLine(input.nudge) : null,
+            cueBlock(input.cue, identity),
+            turnFinalInstruction(identity),
+        ]
             .filter((line): line is string => line !== null)
             .join('\n'),
     ]);

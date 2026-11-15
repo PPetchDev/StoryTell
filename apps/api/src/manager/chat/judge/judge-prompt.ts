@@ -5,6 +5,7 @@ import { Emotion, isEmotion } from '../../../model/story/emotion.js';
 import { PromptMessage } from '../../../service/model-gateway/model-gateway.js';
 import { exchangeUserLine } from '../exchange.js';
 import { PASSED_BY_REPLIES } from '../scene-replies.js';
+import { JudgedSuddenEvent, readJudgedSuddenEvent } from '../sudden-event/sudden-event.js';
 import { ReplyPart } from '../turn/reply-parser.js';
 
 /**
@@ -81,6 +82,12 @@ export interface JudgePromptInput {
      * judge tags each with an emotion. Left out, the prompt is exactly as it was before Expressions.
      */
     expressionParts?: ReplyPart[];
+    /**
+     * The Sudden events section (.scratch/sudden-events/spec.md), already worded: the events that
+     * can start, or the one under way with its rule. Null or left out for a Story with nothing to
+     * say, and the prompt is then exactly as it was before Sudden events.
+     */
+    suddenEventSection?: string | null;
 }
 
 /** How a Character sitting out is marked in the judge's cast (.scratch/speaker-controls/spec.md). */
@@ -90,6 +97,8 @@ export const SITTING_OUT_MARK =
 /** How many Messages before the exchange the judge sees for context. */
 export const JUDGE_CONTEXT_MESSAGES = 6;
 export const JUDGE_MAX_TOKENS = 700;
+/** What answering about a Sudden event adds to the judge's token cap. */
+export const SUDDEN_EVENT_EXTRA_TOKENS = 100;
 /** What tagging the lines adds to the judge's token cap. */
 export const EXPRESSION_EXTRA_TOKENS = 200;
 
@@ -248,7 +257,7 @@ ${input.scene ? `${input.scene.name}. Move-on condition: ${input.scene.gatesOnly
 # Time of day
 ${input.timeOfDay ?? 'not yet known'}
 
-${input.storySoFar?.trim() ? `# Story so far (earlier events, summarised)\n${input.storySoFar.trim()}\n\n` : ''}# Recent story (context)
+${input.suddenEventSection ? `${input.suddenEventSection}\n\n` : ''}${input.storySoFar?.trim() ? `# Story so far (earlier events, summarised)\n${input.storySoFar.trim()}\n\n` : ''}# Recent story (context)
 ${input.recent.join('\n\n') || '(start)'}
 
 # LATEST EXCHANGE (judge this)
@@ -260,7 +269,7 @@ ${input.expressionParts ? numberedReplyText(input.expressionParts) : input.aiTex
             { role: 'system', content: input.expressionParts ? SYSTEM_WITH_EXPRESSIONS : SYSTEM },
             { role: 'user', content: user },
         ],
-        maxTokens: input.expressionParts ? JUDGE_MAX_TOKENS + EXPRESSION_EXTRA_TOKENS : JUDGE_MAX_TOKENS,
+        maxTokens: JUDGE_MAX_TOKENS + (input.expressionParts ? EXPRESSION_EXTRA_TOKENS : 0) + (input.suddenEventSection ? SUDDEN_EVENT_EXTRA_TOKENS : 0),
     };
 }
 
@@ -299,6 +308,8 @@ export interface Judgement {
     timeOfDay: TimeOfDay | null;
     /** The emotion of each numbered speech line, as written; empty when the judge gave none. */
     expressions: JudgedExpression[];
+    /** What it said about Sudden events (.scratch/sudden-events/spec.md); null or left out when nothing readable. */
+    suddenEvent?: JudgedSuddenEvent | null;
 }
 
 /** One numbered line's emotion (.scratch/expressions/spec.md). */
@@ -353,7 +364,7 @@ export function parseJudgement(text: string): Judgement {
         const emotion = str(item.emotion).toLowerCase();
         return isEmotion(emotion) ? [{ line: item.line, emotion }] : [];
     });
-    return { bondChanges, arcSteps, scenes, timeOfDay: readTimeOfDay(json.time_of_day), expressions };
+    return { bondChanges, arcSteps, scenes, timeOfDay: readTimeOfDay(json.time_of_day), expressions, suddenEvent: readJudgedSuddenEvent(json.sudden_event) };
 }
 
 /** Read loosely: an axis whose level is not a whole number in its range, or an unknown axis, is ignored. */

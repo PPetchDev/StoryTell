@@ -13,6 +13,7 @@ import { CueSheet } from '@/components/chat/cue-sheet';
 import { MemoryDrawer } from '@/components/chat/memory-drawer';
 import { NovelRequest, NovelView } from '@/components/chat/novel-view';
 import { SceneStrip } from '@/components/chat/scene-strip';
+import { SuddenEventBanner, suddenEventAnnouncement } from '@/components/chat/sudden-event-banner';
 import { SnapshotSheet } from '@/components/chat/snapshot-sheet';
 import { SnapshotViewer, useChatSnapshots } from '@/components/chat/snapshots';
 import { useThaiReadings } from '@/components/chat/thai-reading';
@@ -136,6 +137,11 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
      */
     const [cue, setCue] = useState<string | null>(null);
     const [cueSheet, setCueSheet] = useState(false);
+    /**
+     * The Roll armed for the next Message (CONTEXT.md, "Roll"): sent with the next send only, where
+     * the app throws the dice. Gone on leaving, like the nudge and the Cue.
+     */
+    const [roll, setRoll] = useState(false);
     /** Each tap on the Character row's "Who's here" opens the sheet in the top bar. */
     const [whoRequest, setWhoRequest] = useState(0);
     const [editing, setEditing] = useState<number | null>(null);
@@ -196,6 +202,14 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
         }, BACKGROUND_POLL_MS);
         return () => clearTimeout(timer);
     }, [chat, reportUnreachable]);
+
+    // A Sudden event that began, moved or ended is said once, when the re-read Chat shows it (the banner shows the same).
+    const eventRef = useRef(initial.suddenEvent);
+    useEffect(() => {
+        const said = suddenEventAnnouncement(eventRef.current, chat.suddenEvent);
+        eventRef.current = chat.suddenEvent;
+        if (said) announce(said);
+    }, [chat.suddenEvent]);
 
     // Once a reply's extraction is done, announce what the AI added and let the drawer re-read.
     useEffect(() => {
@@ -397,10 +411,16 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
         setDraft('');
         // Inside the tap, so iOS lets the reply play by itself later.
         player.unlock();
-        setPending({ text, identityName: chat.identityName });
+        // The Roll rides on this send and no other; a send the API never stored arms it again with the draft.
+        const rolled = roll;
+        setRoll(false);
+        setPending({ text, identityName: chat.identityName, roll: rolled });
         void runTurn(
-            (stream) => chatApi.send(chat.storyId, chat.id, text, stream, { nudge, cue }),
-            () => setDraft((current) => (current === '' ? typed : current)),
+            (stream) => chatApi.send(chat.storyId, chat.id, text, stream, { nudge, cue, roll: rolled }),
+            () => {
+                setDraft((current) => (current === '' ? typed : current));
+                if (rolled) setRoll(true);
+            },
         );
     };
 
@@ -570,6 +590,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                     }}
                 />
             )}
+            {chat.suddenEvent && <SuddenEventBanner event={chat.suddenEvent} />}
 
             {/*
              * The low-credit line (audit M3) and the "Memory added" toasts lie over the top of the
@@ -683,6 +704,11 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                 cue={cue}
                 onCue={() => setCueSheet(true)}
                 onClearCue={() => setCue(null)}
+                roll={roll}
+                onRoll={(next) => {
+                    setRoll(next);
+                    announce(next ? `The dice will decide your next message: ${chat.rollTarget} or more succeeds.` : 'Roll off.');
+                }}
                 characterRow={(writingForMe) => (
                     <CharacterRow
                         characters={characters}

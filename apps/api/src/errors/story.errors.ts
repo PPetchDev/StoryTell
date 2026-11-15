@@ -175,6 +175,20 @@ export class EmptyStartingBeliefError extends AppError {
     }
 }
 
+/** No Sudden event with that id in this Story (.scratch/sudden-events/spec.md). */
+export class SuddenEventNotFoundError extends AppError {
+    constructor() {
+        super('404.003.026', 'Sudden event not found in this Story.');
+    }
+}
+
+/** A Story already has the most Sudden events it can hold. */
+export class SuddenEventLimitError extends AppError {
+    constructor(max: number) {
+        super('422.003.027', `A Story can have at most ${max} Sudden events.`);
+    }
+}
+
 export class InvalidBondGateError extends AppError {
     constructor(reason: string) {
         super('422.003.024', `That Bond gate can't be set: ${reason}`);

@@ -18,6 +18,8 @@ import {
     SelfStartingBondError,
     StartingBondNotFoundError,
     StoryNotFoundError,
+    SuddenEventLimitError,
+    SuddenEventNotFoundError,
 } from '../../errors/story.errors.js';
 import { cleanPatterns, compileLorePattern } from '../chat/lore/lore-pattern.js';
 import { ImageNotFoundError, SnapshotNotFoundError, UnsupportedImageError } from '../../errors/image.errors.js';
@@ -30,6 +32,7 @@ import { CharacterEntity, PortraitCrop } from '../../model/story/entities/charac
 import { LoreEntryEntity, LoreTriggers } from '../../model/story/entities/lore-entry.entity.js';
 import { SceneEntity } from '../../model/story/entities/scene.entity.js';
 import { StartingBondEntity } from '../../model/story/entities/starting-bond.entity.js';
+import { GaugeDirection, MAX_SUDDEN_EVENTS, SUDDEN_EVENT_TURNS, SuddenEventEntity } from '../../model/story/entities/sudden-event.entity.js';
 import {
     Backdrop,
     Balance,
@@ -154,6 +157,17 @@ export interface SceneFields {
     moveOnCondition?: string;
 }
 
+/** A Sudden event's fields (.scratch/sudden-events/spec.md): each is changed only when sent. */
+export interface SuddenEventFields {
+    name?: string;
+    trigger?: string;
+    gauge?: string;
+    direction?: GaugeDirection;
+    turns?: number;
+    success?: string;
+    failure?: string;
+}
+
 /** One Bond gate of a Scene (.scratch/bond-axes/spec.md, "Bond gates and the Scene"). */
 export interface SceneBondGateFields {
     fromCharacterId: number;
@@ -168,6 +182,11 @@ function assignSent<T extends object>(target: T, fields: Partial<T>, keys: (keyo
     for (const key of keys) {
         if (fields[key] !== undefined) target[key] = fields[key] as T[typeof key];
     }
+}
+
+/** The sent Sudden event fields onto the event. */
+function assignSuddenEvent(event: SuddenEventEntity, fields: SuddenEventFields): void {
+    assignSent(event, fields, ['name', 'trigger', 'gauge', 'direction', 'turns', 'success', 'failure']);
 }
 
 /** The sent Lore fields onto the entry, keywords and second keywords trimmed with blanks and repeats dropped. */
@@ -733,6 +752,37 @@ export class StoryManagerService {
         return this.saved(storyId);
     }
 
+    /**
+     * .scratch/sudden-events/spec.md: a new Sudden event at the end of the Story's list. It can
+     * start in any Chat, existing ones included, once it has a trigger and a Gauge name.
+     */
+    async addSuddenEvent(storyId: number, fields: SuddenEventFields): Promise<StoryDetail> {
+        const story = await this.load(storyId);
+        const events = story.suddenEvents ?? [];
+        if (events.length >= MAX_SUDDEN_EVENTS) throw new SuddenEventLimitError(MAX_SUDDEN_EVENTS);
+        const position = Math.max(-1, ...events.map((event) => event.position)) + 1;
+        const event = this.storyModel.createSuddenEvent({ storyId, position, turns: SUDDEN_EVENT_TURNS.default });
+        assignSuddenEvent(event, fields);
+        await this.storyModel.saveSuddenEvent(event);
+        return this.saved(storyId);
+    }
+
+    /** A Chat in the middle of it plays on with the new words; its Gauge and replies left stay as they are. */
+    async updateSuddenEvent(storyId: number, eventId: number, fields: SuddenEventFields): Promise<StoryDetail> {
+        const story = await this.load(storyId);
+        const event = this.findSuddenEvent(story, eventId);
+        assignSuddenEvent(event, fields);
+        await this.storyModel.saveSuddenEvent(event);
+        return this.saved(storyId);
+    }
+
+    /** Removing one ends it in every Chat where it is under way, and takes it out of their history. */
+    async removeSuddenEvent(storyId: number, eventId: number): Promise<StoryDetail> {
+        const story = await this.load(storyId);
+        await this.storyModel.removeSuddenEvent(this.findSuddenEvent(story, eventId));
+        return this.saved(storyId);
+    }
+
     /** Spec: "Reorder Scenes". Each Chat stays on its Scene, which Chats hold by id. */
     async reorderScenes(storyId: number, sceneIds: number[]): Promise<StoryDetail> {
         const story = await this.load(storyId);
@@ -816,6 +866,12 @@ export class StoryManagerService {
         const bond = story.startingBonds.find((other) => other.id === bondId);
         if (!bond) throw new StartingBondNotFoundError();
         return bond;
+    }
+
+    private findSuddenEvent(story: StoryEntity, eventId: number): SuddenEventEntity {
+        const event = (story.suddenEvents ?? []).find((other) => other.id === eventId);
+        if (!event) throw new SuddenEventNotFoundError();
+        return event;
     }
 
     private findScene(story: StoryEntity, sceneId: number): SceneEntity {

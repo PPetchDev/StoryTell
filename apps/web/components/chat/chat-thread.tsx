@@ -727,6 +727,8 @@ export interface OpenAt {
 export interface PendingLine {
     text: string;
     identityName: string;
+    /** Sent with a Roll (CONTEXT.md, "Roll"): shown as "Rolling…" until the API answers with the number. */
+    roll?: boolean;
 }
 
 /** "Writing…" with three pulsing dots, where the reply will appear (the thread, the Visual novel view's box). */
@@ -964,7 +966,7 @@ export function ChatThread(props: ChatThreadProps) {
                 />
                 {pending && (
                     <article className="mb-5" aria-label={`${pending.identityName} said`} aria-busy="true">
-                        <UserLine identityName={pending.identityName} text={pending.text} />
+                        <UserLine identityName={pending.identityName} text={pending.text} roll={pending.roll ? 'pending' : null} />
                     </article>
                 )}
                 {streaming && (

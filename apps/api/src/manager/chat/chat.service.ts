@@ -93,6 +93,9 @@ import { DocumentSearchManagerService, DocumentsInPlay, hasDocumentPassages } fr
 import { TurnMemoryRecord } from '../../model/chat/chat.service.js';
 import { CastName, ParseOptions, parseReply, partsToText, releasedText, ReplyPart } from './turn/reply-parser.js';
 import { TurnStoppedError, TurnStream } from './turn/turn-stream.js';
+import { Dice } from '../../service/dice/dice.js';
+import { Roll, ROLL_SIDES, ROLL_TARGETS } from './roll.js';
+import { eventReady, eventState, promptSuddenEvent, SuddenEventView, suddenEventView } from './sudden-event/sudden-event.js';
 
 /** A Chat as a Story's Chat list shows it (spec: "Lists and Home"). */
 export interface ChatListItem extends ChatSummary {
@@ -113,6 +116,13 @@ export interface ChatDetail extends ChatSummary {
     currentScene: { id: number; name: string } | null;
     /** The Time of day in the story (spec: "Story clock"); null until the story makes one clear. */
     timeOfDay: TimeOfDay | null;
+    /**
+     * The Chat's Sudden event (.scratch/sudden-events/spec.md): the one under way, or the one that
+     * ended with the newest AI Message; null otherwise.
+     */
+    suddenEvent: SuddenEventView | null;
+    /** The number a Roll sent now must reach (.scratch/roll/spec.md), from the Story's Difficulty. */
+    rollTarget: number;
     /** The worn identity's name, under which the next User Message shows. */
     identityName: string;
     /** The worn Persona; null while the Chat wears its Story's Role. */
@@ -307,6 +317,7 @@ export class ChatManagerService {
         private readonly documentSearch: DocumentSearchManagerService,
         private readonly gateway: ModelGateway,
         private readonly spendCap: SpendCap,
+        private readonly dice: Dice,
     ) {}
 
     async listChats(storyId: number): Promise<ChatListItem[]> {
@@ -710,7 +721,16 @@ export class ChatManagerService {
     }
 
     /** Spec: "Send flow". */
-    async send(storyId: number, chatId: number, text: string, stream?: TurnStream, nudgeCharacterId?: number | null, cue?: string | null): Promise<ChatDetail> {
+    async send(
+        storyId: number,
+        chatId: number,
+        text: string,
+        stream?: TurnStream,
+        nudgeCharacterId?: number | null,
+        cue?: string | null,
+        /** .scratch/roll/spec.md: throw the dice for what this Message attempts. */
+        withRoll = false,
+    ): Promise<ChatDetail> {
         if (text.trim() === '') throw new EmptyMessageError();
         const { story, chat: loaded } = await this.load(storyId, chatId);
         const nudge = nudgeOf(story, loaded, nudgeCharacterId);
@@ -719,11 +739,14 @@ export class ChatManagerService {
         return this.writingTurn(chat.id, async () => {
             // Stopped while the gate waited: nothing is stored, and the client keeps the text.
             if (stream?.signal.aborted) throw new TurnStoppedError();
+            // The Roll is thrown here, once, and kept on the Message: a Retry, an edit or Again reads the same one.
+            const roll: Roll | null = withRoll ? { value: this.dice.roll(ROLL_SIDES), target: ROLL_TARGETS[story.difficulty] } : null;
             const userMessage = await this.chatModel.addUserMessage(
                 chat.id,
                 chat.messages.length,
                 text,
                 wornIdentity(story, chat),
+                roll,
             );
             chat.messages.push(userMessage);
             // The reply before it is settled on its shown version, even if this turn fails.
@@ -1051,6 +1074,9 @@ export class ChatManagerService {
             sittingOut: sittingOut.map((character) => character.name),
             nudge,
             cue,
+            // The event as this reply finds it: `chat.messages` holds everything before the reply.
+            suddenEvent: promptSuddenEvent(eventState(story.suddenEvents ?? [], state.suddenEventSteps), newestAiMessage(chat)?.id ?? null),
+            roll: userText !== null ? rollOf(chat.messages[chat.messages.length - 1]) : null,
         });
         if (prompt.trimmed > 0) {
             this.logger.log(`Chat ${chat.id}: left out the ${prompt.trimmed} oldest Messages to fit the prompt budget`);
@@ -1173,6 +1199,7 @@ export class ChatManagerService {
             timeOfDay: chat.timeOfDay,
             lore: promptLore(story),
             hasDocuments: hasDocumentPassages(story),
+            hasSuddenEvents: (story.suddenEvents ?? []).some(eventReady),
             authorsNote: chat.authorsNote,
             present: inLatestExchange(story, chat, null),
             sittingOut: sittingOutOf(story, chat).map((character) => character.name),
@@ -1256,7 +1283,7 @@ export class ChatManagerService {
     }
 
     private async detail(story: StoryEntity, chat: ChatEntity): Promise<ChatDetail> {
-        const [settings, creditOut, source, readings, appSavedReplies, appReplaceRules, bondChanges, beliefs] = await Promise.all([
+        const [settings, creditOut, source, readings, appSavedReplies, appReplaceRules, bondChanges, beliefs, eventSteps] = await Promise.all([
             this.settingsModel.get(),
             this.creditOut(),
             // Read live, so a rename of the source shows.
@@ -1266,6 +1293,8 @@ export class ChatManagerService {
             this.replaceRuleModel.findByScope(null),
             this.ledger.bondChangesOf(chat.id),
             this.beliefModel.findByChat(chat.id),
+            // Only a Story with Sudden events has steps to read.
+            (story.suddenEvents ?? []).length > 0 ? this.ledger.suddenEventStepsOf(chat.id) : [],
         ]);
         const scene = story.scenes.find((candidate) => candidate.id === chat.currentSceneId);
         const lastModel = lastAiModel(chat);
@@ -1274,6 +1303,8 @@ export class ChatManagerService {
             ...chat.toSummary(),
             currentScene: scene ? { id: scene.id, name: scene.name } : null,
             timeOfDay: chat.timeOfDay,
+            suddenEvent: suddenEventView(eventState(story.suddenEvents ?? [], eventSteps), newestAiMessage(chat)?.id ?? null),
+            rollTarget: ROLL_TARGETS[story.difficulty],
             identityName: identity.name,
             personaId: identity.personaId,
             roleName: story.role.name,
@@ -1478,6 +1509,12 @@ function withThaiReadings(messages: MessageResponse[], readings: ThaiReadingEnti
  * null for none. Checked before anything is stored: an id outside the cast is
  * `CharacterNotFoundError`, a Character sitting out is `NudgeSittingOutError`.
  */
+/** A User Message's Roll as the prompt reads it; null without one. */
+function rollOf(message: MessageEntity | undefined): Roll | null {
+    if (!message || message.roll === null || message.roll === undefined || message.rollTarget === null || message.rollTarget === undefined) return null;
+    return { value: message.roll, target: message.rollTarget };
+}
+
 /** The Cue a turn was sent with (CONTEXT.md, "Cue"), trimmed; null for none or a blank one. Never stored. */
 function cueOf(cue: string | null | undefined): string | null {
     const text = cue?.trim() ?? '';

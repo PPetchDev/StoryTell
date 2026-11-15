@@ -50,6 +50,14 @@ export class SendMessageRequestBodyDTO extends TurnRequestBodyDTO {
     @IsString()
     @MaxLength(TEXT_MAX)
     text: string;
+
+    @ApiPropertyOptional({
+        description:
+            "Optional: true sends the message with a Roll (.scratch/roll/spec.md). The app throws a d20 against the number the Story's Difficulty sets, keeps the result on the Message, and the Narrator writes what the user attempts turning out that way. Left out or false: no Roll.",
+    })
+    @IsOptional()
+    @IsBoolean()
+    roll?: boolean;
 }
 
 export class EditMessageRequestBodyDTO extends TurnRequestBodyDTO {

@@ -56,15 +56,17 @@ test('the composer stacks the panel, the Character row, the tool row and the box
         const boxRow = await box(text);
         expect(toolRow.y + toolRow.height).toBeLessThanOrEqual(boxRow.y + 1);
 
-        // With ⚡ and ✱ out of its row, the box shares it only with 🎤 and the send slot
-        // (.scratch/dictation/spec.md: "Box row = box · 🎤 · send slot"), and takes the rest:
-        // two 2.75rem buttons and the gaps leave it about two thirds of the phone.
+        // With ⚡ and ✱ out of its row, the box shares it with 🎲 (.scratch/roll/spec.md: a sixth tool
+        // would wrap the tool row on every phone), 🎤 and the send slot, and takes the rest: three
+        // 2.75rem buttons and the gaps leave it a little over half of the phone.
+        const dice = composer.getByRole('button', { name: 'Roll the dice for this message' });
         const dictate = composer.getByRole('button', { name: 'Dictate' });
         const send = composer.getByRole('button', { name: 'Continue' });
-        const [dictateBox, sendBox] = [await box(dictate), await box(send)];
-        expect(boxRow.x + boxRow.width).toBeLessThanOrEqual(dictateBox.x);
+        const [diceBox, dictateBox, sendBox] = [await box(dice), await box(dictate), await box(send)];
+        expect(boxRow.x + boxRow.width).toBeLessThanOrEqual(diceBox.x);
+        expect(diceBox.x + diceBox.width).toBeLessThanOrEqual(dictateBox.x);
         expect(dictateBox.x + dictateBox.width).toBeLessThanOrEqual(sendBox.x);
-        expect(boxRow.width).toBeGreaterThan(390 * 0.62);
+        expect(boxRow.width).toBeGreaterThan(390 * 0.5);
 
         // A one-Character Story: the Character row is there but takes no height.
         const characters = composer.locator('[data-band="characters"]');
