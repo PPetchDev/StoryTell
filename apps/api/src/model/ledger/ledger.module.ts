@@ -10,6 +10,7 @@ import { SceneAdvanceEntity } from './entities/scene-advance.entity.js';
 import { SuddenEventStepEntity } from './entities/sudden-event-step.entity.js';
 import { DetailChangeEntity } from './entities/detail-change.entity.js';
 import { DiaryEntryEntity } from './entities/diary-entry.entity.js';
+import { EndingReachedEntity } from './entities/ending-reached.entity.js';
 import { TimeChangeEntity } from './entities/time-change.entity.js';
 import { LedgerModelService } from './ledger.service.js';
 
@@ -23,6 +24,7 @@ import { LedgerModelService } from './ledger.service.js';
             SuddenEventStepEntity,
             DetailChangeEntity,
             DiaryEntryEntity,
+            EndingReachedEntity,
             ChatArcDirectionEntity,
             MemoryChangeEntity,
             BeliefChangeEntity,

@@ -12,6 +12,8 @@ import {
     InvalidLorePatternError,
     LoreEntryNotFoundError,
     NoCoverError,
+    EndingLimitError,
+    EndingNotFoundError,
     NoReferenceImageError,
     NoReferenceImageForCoverError,
     SceneNotFoundError,
@@ -33,6 +35,7 @@ import { LoreEntryEntity, LoreTriggers } from '../../model/story/entities/lore-e
 import { SceneEntity } from '../../model/story/entities/scene.entity.js';
 import { StartingBondEntity } from '../../model/story/entities/starting-bond.entity.js';
 import { GaugeDirection, MAX_SUDDEN_EVENTS, SUDDEN_EVENT_TURNS, SuddenEventEntity } from '../../model/story/entities/sudden-event.entity.js';
+import { EndingEntity, MAX_ENDINGS } from '../../model/story/entities/ending.entity.js';
 import {
     Backdrop,
     Balance,
@@ -166,6 +169,13 @@ export interface SuddenEventFields {
     turns?: number;
     success?: string;
     failure?: string;
+}
+
+/** An Ending's fields (.scratch/endings/spec.md): each is changed only when sent. */
+export interface EndingFields {
+    name?: string;
+    condition?: string;
+    epilogue?: string;
 }
 
 /** One Bond gate of a Scene (.scratch/bond-axes/spec.md, "Bond gates and the Scene"). */
@@ -783,6 +793,37 @@ export class StoryManagerService {
         return this.saved(storyId);
     }
 
+    /**
+     * .scratch/endings/spec.md: a new Ending at the end of the Story's list. Any Chat that has
+     * reached none, existing ones included, can reach it once it has a condition.
+     */
+    async addEnding(storyId: number, fields: EndingFields): Promise<StoryDetail> {
+        const story = await this.load(storyId);
+        const endings = story.endings ?? [];
+        if (endings.length >= MAX_ENDINGS) throw new EndingLimitError(MAX_ENDINGS);
+        const position = Math.max(-1, ...endings.map((ending) => ending.position)) + 1;
+        const ending = this.storyModel.createEnding({ storyId, position });
+        assignSent(ending, fields, ['name', 'condition', 'epilogue']);
+        await this.storyModel.saveEnding(ending);
+        return this.saved(storyId);
+    }
+
+    /** A Chat that reached it keeps it, under its new words. */
+    async updateEnding(storyId: number, endingId: number, fields: EndingFields): Promise<StoryDetail> {
+        const story = await this.load(storyId);
+        const ending = this.findEnding(story, endingId);
+        assignSent(ending, fields, ['name', 'condition', 'epilogue']);
+        await this.storyModel.saveEnding(ending);
+        return this.saved(storyId);
+    }
+
+    /** Removing one takes it from every Chat that reached it: those Chats have then reached none, and can reach another. */
+    async removeEnding(storyId: number, endingId: number): Promise<StoryDetail> {
+        const story = await this.load(storyId);
+        await this.storyModel.removeEnding(this.findEnding(story, endingId));
+        return this.saved(storyId);
+    }
+
     /** Spec: "Reorder Scenes". Each Chat stays on its Scene, which Chats hold by id. */
     async reorderScenes(storyId: number, sceneIds: number[]): Promise<StoryDetail> {
         const story = await this.load(storyId);
@@ -866,6 +907,12 @@ export class StoryManagerService {
         const bond = story.startingBonds.find((other) => other.id === bondId);
         if (!bond) throw new StartingBondNotFoundError();
         return bond;
+    }
+
+    private findEnding(story: StoryEntity, endingId: number): EndingEntity {
+        const ending = (story.endings ?? []).find((other) => other.id === endingId);
+        if (!ending) throw new EndingNotFoundError();
+        return ending;
     }
 
     private findSuddenEvent(story: StoryEntity, eventId: number): SuddenEventEntity {

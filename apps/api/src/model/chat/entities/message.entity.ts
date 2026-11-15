@@ -90,6 +90,8 @@ export interface AiMessageResponse {
     memory: BackgroundCallResponse | null;
     /** Its Reply versions; null while it has only the one (spec: .scratch/swipe/spec.md). */
     versions: ReplyVersionsResponse | null;
+    /** Whether it was written as the story's Epilogue (.scratch/endings/spec.md). */
+    epilogue: boolean;
     createdAt: string;
 }
 
@@ -146,6 +148,13 @@ export class MessageEntity {
 
     @Column({ name: 'roll_target', type: 'smallint', nullable: true })
     rollTarget: number | null;
+
+    /**
+     * An AI Message written as the story's Epilogue (.scratch/endings/spec.md). It stays with the
+     * Message, so Again writes every Reply version of it as an Epilogue.
+     */
+    @Column({ type: 'boolean', default: false })
+    epilogue: boolean;
 
     // The judge's status on an AI Message a model wrote; NULL on User Messages and the Opening.
     @Column({
@@ -253,6 +262,7 @@ export class MessageEntity {
             judge: this.judgeStatus === null ? null : { status: this.judgeStatus, error: this.judgeError },
             memory: this.memoryStatus === null ? null : { status: this.memoryStatus, error: this.memoryError },
             versions: this.versionsResponse(),
+            epilogue: this.epilogue ?? false,
             createdAt: this.createdAt.toISOString(),
         };
     }

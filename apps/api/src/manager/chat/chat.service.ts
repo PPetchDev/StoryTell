@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 import {
+    AlreadyEpilogueError,
     AwaitingReplyError,
     BackgroundCallName,
     BackgroundFailedError,
@@ -101,6 +102,7 @@ import { CastName, ParseOptions, parseReply, partsToText, releasedText, ReplyPar
 import { TurnStoppedError, TurnStream } from './turn/turn-stream.js';
 import { Dice } from '../../service/dice/dice.js';
 import { Roll, ROLL_SIDES, ROLL_TARGETS } from './roll.js';
+import { endingName, endingState, EndingView, endingView, promptEpilogue } from './ending/ending.js';
 import { eventReady, eventState, promptSuddenEvent, SuddenEventView, suddenEventView } from './sudden-event/sudden-event.js';
 import { currentDetails, promptDetails } from './details/details.js';
 
@@ -112,6 +114,19 @@ export interface ChatListItem extends ChatSummary {
     latestLine: string;
     /** The Chat it was branched from, with that Chat's title now; null when never branched or that Chat is gone. */
     branchedFrom: { chatId: number; title: string } | null;
+    /** The Ending the Chat reached (.scratch/endings/spec.md); null when it reached none. */
+    ending: { id: number; name: string } | null;
+}
+
+/** A Story's Chats, and how many of its Endings they have found between them. */
+export interface ChatList {
+    chats: ChatListItem[];
+    endings: {
+        /** How many Endings the Story has that can be reached. */
+        total: number;
+        /** The ones reached in at least one of its Chats, in the author's order. */
+        found: Array<{ id: number; name: string }>;
+    };
 }
 
 /** A Message on the Chat screen: what it is, and its current Thai reading or null. */
@@ -128,6 +143,8 @@ export interface ChatDetail extends ChatSummary {
      * ended with the newest AI Message; null otherwise.
      */
     suddenEvent: SuddenEventView | null;
+    /** The Ending the Chat reached (.scratch/endings/spec.md), with the Message it reached it at; null when it reached none. */
+    ending: EndingView | null;
     /** The number a Roll sent now must reach (.scratch/roll/spec.md), from the Story's Difficulty. */
     rollTarget: number;
     /** Where the story is now (.scratch/info-box/spec.md); null until the story makes it clear. */
@@ -334,21 +351,37 @@ export class ChatManagerService {
         private readonly dice: Dice,
     ) {}
 
-    async listChats(storyId: number): Promise<ChatListItem[]> {
+    async listChats(storyId: number): Promise<ChatList> {
         const story = await this.loadStory(storyId);
         const chats = await this.chatModel.findByStory(storyId);
         const latest = await this.chatModel.findLatestMessages(chats.map((chat) => chat.id));
+        // Only a Story with Endings has any to read (.scratch/endings/spec.md).
+        const endings = story.endings ?? [];
+        const records = endings.length > 0 ? await this.ledger.endingsReachedOf(chats.map((chat) => chat.id)) : [];
+        const reachedBy = new Map(
+            chats.map((chat) => [chat.id, endingState(endings, records.filter((record) => record.chatId === chat.id)).reached?.ending ?? null]),
+        );
+        const foundIds = new Set([...reachedBy.values()].flatMap((ending) => (ending ? [ending.id] : [])));
         const latestOf = new Map(latest.map((message) => [message.chatId, message]));
         const titleOf = new Map(chats.map((chat) => [chat.id, chat.title]));
-        return chats.map((chat) => {
+        const items = chats.map((chat) => {
             const sourceTitle = chat.branchedFromChatId === null ? undefined : titleOf.get(chat.branchedFromChatId);
+            const reached = reachedBy.get(chat.id) ?? null;
             return {
                 ...chat.toSummary(),
                 sceneName: story.scenes.find((scene) => scene.id === chat.currentSceneId)?.name ?? null,
                 latestLine: latestLine(latestOf.get(chat.id)),
                 branchedFrom: sourceTitle === undefined ? null : { chatId: chat.branchedFromChatId!, title: sourceTitle },
+                ending: reached ? { id: reached.id, name: endingName(reached) } : null,
             };
         });
+        return {
+            chats: items,
+            endings: {
+                total: endings.filter((ending) => ending.condition.trim() !== '' || foundIds.has(ending.id)).length,
+                found: endings.filter((ending) => foundIds.has(ending.id)).map((ending) => ({ id: ending.id, name: endingName(ending) })),
+            },
+        };
     }
 
     /**
@@ -802,6 +835,25 @@ export class ChatManagerService {
     }
 
     /**
+     * .scratch/endings/spec.md, "The Epilogue": a turn without a User Message that closes the story,
+     * for the Ending the Chat reached or, when it reached none, for an end of the user's own
+     * choosing. Under the same gate as a Continue, so the Judge's word on the last reply is in
+     * before it is written; refused right after an Epilogue (Again writes that one anew). The
+     * reply is an ordinary AI Message marked as the Epilogue: the story can be played on after it.
+     */
+    async writeEpilogue(storyId: number, chatId: number, stream?: TurnStream): Promise<ChatDetail> {
+        const { story, chat: loaded } = await this.load(storyId, chatId);
+        if (awaitingReply(loaded)) throw new AwaitingReplyError();
+        if (newestAiMessage(loaded)?.epilogue) throw new AlreadyEpilogueError();
+        const chat = await this.requireSendable(story, loaded);
+
+        return this.writingTurn(chat.id, async () => {
+            await this.writeTurn(story, chat, stream, undefined, null, null, true);
+            return this.getChat(storyId, chatId);
+        });
+    }
+
+    /**
      * Spec: "Retry re-runs only the failed call." Allowed on the latest judged AI Message
      * when its judge failed; it runs to the end before answering with the dashboard. It holds
      * the Chat's turn lock meanwhile, so a send, an edit, a reset or a Branch is refused.
@@ -1104,7 +1156,10 @@ export class ChatManagerService {
         replacing?: MessageEntity,
         nudge: string | null = null,
         cue: string | null = null,
+        epilogue = false,
     ): Promise<void> {
+        // An Epilogue written again (Regenerate) is written as one again.
+        const asEpilogue = epilogue || replacing?.epilogue === true;
         const userText = exchangeUserText(chat.messages, chat.messages.length);
         const history: PromptHistoryMessage[] = (userText !== null ? chat.messages.slice(0, -1) : chat.messages)
             .map((message) => ({
@@ -1166,6 +1221,7 @@ export class ChatManagerService {
             // The event as this reply finds it: `chat.messages` holds everything before the reply.
             suddenEvent: promptSuddenEvent(eventState(story.suddenEvents ?? [], state.suddenEventSteps), newestAiMessage(chat)?.id ?? null),
             roll: userText !== null ? rollOf(chat.messages[chat.messages.length - 1]) : null,
+            epilogue: asEpilogue ? promptEpilogue(endingState(story.endings ?? [], state.endingsReached)) : null,
         });
         if (prompt.trimmed > 0) {
             this.logger.log(`Chat ${chat.id}: left out the ${prompt.trimmed} oldest Messages to fit the prompt budget`);
@@ -1207,7 +1263,7 @@ export class ChatManagerService {
             aiMessageId = replacing.id;
         } else {
             aiMessageId = (
-                await this.chatModel.addAiMessage(chat.id, chat.messages.length, result.model, parts, BackgroundStatus.Pending, documents.record, memoryRecord)
+                await this.chatModel.addAiMessage(chat.id, chat.messages.length, result.model, parts, BackgroundStatus.Pending, documents.record, memoryRecord, asEpilogue)
             ).id;
             // A Message after the one with versions settles it on its shown version.
             await this.chatModel.dropReplyVersions(chat.id);
@@ -1373,7 +1429,7 @@ export class ChatManagerService {
     }
 
     private async detail(story: StoryEntity, chat: ChatEntity): Promise<ChatDetail> {
-        const [settings, creditOut, source, readings, appSavedReplies, appReplaceRules, bondChanges, beliefs, eventSteps, detailChanges] = await Promise.all([
+        const [settings, creditOut, source, readings, appSavedReplies, appReplaceRules, bondChanges, beliefs, eventSteps, detailChanges, endingsReached] = await Promise.all([
             this.settingsModel.get(),
             this.creditOut(),
             // Read live, so a rename of the source shows.
@@ -1386,6 +1442,8 @@ export class ChatManagerService {
             // Only a Story with Sudden events has steps to read.
             (story.suddenEvents ?? []).length > 0 ? this.ledger.suddenEventStepsOf(chat.id) : [],
             this.ledger.detailChangesOf(chat.id),
+            // Only a Story with Endings has a record to read.
+            (story.endings ?? []).length > 0 ? this.ledger.endingsReachedOf([chat.id]) : [],
         ]);
         const details = currentDetails(detailChanges);
         const scene = story.scenes.find((candidate) => candidate.id === chat.currentSceneId);
@@ -1396,6 +1454,7 @@ export class ChatManagerService {
             currentScene: scene ? { id: scene.id, name: scene.name } : null,
             timeOfDay: chat.timeOfDay,
             suddenEvent: suddenEventView(eventState(story.suddenEvents ?? [], eventSteps), newestAiMessage(chat)?.id ?? null),
+            ending: endingView(endingState(story.endings ?? [], endingsReached)),
             rollTarget: ROLL_TARGETS[story.difficulty],
             place: details.place,
             weather: details.weather,

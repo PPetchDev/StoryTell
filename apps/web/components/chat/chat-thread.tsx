@@ -31,7 +31,8 @@ import { STORY_TEXT_SIZE, useTextSize } from '@/lib/text-size';
 
 function messageLabel(message: Message): string {
     if (message.kind === 'user') return `${message.identityName} said`;
-    return isOpening(message) ? 'Opening' : 'AI reply';
+    if (isOpening(message)) return 'Opening';
+    return message.epilogue ? 'Epilogue' : 'AI reply';
 }
 
 /** Focus back on a Message once what held it (its edit box, a menu item) is gone, unless the user is already elsewhere. */
@@ -601,7 +602,15 @@ const MessageView = memo(function MessageView({
                         }}
                     />
                 ) : (
-                    <MessageBody message={message} cast={cast} portraits={portraits} readingNow={readingNow} />
+                    <>
+                        {/* The story's closing passage says what it is (.scratch/endings/spec.md). */}
+                        {message.kind === 'ai' && message.epilogue && (
+                            <p className="mt-0 mb-1 text-xs font-bold tracking-widest text-muted uppercase" data-epilogue-label>
+                                Epilogue
+                            </p>
+                        )}
+                        <MessageBody message={message} cast={cast} portraits={portraits} readingNow={readingNow} />
+                    </>
                 )}
                 {/* Its Thai reading, or why one failed: under the story text, above the Snapshots. */}
                 {!editing && <ThaiReadingBlock message={message} readings={readings} />}

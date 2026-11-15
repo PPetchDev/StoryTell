@@ -175,6 +175,13 @@ export class DiaryEntryNotFoundError extends AppError {
     }
 }
 
+/** An Epilogue asked for right after one (.scratch/endings/spec.md). No call; nothing stored. */
+export class AlreadyEpilogueError extends AppError {
+    constructor() {
+        super('409.004.029', 'The story already has its epilogue. Use Again to write it anew, or play on.');
+    }
+}
+
 /** The background model's Thai reading came back empty. Nothing stored. */
 export class UnreadableThaiReadingError extends AppError {
     constructor() {

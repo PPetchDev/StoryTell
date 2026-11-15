@@ -15,7 +15,7 @@ import type { StoryCover } from '../lib/story';
 const asStored = (text: string) => text;
 
 function ai(id: number, parts: MessagePart[]): AiMessage {
-    return { id, kind: 'ai', model: 'glm-5.3', parts, judge: null, memory: null, versions: null, createdAt: '', thaiReading: null };
+    return { id, kind: 'ai', model: 'glm-5.3', parts, judge: null, memory: null, versions: null, epilogue: false, createdAt: '', thaiReading: null };
 }
 function user(id: number, text: string): UserMessage {
     return { id, kind: 'user', text, identityName: 'Ash', personaId: null, roll: null, createdAt: '', thaiReading: null };

@@ -11,6 +11,8 @@ interface ConfirmDialogProps {
     confirmLabel: string;
     onCancel(): void;
     onConfirm(): void;
+    /** For an action that destroys nothing: the confirm button is the plain one, not the danger one. */
+    plain?: boolean;
 }
 
 /**
@@ -18,7 +20,7 @@ interface ConfirmDialogProps {
  * screen with Cancel and the danger button. Focus starts on Cancel, the safe choice; tapping
  * the dimmed page or Escape cancels.
  */
-export function ConfirmDialog({ question, confirmLabel, onCancel, onConfirm }: ConfirmDialogProps) {
+export function ConfirmDialog({ question, confirmLabel, onCancel, onConfirm, plain = false }: ConfirmDialogProps) {
     const panel = useRef<HTMLDivElement>(null);
     const cancel = useRef<HTMLButtonElement>(null);
     const titleId = useId();
@@ -42,7 +44,11 @@ export function ConfirmDialog({ question, confirmLabel, onCancel, onConfirm }: C
                     <button ref={cancel} type="button" className="bare-button press min-h-11 rounded-full border border-field-line px-[1.1rem] font-semibold text-text" onClick={onCancel}>
                         Cancel
                     </button>
-                    <button type="button" className="bare-button press min-h-11 rounded-full border border-danger bg-danger-soft px-[1.1rem] font-semibold text-danger-text" onClick={onConfirm}>
+                    <button
+                        type="button"
+                        className={plain ? 'button' : 'bare-button press min-h-11 rounded-full border border-danger bg-danger-soft px-[1.1rem] font-semibold text-danger-text'}
+                        onClick={onConfirm}
+                    >
                         {confirmLabel}
                     </button>
                 </div>

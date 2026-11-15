@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useId, useRef, useState } from 'react';
 
 import { useConnection } from '@/components/connection';
-import { BranchIcon, ChevronRightIcon } from '@/components/icons';
+import { BranchIcon, ChevronRightIcon, EndingIcon } from '@/components/icons';
 import { ConfirmButton } from '@/components/story-editor/fields';
 import { ApiError, ApiUnreachableError } from '@/lib/api';
 import { chatApi, ChatListItem, formatWhen } from '@/lib/chat';
@@ -153,6 +153,12 @@ export function ChatList({ storyId, initial, emptyFocus }: { storyId: number; in
                                     </span>
                                 )}
                                 <span className="text-xs font-bold tracking-wide text-accent">{chat.sceneName ?? 'Free play'}</span>
+                                {chat.ending && (
+                                    <span className="flex items-center gap-1 text-sm text-text" data-chat-ending>
+                                        <EndingIcon size={14} className="shrink-0 text-accent" />
+                                        Ending: {chat.ending.name}
+                                    </span>
+                                )}
                                 {chat.latestLine && <span className="line-clamp-2 text-md text-text">{chat.latestLine}</span>}
                                 <span className="text-sm text-muted">
                                     Started {formatWhen(chat.createdAt)} · Last played {formatWhen(chat.lastPlayedAt)}

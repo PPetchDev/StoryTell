@@ -14,6 +14,7 @@ import { Chat, messageHref } from '@/lib/chat';
 import { PersonaList } from '@/lib/persona';
 
 const RESET_QUESTION = 'Clear every Message and start this Chat over from the Opening?';
+const END_QUESTION = 'End the story here? The Narrator writes an epilogue from where it stands. You can still play on after it.';
 
 /** A round 44px icon button in the bar: ‹ back and ⋯. */
 const BAR_ICON = [
@@ -399,6 +400,10 @@ interface ChatTopBarProps {
     /** Turns Read replies aloud on or off. */
     onSetAutoRead(autoRead: boolean): void;
     onReset(): void;
+    /** Asks for the story's Epilogue (.scratch/endings/spec.md); the menu asks first. */
+    onEndStory(): void;
+    /** Whether an Epilogue can be asked for now: not blocked, no Message waiting for its reply, and the newest reply is not one. */
+    canEndStory: boolean;
     /** Counts the asks for "Who's in this Chat" from outside the menu; each new one opens it. */
     whoRequest?: number;
     /** The Visual novel view is on (.scratch/chat-looks/spec.md); the toggle sits between the title and ⋯. */
@@ -431,6 +436,8 @@ export function ChatTopBar({
     onSetSittingOut,
     onSetAutoRead,
     onReset,
+    onEndStory,
+    canEndStory,
     whoRequest = 0,
     novel = false,
     onToggleNovel,
@@ -440,6 +447,7 @@ export function ChatTopBar({
     const [menu, setMenu] = useState<'closed' | 'menu' | 'rename' | 'note' | 'who'>('closed');
     const sittingOutNames = chat.sittingOut.flatMap((id) => characters.find((character) => character.id === id)?.name ?? []);
     const [confirming, setConfirming] = useState(false);
+    const [ending, setEnding] = useState(false);
     const close = () => setMenu('closed');
     // The Character row's "Who's here" opens the same sheet (.scratch/speaker-controls/spec.md).
     useEffect(() => {
@@ -629,6 +637,9 @@ export function ChatTopBar({
                                 </button>
                             </section>
                             <div className="border-t border-line pt-1">
+                                <MenuButton onClick={choose(() => setEnding(true))} disabled={busy || !canEndStory}>
+                                    <MenuText label="End the story" sub="The Narrator writes an epilogue from here" />
+                                </MenuButton>
                                 <MenuButton danger onClick={choose(() => setConfirming(true))} disabled={busy || !chat.playable}>
                                     <MenuText label="Reset Chat" sub="Start again from the Opening" danger />
                                 </MenuButton>
@@ -638,6 +649,18 @@ export function ChatTopBar({
                 </Sheet>
             )}
 
+            {ending && (
+                <ConfirmDialog
+                    plain
+                    question={END_QUESTION}
+                    confirmLabel="Write the epilogue"
+                    onCancel={() => setEnding(false)}
+                    onConfirm={() => {
+                        setEnding(false);
+                        onEndStory();
+                    }}
+                />
+            )}
             {confirming && (
                 <ConfirmDialog
                     question={RESET_QUESTION}

@@ -26,6 +26,7 @@ import {
     SceneFields,
     StartingBondFields,
     SuddenEventFields,
+    EndingFields,
     StoryFields,
 } from '../../../manager/story/story.service.js';
 import { BOND_AXES, BOND_AXIS_RANGE } from '../../../model/ledger/bond-axes.js';
@@ -325,6 +326,27 @@ export class SuddenEventRequestBodyDTO implements SuddenEventFields {
     @IsString()
     @MaxLength(TEXT_MAX)
     failure?: string;
+}
+
+/** An Ending's fields (.scratch/endings/spec.md). Every field is optional, so autosave can send one at a time. */
+export class EndingRequestBodyDTO implements EndingFields {
+    @ApiPropertyOptional()
+    @IsOptional()
+    @IsString()
+    @MaxLength(TEXT_MAX)
+    name?: string;
+
+    @ApiPropertyOptional({ description: 'When the story has reached it, in plain language.' })
+    @IsOptional()
+    @IsString()
+    @MaxLength(TEXT_MAX)
+    condition?: string;
+
+    @ApiPropertyOptional({ description: 'What its Epilogue should tell, for the Narrator.' })
+    @IsOptional()
+    @IsString()
+    @MaxLength(TEXT_MAX)
+    epilogue?: string;
 }
 
 export class SceneRequestBodyDTO implements SceneFields {

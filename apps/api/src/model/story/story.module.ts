@@ -8,6 +8,7 @@ import { RoleEntity } from './entities/role.entity.js';
 import { SceneEntity } from './entities/scene.entity.js';
 import { SceneBondGateEntity } from './entities/scene-bond-gate.entity.js';
 import { SuddenEventEntity } from './entities/sudden-event.entity.js';
+import { EndingEntity } from './entities/ending.entity.js';
 import { StartingBeliefEntity } from './entities/starting-belief.entity.js';
 import { StartingBondEntity } from './entities/starting-bond.entity.js';
 import { StoryEntity } from './entities/story.entity.js';
@@ -25,6 +26,7 @@ import { StoryModelService } from './story.service.js';
             SceneBondGateEntity,
             SceneEntity,
             SuddenEventEntity,
+            EndingEntity,
             LoreEntryEntity,
         ]),
     ],

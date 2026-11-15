@@ -20,6 +20,7 @@ import type { LoreEntryEntity, LoreEntryResponse } from './lore-entry.entity.js'
 import type { RoleEntity, RoleResponse } from './role.entity.js';
 import type { SceneEntity, SceneResponse } from './scene.entity.js';
 import type { SuddenEventEntity, SuddenEventResponse } from './sudden-event.entity.js';
+import type { EndingEntity, EndingResponse } from './ending.entity.js';
 import type { StartingBeliefEntity, StartingBeliefResponse } from './starting-belief.entity.js';
 import type { StartingBondEntity, StartingBondResponse } from './starting-bond.entity.js';
 
@@ -114,6 +115,8 @@ export interface StoryResponse extends StorySummary {
     scenes: SceneResponse[];
     /** Its Sudden events (.scratch/sudden-events/spec.md), in the author's order. */
     suddenEvents: SuddenEventResponse[];
+    /** Its Endings (.scratch/endings/spec.md), in the author's order. */
+    endings: EndingResponse[];
     /** In add order. */
     lore: LoreEntryResponse[];
     /** In add order, without text or vectors (.scratch/documents/spec.md). */
@@ -224,6 +227,9 @@ export class StoryEntity {
     @OneToMany('SuddenEventEntity', 'story')
     suddenEvents: Relation<SuddenEventEntity[]>;
 
+    @OneToMany('EndingEntity', 'story')
+    endings: Relation<EndingEntity[]>;
+
     @OneToMany('LoreEntryEntity', 'story')
     lore: Relation<LoreEntryEntity[]>;
 
@@ -274,6 +280,7 @@ export class StoryEntity {
             startingBeliefs: (this.startingBeliefs ?? []).map((belief) => belief.toResponse()),
             scenes: this.scenes.map((scene) => scene.toResponse()),
             suddenEvents: (this.suddenEvents ?? []).map((event) => event.toResponse()),
+            endings: (this.endings ?? []).map((ending) => ending.toResponse()),
             lore: this.lore.map((entry) => entry.toResponse()),
             documents: this.documents.map((document) => document.toSummary()),
             savedReplies: this.savedReplies.map((line) => line.toResponse()),

@@ -11,7 +11,7 @@ import type { MessagePartResponse } from '../src/model/chat/entities/message-par
 
 const createdAt = '2026-11-09T00:00:00.000Z';
 const ai = (parts: MessagePartResponse[]) =>
-    ({ id: 1, kind: 'ai', model: 'glm-5.3', parts, judge: null, memory: null, versions: null, createdAt }) as const;
+    ({ id: 1, kind: 'ai', model: 'glm-5.3', parts, judge: null, memory: null, versions: null, epilogue: false, createdAt }) as const;
 
 describe('Thai reading: the source text (pure)', () => {
     it("is a User Message's stored text as it is", () => {

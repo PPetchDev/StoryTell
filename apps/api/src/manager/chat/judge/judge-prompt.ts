@@ -7,6 +7,7 @@ import { exchangeUserLine } from '../exchange.js';
 import { PASSED_BY_REPLIES } from '../scene-replies.js';
 import { JudgedSuddenEvent, readJudgedSuddenEvent } from '../sudden-event/sudden-event.js';
 import { DETAILS_EXTRA_TOKENS, JudgedDetails, readJudgedDetails } from '../details/details.js';
+import { ENDING_EXTRA_TOKENS, JudgedEnding, readJudgedEnding } from '../ending/ending.js';
 import { ReplyPart } from '../turn/reply-parser.js';
 
 /**
@@ -94,6 +95,12 @@ export interface JudgePromptInput {
      * rule. It goes last, after the exchange it is read from. Left out, the prompt is as it was before.
      */
     detailsSection?: string | null;
+    /**
+     * The Endings section (.scratch/endings/spec.md), already worded, with its rule: the Endings the
+     * Chat can still reach. It goes after the exchange, before the details section. Left out, the
+     * prompt is as it was before.
+     */
+    endingSection?: string | null;
 }
 
 /** How a Character sitting out is marked in the judge's cast (.scratch/speaker-controls/spec.md). */
@@ -269,7 +276,7 @@ ${input.recent.join('\n\n') || '(start)'}
 # LATEST EXCHANGE (judge this)
 ${exchangeUserLine(input.identityName, input.userText)}
 
-${input.expressionParts ? numberedReplyText(input.expressionParts) : input.aiText}${input.detailsSection ? `\n\n${input.detailsSection}` : ''}`;
+${input.expressionParts ? numberedReplyText(input.expressionParts) : input.aiText}${input.endingSection ? `\n\n${input.endingSection}` : ''}${input.detailsSection ? `\n\n${input.detailsSection}` : ''}`;
     return {
         messages: [
             { role: 'system', content: input.expressionParts ? SYSTEM_WITH_EXPRESSIONS : SYSTEM },
@@ -279,6 +286,7 @@ ${input.expressionParts ? numberedReplyText(input.expressionParts) : input.aiTex
             JUDGE_MAX_TOKENS +
             (input.expressionParts ? EXPRESSION_EXTRA_TOKENS : 0) +
             (input.suddenEventSection ? SUDDEN_EVENT_EXTRA_TOKENS : 0) +
+            (input.endingSection ? ENDING_EXTRA_TOKENS : 0) +
             (input.detailsSection ? DETAILS_EXTRA_TOKENS : 0),
     };
 }
@@ -322,6 +330,8 @@ export interface Judgement {
     suddenEvent?: JudgedSuddenEvent | null;
     /** The Place, the Weather and the Outfits it gave (.scratch/info-box/spec.md); null or left out when none. */
     details?: JudgedDetails | null;
+    /** The Ending it says the story reached (.scratch/endings/spec.md); null or left out when none. */
+    ending?: JudgedEnding | null;
 }
 
 /** One numbered line's emotion (.scratch/expressions/spec.md). */
@@ -376,7 +386,7 @@ export function parseJudgement(text: string): Judgement {
         const emotion = str(item.emotion).toLowerCase();
         return isEmotion(emotion) ? [{ line: item.line, emotion }] : [];
     });
-    return { bondChanges, arcSteps, scenes, timeOfDay: readTimeOfDay(json.time_of_day), expressions, suddenEvent: readJudgedSuddenEvent(json.sudden_event), details: readJudgedDetails(json.details) };
+    return { bondChanges, arcSteps, scenes, timeOfDay: readTimeOfDay(json.time_of_day), expressions, suddenEvent: readJudgedSuddenEvent(json.sudden_event), details: readJudgedDetails(json.details), ending: readJudgedEnding(json.ending) };
 }
 
 /** Read loosely: an axis whose level is not a whole number in its range, or an unknown axis, is ignored. */

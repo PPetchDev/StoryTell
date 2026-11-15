@@ -113,6 +113,19 @@ export interface Scene {
 }
 
 /** Which way the user must move a Sudden event's Gauge (mirrors the API's GaugeDirection). */
+/**
+ * An Ending (CONTEXT.md): a way the story can end, written by the author. A Chat reaches it when
+ * its condition has happened there (mirrors EndingDTO).
+ */
+export interface Ending {
+    id: number;
+    name: string;
+    /** When the story has reached it, in plain language. Without one it is never reached. */
+    condition: string;
+    /** What its Epilogue should tell, for the Narrator. */
+    epilogue: string;
+}
+
 export type GaugeDirection = 'lower' | 'raise';
 
 /**
@@ -248,6 +261,8 @@ export interface Story {
     scenes: Scene[];
     /** Its Sudden events, in the author's order. */
     suddenEvents: SuddenEvent[];
+    /** Its Endings, in the author's order. */
+    endings: Ending[];
     /** In add order. */
     lore: LoreEntry[];
     /** In add order. */
@@ -272,6 +287,7 @@ export type StoryFields = Partial<Pick<Story, 'title' | 'setting' | 'opening' | 
 export type CharacterFields = Partial<Omit<Character, 'id' | 'referenceImagePath' | 'portraitCrop' | 'expressions'>>;
 export type SceneFields = Partial<Omit<Scene, 'id' | 'gates'>>;
 export type SuddenEventFields = Partial<Omit<SuddenEvent, 'id'>>;
+export type EndingFields = Partial<Omit<Ending, 'id'>>;
 export type StartingBondFields = Partial<Pick<StartingBond, 'label' | 'description'> & BondLevels>;
 export type LoreEntryFields = Partial<Omit<LoreEntry, 'id'>>;
 
@@ -303,6 +319,8 @@ export function gaugeGoalInWords(direction: GaugeDirection): string {
 /** The replies a Sudden event can give, as the editor's choices (mirrors SUDDEN_EVENT_TURNS: 2 to 8). */
 export const SUDDEN_EVENT_TURN_LABELS: Record<string, string> = { 2: '2', 3: '3', 4: '4', 5: '5', 6: '6', 7: '7', 8: '8' };
 export const MAX_SUDDEN_EVENTS = 8;
+/** The most Endings a Story holds (mirrors MAX_ENDINGS). */
+export const MAX_ENDINGS = 6;
 
 export const MAX_CHARACTERS = 6;
 
@@ -406,6 +424,11 @@ export const storyApi = {
         apiSend<Story>('PATCH', `/stories/${storyId}/sudden-events/${eventId}`, fields),
     removeSuddenEvent: (storyId: number, eventId: number) =>
         apiSend<Story>('DELETE', `/stories/${storyId}/sudden-events/${eventId}`),
+
+    addEnding: (storyId: number, fields: EndingFields = {}) => apiSend<Story>('POST', `/stories/${storyId}/endings`, fields),
+    updateEnding: (storyId: number, endingId: number, fields: EndingFields) =>
+        apiSend<Story>('PATCH', `/stories/${storyId}/endings/${endingId}`, fields),
+    removeEnding: (storyId: number, endingId: number) => apiSend<Story>('DELETE', `/stories/${storyId}/endings/${endingId}`),
 
     addScene: (storyId: number, fields: SceneFields = {}) =>
         apiSend<Story>('POST', `/stories/${storyId}/scenes`, fields),

@@ -189,6 +189,20 @@ export class SuddenEventLimitError extends AppError {
     }
 }
 
+/** No Ending with that id in this Story (.scratch/endings/spec.md). */
+export class EndingNotFoundError extends AppError {
+    constructor() {
+        super('404.003.028', 'Ending not found in this Story.');
+    }
+}
+
+/** A Story already has the most Endings it can hold. */
+export class EndingLimitError extends AppError {
+    constructor(max: number) {
+        super('422.003.029', `A Story can have at most ${max} Endings.`);
+    }
+}
+
 export class InvalidBondGateError extends AppError {
     constructor(reason: string) {
         super('422.003.024', `That Bond gate can't be set: ${reason}`);

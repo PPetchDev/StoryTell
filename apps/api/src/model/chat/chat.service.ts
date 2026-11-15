@@ -257,6 +257,7 @@ export class ChatModelService {
         background: BackgroundStatus | null,
         documentPassages: DocumentPassagesUsed | null = null,
         memory: TurnMemoryRecord | null = null,
+        epilogue = false,
     ): Promise<MessageEntity> {
         return this.dataSource.transaction(async (manager) => {
             const message = await manager.save(
@@ -265,6 +266,7 @@ export class ChatModelService {
                     position,
                     kind: MessageKind.Ai,
                     model,
+                    epilogue,
                     documentPassages,
                     ...memoryColumns(memory),
                     judgeStatus: background,

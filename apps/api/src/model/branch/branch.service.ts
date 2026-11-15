@@ -118,11 +118,11 @@ const copyMessages: CopyStep = async ({ manager, sourceChatId, chatId, through, 
     await manager.query(
         `INSERT INTO "message" ("id", "chat_id", "position", "kind", "text", "identity_name", "persona_id", "model",
                 "judge_status", "judge_error", "memory_status", "memory_error", "version_ordinal", "document_passages",
-                "memories_used", "context_query", "context_query_model", "roll", "roll_target", "created_at")
+                "memories_used", "context_query", "context_query_model", "roll", "roll_target", "epilogue", "created_at")
          SELECT m."new_id", $1, s."position", s."kind", s."text", s."identity_name", s."persona_id", s."model",
                 s."judge_status", s."judge_error", s."memory_status", s."memory_error",
                 s."version_ordinal", s."document_passages", s."memories_used", s."context_query", s."context_query_model",
-                s."roll", s."roll_target", s."created_at"
+                s."roll", s."roll_target", s."epilogue", s."created_at"
          FROM "message" s JOIN unnest($3::int[], $4::int[]) AS m("old_id", "new_id") ON m."old_id" = s."id"
          WHERE s."chat_id" = $2 ORDER BY s."id"`,
         [chatId, sourceChatId, olds, news],
@@ -240,6 +240,13 @@ const copyLedger: CopyStep = async ({ manager, sourceChatId, chatId, messageIds 
         `INSERT INTO "detail_change" ("chat_id", "kind", "character_id", "value", "message_id", "created_at")
          SELECT $1, s."kind", s."character_id", s."value", msg."new_id", s."created_at"
          FROM "detail_change" s JOIN ${remap} WHERE s."chat_id" = $2 ORDER BY s."id"`,
+        params,
+    );
+    // The Ending reached (.scratch/endings/spec.md): the rollback drops it when a Message after N reached it.
+    await manager.query(
+        `INSERT INTO "ending_reached" ("chat_id", "ending_id", "reason", "message_id", "created_at")
+         SELECT $1, s."ending_id", s."reason", msg."new_id", s."created_at"
+         FROM "ending_reached" s JOIN ${remap} WHERE s."chat_id" = $2 ORDER BY s."id"`,
         params,
     );
     // Diary entries (.scratch/diary/spec.md): the rollback drops those written after N.

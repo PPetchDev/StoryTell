@@ -16,6 +16,8 @@ import { TimeChangeEntity } from '../../model/ledger/entities/time-change.entity
 import { SuddenEventStepEntity } from '../../model/ledger/entities/sudden-event-step.entity.js';
 import { DetailChangeEntity } from '../../model/ledger/entities/detail-change.entity.js';
 import { DiaryEntryEntity } from '../../model/ledger/entities/diary-entry.entity.js';
+import { EndingReachedEntity } from '../../model/ledger/entities/ending-reached.entity.js';
+import { EndingEntity } from '../../model/story/entities/ending.entity.js';
 import { SuddenEventEntity } from '../../model/story/entities/sudden-event.entity.js';
 import { MemoryKnownByEntity } from '../../model/memory/entities/memory-known-by.entity.js';
 import { MemoryEntity } from '../../model/memory/entities/memory.entity.js';
@@ -67,6 +69,8 @@ export const entities = [
     SuddenEventStepEntity,
     DetailChangeEntity,
     DiaryEntryEntity,
+    EndingEntity,
+    EndingReachedEntity,
     ChatArcDirectionEntity,
     MemoryEntity,
     MemoryKnownByEntity,

@@ -6,6 +6,7 @@ import {
     ChatBond,
     ChatDashboard,
     ChatDetail,
+    ChatList,
     ChatListItem,
     DashboardBackground,
     DashboardBond,
@@ -18,6 +19,7 @@ import type { Emotion } from '../../../model/story/emotion.js';
 import { BackgroundCallResponse, BackgroundStatus, MemoriesUsed, MessageRoll, ReplyVersionsResponse } from '../../../model/chat/entities/message.entity.js';
 import { GaugeDirection } from '../../../model/story/entities/sudden-event.entity.js';
 import type { SuddenEventView } from '../../../manager/chat/sudden-event/sudden-event.js';
+import type { EndingView } from '../../../manager/chat/ending/ending.js';
 import { BeliefDTO } from '../../memory/dto/belief.response.dto.js';
 import { BondLevels } from '../../../model/ledger/bond-axes.js';
 import { BondChangeResponse } from '../../../model/ledger/entities/bond-change.entity.js';
@@ -76,11 +78,48 @@ export class ChatListItemDTO extends ChatSummaryDTO implements ChatListItem {
         description: 'The latest Message as one plain line of about 100 characters, speakers named, `*` marks dropped.',
     })
     latestLine: string;
+
+    @ApiProperty({ type: () => EndingNameDTO, nullable: true, description: 'The Ending the Chat reached; null when it reached none.' })
+    ending: EndingNameDTO | null;
 }
 
-export class ListChatsResponseBodyDTO {
+export class EndingNameDTO {
+    @ApiProperty()
+    id: number;
+
+    @ApiProperty()
+    name: string;
+}
+
+export class EndingsFoundDTO {
+    @ApiProperty({ description: 'How many Endings the Story has that can be reached.' })
+    total: number;
+
+    @ApiProperty({ type: [EndingNameDTO], description: "The ones reached in at least one of the Story's Chats, in the author's order." })
+    found: EndingNameDTO[];
+}
+
+export class ListChatsResponseBodyDTO implements ChatList {
     @ApiProperty({ type: [ChatListItemDTO], description: 'Most recently played first.' })
     chats: ChatListItemDTO[];
+
+    @ApiProperty({ type: EndingsFoundDTO, description: "The Story's Endings found so far (.scratch/endings/spec.md)." })
+    endings: EndingsFoundDTO;
+}
+
+/** The Ending a Chat reached, as the Chat screen shows it (.scratch/endings/spec.md). */
+export class ChatEndingDTO implements EndingView {
+    @ApiProperty()
+    id: number;
+
+    @ApiProperty()
+    name: string;
+
+    @ApiProperty({ description: 'What brought the story there, in a sentence; may be empty.' })
+    reason: string;
+
+    @ApiProperty({ description: 'The AI Message the story reached it with.' })
+    messageId: number;
 }
 
 export class MessagePartDTO {
@@ -225,6 +264,9 @@ export class MessageDTO {
     })
     versions?: ReplyVersionsDTO | null;
 
+    @ApiPropertyOptional({ description: "AI Message only: whether it was written as the story's Epilogue." })
+    epilogue?: boolean;
+
     @ApiProperty()
     createdAt: string;
 
@@ -307,6 +349,9 @@ export class ChatResponseBodyDTO extends ChatSummaryDTO implements Omit<ChatDeta
 
     @ApiProperty({ type: ChatSuddenEventDTO, nullable: true, description: 'The Sudden event under way, or the one that ended with the newest reply; null otherwise.' })
     suddenEvent: ChatSuddenEventDTO | null;
+
+    @ApiProperty({ type: ChatEndingDTO, nullable: true, description: 'The Ending the Chat reached; null when it reached none.' })
+    ending: ChatEndingDTO | null;
 
     @ApiProperty({ description: "The number a Roll sent now must reach, from the Story's Difficulty." })
     rollTarget: number;

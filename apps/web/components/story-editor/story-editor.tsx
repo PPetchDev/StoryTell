@@ -23,6 +23,7 @@ import {
     LoreEntry,
     LoreEntryFields,
     MAX_CHARACTERS,
+    MAX_ENDINGS,
     MAX_SUDDEN_EVENTS,
     MissingField,
     PACING_LABELS,
@@ -34,6 +35,7 @@ import {
     Story,
     storyApi,
     storyTitle,
+    EndingFields,
     SuddenEventFields,
     TENSE_LABELS,
 } from '@/lib/story';
@@ -67,6 +69,7 @@ import { storySavedReplies } from '@/lib/saved-replies';
 import { ReplaceRuleList } from '@/components/replace-rules/replace-rule-list';
 import { storyReplaceRules } from '@/lib/replace-rules';
 import { SceneCard } from './scene-card';
+import { EndingCard } from './ending-card';
 import { SuddenEventCard } from './sudden-event-card';
 import { StartingBeliefsCard } from './starting-beliefs-card';
 import { StartingBondsCard } from './starting-bonds-card';
@@ -416,6 +419,16 @@ export function StoryEditor({ initial }: { initial: Story }) {
         }));
         for (const field of Object.keys(fields)) {
             queue(`suddenEvent.${eventId}.${field}`, () => storyApi.updateSuddenEvent(storyId, eventId, fields), applyStatus);
+        }
+    };
+    /** One field of an Ending (.scratch/endings/spec.md): shown at once, saved like any other field. */
+    const setEndingField = (endingId: number, fields: EndingFields) => {
+        setStory((current) => ({
+            ...current,
+            endings: (current.endings ?? []).map((ending) => (ending.id === endingId ? { ...ending, ...fields } : ending)),
+        }));
+        for (const field of Object.keys(fields)) {
+            queue(`ending.${endingId}.${field}`, () => storyApi.updateEnding(storyId, endingId, fields), applyStatus);
         }
     };
     const setSceneGates = (sceneId: number, gates: SceneBondGate[]) => {
@@ -904,6 +917,38 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                         }
                                     >
                                         + Add Sudden event
+                                    </button>
+                                </section>
+                                {/* Endings (.scratch/endings/spec.md): where the plot can come to rest, after what moves it. */}
+                                <section aria-labelledby="endings-heading" className="mt-6">
+                                    <h2 id="endings-heading" className="mt-0 mb-1 text-lg font-semibold">
+                                        Endings
+                                    </h2>
+                                    <p className={NOTE}>
+                                        Optional. A way the story can end. When what it says has happened in a Chat, that Chat has reached it:
+                                        you can ask for an epilogue, or play on. A Chat reaches one Ending; another Chat can find another.
+                                    </p>
+                                    {(story.endings ?? []).map((ending, index) => (
+                                        <EndingCard
+                                            key={ending.id}
+                                            ending={ending}
+                                            index={index}
+                                            onText={(field, value) => setEndingField(ending.id, { [field]: value })}
+                                            onRemove={() => commit(() => storyApi.removeEnding(storyId, ending.id), applyWhole)}
+                                        />
+                                    ))}
+                                    <button
+                                        type="button"
+                                        className={ADD_BUTTON}
+                                        disabled={(story.endings ?? []).length >= MAX_ENDINGS}
+                                        onClick={() =>
+                                            void commit(() => storyApi.addEnding(storyId), (saved) => {
+                                                openAdded('ending', story.endings ?? [], saved.endings ?? []);
+                                                applyWhole(saved);
+                                            })
+                                        }
+                                    >
+                                        + Add Ending
                                     </button>
                                 </section>
                             </section>

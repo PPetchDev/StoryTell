@@ -36,6 +36,14 @@ _Avoid_: Quest, challenge, encounter, mini-game, skill check
 What a Sudden event measures, named by the author ("Suspicion", "Nerve"): a number from 0 to 100 that each reply moves by how the user played it, with a sentence saying why. The user must bring it down, or up, to its goal before their replies run out; its far end fails at once. The user sees it as a number, unlike a Bond's levels.
 _Avoid_: Meter, stat, score, bar, HP
 
+**Ending**:
+An optional, author-written way a Story can end: a name, when it is reached in plain language, and what its Epilogue should tell. A Chat **reaches** an Ending when that has happened there, and reaches at most one; another Chat, or a Branch from before it, can find another. Reaching one closes nothing: the Chat can be played on. The Narrator is never told the Endings, so they are found by how the story is played, where a Scene steers it.
+_Avoid_: Finale, outcome, route, win condition, game over
+
+**Epilogue**:
+The story's closing passage in one Chat, written by the Narrator when the user asks: how things settle after the Ending the Chat reached, or after an end the user chose themselves in a Story with none. It is an AI Message like any other, so the story can go on after it, and Regenerate writes it as an Epilogue again.
+_Avoid_: Afterword, outro, final message, summary
+
 **Lore**:
 A Story's notes about its world, each a **Lore entry**: a name, keywords and a short text about a place, people, custom or object. An entry reaches the Narrator only when its triggers come up in the latest exchange or in another entry already chosen, for a few Messages after that when it is set to stay, or on every turn when it is set to always be included; the Setting stays the short core sent on every turn. Lore is common knowledge in the world, so every Character knows it; a Character's secrets stay on their card. It belongs to the Story and is shared by all its Chats, where a Memory belongs to one Chat.
 _Avoid_: Lorebook, world info, codex, wiki
@@ -73,7 +81,7 @@ The picture the author chooses for a Story, shown on its card on Home and at the
 _Avoid_: Thumbnail, banner, key art
 
 **Duplicate**:
-Making a new Story, "<title> (copy)", from everything the author wrote in another: its text, style, Narration voice and Backdrop choice, Role, Characters with their Reference images, Portraits, Expressions and Speaking voices, Scenes, Sudden events, Starting Bonds, Lore, Documents, its own Saved replies and Replace rules, and Cover, each image in a file of its own. No Chats or Snapshots come along, so a Cover that is a Snapshot is dropped.
+Making a new Story, "<title> (copy)", from everything the author wrote in another: its text, style, Narration voice and Backdrop choice, Role, Characters with their Reference images, Portraits, Expressions and Speaking voices, Scenes, Sudden events, Endings, Starting Bonds, Lore, Documents, its own Saved replies and Replace rules, and Cover, each image in a file of its own. No Chats or Snapshots come along, so a Cover that is a Snapshot is dropped.
 _Avoid_: Clone, fork, template
 
 ## Playing
@@ -87,7 +95,7 @@ One entry in a Chat's history: either what the user wrote, shown under the Role 
 _Avoid_: Post, reply, bubble, entry
 
 **Branch**:
-A new Chat copied from another up to one of its Messages, with everything that Chat knew at that Message — Memory, Bonds, Arcs, Scene, Time of day, Place, Weather, Outfits, Diaries, a Sudden event under way — so the story can go another way while the original stays as it was. A Branch remembers which Chat it came from.
+A new Chat copied from another up to one of its Messages, with everything that Chat knew at that Message — Memory, Bonds, Arcs, Scene, Time of day, Place, Weather, Outfits, Diaries, a Sudden event under way, an Ending reached — so the story can go another way while the original stays as it was. A Branch remembers which Chat it came from.
 _Avoid_: Fork, checkpoint, clone, copy
 
 **Author's note**:

@@ -6,10 +6,10 @@ import { use, useId, useRef, useState } from 'react';
 
 import { ChatList } from '@/components/chat/chat-list';
 import { useApiQuery, useConnection } from '@/components/connection';
-import { ArrowLeftIcon, PencilIcon } from '@/components/icons';
+import { ArrowLeftIcon, EndingIcon, PencilIcon } from '@/components/icons';
 import { ErrorState, Loading } from '@/components/query-state';
 import { ApiError, ApiUnreachableError } from '@/lib/api';
-import { chatApi, ChatListItem } from '@/lib/chat';
+import { chatApi, ChatListResponse } from '@/lib/chat';
 import { Story, storyTitle } from '@/lib/story';
 
 /** Gallery and Edit Story in the header: an outlined pill, 44px tall, the text colour. */
@@ -22,7 +22,7 @@ export default function ChatsPage({ params }: { params: Promise<{ id: string }> 
     const router = useRouter();
     const { reportUnreachable } = useConnection();
     const story = useApiQuery<Story>(`/stories/${id}`);
-    const chats = useApiQuery<{ chats: ChatListItem[] }>(`/stories/${id}/chats`);
+    const chats = useApiQuery<ChatListResponse>(`/stories/${id}/chats`);
     const [starting, setStarting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const whyId = useId();
@@ -127,6 +127,14 @@ export default function ChatsPage({ params }: { params: Promise<{ id: string }> 
             {error && (
                 <p role="alert" className="turn-error">
                     {error}
+                </p>
+            )}
+            {/* The Endings its Chats have found (.scratch/endings/spec.md); a Story without Endings says nothing. */}
+            {chats.data.endings.total > 0 && (
+                <p className="muted mt-0 mb-3 text-sm" data-endings-found>
+                    <EndingIcon size={14} className="mr-1 inline-block align-[-0.15em] text-accent" />
+                    Endings found: {chats.data.endings.found.length} of {chats.data.endings.total}
+                    {chats.data.endings.found.length > 0 && `: ${chats.data.endings.found.map((ending) => ending.name).join(', ')}`}
                 </p>
             )}
             <ChatList storyId={storyId} initial={chats.data.chats} emptyFocus={() => heading.current} />

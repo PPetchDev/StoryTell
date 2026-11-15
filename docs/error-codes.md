@@ -80,6 +80,10 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | `422.003.021` | `UnknownVoiceError` | A Narration voice, Speaking voice or voice sample (`POST /api/voices/:voiceId/preview`) naming a voice that `GET /api/voices` doesn't list. Nothing changes and no call is made; `null` (the default) is always allowed. |
 | `404.003.022` | `ExpressionNotFoundError` | Setting or resetting the square of, or removing, an Expression the Character does not have for that emotion. An emotion outside the seven (`neutral` included) is a validation error (`400.000.000`). |
 | `409.003.023` | `NoReferenceImageToDrawError` | Drawing an Expression (`POST .../expressions/:emotion/draw`) for a Character with no Reference image. No call is made. Add a Reference image first. |
+| `404.003.026` | `SuddenEventNotFoundError` | No Sudden event with that id in this Story (`PATCH`/`DELETE /api/stories/:storyId/sudden-events/:eventId`). Nothing changes. |
+| `422.003.027` | `SuddenEventLimitError` | A ninth Sudden event on one Story. Nothing is added. |
+| `404.003.028` | `EndingNotFoundError` | No Ending with that id in this Story (`PATCH`/`DELETE /api/stories/:storyId/endings/:endingId`, `.scratch/endings/spec.md`). Nothing changes. |
+| `422.003.029` | `EndingLimitError` | A seventh Ending on one Story. Nothing is added. |
 | `422.003.025` | `EmptyStartingBeliefError` | Starting Beliefs (`PUT /api/stories/:storyId/starting-beliefs`) with one whose text is nothing but whitespace. The whole list is refused and nothing changes. A Character outside the cast is `CharacterNotFoundError`. |
 | `404.004.001` | `ChatNotFoundError` | No Chat with that id in this Story. |
 | `422.004.002` | `StoryNotPlayableError` | The Story has a required field empty. The message names the missing fields. Blocks starting a Chat, sending, Continue and Regenerate. |
@@ -108,6 +112,7 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | `422.004.025` | `EmptyBeliefError` | A Belief added or edited with nothing but whitespace. Nothing changes. |
 | `409.004.026` | `NothingNewForDiaryError` | A Diary entry asked of a Character (`POST /api/stories/:storyId/chats/:chatId/characters/:characterId/diary`) who already wrote one at the Chat's newest AI Message (`.scratch/diary/spec.md`). No call. "<Name> has already written about this. Play on, then ask again." |
 | `502.004.027` | `UnreadableDiaryEntryError` | The play model answered a Diary entry with nothing. Nothing stored. The client shows "Couldn't write the diary entry. Try again." |
+| `409.004.029` | `AlreadyEpilogueError` | An Epilogue asked for (`POST /api/stories/:storyId/chats/:chatId/epilogue`) when the Chat's newest AI Message is one (`.scratch/endings/spec.md`). No call; nothing stored. "The story already has its epilogue. Use Again to write it anew, or play on." While a User Message waits for its reply the answer is `409.004.013`, as for a Continue. |
 | `404.004.028` | `DiaryEntryNotFoundError` | No Diary entry with that id in this Chat (`DELETE /api/stories/:storyId/chats/:chatId/diary/:entryId`): one already deleted, taken back with its Message, or another Chat's. Nothing changes. |
 | `502.005.001` | `UnreadableDraftError` | The model's draft or rewrite could not be read (no JSON object, or no text). Nothing saved. Show with Retry. |
 | `502.005.002` | `InvalidDraftError` | The draft does not fit a Story (0 or 7 Characters, a Style value outside its set, a required field empty, a bad StartingBond). Nothing saved. Show with Retry. |

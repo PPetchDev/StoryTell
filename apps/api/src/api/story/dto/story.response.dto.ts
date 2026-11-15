@@ -15,6 +15,7 @@ import { LORE_SECONDARY_MODES, LoreEntryResponse } from '../../../model/story/en
 import type { LoreSecondaryMode } from '../../../model/story/entities/lore-entry.entity.js';
 import { SceneResponse } from '../../../model/story/entities/scene.entity.js';
 import { GaugeDirection, SuddenEventResponse } from '../../../model/story/entities/sudden-event.entity.js';
+import { EndingResponse } from '../../../model/story/entities/ending.entity.js';
 import { StartingBeliefResponse } from '../../../model/story/entities/starting-belief.entity.js';
 import { StartingBondResponse } from '../../../model/story/entities/starting-bond.entity.js';
 import { SceneBondGateResponse } from '../../../model/story/entities/scene-bond-gate.entity.js';
@@ -308,6 +309,21 @@ export class SuddenEventDTO implements SuddenEventResponse {
     failure: string;
 }
 
+/** An Ending (.scratch/endings/spec.md). */
+export class EndingDTO implements EndingResponse {
+    @ApiProperty()
+    id: number;
+
+    @ApiProperty()
+    name: string;
+
+    @ApiProperty({ description: 'When the story has reached it, in plain language. An Ending without one is never reached.' })
+    condition: string;
+
+    @ApiProperty({ description: 'What its Epilogue should tell, for the Narrator; may be empty.' })
+    epilogue: string;
+}
+
 export class SceneDTO implements SceneResponse {
     @ApiProperty()
     id: number;
@@ -449,6 +465,9 @@ export class StoryResponseBodyDTO implements StoryDetail {
 
     @ApiProperty({ type: [SuddenEventDTO], description: "The Story's Sudden events, in the author's order." })
     suddenEvents: SuddenEventDTO[];
+
+    @ApiProperty({ type: [EndingDTO], description: "The Story's Endings, in the author's order." })
+    endings: EndingDTO[];
 
     @ApiProperty({ type: [LoreEntryDTO], description: 'In add order.' })
     lore: LoreEntryDTO[];

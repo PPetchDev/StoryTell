@@ -19,6 +19,7 @@ import { SceneAdvanceEntity } from './entities/scene-advance.entity.js';
 import { SuddenEventStepEntity, SuddenEventStepKind } from './entities/sudden-event-step.entity.js';
 import { DetailChangeEntity, DetailKind } from './entities/detail-change.entity.js';
 import { DiaryEntryEntity } from './entities/diary-entry.entity.js';
+import { EndingReachedEntity } from './entities/ending-reached.entity.js';
 import { TimeChangeEntity } from './entities/time-change.entity.js';
 
 /** A StartingBond as it is seeded into a Chat: no event, no causing Message. */
@@ -95,6 +96,12 @@ export interface PartEmotion {
     emotion: Emotion;
 }
 
+/** A Chat reaching an Ending, as a judged reply showed it (.scratch/endings/spec.md), after the apply rules. */
+export interface NewEndingReached {
+    endingId: number;
+    reason: string;
+}
+
 /** What one judgement changed, recorded together against the AI Message that caused it. */
 export interface MessageChanges {
     bonds: NewBondChange[];
@@ -106,6 +113,8 @@ export interface MessageChanges {
     suddenEvent?: NewSuddenEventStep | null;
     /** The Place, the Weather and the Outfits this reply set; left out or empty when it set none. */
     details?: NewDetailChange[];
+    /** The Ending this reply reached; null or left out when it reached none. */
+    ending?: NewEndingReached | null;
     /**
      * The emotion of each tagged speech part of the Message; every other part of it is cleared. Not
      * ledger rows: nothing rolls them back, since whatever undoes a judgement replaces the parts.
@@ -143,6 +152,8 @@ export interface LedgerState {
     suddenEventSteps: SuddenEventStepEntity[];
     /** Every Place, Weather and Outfit record of the Chat (.scratch/info-box/spec.md): the newest of each is current. */
     detailChanges: DetailChangeEntity[];
+    /** The Chat's record of reaching an Ending (.scratch/endings/spec.md); at most one in practice. */
+    endingsReached: EndingReachedEntity[];
 }
 
 /** Counts by kind for the rollback notice (spec: "3 Memories rolled back"). */
@@ -171,6 +182,7 @@ export class LedgerModelService {
         @InjectRepository(SuddenEventStepEntity) private readonly suddenEventSteps: Repository<SuddenEventStepEntity>,
         @InjectRepository(DetailChangeEntity) private readonly detailChanges: Repository<DetailChangeEntity>,
         @InjectRepository(DiaryEntryEntity) private readonly diaryEntries: Repository<DiaryEntryEntity>,
+        @InjectRepository(EndingReachedEntity) private readonly endingsReached: Repository<EndingReachedEntity>,
     ) {}
 
     /**
@@ -241,15 +253,22 @@ export class LedgerModelService {
     }
 
     async state(chatId: number): Promise<LedgerState> {
-        const [bondChanges, arcSteps, sceneAdvances, arcDirections, suddenEventSteps, detailChanges] = await Promise.all([
+        const [bondChanges, arcSteps, sceneAdvances, arcDirections, suddenEventSteps, detailChanges, endingsReached] = await Promise.all([
             this.bondChanges.find({ where: { chatId }, order: { id: 'ASC' } }),
             this.arcSteps.find({ where: { chatId }, order: { id: 'ASC' } }),
             this.sceneAdvances.find({ where: { chatId }, order: { id: 'ASC' } }),
             this.arcDirections.find({ where: { chatId }, order: { id: 'ASC' } }),
             this.suddenEventStepsOf(chatId),
             this.detailChangesOf(chatId),
+            this.endingsReachedOf([chatId]),
         ]);
-        return { bondChanges, arcSteps, sceneAdvances, arcDirections, suddenEventSteps, detailChanges };
+        return { bondChanges, arcSteps, sceneAdvances, arcDirections, suddenEventSteps, detailChanges, endingsReached };
+    }
+
+    /** The records of these Chats reaching an Ending (.scratch/endings/spec.md), oldest first. */
+    endingsReachedOf(chatIds: number[]): Promise<EndingReachedEntity[]> {
+        if (chatIds.length === 0) return Promise.resolve([]);
+        return this.endingsReached.find({ where: { chatId: In(chatIds) }, order: { id: 'ASC' } });
     }
 
     /** The Chat's Diary entries (.scratch/diary/spec.md), every Character's, oldest first. */
@@ -327,6 +346,9 @@ export class LedgerModelService {
             }
             if (changes.suddenEvent) {
                 await manager.save(manager.create(SuddenEventStepEntity, { chatId, messageId, ...changes.suddenEvent }));
+            }
+            if (changes.ending) {
+                await manager.save(manager.create(EndingReachedEntity, { chatId, messageId, ...changes.ending }));
             }
             if (changes.details && changes.details.length > 0) {
                 await manager.save(changes.details.map((detail) => manager.create(DetailChangeEntity, { chatId, messageId, ...detail })));
@@ -473,6 +495,8 @@ export class LedgerModelService {
             await manager.delete(SuddenEventStepEntity, { messageId: In(ids) });
             // The same for the Place, the Weather and the Outfits: the record before each is current again.
             await manager.delete(DetailChangeEntity, { messageId: In(ids) });
+            // An Ending reached there is no longer reached (.scratch/endings/spec.md). Not counted.
+            await manager.delete(EndingReachedEntity, { messageId: In(ids) });
             // A Diary entry tells the story up to its Message: it goes with it (.scratch/diary/spec.md). Not counted.
             await manager.delete(DiaryEntryEntity, { messageId: In(ids) });
             const arcs = newestFirst(await manager.find(ArcStepEntity, { where: { messageId: In(ids) } }));
@@ -501,6 +525,7 @@ export class LedgerModelService {
             await manager.delete(SuddenEventStepEntity, { chatId });
             await manager.delete(DetailChangeEntity, { chatId });
             await manager.delete(DiaryEntryEntity, { chatId });
+            await manager.delete(EndingReachedEntity, { chatId });
             await manager.delete(BeliefChangeEntity, { chatId });
             await manager.delete(BeliefEntity, { chatId });
             await manager.delete(MemoryChangeEntity, { chatId });

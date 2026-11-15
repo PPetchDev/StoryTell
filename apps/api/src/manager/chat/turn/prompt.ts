@@ -12,6 +12,7 @@ import { Roll, rollBlock } from '../roll.js';
 import { LINGERING_REPLIES } from '../scene-replies.js';
 import { PromptSuddenEvent, suddenEventBlock } from '../sudden-event/sudden-event.js';
 import { detailsReminder, PromptDetails } from '../details/details.js';
+import { EPILOGUE_MIN_TOKENS, epilogueFinalInstruction, epilogueInstruction, PromptEpilogue } from '../ending/ending.js';
 import { estimateTokens } from './prompt-tokens.js';
 
 /**
@@ -166,6 +167,12 @@ export interface TurnPromptInput {
     suddenEvent?: PromptSuddenEvent | null;
     /** The Roll the user's message was sent with (.scratch/roll/spec.md); null or left out for none. Turn-only. */
     roll?: Roll | null;
+    /**
+     * Set on an Epilogue turn (.scratch/endings/spec.md): a turn without a User Message that closes
+     * the story. Its instruction stands in for the continue instruction and the final instruction,
+     * and the turn's Sudden event, Nudge and Cue lines are left out. Null or left out on every other turn.
+     */
+    epilogue?: PromptEpilogue | null;
     /** Whether the Story has a Sudden event that can run: the Story so far then reserves room for its block. */
     hasSuddenEvents?: boolean;
     /** Total prompt budget in tokens; recent Messages are trimmed from the oldest to fit. */
@@ -484,7 +491,7 @@ export function continueInstruction(identity: string): string {
 }
 
 /** The layers a prompt is built on: everything of a turn's input but the Messages. */
-export type PromptLayersInput = Omit<TurnPromptInput, 'history' | 'userText' | 'tokenBudget' | 'nudge' | 'cue' | 'suddenEvent' | 'roll'>;
+export type PromptLayersInput = Omit<TurnPromptInput, 'history' | 'userText' | 'tokenBudget' | 'nudge' | 'cue' | 'suddenEvent' | 'roll' | 'epilogue'>;
 
 /**
  * Layers 1–9 as the one system message, shared by the turn and by Suggested replies so they
@@ -634,7 +641,9 @@ export function withoutStageDirections(text: string): string {
 
 export function buildTurnPrompt(input: TurnPromptInput): TurnPrompt {
     const identity = input.identity.name;
-    const userText = input.userText ?? continueInstruction(identity);
+    // An Epilogue is a turn without a User Message, like a Continue, with its own instruction.
+    const epilogue = input.userText === null ? (input.epilogue ?? null) : null;
+    const userText = input.userText ?? (epilogue ? epilogueInstruction(identity, epilogue) : continueInstruction(identity));
     const system = systemPrompt(input);
     const lore = loreBlock(input.chosenLore ?? []);
     // One order (.scratch/sillytavern-gaps/integration.md): Lore, Documents, Author's note, Where things stand, Sudden event, Roll, Nudge, Cue, the final instruction.
@@ -645,11 +654,15 @@ export function buildTurnPrompt(input: TurnPromptInput): TurnPrompt {
         // With none of the turn's own lines, exactly the reminder and the final instruction as before.
         [
             stateReminder(input),
-            suddenEventBlock(input.suddenEvent, identity),
-            rollBlock(input.roll, identity),
-            input.nudge ? nudgeLine(input.nudge) : null,
-            cueBlock(input.cue, identity),
-            turnFinalInstruction(identity),
+            ...(epilogue
+                ? [epilogueFinalInstruction(identity)]
+                : [
+                      suddenEventBlock(input.suddenEvent, identity),
+                      rollBlock(input.roll, identity),
+                      input.nudge ? nudgeLine(input.nudge) : null,
+                      cueBlock(input.cue, identity),
+                      turnFinalInstruction(identity),
+                  ]),
         ]
             .filter((line): line is string => line !== null)
             .join('\n'),
@@ -671,7 +684,10 @@ export function buildTurnPrompt(input: TurnPromptInput): TurnPrompt {
             { role: 'system', content: finalInstruction },
         ],
         stop: stopStrings(identity),
-        maxTokens: REPLY_LENGTH_WORDS[input.story.replyLength].maxTokens,
+        // An Epilogue has its own length, whatever the Story's reply length.
+        maxTokens: epilogue
+            ? Math.max(EPILOGUE_MIN_TOKENS, REPLY_LENGTH_WORDS[input.story.replyLength].maxTokens)
+            : REPLY_LENGTH_WORDS[input.story.replyLength].maxTokens,
         // Covered Messages are in the Story so far, so only uncovered ones count as left out.
         trimmed: uncovered.length - kept.length,
         memoriesLeftOut: system.memoriesLeftOut,

@@ -24,6 +24,24 @@ export interface ChatListItem extends ChatSummary {
     latestLine: string;
     /** Shown as "Branched from <title>"; null when never branched, or once that Chat is deleted. */
     branchedFrom: { chatId: number; title: string } | null;
+    /** The Ending the Chat reached (CONTEXT.md, "Ending"); null when it reached none. */
+    ending: { id: number; name: string } | null;
+}
+
+/** A Story's Chats, and the Endings they have found between them (mirrors ListChatsResponseBodyDTO). */
+export interface ChatListResponse {
+    chats: ChatListItem[];
+    endings: { total: number; found: Array<{ id: number; name: string }> };
+}
+
+/** The Ending a Chat reached, as the Chat screen shows it (mirrors ChatEndingDTO). */
+export interface ChatEnding {
+    id: number;
+    name: string;
+    /** What brought the story there, in a sentence; may be empty. */
+    reason: string;
+    /** The AI Message the story reached it with. */
+    messageId: number;
 }
 
 export type MessagePart =
@@ -116,6 +134,8 @@ export interface AiMessage {
     memory: BackgroundCall | null;
     /** Its Reply versions; null while it has only one. Only the newest AI Message has more. */
     versions: ReplyVersions | null;
+    /** Whether it was written as the story's Epilogue (CONTEXT.md, "Epilogue"). */
+    epilogue: boolean;
     createdAt: string;
     /** Its Thai reading for the text as it stands; null when none was made (.scratch/write-for-me/spec.md). */
     thaiReading: string | null;
@@ -132,6 +152,8 @@ export interface Chat extends ChatSummary {
     timeOfDay: TimeOfDay | null;
     /** The Sudden event under way, or the one that ended with the newest reply; null otherwise. */
     suddenEvent: ChatSuddenEvent | null;
+    /** The Ending the Chat reached; null when it reached none. */
+    ending: ChatEnding | null;
     /** The number a Roll sent now must reach, from the Story's Difficulty. */
     rollTarget: number;
     /** Where the story is now (CONTEXT.md, "Place"); null until the story makes it clear. */
@@ -390,6 +412,8 @@ export const chatApi = {
     /** Lets the story go on without a line from the user: the Narrator writes the next reply. */
     continue: (storyId: number, chatId: number, stream?: TurnStream, extras?: TurnExtras) =>
         turn<Chat>('POST', `/stories/${storyId}/chats/${chatId}/continue`, withExtras(undefined, extras), stream),
+    /** Closes the story: the Narrator writes its Epilogue, for the Ending reached or an end the user chose. An AI Message like any other. */
+    epilogue: (storyId: number, chatId: number, stream?: TurnStream) => turn<Chat>('POST', `/stories/${storyId}/chats/${chatId}/epilogue`, undefined, stream),
     /** Three things the user might write next, as the worn identity. Nothing is stored. */
     suggest: (storyId: number, chatId: number) =>
         apiSend<{ suggestions: SuggestedReply[] }>('POST', `/stories/${storyId}/chats/${chatId}/suggestions`),

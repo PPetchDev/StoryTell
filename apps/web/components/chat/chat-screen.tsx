@@ -15,6 +15,7 @@ import { MemoryDrawer } from '@/components/chat/memory-drawer';
 import { NovelRequest, NovelView } from '@/components/chat/novel-view';
 import { SceneStrip } from '@/components/chat/scene-strip';
 import { SuddenEventBanner, suddenEventAnnouncement } from '@/components/chat/sudden-event-banner';
+import { EndingBanner, endingAnnouncement, epilogueWritten } from '@/components/chat/ending-banner';
 import { SnapshotSheet } from '@/components/chat/snapshot-sheet';
 import { SnapshotViewer, useChatSnapshots } from '@/components/chat/snapshots';
 import { useThaiReadings } from '@/components/chat/thai-reading';
@@ -216,6 +217,14 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
         eventRef.current = chat.suddenEvent;
         if (said) announce(said);
     }, [chat.suddenEvent]);
+
+    // An Ending reached is said once too (.scratch/endings/spec.md); the banner shows it.
+    const endingRef = useRef(initial.ending);
+    useEffect(() => {
+        const said = endingAnnouncement(endingRef.current, chat.ending);
+        endingRef.current = chat.ending;
+        if (said) announce(said);
+    }, [chat.ending]);
 
     // Once a reply's extraction is done, announce what the AI added and let the drawer re-read.
     useEffect(() => {
@@ -430,6 +439,16 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
         );
     };
 
+    // An Epilogue can be asked for like a Continue, but not right after one: Again writes that one anew.
+    const newestIsEpilogue = newestMessage?.kind === 'ai' && newestMessage.epilogue;
+    const canEndStory = !writing && !busy && !blocked && !chat.awaitingReply && !newestIsEpilogue;
+    /** The story's Epilogue (.scratch/endings/spec.md): a turn with no User Message, streamed like any reply. */
+    const writeEpilogue = () => {
+        if (!canEndStory) return;
+        player.unlock();
+        void runTurn((stream) => chatApi.epilogue(chat.storyId, chat.id, stream));
+    };
+
     /** ▶ (spec: "Continue"): a turn with no User Message. A failed one stores nothing, so ▶ again is the way on. */
     const continueStory = () => {
         if (writing || busy || blocked || chat.awaitingReply) return;
@@ -568,6 +587,8 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                 onSetSittingOut={(characterIds) =>
                     void runWrite(() => chatApi.setSittingOut(chat.storyId, chat.id, characterIds))
                 }
+                onEndStory={writeEpilogue}
+                canEndStory={canEndStory}
                 onReset={() => {
                     player.stop();
                     askNovel('opening');
@@ -600,6 +621,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                 />
             )}
             {chat.suddenEvent && <SuddenEventBanner event={chat.suddenEvent} />}
+            {chat.ending && <EndingBanner ending={chat.ending} written={epilogueWritten(chat)} canWrite={canEndStory} onWrite={writeEpilogue} />}
 
             {/*
              * The low-credit line (audit M3) and the "Memory added" toasts lie over the top of the

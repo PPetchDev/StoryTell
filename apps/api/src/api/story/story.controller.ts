@@ -28,6 +28,7 @@ import {
     StartingBondRequestBodyDTO,
     StoryRequestBodyDTO,
     SuddenEventRequestBodyDTO,
+    EndingRequestBodyDTO,
 } from './dto/story.request.dto.js';
 import { OpeningPreviewResponseBodyDTO } from './dto/opening.response.dto.js';
 import { ListStoriesResponseBodyDTO, StoryResponseBodyDTO } from './dto/story.response.dto.js';
@@ -245,6 +246,25 @@ export class StoryApiController {
     @ApiOkResponse({ type: StoryResponseBodyDTO })
     removeSuddenEvent(@Id('storyId') storyId: number, @Id('eventId') eventId: number): Promise<StoryResponseBodyDTO> {
         return this.storyManager.removeSuddenEvent(storyId, eventId);
+    }
+
+    /** .scratch/endings/spec.md: a Story's Endings. */
+    @Post(':storyId/endings')
+    @ApiCreatedResponse({ type: StoryResponseBodyDTO })
+    addEnding(@Id('storyId') storyId: number, @Body() body: EndingRequestBodyDTO): Promise<StoryResponseBodyDTO> {
+        return this.storyManager.addEnding(storyId, body);
+    }
+
+    @Patch(':storyId/endings/:endingId')
+    @ApiOkResponse({ type: StoryResponseBodyDTO })
+    updateEnding(@Id('storyId') storyId: number, @Id('endingId') endingId: number, @Body() body: EndingRequestBodyDTO): Promise<StoryResponseBodyDTO> {
+        return this.storyManager.updateEnding(storyId, endingId, body);
+    }
+
+    @Delete(':storyId/endings/:endingId')
+    @ApiOkResponse({ type: StoryResponseBodyDTO })
+    removeEnding(@Id('storyId') storyId: number, @Id('endingId') endingId: number): Promise<StoryResponseBodyDTO> {
+        return this.storyManager.removeEnding(storyId, endingId);
     }
 
     @Post(':storyId/lore')

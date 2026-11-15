@@ -217,6 +217,8 @@ export const WeatherIcon = icon('WeatherIcon', <path d="M7.5 18.5a4 4 0 0 1-.6-7
 export const OutfitIcon = icon('OutfitIcon', <path d="M9 4.5 4 7l1.8 4 2.2-1v9.5h8V10l2.2 1L20 7l-5-2.5a3 3 0 0 1-6 0z" />);
 /** ⚡ A Sudden event: a bolt. */
 export const BoltIcon = icon('BoltIcon', <path d="M13 2.5 4.5 13.5H11l-1 8 8.5-11H12z" />);
+/** 🏁 An Ending: a flag on its pole. */
+export const EndingIcon = icon('EndingIcon', <path d="M5.5 21V4m0 1h11l-2 3.75 2 3.75h-11" />);
 /** 🔒 Locked: a padlock. */
 export const LockIcon = icon(
     'LockIcon',

@@ -1,0 +1,186 @@
+import { APIRequestContext, expect, Page, test } from '@playwright/test';
+
+// Endings (.scratch/endings/spec.md), on a phone. An Ending is the author's: when what it says has
+// happened in a Chat, the Chat shows it and offers an Epilogue. The user can also end any story
+// themselves from the Chat menu. Either way the story can be played on.
+test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+const OPENING = 'The lamp went out an hour ago.\n\n@Mira: Boots off, keeper.';
+const NO_OPS = '{"operations":[]}';
+
+function judgement(ending?: Record<string, unknown>): string {
+    return JSON.stringify({ bond_changes: [], arc_steps: [], scene: { move_on: false, reason: 'nothing yet' }, ...(ending ? { ending } : {}) });
+}
+
+async function createStory(request: APIRequestContext): Promise<number> {
+    const created = await request.post('/api/stories', { data: { title: 'The Lighthouse', setting: 'A lighthouse on a storm-cut island.', opening: OPENING } });
+    expect(created.ok()).toBe(true);
+    const storyId = (await created.json()).id as number;
+    await request.patch(`/api/stories/${storyId}/role`, { data: { name: 'Ash', description: 'The new keeper.' } });
+    await request.post(`/api/stories/${storyId}/characters`, { data: { name: 'Mira', appearance: 'Tall.', personality: 'Guarded.', voice: 'Short sentences.' } });
+    return storyId;
+}
+
+async function createChat(request: APIRequestContext, storyId: number): Promise<number> {
+    const chat = await request.post(`/api/stories/${storyId}/chats`);
+    expect(chat.ok()).toBe(true);
+    return (await chat.json()).id as number;
+}
+
+/** One turn reply, with what its judge says and an extraction that adds nothing. */
+async function scriptTurn(request: APIRequestContext, reply: string, judge = judgement()) {
+    await request.post('/api/testing/fake-gateway/text', { data: { kind: 'turn', replies: [{ text: reply, model: 'glm-5.3' }] } });
+    await request.post('/api/testing/fake-gateway/text', { data: { kind: 'judge', replies: [judge] } });
+    await request.post('/api/testing/fake-gateway/text', { data: { kind: 'memory_extraction', replies: [NO_OPS] } });
+}
+
+/** The last turn's stand-in for the user's message, as the API sent it to the model. */
+async function lastTurnAsked(request: APIRequestContext): Promise<string> {
+    const { calls } = (await (await request.get('/api/testing/fake-gateway/calls')).json()) as {
+        calls: Array<{ request: { kind?: string; messages?: Array<{ content: string }> } }>;
+    };
+    return calls.filter((call) => call.request?.kind === 'turn').at(-1)!.request.messages!.at(-2)!.content;
+}
+
+async function send(page: Page, text: string) {
+    const composer = page.getByRole('form', { name: 'Composer' });
+    await composer.getByRole('textbox', { name: 'Write as Ash' }).fill(text);
+    await composer.getByRole('button', { name: 'Send' }).tap();
+}
+
+const noSidewaysScroll = async (page: Page) => expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+
+test('a Chat that reaches an Ending shows it, writes its Epilogue on request, and plays on; the Chats page counts it', async ({ page, request }) => {
+    const storyId = await createStory(request);
+    await request.post(`/api/stories/${storyId}/endings`, {
+        data: { name: 'The light returns', condition: 'The lamp is lit again.', epilogue: 'Tell of the first ship to pass safely.' },
+    });
+    await request.post(`/api/stories/${storyId}/endings`, { data: { name: 'Into the dark', condition: 'Ash leaves the island for good.' } });
+    const chatId = await createChat(request, storyId);
+    await request.delete('/api/testing/fake-gateway');
+    try {
+        await page.goto(`/stories/${storyId}/chats/${chatId}`);
+        const banner = page.getByRole('region', { name: 'Ending', exact: true });
+        await expect(page.getByRole('article', { name: 'Opening' })).toBeVisible();
+        await expect(banner).toHaveCount(0);
+
+        await scriptTurn(request, 'The wick catches.\n\n@Mira: There. She burns.', judgement({ reason: 'Ash lit the lamp.', reached: 1 }));
+        await send(page, 'I light the lamp.');
+        await expect(page.getByRole('article', { name: 'AI reply' }).last()).toContainText('She burns.');
+
+        // Reached: its name, what brought the story there, and the way to its Epilogue.
+        await expect(banner).toContainText('Ending reached');
+        await expect(banner.getByRole('heading', { name: 'The light returns' })).toBeVisible();
+        await expect(banner).toContainText('Ash lit the lamp.');
+        await expect(banner).toHaveAttribute('data-epilogue', 'none');
+        await noSidewaysScroll(page);
+
+        await scriptTurn(request, 'For forty winters the beam swept the reef.\n\n@Mira: Still here, keeper.');
+        await banner.getByRole('button', { name: 'Write the epilogue' }).tap();
+        const epilogue = page.getByRole('article', { name: 'Epilogue' });
+        await expect(epilogue).toContainText('For forty winters the beam swept the reef.');
+        await expect(epilogue.locator('[data-epilogue-label]')).toHaveText('Epilogue');
+        const asked = await lastTurnAsked(request);
+        expect(asked).toContain('The story has reached its ending: "The light returns".');
+        expect(asked).toContain('What the author wants the epilogue to tell: Tell of the first ship to pass safely.');
+
+        // Written: the banner folds to a line, and the menu offers no second Epilogue right after it.
+        await expect(banner).toHaveAttribute('data-epilogue', 'written');
+        await expect(banner).toContainText('Ending: The light returns');
+        await expect(banner.getByRole('button')).toHaveCount(0);
+        await page.getByRole('button', { name: 'Chat menu' }).tap();
+        await expect(page.getByRole('button', { name: /^End the story/ })).toBeDisabled();
+        await page.keyboard.press('Escape');
+
+        // The story goes on after it, as an ordinary turn.
+        await scriptTurn(request, '@Mira: Up you come, then.');
+        await send(page, 'I climb once more.');
+        await expect(page.getByRole('article', { name: 'AI reply' }).last()).toContainText('Up you come, then.');
+        expect(await lastTurnAsked(request)).toBe('I climb once more.');
+        await expect(banner).toContainText('Ending: The light returns');
+
+        // The Story's Chats say which Chat ended how, and how many Endings are found.
+        await page.goto(`/stories/${storyId}/chats`);
+        await expect(page.locator('[data-endings-found]')).toHaveText('Endings found: 1 of 2: The light returns');
+        await expect(page.locator('[data-chat-ending]')).toHaveText('Ending: The light returns');
+        await noSidewaysScroll(page);
+    } finally {
+        await request.delete(`/api/stories/${storyId}`);
+    }
+});
+
+test('the Chat menu ends any story with an Epilogue, after asking; Again writes the Epilogue anew', async ({ page, request }) => {
+    const storyId = await createStory(request);
+    const chatId = await createChat(request, storyId);
+    await request.delete('/api/testing/fake-gateway');
+    try {
+        await page.goto(`/stories/${storyId}/chats/${chatId}`);
+        await scriptTurn(request, '@Mira: Sit, then.');
+        await send(page, 'I sit by the lamp.');
+        await expect(page.getByRole('article', { name: 'AI reply' }).last()).toContainText('Sit, then.');
+
+        // Cancel changes nothing.
+        await page.getByRole('button', { name: 'Chat menu' }).tap();
+        await page.getByRole('button', { name: /^End the story/ }).tap();
+        const ask = page.getByRole('alertdialog', { name: /^End the story here\?/ });
+        await ask.getByRole('button', { name: 'Cancel' }).tap();
+        await expect(ask).toHaveCount(0);
+        await expect(page.getByRole('article', { name: 'Epilogue' })).toHaveCount(0);
+
+        await scriptTurn(request, 'The island kept its quiet.');
+        await page.getByRole('button', { name: 'Chat menu' }).tap();
+        await page.getByRole('button', { name: /^End the story/ }).tap();
+        await ask.getByRole('button', { name: 'Write the epilogue' }).tap();
+        const epilogue = page.getByRole('article', { name: 'Epilogue' });
+        await expect(epilogue).toContainText('The island kept its quiet.');
+        expect(await lastTurnAsked(request)).toContain('Ash has chosen to end the story at this point.');
+        // No authored Ending was reached: there is no banner, only the Epilogue.
+        await expect(page.getByRole('region', { name: 'Ending', exact: true })).toHaveCount(0);
+
+        // Again writes it as an Epilogue again.
+        await scriptTurn(request, 'The lamp stayed dark, and nobody minded.');
+        await epilogue.getByRole('button', { name: 'Again' }).tap();
+        await expect(page.getByRole('article', { name: 'Epilogue' })).toContainText('The lamp stayed dark, and nobody minded.');
+        expect(await lastTurnAsked(request)).toContain('Write the epilogue');
+
+        // A Story with no Endings says nothing of them on its Chats page.
+        await page.goto(`/stories/${storyId}/chats`);
+        await expect(page.getByRole('link', { name: /Chat 1/ })).toBeVisible();
+        await expect(page.locator('[data-endings-found]')).toHaveCount(0);
+    } finally {
+        await request.delete(`/api/stories/${storyId}`);
+    }
+});
+
+test('the Scenes tab adds an Ending, saves each field, keeps it through a reload, and removes it', async ({ page, request }) => {
+    const storyId = await createStory(request);
+    try {
+        await page.goto(`/stories/${storyId}?tab=scenes`);
+        await expect(page.getByRole('heading', { name: 'Endings' })).toBeVisible();
+        await page.getByRole('button', { name: 'Add Ending' }).tap();
+        const card = page.getByRole('region', { name: 'Ending 1', exact: true });
+        // A new one opens, and says what it still needs.
+        await expect(card.getByText('It can be reached once it says when.')).toBeVisible();
+
+        await card.getByRole('textbox', { name: 'Name' }).fill('The light returns');
+        await card.getByRole('textbox', { name: 'Reached when' }).fill('The lamp is lit again.');
+        await expect(card.getByText('It can be reached once it says when.')).toHaveCount(0);
+        await card.getByRole('textbox', { name: 'The epilogue should tell' }).fill('The first ship to pass safely.');
+        await expect(page.getByText('Saved', { exact: true })).toBeVisible();
+        await noSidewaysScroll(page);
+
+        await expect
+            .poll(async () => (await (await request.get(`/api/stories/${storyId}`)).json()).endings)
+            .toMatchObject([{ name: 'The light returns', condition: 'The lamp is lit again.', epilogue: 'The first ship to pass safely.' }]);
+
+        await page.reload();
+        await expect(card.getByRole('heading', { name: 'The light returns' })).toBeVisible();
+
+        await card.getByRole('button', { name: 'Remove Ending 1' }).tap();
+        await page.getByRole('group', { name: 'Remove The light returns?' }).getByRole('button', { name: 'Remove' }).tap();
+        await expect(card).toHaveCount(0);
+        await expect.poll(async () => (await (await request.get(`/api/stories/${storyId}`)).json()).endings).toEqual([]);
+    } finally {
+        await request.delete(`/api/stories/${storyId}`);
+    }
+});

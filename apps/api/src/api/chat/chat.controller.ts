@@ -47,7 +47,7 @@ export class ChatApiController {
     @Get()
     @ApiOkResponse({ type: ListChatsResponseBodyDTO })
     async list(@Id('storyId') storyId: number): Promise<ListChatsResponseBodyDTO> {
-        return { chats: await this.chatManager.listChats(storyId) };
+        return this.chatManager.listChats(storyId);
     }
 
     @Post()
@@ -160,6 +160,18 @@ export class ChatApiController {
         return answerTurn<ChatResponseBodyDTO>(request, response, 200, (stream) =>
             this.chatManager.continueChat(storyId, chatId, stream, body?.nudgeCharacterId, body?.cue),
         );
+    }
+
+    /**
+     * .scratch/endings/spec.md, "The Epilogue": the Narrator closes the story, for the Ending the
+     * Chat reached or, with none, for an end the user chose. Gated and stored like a Continue; the
+     * reply is an AI Message marked as the Epilogue. Refused right after an Epilogue.
+     */
+    @Post(':chatId/epilogue')
+    @ApiOkResponse({ type: ChatResponseBodyDTO })
+    @ApiProduces('application/json', 'text/event-stream')
+    epilogue(@Id('storyId') storyId: number, @Id('chatId') chatId: number, @Req() request: Request, @Res() response: Response): Promise<void> {
+        return answerTurn<ChatResponseBodyDTO>(request, response, 200, (stream) => this.chatManager.writeEpilogue(storyId, chatId, stream));
     }
 
     /**
