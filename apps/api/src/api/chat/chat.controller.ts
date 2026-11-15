@@ -26,6 +26,7 @@ import { DocumentsInPlayResponseBodyDTO } from './dto/documents-in-play.response
 import { SuggestionsResponseBodyDTO } from './dto/suggestions.response.dto.js';
 import { WriteForMeResponseBodyDTO } from './dto/write-for-me.response.dto.js';
 import { ThaiReadingResponseBodyDTO } from './dto/thai-reading.response.dto.js';
+import { DiaryEntryResponseBodyDTO, DiaryResponseBodyDTO } from './dto/diary.response.dto.js';
 import { answerTurn } from './turn-response.js';
 
 const Id = (name: string) => Param(name, ParseIntPipe);
@@ -328,6 +329,36 @@ export class ChatApiController {
         @Id('messageId') messageId: number,
     ): Promise<ThaiReadingResponseBodyDTO> {
         return this.chatManager.thaiReading(storyId, chatId, messageId);
+    }
+
+    /** .scratch/diary/spec.md: every Diary entry of the Chat, newest first. No model call. */
+    @Get(':chatId/diary')
+    @ApiOkResponse({ type: DiaryResponseBodyDTO })
+    async diary(@Id('storyId') storyId: number, @Id('chatId') chatId: number): Promise<DiaryResponseBodyDTO> {
+        return { entries: await this.chatManager.diary(storyId, chatId) };
+    }
+
+    /**
+     * .scratch/diary/spec.md: asks a Character for a Diary entry about the story since their last
+     * one, written by the play model and kept. Refused when they already wrote one at the Chat's
+     * newest AI Message, while a turn is in flight or with text credit out.
+     */
+    @Post(':chatId/characters/:characterId/diary')
+    @ApiCreatedResponse({ type: DiaryEntryResponseBodyDTO })
+    writeDiaryEntry(
+        @Id('storyId') storyId: number,
+        @Id('chatId') chatId: number,
+        @Id('characterId') characterId: number,
+    ): Promise<DiaryEntryResponseBodyDTO> {
+        return this.chatManager.writeDiaryEntry(storyId, chatId, characterId);
+    }
+
+    /** Deletes one Diary entry. */
+    @Delete(':chatId/diary/:entryId')
+    @HttpCode(204)
+    @ApiNoContentResponse()
+    deleteDiaryEntry(@Id('storyId') storyId: number, @Id('chatId') chatId: number, @Id('entryId') entryId: number): Promise<void> {
+        return this.chatManager.deleteDiaryEntry(storyId, chatId, entryId);
     }
 
     /** Clears every Message and copies the current Opening in again; title and identity stay. */

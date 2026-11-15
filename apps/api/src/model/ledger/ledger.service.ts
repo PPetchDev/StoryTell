@@ -18,6 +18,7 @@ import { MemoryChangeEntity, MemoryChangeKind } from './entities/memory-change.e
 import { SceneAdvanceEntity } from './entities/scene-advance.entity.js';
 import { SuddenEventStepEntity, SuddenEventStepKind } from './entities/sudden-event-step.entity.js';
 import { DetailChangeEntity, DetailKind } from './entities/detail-change.entity.js';
+import { DiaryEntryEntity } from './entities/diary-entry.entity.js';
 import { TimeChangeEntity } from './entities/time-change.entity.js';
 
 /** A StartingBond as it is seeded into a Chat: no event, no causing Message. */
@@ -169,6 +170,7 @@ export class LedgerModelService {
         @InjectRepository(ChatArcDirectionEntity) private readonly arcDirections: Repository<ChatArcDirectionEntity>,
         @InjectRepository(SuddenEventStepEntity) private readonly suddenEventSteps: Repository<SuddenEventStepEntity>,
         @InjectRepository(DetailChangeEntity) private readonly detailChanges: Repository<DetailChangeEntity>,
+        @InjectRepository(DiaryEntryEntity) private readonly diaryEntries: Repository<DiaryEntryEntity>,
     ) {}
 
     /**
@@ -248,6 +250,22 @@ export class LedgerModelService {
             this.detailChangesOf(chatId),
         ]);
         return { bondChanges, arcSteps, sceneAdvances, arcDirections, suddenEventSteps, detailChanges };
+    }
+
+    /** The Chat's Diary entries (.scratch/diary/spec.md), every Character's, oldest first. */
+    diaryEntriesOf(chatId: number): Promise<DiaryEntryEntity[]> {
+        return this.diaryEntries.find({ where: { chatId }, order: { id: 'ASC' } });
+    }
+
+    /** Keeps an entry a Character wrote, against the AI Message the story stood at. */
+    addDiaryEntry(entry: { chatId: number; characterId: number; messageId: number; moment: string | null; text: string }): Promise<DiaryEntryEntity> {
+        return this.diaryEntries.save(this.diaryEntries.create(entry));
+    }
+
+    /** Deletes one entry of the Chat; false when the Chat has none with that id. */
+    async deleteDiaryEntry(chatId: number, entryId: number): Promise<boolean> {
+        const result = await this.diaryEntries.delete({ id: entryId, chatId });
+        return (result.affected ?? 0) > 0;
     }
 
     /** The Chat's Place, Weather and Outfit records alone, oldest first: the newest of each is current. */
@@ -455,6 +473,8 @@ export class LedgerModelService {
             await manager.delete(SuddenEventStepEntity, { messageId: In(ids) });
             // The same for the Place, the Weather and the Outfits: the record before each is current again.
             await manager.delete(DetailChangeEntity, { messageId: In(ids) });
+            // A Diary entry tells the story up to its Message: it goes with it (.scratch/diary/spec.md). Not counted.
+            await manager.delete(DiaryEntryEntity, { messageId: In(ids) });
             const arcs = newestFirst(await manager.find(ArcStepEntity, { where: { messageId: In(ids) } }));
             for (const arc of arcs) {
                 await manager.delete(ArcStepEntity, { id: arc.id });
@@ -480,6 +500,7 @@ export class LedgerModelService {
             await manager.update(ChatEntity, { id: chatId }, { timeOfDay: null });
             await manager.delete(SuddenEventStepEntity, { chatId });
             await manager.delete(DetailChangeEntity, { chatId });
+            await manager.delete(DiaryEntryEntity, { chatId });
             await manager.delete(BeliefChangeEntity, { chatId });
             await manager.delete(BeliefEntity, { chatId });
             await manager.delete(MemoryChangeEntity, { chatId });

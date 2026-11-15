@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { ChatBackdrop } from '@/components/chat/backdrop';
-import { useProfileOutfits } from '@/components/chat/character-profile';
+import { useProfileChat, useProfileOutfits } from '@/components/chat/character-profile';
 import { CharacterRow } from '@/components/chat/character-row';
 import { ChatComposer } from '@/components/chat/chat-composer';
 import { ChatThread, OpenAt, PendingLine } from '@/components/chat/chat-thread';
@@ -206,6 +206,8 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
 
     // A Character's profile shows what they are wearing now in this Chat (.scratch/info-box/spec.md).
     useProfileOutfits(chat.outfits);
+    // And their Diary, which is written at the Chat's newest AI Message (.scratch/diary/spec.md).
+    useProfileChat(chat.storyId, chat.id, chat.messages.findLast((message) => message.kind === 'ai')?.id ?? null);
 
     // A Sudden event that began, moved or ended is said once, when the re-read Chat shows it (the banner shows the same).
     const eventRef = useRef(initial.suddenEvent);

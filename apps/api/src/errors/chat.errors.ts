@@ -155,6 +155,26 @@ export class UnreadableWriteForMeError extends AppError {
     }
 }
 
+/** A Diary entry asked of a Character who already wrote one at the Chat's newest AI Message (.scratch/diary/spec.md). No call. */
+export class NothingNewForDiaryError extends AppError {
+    constructor(name: string) {
+        super('409.004.026', `${name} has already written about this. Play on, then ask again.`);
+    }
+}
+
+/** The play model's Diary entry came back empty. Nothing stored. */
+export class UnreadableDiaryEntryError extends AppError {
+    constructor() {
+        super('502.004.027', "Couldn't write the diary entry. Try again.");
+    }
+}
+
+export class DiaryEntryNotFoundError extends AppError {
+    constructor() {
+        super('404.004.028', 'Diary entry not found in this Chat.');
+    }
+}
+
 /** The background model's Thai reading came back empty. Nothing stored. */
 export class UnreadableThaiReadingError extends AppError {
     constructor() {

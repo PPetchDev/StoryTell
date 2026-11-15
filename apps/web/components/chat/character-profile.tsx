@@ -2,6 +2,7 @@
 
 import { CSSProperties, createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
+import { DiaryChat, DiarySection } from '@/components/chat/diary-section';
 import { PortraitImage } from '@/components/portrait/portrait-image';
 import { Sheet } from '@/components/sheet/sheet';
 import { characterColour } from '@/lib/character-colour';
@@ -20,7 +21,20 @@ const ProfileContext = createContext<{
     has(characterId: number): boolean;
     character(characterId: number): Character | undefined;
     setOutfits(outfits: Outfits): void;
+    setChat(chat: DiaryChat | null): void;
 } | null>(null);
+
+/**
+ * Tells the profiles which Chat is on screen and its newest AI Message, so a profile shows the
+ * Character's Diary there (.scratch/diary/spec.md). Outside a Chat it does nothing, and no Diary shows.
+ */
+export function useProfileChat(storyId: number, chatId: number, newestAiMessageId: number | null): void {
+    const setChat = useContext(ProfileContext)?.setChat;
+    useEffect(() => {
+        setChat?.({ storyId, chatId, newestAiMessageId });
+    }, [setChat, storyId, chatId, newestAiMessageId]);
+    useEffect(() => () => setChat?.(null), [setChat]);
+}
 
 /**
  * Tells the profiles what each Character is wearing now, from the Chat on screen, so a profile
@@ -56,7 +70,7 @@ export function useCastCharacter(characterId: number | null): Character | undefi
 
 /**
  * Lets a tap on a Character's Portrait open their profile over the Chat: their Reference image
- * in full, their Expressions under it, name, Appearance, Personality, Voice and Background. Secrets and Arc directions stay
+ * in full, their Expressions under it, name, their Diary in the Chat, Appearance, Personality, Voice and Background. Secrets and Arc directions stay
  * hidden, since they would give the story away.
  */
 export function CharacterProfiles({ characters, children }: { characters: readonly Character[]; children: ReactNode }) {
@@ -64,7 +78,8 @@ export function CharacterProfiles({ characters, children }: { characters: readon
     const has = useCallback((characterId: number) => characters.some((character) => character.id === characterId), [characters]);
     const find = useCallback((characterId: number) => characters.find((character) => character.id === characterId), [characters]);
     const [outfits, setOutfits] = useState<Outfits>({});
-    const value = useMemo(() => ({ open: setOpenId, has, character: find, setOutfits }), [has, find]);
+    const [chat, setChat] = useState<DiaryChat | null>(null);
+    const value = useMemo(() => ({ open: setOpenId, has, character: find, setOutfits, setChat }), [has, find]);
     const character = characters.find((candidate) => candidate.id === openId);
     const close = useCallback(() => setOpenId(null), []);
 
@@ -76,6 +91,7 @@ export function CharacterProfiles({ characters, children }: { characters: readon
                     character={character}
                     colour={characterColour(character.id, characters.map((member) => member.id))}
                     outfit={outfits[character.id] ?? null}
+                    chat={chat}
                     onClose={close}
                 />
             )}
@@ -90,7 +106,19 @@ const SECTIONS = [
     ['Background', 'background'],
 ] as const satisfies readonly (readonly [string, keyof Character])[];
 
-function CharacterProfileSheet({ character, colour, outfit, onClose }: { character: Character; colour: string; outfit: string | null; onClose(): void }) {
+function CharacterProfileSheet({
+    character,
+    colour,
+    outfit,
+    chat,
+    onClose,
+}: {
+    character: Character;
+    colour: string;
+    outfit: string | null;
+    chat: DiaryChat | null;
+    onClose(): void;
+}) {
     const name = character.name.trim() || 'Unnamed';
     const sections = SECTIONS.filter(([, field]) => character[field].trim() !== '');
     return (
@@ -130,6 +158,8 @@ function CharacterProfileSheet({ character, colour, outfit, onClose }: { charact
                         <p className="m-0 leading-normal [overflow-wrap:anywhere]">{outfit}</p>
                     </section>
                 )}
+                {/* Their Diary in this Chat, above who they are: it is what changes as the story goes. */}
+                {chat && <DiarySection chat={chat} characterId={character.id} name={name} />}
                 {sections.map(([label, field]) => (
                     <section key={field} className="rounded-lg bg-surface-raised px-3.5 py-3">
                         <h3 className="mt-0 mb-1 text-sm font-semibold text-muted">{label}</h3>

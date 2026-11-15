@@ -356,6 +356,18 @@ function recordingExtension(mimeType: string): string {
     return 'webm';
 }
 
+/** One entry of a Character's Diary in a Chat (CONTEXT.md, "Diary"). */
+export interface DiaryEntry {
+    id: number;
+    characterId: number;
+    /** The AI Message the story stood at when it was written. */
+    messageId: number;
+    /** When and where in the story ("Night, the lamp room"); null when the Chat knew neither. */
+    moment: string | null;
+    text: string;
+    createdAt: string;
+}
+
 /** Writes answer with the whole Chat; the list and the Chat itself are read with useApiQuery. */
 export const chatApi = {
     create: (storyId: number) => apiSend<Chat>('POST', `/stories/${storyId}/chats`),
@@ -395,6 +407,13 @@ export const chatApi = {
     /** The Message's stored text in Thai, made once by the background model and kept. */
     thaiReading: (storyId: number, chatId: number, messageId: number) =>
         apiSend<{ messageId: number; text: string }>('POST', `/stories/${storyId}/chats/${chatId}/messages/${messageId}/thai-reading`),
+    /** Every Diary entry of the Chat, all Characters', newest first. */
+    diary: (storyId: number, chatId: number) => apiFetch<{ entries: DiaryEntry[] }>(`/stories/${storyId}/chats/${chatId}/diary`),
+    /** Asks a Character for a Diary entry about the story since their last one. A model call; the entry is kept. */
+    writeDiaryEntry: (storyId: number, chatId: number, characterId: number) =>
+        apiSend<DiaryEntry>('POST', `/stories/${storyId}/chats/${chatId}/characters/${characterId}/diary`),
+    deleteDiaryEntry: (storyId: number, chatId: number, entryId: number) =>
+        apiSend<void>('DELETE', `/stories/${storyId}/chats/${chatId}/diary/${entryId}`),
     /**
      * Rewrites a Message, discards every Message after it and rolls back their changes; a
      * User Message gets a new reply, an AI Message is judged again.

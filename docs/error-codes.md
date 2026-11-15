@@ -106,6 +106,9 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | `404.004.023` | `SpeechItemNotFoundError` | A Read aloud item (`POST .../speech/:index`) outside the Message's queue as it reads now: an edit, a Regenerate or a Replace rule may have changed it since the queue was read. No call; read the queue again. |
 | `404.004.024` | `BeliefNotFoundError` | No Belief with that id in this Chat: an edit or delete (`PATCH`/`DELETE /api/stories/:storyId/chats/:chatId/beliefs/:beliefId`) of one that is gone, or another Chat's. Nothing changes. |
 | `422.004.025` | `EmptyBeliefError` | A Belief added or edited with nothing but whitespace. Nothing changes. |
+| `409.004.026` | `NothingNewForDiaryError` | A Diary entry asked of a Character (`POST /api/stories/:storyId/chats/:chatId/characters/:characterId/diary`) who already wrote one at the Chat's newest AI Message (`.scratch/diary/spec.md`). No call. "<Name> has already written about this. Play on, then ask again." |
+| `502.004.027` | `UnreadableDiaryEntryError` | The play model answered a Diary entry with nothing. Nothing stored. The client shows "Couldn't write the diary entry. Try again." |
+| `404.004.028` | `DiaryEntryNotFoundError` | No Diary entry with that id in this Chat (`DELETE /api/stories/:storyId/chats/:chatId/diary/:entryId`): one already deleted, taken back with its Message, or another Chat's. Nothing changes. |
 | `502.005.001` | `UnreadableDraftError` | The model's draft or rewrite could not be read (no JSON object, or no text). Nothing saved. Show with Retry. |
 | `502.005.002` | `InvalidDraftError` | The draft does not fit a Story (0 or 7 Characters, a Style value outside its set, a required field empty, a bad StartingBond). Nothing saved. Show with Retry. |
 | `422.005.003` | `EmptyIdeaError` | A draft was asked for with a blank idea. |

@@ -87,7 +87,7 @@ One entry in a Chat's history: either what the user wrote, shown under the Role 
 _Avoid_: Post, reply, bubble, entry
 
 **Branch**:
-A new Chat copied from another up to one of its Messages, with everything that Chat knew at that Message — Memory, Bonds, Arcs, Scene, Time of day, Place, Weather, Outfits, a Sudden event under way — so the story can go another way while the original stays as it was. A Branch remembers which Chat it came from.
+A new Chat copied from another up to one of its Messages, with everything that Chat knew at that Message — Memory, Bonds, Arcs, Scene, Time of day, Place, Weather, Outfits, Diaries, a Sudden event under way — so the story can go another way while the original stays as it was. A Branch remembers which Chat it came from.
 _Avoid_: Fork, checkpoint, clone, copy
 
 **Author's note**:
@@ -202,6 +202,10 @@ _Avoid_: Affinity, relationship, love meter, stat, score
 An intended, lasting change to a Character's personality within one Chat, always traceable to an event in the story that caused it; a later event can turn it back. The user can see that a Character has changed and the events that changed them, but never the direction the author set, which would give the story away.
 _Avoid_: Drift, character development, evolution
 
+**Diary**:
+What one Character writes in private, in their own voice, about one Chat's story: an **entry** each time the user asks, telling of what happened since their last one. It is for the user to read; the Narrator never reads it, so nothing in it becomes a fact (a Memory), and it never tells the Character's Secrets or Arc direction. An entry is written at the Chat's newest AI Message and goes when that Message is taken back.
+_Avoid_: Journal, inner thoughts, monologue, log
+
 **Drift**:
 An unintended loss of a Character's established personality or voice, as opposed to an Arc.
 _Avoid_: Character development, inconsistency
@@ -239,7 +243,7 @@ The synthetic voice a Character's lines are read aloud in, chosen by the author;
 _Avoid_: TTS voice, audio voice
 
 **Character profile**:
-What a tap on a Character's Portrait in a Chat opens: their whole Reference image, name, Appearance, Personality, Voice and Background, but never their Secrets or Arc directions, which would give the story away.
+What a tap on a Character's Portrait in a Chat opens: their whole Reference image, name, what they are wearing, their Diary, Appearance, Personality, Voice and Background, but never their Secrets or Arc directions, which would give the story away.
 _Avoid_: Bio, character card
 
 ## Accounts

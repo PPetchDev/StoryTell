@@ -242,6 +242,13 @@ const copyLedger: CopyStep = async ({ manager, sourceChatId, chatId, messageIds 
          FROM "detail_change" s JOIN ${remap} WHERE s."chat_id" = $2 ORDER BY s."id"`,
         params,
     );
+    // Diary entries (.scratch/diary/spec.md): the rollback drops those written after N.
+    await manager.query(
+        `INSERT INTO "diary_entry" ("chat_id", "character_id", "message_id", "moment", "text", "created_at")
+         SELECT $1, s."character_id", msg."new_id", s."moment", s."text", s."created_at"
+         FROM "diary_entry" s JOIN ${remap} WHERE s."chat_id" = $2 ORDER BY s."id"`,
+        params,
+    );
     await manager.query(
         `INSERT INTO "chat_arc_direction" ("chat_id", "character_id", "text")
          SELECT $1, s."character_id", s."text" FROM "chat_arc_direction" s WHERE s."chat_id" = $2 ORDER BY s."id"`,

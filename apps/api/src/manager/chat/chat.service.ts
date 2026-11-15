@@ -6,8 +6,10 @@ import {
     BackgroundFailedError,
     BackgroundStillSavingError,
     ChatNotFoundError,
+    DiaryEntryNotFoundError,
     EmptyMessageError,
     MessageNotFoundError,
+    NothingNewForDiaryError,
     NoFailedExtractionError,
     NoFailedJudgeError,
     NoTurnToRetryError,
@@ -68,6 +70,10 @@ import { ChoiceBelief, ContextQueryVector, MemoryChoice, memorySearchLogLine } f
 import { beliefResponses, choiceBeliefs } from './memory/beliefs.js';
 import { promptStorySoFar, StorySoFarManagerService } from './story-so-far/story-so-far.service.js';
 import { SuggestedRepliesManagerService } from './suggestions/suggested-replies.service.js';
+import { DiaryManagerService } from './diary/diary.service.js';
+import { renderUser } from './memory/render-user.js';
+import { diaryMoment, storySince } from './diary/diary.js';
+import type { DiaryEntryResponse } from '../../model/ledger/entities/diary-entry.entity.js';
 import { WriteForMeManagerService } from './write-for-me/write-for-me.service.js';
 import { ThaiReadingManagerService } from './thai-reading/thai-reading.service.js';
 import { sourceFingerprint, thaiReadingSource } from './thai-reading/thai-reading.js';
@@ -320,6 +326,7 @@ export class ChatManagerService {
         private readonly suggestedReplies: SuggestedRepliesManagerService,
         private readonly writeForMeWriter: WriteForMeManagerService,
         private readonly thaiReadings: ThaiReadingManagerService,
+        private readonly diaryWriter: DiaryManagerService,
         private readonly storySoFar: StorySoFarManagerService,
         private readonly documentSearch: DocumentSearchManagerService,
         private readonly gateway: ModelGateway,
@@ -982,6 +989,80 @@ export class ChatManagerService {
         const names = [...story.characters.map((character) => character.name), wornIdentity(story, chat).name, message.identityName ?? ''];
         const text = await this.thaiReadings.make(message.id, source, fingerprint, names, { storyId: story.id, chatId: chat.id });
         return { messageId: message.id, text };
+    }
+
+    /** .scratch/diary/spec.md: every Diary entry of the Chat, newest first. A removed Character's went with them. */
+    async diary(storyId: number, chatId: number): Promise<DiaryEntryResponse[]> {
+        const { chat } = await this.load(storyId, chatId);
+        const entries = await this.ledger.diaryEntriesOf(chat.id);
+        return entries.reverse().map((entry) => entry.toResponse());
+    }
+
+    /**
+     * .scratch/diary/spec.md: a Character's Diary entry about the story since their last one, up to
+     * the Chat's newest AI Message, written by the play model and kept against that Message.
+     * Refused, before any call, when they already wrote one there, while a turn is in flight or
+     * with text credit out. It holds the turn lock while it is written, so the Message it tells of
+     * can't be rewound or written again under it; like Suggested replies it does not wait for
+     * the previous reply's background calls.
+     */
+    async writeDiaryEntry(storyId: number, chatId: number, characterId: number): Promise<DiaryEntryResponse> {
+        const { story, chat: loaded } = await this.load(storyId, chatId);
+        const character = story.characters.find((candidate) => candidate.id === characterId);
+        if (!character) throw new CharacterNotFoundError();
+        if (this.inFlight.has(loaded.id)) throw new TurnInProgressError();
+        if (await this.textCreditOut()) throw new OutOfCreditError('text');
+
+        return this.writingTurn(loaded.id, async () => {
+            // Read again inside the lock: a turn that ended meanwhile may have added or taken Messages.
+            const chat = await this.reload(loaded.id);
+            const at = newestAiMessage(chat);
+            if (!at) throw new MessageNotFoundError();
+            const [entries, state, held] = await Promise.all([
+                this.ledger.diaryEntriesOf(chat.id),
+                this.ledger.state(chat.id),
+                this.beliefModel.findByChat(chat.id),
+            ]);
+            const previous = entries.filter((entry) => entry.characterId === character.id).at(-1) ?? null;
+            if (previous?.messageId === at.id) throw new NothingNewForDiaryError(character.name);
+            const previousPosition = previous === null ? null : (chat.messages.find((message) => message.id === previous.messageId)?.position ?? null);
+            const identity = wornIdentity(story, chat);
+            const nameOf = (id: number | null): string | null =>
+                id === null ? identity.name : (story.characters.find((candidate) => candidate.id === id)?.name ?? null);
+            const moment = diaryMoment(chat.timeOfDay, currentDetails(state.detailChanges).place);
+            const text = await this.diaryWriter.write(
+                {
+                    character: { name: character.name, personality: character.personality, voice: character.voice, background: character.background },
+                    identityName: identity.name,
+                    setting: story.setting,
+                    arcSteps: state.arcSteps.filter((step) => step.characterId === character.id).map((step) => step.step),
+                    bonds: currentBonds(state.bondChanges).flatMap((bond) => {
+                        const towardName = nameOf(bond.toCharacterId);
+                        if (bond.fromCharacterId !== character.id || towardName === null) return [];
+                        return [{ towardName, label: bond.label, description: bond.description, levels: bond.levels() }];
+                    }),
+                    beliefs: held.filter((belief) => belief.active && belief.characterId === character.id).map((belief) => renderUser(belief.text, identity.name)),
+                    previousEntry: previous?.text ?? null,
+                    story: storySince(chat.messages, previousPosition, at.position).map((message) => ({
+                        position: message.position,
+                        text:
+                            message.kind === MessageKind.User
+                                ? `${message.identityName ?? identity.name}: ${(message.text ?? '').trim()}`
+                                : thaiReadingSource(message.toResponse()),
+                    })),
+                    moment,
+                },
+                { storyId: story.id, chatId: chat.id },
+            );
+            const entry = await this.ledger.addDiaryEntry({ chatId: chat.id, characterId: character.id, messageId: at.id, moment, text });
+            return entry.toResponse();
+        });
+    }
+
+    /** Deletes one Diary entry; the Character may then write about that moment again. */
+    async deleteDiaryEntry(storyId: number, chatId: number, entryId: number): Promise<void> {
+        const { chat } = await this.load(storyId, chatId);
+        if (!(await this.ledger.deleteDiaryEntry(chat.id, entryId))) throw new DiaryEntryNotFoundError();
     }
 
     /**
