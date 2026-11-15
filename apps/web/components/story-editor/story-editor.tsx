@@ -582,16 +582,20 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                 aria-selected={tab === t.key}
                                 aria-controls="editor-panel"
                                 tabIndex={tab === t.key ? 0 : -1}
-                                // The count is said in words too, for a screen reader.
-                                aria-label={missingHere > 0 ? `${t.label}, has missing fields (${missingHere})` : undefined}
                                 className={TAB}
                                 onClick={() => selectTab(t.key)}
                             >
                                 {t.label}
+                                {/*
+                                 * The tab's name is what it shows, then what the number means: "Scenes 1 still to
+                                 * fill in". It begins with the words on the tab, so someone using voice control can
+                                 * say them (WCAG 2.5.3, label in name); an aria-label that left the number out failed that.
+                                 */}
                                 {missingHere > 0 && (
-                                    <span className={TAB_COUNT} aria-hidden="true">
-                                        {missingHere}
-                                    </span>
+                                    <>
+                                        <span className={TAB_COUNT}>{missingHere}</span>
+                                        <span className="sr-only"> still to fill in</span>
+                                    </>
                                 )}
                             </button>
                         );

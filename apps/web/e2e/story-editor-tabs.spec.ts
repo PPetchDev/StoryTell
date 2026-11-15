@@ -35,7 +35,7 @@ test('a missing Scene goal: its item lands on the field in the Scenes tab, and f
         await expect(play).toBeDisabled();
         await expect(page.getByRole('tab', { name: 'Story', exact: true })).toHaveAttribute('aria-selected', 'true');
         // Only the Scenes tab has a missing field, and says so.
-        await expect(page.getByRole('tab', { name: 'Scenes, has missing fields' })).toBeVisible();
+        await expect(page.getByRole('tab', { name: 'Scenes 1 still to fill in', exact: true })).toBeVisible();
         await expect(page.getByRole('tab', { name: 'Characters', exact: true })).toBeVisible();
 
         const status = page.getByRole('region', { name: 'Playable status' });

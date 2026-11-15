@@ -170,7 +170,7 @@ test('async changes are said: a rewrite, the Story turning playable, new candida
     try {
         await page.goto(`/stories/${storyId}`);
         const storySection = page.getByRole('region', { name: 'Story' });
-        await expect(page.getByRole('tab', { name: 'Story, has missing fields (1)' })).toBeVisible();
+        await expect(page.getByRole('tab', { name: 'Story 1 still to fill in', exact: true })).toBeVisible();
         await expect(storySection.getByLabel('Setting')).toHaveAttribute('aria-required', 'true');
 
         // A rewrite lands: the field is lit, and it is said, as is the Story turning playable (H12).

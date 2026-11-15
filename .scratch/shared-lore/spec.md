@@ -61,4 +61,4 @@ Sets are made, linked, edited and removed on a Story's Lore tab, under "Shared L
 
 ## Further Notes
 
-- While checking the page with axe, the Story editor's tabs were found to fail "label in name" when a tab has fields still to fill in: the tab shows a count beside its name, and its accessible name says "has missing fields (n)" instead. It is older than this work and is not changed here.
+- While checking the page with axe, the Story editor's tabs were found to fail "label in name" when a tab has fields still to fill in: the tab shows a count beside its name, and its accessible name says "has missing fields (n)" instead. It is older than this work and was not changed with it; it was fixed straight after, on the user's ask: the tab's name is now the words on it and then what the number means ("Scenes 1 still to fill in").
