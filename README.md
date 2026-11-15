@@ -327,11 +327,18 @@ scp release.tar.gz scripts/vm/deploy.sh ubuntu@<vm>:/tmp/
 ssh -o ServerAliveInterval=30 ubuntu@<vm> "bash /tmp/deploy.sh <commit>"
 ```
 
-`deploy.sh` builds the release beside the running one, makes a backup of what is live, stops
-the app, runs the migrations, swaps the folders and starts the app. It prints `BUILD_OK`,
-`BACKUP_OK`, `MIGRATE_OK`, the units' state, the commit and the health check. The work runs detached
-from the SSH session, so a dropped connection never stops a deploy halfway (the backup step is
-minutes of silence): it carries on, and `tail -f /tmp/st-deploy.log` on the VM shows the rest.
+`deploy.sh` builds the release beside the running one, makes a restore point of what is live,
+stops the app, runs the migrations, swaps the folders and starts the app. It prints `BUILD_OK`,
+`RESTORE_POINT_OK`, `MIGRATE_OK`, the units' state, the commit and the health check. The work runs
+detached from the SSH session, so a dropped connection never stops a deploy halfway: it carries on,
+and `tail -f /tmp/st-deploy.log` on the VM shows the rest.
+
+A restore point is the database and the images as they were just before the deploy, in
+`/srv/storytell/backup/restore-points`, the newest 3 kept (`backup.mjs --restore-point`, run from
+the new release). It takes a couple of seconds. It is not the day's backup: it goes to no off-site
+copy and does not count against the 14 kept. Until 2026-11-15 a deploy made a full backup
+instead, which waited ten minutes or so on the Drive upload each time, dropped the SSH connection
+twice, and filled Drive and the 14 kept with copies an hour apart.
 
 ### Backups
 
@@ -401,7 +408,9 @@ backup exists); `sudo tail /srv/storytell/logs/backup.log` says what happened.
 ### Restoring
 
 A backup is a folder `storytell-YYYYMMDD-HHMMSS` holding `storytell.dump`, `images/` and
-`manifest.json`. To put one back, as the `ubuntu` user:
+`manifest.json`; a deploy's restore point is the same, under `/srv/storytell/backup/restore-points`
+(use `sudo ls` to see them), and is the one to put back when a deploy went wrong. To put one back,
+as the `ubuntu` user, with `B` set to its folder:
 
 ```bash
 B=/var/backups/storytell/storytell-YYYYMMDD-HHMMSS

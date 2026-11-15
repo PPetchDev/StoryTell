@@ -5,13 +5,14 @@
 #   scp release.tar.gz scripts/vm/deploy.sh ubuntu@<vm>:/tmp/
 #   ssh -o ServerAliveInterval=30 ubuntu@<vm> "bash /tmp/deploy.sh <commit>"
 #
-# It builds the release beside the running one, backs up what is live, stops the app, runs the
-# migrations, swaps the folders and starts the app. /srv/storytell/app-prev is the release before,
-# for going back (only safe before a migration the old code can't run on; else restore the backup).
+# It builds the release beside the running one, makes a restore point of what is live, stops the
+# app, runs the migrations, swaps the folders and starts the app. /srv/storytell/app-prev is the
+# release before, for going back (only safe before a migration the old code can't run on; else
+# restore the restore point: README, "Restoring").
 #
-# The work runs detached from the SSH session, with its output in /tmp/st-deploy.log: the backup
-# step is minutes of silence, a quiet connection gets dropped (it was, on 2026-11-15), and a deploy
-# must never stop between stopping the app and starting it. If the connection goes, the deploy
+# The work runs detached from the SSH session, with its output in /tmp/st-deploy.log: a deploy
+# must never stop between stopping the app and starting it, and connections do drop (twice on
+# 2026-11-15, while a full backup was uploading to Drive). If the connection goes, the deploy
 # carries on; `tail -f /tmp/st-deploy.log` shows the rest.
 set -euo pipefail
 
@@ -34,14 +35,18 @@ as_app "mkdir -p $HOME_DIR/app-next && tar -xzf /tmp/release.tar.gz -C $HOME_DIR
 as_app "cd $HOME_DIR/app-next && npm ci --no-audit --no-fund >/tmp/st-ci.log 2>&1 && npm run build -w apps/api >/tmp/st-api.log 2>&1 && cd apps/web && API_ORIGIN=http://127.0.0.1:4000 npx next build >/tmp/st-web.log 2>&1"
 echo BUILD_OK
 
-# A backup of what is live, before anything changes. systemd-run reads the API's settings file
-# for DATABASE_URL, as the hourly unit does.
-if sudo test -f "$HOME_DIR/backup.mjs" && sudo test -f "$HOME_DIR/live.env"; then
+# A restore point of what is live, before anything changes: the database and the images, in
+# /srv/storytell/backup/restore-points, a few seconds' work. It is not the day's backup: that one
+# goes to Drive too, which takes minutes, and the hourly timer makes it. The script is the new
+# release's own, so a change to it works from the deploy that brings it. systemd-run reads the
+# API's settings file for DATABASE_URL, as the hourly unit does. A failed one stops the deploy
+# here, with the app still running.
+if sudo test -f "$HOME_DIR/live.env"; then
     sudo systemd-run --quiet --wait --collect -p User=storytell -p Group=storytell -p EnvironmentFile=/etc/storytell/api.env \
-        /usr/local/bin/node "$HOME_DIR/backup.mjs" --force
-    echo BACKUP_OK
+        /usr/local/bin/node "$HOME_DIR/app-next/scripts/backup.mjs" --home "$HOME_DIR" --restore-point
+    echo RESTORE_POINT_OK
 else
-    echo "BACKUP_SKIPPED: no $HOME_DIR/backup.mjs or live.env (see README, Live on the VM)"
+    echo "RESTORE_POINT_SKIPPED: no $HOME_DIR/live.env (see README, Live on the VM)"
 fi
 
 sudo systemctl stop storytell-web storytell-api

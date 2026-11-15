@@ -13,6 +13,13 @@
 // On the Oracle VM (scripts/vm/) a systemd timer runs it hourly the same way. There DATABASE_URL
 // is not in live.env: the unit hands it over from the API's own settings file, so the database
 // password is kept in one place.
+//
+// --restore-point makes a restore point instead: the same folder (dump, images, manifest), kept
+// in <LIVE_HOME>/backup/restore-points, the newest 3 only. A deploy makes one before it changes
+// anything (scripts/vm/deploy.sh). It is not the day's backup: it goes to no target, so it never
+// waits minutes on the Drive upload, never counts against BACKUP_KEEP, and leaves the last-run
+// stamp, the status and the banner alone. It takes no lock and has its own staging folder, so it
+// runs even while the day's backup is still uploading.
 import { execFileSync } from 'node:child_process';
 import {
     appendFileSync,
@@ -36,6 +43,9 @@ const NAME = /^storytell-\d{8}-\d{6}$/;
 const PARTIAL = /^storytell-\d{8}-\d{6}\.partial$/;
 const args = process.argv.slice(2);
 const force = args.includes('--force');
+const restorePoint = args.includes('--restore-point');
+/** How many restore points stay on disk: the last few deploys. */
+const RESTORE_POINTS_KEPT = 3;
 const homeArg = args.indexOf('--home');
 const home = path.resolve(homeArg >= 0 ? args[homeArg + 1] : path.dirname(fileURLToPath(import.meta.url)));
 
@@ -79,6 +89,14 @@ if (diskDir && (inside(diskDir, imageDir) || inside(diskDir, home))) {
 }
 // Without a colon rclone reads the remote as a local folder; the banner would say "saved" wrongly.
 if (remote && !remote.includes(':')) problems.push(`BACKUP_REMOTE must be an rclone remote such as "storytell-backup:", got "${remote}"`);
+if (restorePoint) {
+    // A restore point needs only the database and the images: no target, no stamp, no lock.
+    if (!databaseUrl) {
+        log(`restore point: DATABASE_URL is not set in ${envFile} or the environment`);
+        process.exit(1);
+    }
+    process.exit(await makeRestorePoint());
+}
 if (!diskDir && !remote) {
     log('no backup targets: set BACKUP_DISK_DIR and/or BACKUP_REMOTE in .env.live');
     process.exit(0);
@@ -219,8 +237,85 @@ function folderStats(dir) {
     return { files, bytes };
 }
 
+/** storytell-YYYYMMDD-HHMMSS for a moment, in local time. */
+function backupName(date) {
+    const two = (value) => String(value).padStart(2, '0');
+    const day = `${date.getFullYear()}${two(date.getMonth() + 1)}${two(date.getDate())}`;
+    return `storytell-${day}-${two(date.getHours())}${two(date.getMinutes())}${two(date.getSeconds())}`;
+}
+
+/**
+ * A restore point (see the top of this file): staged in its own folder, then moved into
+ * <LIVE_HOME>/backup/restore-points, which is on the same disk, so the move is a rename.
+ */
+async function makeRestorePoint() {
+    const taken = new Date();
+    const name = backupName(taken);
+    const root = path.join(backupDir, 'restore-points');
+    const stagingRoot = path.join(backupDir, 'restore-staging');
+    log(`restore point ${name} starting`);
+    try {
+        rmSync(stagingRoot, { recursive: true, force: true });
+        stageBackup(path.join(stagingRoot, name), name, taken);
+        mkdirSync(root, { recursive: true });
+        await renameWithRetries(path.join(stagingRoot, name), path.join(root, name));
+        const points = readdirSync(root).filter((entry) => NAME.test(entry)).sort().reverse();
+        for (const old of points.slice(RESTORE_POINTS_KEPT)) rmSync(path.join(root, old), { recursive: true, force: true });
+        log(`restore point saved to ${path.join(root, name)}; keeping ${Math.min(points.length, RESTORE_POINTS_KEPT)}`);
+        return 0;
+    } catch (error) {
+        log(`restore point failed: ${message(error)}`);
+        return 1;
+    } finally {
+        rmSync(stagingRoot, { recursive: true, force: true });
+    }
+}
+
+/**
+ * Makes the backup's folder at `staging`: the image folder, the database's dump, then any images
+ * made meanwhile, and the manifest. Throws when any of it fails.
+ */
+function stageBackup(staging, name, at) {
+    mkdirSync(staging, { recursive: true });
+    const pgBin = findPgBin();
+    const pgDump = pgBin ? path.join(pgBin, process.platform === 'win32' ? 'pg_dump.exe' : 'pg_dump') : 'pg_dump';
+    // The password goes in the environment, not the command line other processes can read.
+    const url = new URL(databaseUrl);
+    const password = decodeURIComponent(url.password) || url.searchParams.get('password') || '';
+    url.password = '';
+    url.searchParams.delete('password');
+    // Images are copied on both sides of the dump, so every image the dump names is whole in the
+    // backup. The app writes an image's file before its row, so the second copy, which
+    // overwrites, has every file the dump names in full, including one caught mid-write by the
+    // first. A file deleted while the dump ran is still there from the first copy, since
+    // copying never removes. Either order alone loses one of those.
+    const stagedImages = path.join(staging, 'images');
+    copyImages(imageDir, stagedImages);
+    execFileSync(pgDump, ['--format=custom', '--no-owner', '--file', path.join(staging, 'storytell.dump'), '--dbname', url.toString()], {
+        stdio: ['ignore', 'ignore', 'pipe'],
+        env: { ...process.env, PGPASSWORD: password },
+    });
+    copyImages(imageDir, stagedImages);
+    writeFileSync(
+        path.join(staging, 'manifest.json'),
+        JSON.stringify(
+            {
+                backup: name,
+                createdAt: at.toISOString(),
+                database: url.toString(),
+                release: existsSync(path.join(home, 'current')) ? readFileSync(path.join(home, 'current'), 'utf8').trim() : null,
+                pgDump: execFileSync(pgDump, ['--version'], { encoding: 'utf8' }).trim(),
+                dumpBytes: statSync(path.join(staging, 'storytell.dump')).size,
+                images: folderStats(path.join(staging, 'images')),
+            },
+            null,
+            2,
+        ),
+    );
+}
+
 async function backUp() {
-    const name = `storytell-${localDate(now)}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
+    const name = backupName(now);
     const staging = path.join(backupDir, 'staging', name);
     const status = { attemptedAt: now.toISOString(), backup: name, targets: {} };
     const targets = [diskDir && 'disk', remote && 'drive'].filter(Boolean);
@@ -230,42 +325,7 @@ async function backUp() {
     // 1. Copy the image folder, dump the database, then add any images made meanwhile, into a staging folder.
     try {
         rmSync(path.join(backupDir, 'staging'), { recursive: true, force: true });
-        mkdirSync(staging, { recursive: true });
-        const pgBin = findPgBin();
-        const pgDump = pgBin ? path.join(pgBin, process.platform === 'win32' ? 'pg_dump.exe' : 'pg_dump') : 'pg_dump';
-        // The password goes in the environment, not the command line other processes can read.
-        const url = new URL(databaseUrl);
-        const password = decodeURIComponent(url.password) || url.searchParams.get('password') || '';
-        url.password = '';
-        url.searchParams.delete('password');
-        // Images are copied on both sides of the dump, so every image the dump names is whole in the
-        // backup. The app writes an image's file before its row, so the second copy, which
-        // overwrites, has every file the dump names in full, including one caught mid-write by the
-        // first. A file deleted while the dump ran is still there from the first copy, since
-        // copying never removes. Either order alone loses one of those.
-        const stagedImages = path.join(staging, 'images');
-        copyImages(imageDir, stagedImages);
-        execFileSync(pgDump, ['--format=custom', '--no-owner', '--file', path.join(staging, 'storytell.dump'), '--dbname', url.toString()], {
-            stdio: ['ignore', 'ignore', 'pipe'],
-            env: { ...process.env, PGPASSWORD: password },
-        });
-        copyImages(imageDir, stagedImages);
-        writeFileSync(
-            path.join(staging, 'manifest.json'),
-            JSON.stringify(
-                {
-                    backup: name,
-                    createdAt: now.toISOString(),
-                    database: url.toString(),
-                    release: existsSync(path.join(home, 'current')) ? readFileSync(path.join(home, 'current'), 'utf8').trim() : null,
-                    pgDump: execFileSync(pgDump, ['--version'], { encoding: 'utf8' }).trim(),
-                    dumpBytes: statSync(path.join(staging, 'storytell.dump')).size,
-                    images: folderStats(path.join(staging, 'images')),
-                },
-                null,
-                2,
-            ),
-        );
+        stageBackup(staging, name, now);
     } catch (error) {
         const reason = `couldn't make the backup: ${message(error)}`;
         for (const target of targets) status.targets[target] = { ok: false, at: new Date().toISOString(), error: reason };
