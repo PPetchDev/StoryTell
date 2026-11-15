@@ -157,6 +157,33 @@ export interface SceneBondGate {
     atLeast: number;
 }
 
+/**
+ * A Lore set (CONTEXT.md): Lore kept apart from any one Story and linked to the Stories that share
+ * it, as a Story that links it reads it (mirrors LoreSetDTO).
+ */
+export interface LoreSet {
+    id: number;
+    /** May be empty; shown as "Lore set" then. */
+    name: string;
+    /** In add order. */
+    entries: LoreEntry[];
+    /** How many Stories link it, this one included: a change to it reaches them all. */
+    usedBy: number;
+}
+
+/** A Lore set as the picker lists it (mirrors LoreSetSummaryDTO). */
+export interface LoreSetSummary {
+    id: number;
+    name: string;
+    /** How many entries it holds. */
+    entries: number;
+    /** The Stories that link it. */
+    stories: Array<{ id: number; title: string }>;
+}
+
+/** The most Lore sets a Story links (mirrors MAX_LORE_SETS_PER_STORY). */
+export const MAX_LORE_SETS_PER_STORY = 5;
+
 /** A note about the Story's world, sent when its name or a keyword comes up (mirrors LoreEntryDTO). */
 export interface LoreEntry {
     id: number;
@@ -265,6 +292,8 @@ export interface Story {
     endings: Ending[];
     /** In add order. */
     lore: LoreEntry[];
+    /** The Lore sets it links, in the order they were linked, each with its entries. */
+    loreSets: LoreSet[];
     /** In add order. */
     documents: DocumentSummary[];
     /** The Story's own Saved replies, in add order (.scratch/saved-replies-and-replace-rules/spec.md). */
@@ -447,6 +476,23 @@ export const storyApi = {
     updateLoreEntry: (storyId: number, loreId: number, fields: LoreEntryFields) =>
         apiSend<Story>('PATCH', `/stories/${storyId}/lore/${loreId}`, fields),
     removeLoreEntry: (storyId: number, loreId: number) => apiSend<Story>('DELETE', `/stories/${storyId}/lore/${loreId}`),
+
+    /** The Account's Lore sets, for a Story's picker. */
+    listLoreSets: () => apiFetch<{ loreSets: LoreSetSummary[] }>('/lore-sets'),
+    /** A new Lore set, linked to the Story; with `moveLore`, the Story's own Lore entries become the set's. */
+    createLoreSet: (storyId: number, fields: { name?: string; moveLore?: boolean } = {}) =>
+        apiSend<Story>('POST', `/stories/${storyId}/lore-sets`, fields),
+    /** The Story links exactly these sets, in this order; one left out is unlinked, not deleted. */
+    linkLoreSets: (storyId: number, loreSetIds: number[]) => apiSend<Story>('PUT', `/stories/${storyId}/lore-sets`, { loreSetIds }),
+    renameLoreSet: (storyId: number, setId: number, name: string) => apiSend<Story>('PATCH', `/stories/${storyId}/lore-sets/${setId}`, { name }),
+    /** Deletes the set for good, from every Story that links it. */
+    deleteLoreSet: (storyId: number, setId: number) => apiSend<Story>('DELETE', `/stories/${storyId}/lore-sets/${setId}`),
+    addLoreSetEntry: (storyId: number, setId: number, fields: LoreEntryFields = {}) =>
+        apiSend<Story>('POST', `/stories/${storyId}/lore-sets/${setId}/entries`, fields),
+    updateLoreSetEntry: (storyId: number, setId: number, entryId: number, fields: LoreEntryFields) =>
+        apiSend<Story>('PATCH', `/stories/${storyId}/lore-sets/${setId}/entries/${entryId}`, fields),
+    removeLoreSetEntry: (storyId: number, setId: number, entryId: number) =>
+        apiSend<Story>('DELETE', `/stories/${storyId}/lore-sets/${setId}/entries/${entryId}`),
 
     /** Splits and embeds the text (a fraction of a cent), then stores it; the only Document write that spends. */
     addDocument: (storyId: number, document: NewDocument) => apiSend<Story>('POST', `/stories/${storyId}/documents`, document),

@@ -349,6 +349,35 @@ export class EndingRequestBodyDTO implements EndingFields {
     epilogue?: string;
 }
 
+/** A new Lore set, linked to the Story (.scratch/shared-lore/spec.md). */
+export class CreateLoreSetRequestBodyDTO {
+    @ApiPropertyOptional({ description: 'Its name; may be left out and written later.' })
+    @IsOptional()
+    @IsString()
+    @MaxLength(200)
+    name?: string;
+
+    @ApiPropertyOptional({ description: "True moves the Story's own Lore entries into the new set, so other Stories can link them. Left out or false: the set starts empty." })
+    @IsOptional()
+    @IsBoolean()
+    moveLore?: boolean;
+}
+
+/** The Lore sets a Story links, in order: the whole list at once. */
+export class LinkLoreSetsRequestBodyDTO {
+    @ApiProperty({ type: [Number], description: 'Lore set ids of this Account, each once, at most five. An empty list unlinks them all.' })
+    @IsArray()
+    @IsInt({ each: true })
+    loreSetIds: number[];
+}
+
+export class RenameLoreSetRequestBodyDTO {
+    @ApiProperty({ description: 'Shown in every Story that links the set; may be empty.' })
+    @IsString()
+    @MaxLength(200)
+    name: string;
+}
+
 export class SceneRequestBodyDTO implements SceneFields {
     @ApiPropertyOptional()
     @IsOptional()

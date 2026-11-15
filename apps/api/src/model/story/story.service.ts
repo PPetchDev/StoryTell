@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 
 import { copyDocuments } from '../document/document.service.js';
 import { ReplaceRuleEntity } from '../replace-rule/entities/replace-rule.entity.js';
@@ -14,6 +14,7 @@ import { SceneBondGateEntity } from './entities/scene-bond-gate.entity.js';
 import { SceneEntity } from './entities/scene.entity.js';
 import { SuddenEventEntity } from './entities/sudden-event.entity.js';
 import { EndingEntity } from './entities/ending.entity.js';
+import { LoreSetEntity, StoryLoreSetEntity } from './entities/lore-set.entity.js';
 import { StartingBeliefEntity } from './entities/starting-belief.entity.js';
 import { StartingBondEntity } from './entities/starting-bond.entity.js';
 import { CoverFocus, StoryEntity } from './entities/story.entity.js';
@@ -34,6 +35,8 @@ const FULL_RELATIONS = {
     suddenEvents: true,
     endings: true,
     lore: true,
+    // Each linked Lore set with its entries, and its links for "used by" (.scratch/shared-lore/spec.md).
+    loreSetLinks: { loreSet: { entries: true, links: true } },
     documents: true,
     savedReplies: true,
     replaceRules: true,
@@ -69,6 +72,10 @@ function sorted(story: StoryEntity): StoryEntity {
     story.suddenEvents = byPosition(story.suddenEvents ?? []);
     story.endings = byPosition(story.endings ?? []);
     story.lore = byPosition(story.lore);
+    story.loreSetLinks = byPosition(story.loreSetLinks ?? []);
+    for (const link of story.loreSetLinks) {
+        if (link.loreSet) link.loreSet.entries = byPosition(link.loreSet.entries ?? []);
+    }
     story.documents = byPosition(story.documents);
     story.savedReplies = byPosition(story.savedReplies);
     story.replaceRules = byPosition(story.replaceRules);
@@ -90,6 +97,8 @@ export class StoryModelService {
         @InjectRepository(SuddenEventEntity) private readonly suddenEvents: Repository<SuddenEventEntity>,
         @InjectRepository(EndingEntity) private readonly endings: Repository<EndingEntity>,
         @InjectRepository(LoreEntryEntity) private readonly lore: Repository<LoreEntryEntity>,
+        @InjectRepository(LoreSetEntity) private readonly loreSets: Repository<LoreSetEntity>,
+        @InjectRepository(StoryLoreSetEntity) private readonly loreSetLinks: Repository<StoryLoreSetEntity>,
         @InjectRepository(CharacterExpressionEntity) private readonly expressions: Repository<CharacterExpressionEntity>,
         private readonly accounts: AccountModelService,
     ) {}
@@ -228,6 +237,10 @@ export class StoryModelService {
                 // Every field the entry answers with, its trigger settings included (.scratch/lore-triggers/spec.md).
                 const { id: _id, ...fields } = entry.toResponse();
                 await manager.save(manager.create(LoreEntryEntity, { ...fields, storyId: story.id, position: entry.position }));
+            }
+            // The Lore sets it links are shared, not copied: the copy links the same ones (.scratch/shared-lore/spec.md).
+            for (const link of source.loreSetLinks ?? []) {
+                await manager.save(manager.create(StoryLoreSetEntity, { storyId: story.id, loreSetId: link.loreSetId, position: link.position }));
             }
             // With their passages and vectors, so the copy is complete and costs nothing (.scratch/documents/spec.md).
             await copyDocuments(manager, source.id, story.id);
@@ -446,5 +459,54 @@ export class StoryModelService {
 
     async removeLoreEntry(entry: LoreEntryEntity): Promise<void> {
         await this.lore.delete({ id: entry.id });
+    }
+
+    /** The current Account's Lore sets, oldest first, each with its entries and the Stories that link it. */
+    findLoreSets(): Promise<LoreSetEntity[]> {
+        return this.loreSets.find({
+            where: { userId: this.accounts.currentId() },
+            relations: { entries: true, links: { story: true } },
+            relationLoadStrategy: 'query',
+            order: { id: 'ASC' },
+        });
+    }
+
+    /** The ids among `ids` that are Lore sets of the current Account; another Account's answers as missing. */
+    async ownLoreSetIds(ids: number[]): Promise<Set<number>> {
+        if (ids.length === 0) return new Set();
+        const found = await this.loreSets.find({ where: { id: In(ids), userId: this.accounts.currentId() }, select: { id: true } });
+        return new Set(found.map((set) => set.id));
+    }
+
+    createLoreSet(name: string): Promise<LoreSetEntity> {
+        return this.loreSets.save(this.loreSets.create({ name, userId: this.accounts.currentId() }));
+    }
+
+    async renameLoreSet(setId: number, name: string): Promise<void> {
+        await this.loreSets.update({ id: setId }, { name });
+    }
+
+    /** Its entries and its links in every Story go with it (ON DELETE CASCADE). */
+    async removeLoreSet(setId: number): Promise<void> {
+        await this.loreSets.delete({ id: setId, userId: this.accounts.currentId() });
+    }
+
+    /** Replaces the Story's links to Lore sets, in the order given. */
+    setLoreSetLinks(storyId: number, loreSetIds: number[]): Promise<void> {
+        return this.dataSource.transaction(async (manager) => {
+            await manager.delete(StoryLoreSetEntity, { storyId });
+            await manager.save(loreSetIds.map((loreSetId, position) => manager.create(StoryLoreSetEntity, { storyId, loreSetId, position })));
+        });
+    }
+
+    /** Hands every Lore entry of the Story's own over to a Lore set, after the set's own entries and in the same order. */
+    async moveLoreToSet(storyId: number, setId: number): Promise<void> {
+        await this.dataSource.transaction(async (manager) => {
+            const [{ last }]: Array<{ last: number | null }> = await manager.query('SELECT max("position") AS "last" FROM "lore_entry" WHERE "lore_set_id" = $1', [setId]);
+            await manager.query(
+                `UPDATE "lore_entry" SET "lore_set_id" = $1, "story_id" = NULL, "position" = "position" + $3 WHERE "story_id" = $2`,
+                [setId, storyId, (last ?? -1) + 1],
+            );
+        });
     }
 }

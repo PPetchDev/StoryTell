@@ -29,6 +29,9 @@ import {
     StoryRequestBodyDTO,
     SuddenEventRequestBodyDTO,
     EndingRequestBodyDTO,
+    CreateLoreSetRequestBodyDTO,
+    LinkLoreSetsRequestBodyDTO,
+    RenameLoreSetRequestBodyDTO,
 } from './dto/story.request.dto.js';
 import { OpeningPreviewResponseBodyDTO } from './dto/opening.response.dto.js';
 import { ListStoriesResponseBodyDTO, StoryResponseBodyDTO } from './dto/story.response.dto.js';
@@ -246,6 +249,58 @@ export class StoryApiController {
     @ApiOkResponse({ type: StoryResponseBodyDTO })
     removeSuddenEvent(@Id('storyId') storyId: number, @Id('eventId') eventId: number): Promise<StoryResponseBodyDTO> {
         return this.storyManager.removeSuddenEvent(storyId, eventId);
+    }
+
+    /**
+     * .scratch/shared-lore/spec.md: the Lore sets a Story links. A set is the Account's, shared by
+     * every Story that links it, and is changed only through one of those Stories; each write
+     * answers with this whole Story.
+     */
+    @Post(':storyId/lore-sets')
+    @ApiCreatedResponse({ type: StoryResponseBodyDTO, description: 'A new Lore set, linked to this Story last.' })
+    createLoreSet(@Id('storyId') storyId: number, @Body() body: CreateLoreSetRequestBodyDTO): Promise<StoryResponseBodyDTO> {
+        return this.storyManager.createLoreSet(storyId, body);
+    }
+
+    @Put(':storyId/lore-sets')
+    @ApiOkResponse({ type: StoryResponseBodyDTO, description: 'The Story links exactly these sets, in this order. A set left out is unlinked, not deleted.' })
+    linkLoreSets(@Id('storyId') storyId: number, @Body() body: LinkLoreSetsRequestBodyDTO): Promise<StoryResponseBodyDTO> {
+        return this.storyManager.linkLoreSets(storyId, body.loreSetIds);
+    }
+
+    @Patch(':storyId/lore-sets/:setId')
+    @ApiOkResponse({ type: StoryResponseBodyDTO })
+    renameLoreSet(@Id('storyId') storyId: number, @Id('setId') setId: number, @Body() body: RenameLoreSetRequestBodyDTO): Promise<StoryResponseBodyDTO> {
+        return this.storyManager.renameLoreSet(storyId, setId, body.name);
+    }
+
+    @Delete(':storyId/lore-sets/:setId')
+    @ApiOkResponse({ type: StoryResponseBodyDTO, description: 'The set is deleted for good, with its entries, from every Story that linked it.' })
+    deleteLoreSet(@Id('storyId') storyId: number, @Id('setId') setId: number): Promise<StoryResponseBodyDTO> {
+        return this.storyManager.deleteLoreSet(storyId, setId);
+    }
+
+    @Post(':storyId/lore-sets/:setId/entries')
+    @ApiCreatedResponse({ type: StoryResponseBodyDTO })
+    addLoreSetEntry(@Id('storyId') storyId: number, @Id('setId') setId: number, @Body() body: LoreEntryRequestBodyDTO): Promise<StoryResponseBodyDTO> {
+        return this.storyManager.addLoreSetEntry(storyId, setId, body);
+    }
+
+    @Patch(':storyId/lore-sets/:setId/entries/:entryId')
+    @ApiOkResponse({ type: StoryResponseBodyDTO })
+    updateLoreSetEntry(
+        @Id('storyId') storyId: number,
+        @Id('setId') setId: number,
+        @Id('entryId') entryId: number,
+        @Body() body: LoreEntryRequestBodyDTO,
+    ): Promise<StoryResponseBodyDTO> {
+        return this.storyManager.updateLoreSetEntry(storyId, setId, entryId, body);
+    }
+
+    @Delete(':storyId/lore-sets/:setId/entries/:entryId')
+    @ApiOkResponse({ type: StoryResponseBodyDTO })
+    removeLoreSetEntry(@Id('storyId') storyId: number, @Id('setId') setId: number, @Id('entryId') entryId: number): Promise<StoryResponseBodyDTO> {
+        return this.storyManager.removeLoreSetEntry(storyId, setId, entryId);
     }
 
     /** .scratch/endings/spec.md: a Story's Endings. */

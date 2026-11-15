@@ -70,6 +70,7 @@ import { ReplaceRuleList } from '@/components/replace-rules/replace-rule-list';
 import { storyReplaceRules } from '@/lib/replace-rules';
 import { SceneCard } from './scene-card';
 import { EndingCard } from './ending-card';
+import { SharedLore } from './shared-lore';
 import { SuddenEventCard } from './sudden-event-card';
 import { StartingBeliefsCard } from './starting-beliefs-card';
 import { StartingBondsCard } from './starting-bonds-card';
@@ -452,6 +453,35 @@ export function StoryEditor({ initial }: { initial: Story }) {
             lore: current.lore.map((entry) => (entry.id === loreId ? { ...entry, [field]: value } : entry)),
         }));
         queue(`lore.${loreId}.${field}`, () => storyApi.updateLoreEntry(storyId, loreId, { [field]: value }), applyStatus);
+    };
+
+    /** One entry of a linked Lore set, changed in place (.scratch/shared-lore/spec.md): the same for every Story that links the set. */
+    const mapLoreSetEntry = (current: Story, setId: number, entryId: number, change: (entry: LoreEntry) => LoreEntry): Story => ({
+        ...current,
+        loreSets: (current.loreSets ?? []).map((set) =>
+            set.id === setId ? { ...set, entries: set.entries.map((entry) => (entry.id === entryId ? change(entry) : entry)) } : set,
+        ),
+    });
+    const setLoreSetEntry = <K extends keyof LoreEntry>(setId: number, entryId: number, field: K, value: LoreEntry[K]) => {
+        setStory((current) => mapLoreSetEntry(current, setId, entryId, (entry) => ({ ...entry, [field]: value })));
+        queue(`loreSetEntry.${entryId}.${String(field)}`, () => storyApi.updateLoreSetEntry(storyId, setId, entryId, { [field]: value }), applyStatus);
+    };
+    const setLoreSetEntryPatterns = (setId: number, entryId: number, patterns: string[], onSaved: () => void, onError: (message: string) => void) => {
+        queue(
+            `loreSetEntry.${entryId}.patterns`,
+            () => storyApi.updateLoreSetEntry(storyId, setId, entryId, { patterns }),
+            (saved: Story) => {
+                applyStatus(saved);
+                const stored = saved.loreSets.find((set) => set.id === setId)?.entries.find((entry) => entry.id === entryId)?.patterns ?? patterns;
+                setStory((current) => mapLoreSetEntry(current, setId, entryId, (entry) => ({ ...entry, patterns: stored })));
+                onSaved();
+            },
+            onError,
+        );
+    };
+    const setLoreSetName = (setId: number, name: string) => {
+        setStory((current) => ({ ...current, loreSets: (current.loreSets ?? []).map((set) => (set.id === setId ? { ...set, name } : set)) }));
+        queue(`loreSet.${setId}.name`, () => storyApi.renameLoreSet(storyId, setId, name), applyStatus);
     };
 
     /**
@@ -983,6 +1013,18 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                 })}>
                                     + Add Lore entry
                                 </button>
+                                <SharedLore
+                                    storyId={storyId}
+                                    sets={story.loreSets ?? []}
+                                    ownEntries={story.lore.length}
+                                    rewrites={fieldRewrites}
+                                    commit={commit}
+                                    applyWhole={applyWhole}
+                                    onName={setLoreSetName}
+                                    onEntry={setLoreSetEntry}
+                                    onEntryPatterns={setLoreSetEntryPatterns}
+                                    onInvalidNumber={(entryId, field) => cancel(`loreSetEntry.${entryId}.${field}`)}
+                                />
                                 <DocumentsSection
                                     storyId={storyId}
                                     documents={story.documents}

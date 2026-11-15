@@ -72,14 +72,31 @@ interface LoreCardProps {
     onRemove(): void | Promise<unknown>;
     /** A number typed out of range: drop the edit of that setting still waiting to be saved (audit M21). */
     onInvalidNumber?(field: LoreTriggerKey): void;
+    /** What the card is called before its number: "Lore" for a Story's own entry, the set's name for a Lore set's. */
+    labelPrefix?: string;
+    /** What removing it means, where that is more than the Story's own Chats losing the note. */
+    removeWarning?: string;
 }
 
 /**
  * One Lore entry (spec: "Lore"). Lore has no ✨ Rewrite; the field ids and highlights still
  * follow the Rewrite naming, so the assistant's changes light up here and links land here.
  */
-export function LoreCard({ entry, index, rewrites, onText, onKeywords, onAlwaysOn, onTrigger, onPatterns, onRemove, onInvalidNumber }: LoreCardProps) {
-    const heading = entry.name.trim() === '' ? `Lore ${index + 1}` : entry.name;
+export function LoreCard({
+    entry,
+    index,
+    rewrites,
+    onText,
+    onKeywords,
+    onAlwaysOn,
+    onTrigger,
+    onPatterns,
+    onRemove,
+    onInvalidNumber,
+    labelPrefix = 'Lore',
+    removeWarning,
+}: LoreCardProps) {
+    const heading = entry.name.trim() === '' ? `${labelPrefix} ${index + 1}` : entry.name;
     const marks = (field: string) => {
         const request = { target: 'lore' as const, id: entry.id, field };
         return { domId: fieldDomId(request), highlighted: rewrites.highlights.has(rewriteKey(request)) };
@@ -110,7 +127,7 @@ export function LoreCard({ entry, index, rewrites, onText, onKeywords, onAlwaysO
     return (
         <FoldingCard
             foldKey={`lore:${entry.id}`}
-            label={`Lore ${index + 1}`}
+            label={`${labelPrefix} ${index + 1}`}
             fieldPrefixes={[`field-lore.${entry.id}.`]}
             title={heading}
             tools={
@@ -119,11 +136,11 @@ export function LoreCard({ entry, index, rewrites, onText, onKeywords, onAlwaysO
                         label="Remove"
                         danger
                         question={`Remove ${heading}?`}
-                        warning="Chats stop getting this note from their next turn."
+                        warning={removeWarning ?? 'Chats stop getting this note from their next turn.'}
                         confirmLabel="Remove"
-                        ariaLabel={`Remove Lore ${index + 1}`}
+                        ariaLabel={`Remove ${labelPrefix} ${index + 1}`}
                         onConfirm={onRemove}
-                        focusAfter={() => cardToggle(`Lore ${index + 1}`) ?? cardToggle(`Lore ${index}`)}
+                        focusAfter={() => cardToggle(`${labelPrefix} ${index + 1}`) ?? cardToggle(`${labelPrefix} ${index}`)}
                     />
                 </Toolbar>
             }

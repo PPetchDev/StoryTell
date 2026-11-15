@@ -17,6 +17,7 @@ import type { SavedReplyEntity, SavedReplyResponse } from '../../saved-reply/ent
 import type { SnapshotEntity } from '../../snapshot/entities/snapshot.entity.js';
 import type { CharacterEntity, CharacterResponse } from './character.entity.js';
 import type { LoreEntryEntity, LoreEntryResponse } from './lore-entry.entity.js';
+import type { LoreSetResponse, StoryLoreSetEntity } from './lore-set.entity.js';
 import type { RoleEntity, RoleResponse } from './role.entity.js';
 import type { SceneEntity, SceneResponse } from './scene.entity.js';
 import type { SuddenEventEntity, SuddenEventResponse } from './sudden-event.entity.js';
@@ -119,6 +120,8 @@ export interface StoryResponse extends StorySummary {
     endings: EndingResponse[];
     /** In add order. */
     lore: LoreEntryResponse[];
+    /** The Lore sets it links (.scratch/shared-lore/spec.md), in the order they were linked, each with its entries. */
+    loreSets: LoreSetResponse[];
     /** In add order, without text or vectors (.scratch/documents/spec.md). */
     documents: DocumentSummary[];
     /** The Story's own Saved replies, in add order (.scratch/saved-replies-and-replace-rules/spec.md). */
@@ -233,6 +236,10 @@ export class StoryEntity {
     @OneToMany('LoreEntryEntity', 'story')
     lore: Relation<LoreEntryEntity[]>;
 
+    /** Its links to Lore sets (.scratch/shared-lore/spec.md), each with the set and the set's entries when loaded. */
+    @OneToMany('StoryLoreSetEntity', 'story')
+    loreSetLinks: Relation<StoryLoreSetEntity[]>;
+
     /** Loaded without text; passages are never loaded with the Story. */
     @OneToMany('DocumentEntity', 'story')
     documents: Relation<DocumentEntity[]>;
@@ -260,6 +267,14 @@ export class StoryEntity {
     }
 
     /** Needs the relations loaded (StoryModelService.findFull). */
+    /**
+     * Every Lore entry the Story's prompts can carry: its own, then those of the Lore sets it links,
+     * set by set in link order (.scratch/shared-lore/spec.md). Needs `lore` and `loreSetLinks` loaded.
+     */
+    allLore(): LoreEntryEntity[] {
+        return [...this.lore, ...(this.loreSetLinks ?? []).flatMap((link) => link.loreSet?.entries ?? [])];
+    }
+
     toResponse(): StoryResponse {
         return {
             ...this.toSummary(),
@@ -282,6 +297,7 @@ export class StoryEntity {
             suddenEvents: (this.suddenEvents ?? []).map((event) => event.toResponse()),
             endings: (this.endings ?? []).map((ending) => ending.toResponse()),
             lore: this.lore.map((entry) => entry.toResponse()),
+            loreSets: (this.loreSetLinks ?? []).flatMap((link) => (link.loreSet ? [link.loreSet.toResponse()] : [])),
             documents: this.documents.map((document) => document.toSummary()),
             savedReplies: this.savedReplies.map((line) => line.toResponse()),
             replaceRules: this.replaceRules.map((rule) => rule.toResponse()),

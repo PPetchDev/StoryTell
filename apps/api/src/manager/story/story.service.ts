@@ -11,6 +11,8 @@ import {
     InvalidOrderError,
     InvalidLorePatternError,
     LoreEntryNotFoundError,
+    LoreSetLimitError,
+    LoreSetNotFoundError,
     NoCoverError,
     EndingLimitError,
     EndingNotFoundError,
@@ -32,6 +34,7 @@ import { LedgerModelService } from '../../model/ledger/ledger.service.js';
 import { SnapshotModelService } from '../../model/snapshot/snapshot.service.js';
 import { CharacterEntity, PortraitCrop } from '../../model/story/entities/character.entity.js';
 import { LoreEntryEntity, LoreTriggers } from '../../model/story/entities/lore-entry.entity.js';
+import { LoreSetEntity, loreSetName, MAX_LORE_SETS_PER_STORY } from '../../model/story/entities/lore-set.entity.js';
 import { SceneEntity } from '../../model/story/entities/scene.entity.js';
 import { StartingBondEntity } from '../../model/story/entities/starting-bond.entity.js';
 import { GaugeDirection, MAX_SUDDEN_EVENTS, SUDDEN_EVENT_TURNS, SuddenEventEntity } from '../../model/story/entities/sudden-event.entity.js';
@@ -137,6 +140,16 @@ export interface NewStartingBond extends StartingBondFields {
     fromCharacterId: number;
     /** `null` means toward the Role. */
     toCharacterId: number | null;
+}
+
+/** A Lore set as the picker lists it (.scratch/shared-lore/spec.md): what it is, how much it holds and who uses it. */
+export interface LoreSetSummary {
+    id: number;
+    name: string;
+    /** How many entries it holds. */
+    entries: number;
+    /** The Stories that link it, by title. */
+    stories: Array<{ id: number; title: string }>;
 }
 
 /** Spec: "Lore". Keywords are trimmed and blanks dropped before they are stored. */
@@ -855,6 +868,102 @@ export class StoryManagerService {
         const story = await this.load(storyId);
         await this.storyModel.removeLoreEntry(this.findLoreEntry(story, loreId));
         return this.saved(storyId);
+    }
+
+    /** .scratch/shared-lore/spec.md: the Account's Lore sets, oldest first, for the picker. */
+    async listLoreSets(): Promise<LoreSetSummary[]> {
+        const sets = await this.storyModel.findLoreSets();
+        return sets.map((set) => ({
+            id: set.id,
+            name: loreSetName(set.name),
+            entries: (set.entries ?? []).length,
+            stories: (set.links ?? [])
+                .flatMap((link) => (link.story ? [{ id: link.story.id, title: link.story.title }] : []))
+                .sort((a, b) => a.id - b.id),
+        }));
+    }
+
+    /**
+     * .scratch/shared-lore/spec.md: a new Lore set, linked to this Story last. With `moveLore` the
+     * Story's own Lore entries become the set's, so what the Story reads stays the same and other
+     * Stories can now link it.
+     */
+    async createLoreSet(storyId: number, fields: { name?: string; moveLore?: boolean }): Promise<StoryDetail> {
+        const story = await this.load(storyId);
+        const linked = (story.loreSetLinks ?? []).map((link) => link.loreSetId);
+        if (linked.length >= MAX_LORE_SETS_PER_STORY) throw new LoreSetLimitError(MAX_LORE_SETS_PER_STORY);
+        const set = await this.storyModel.createLoreSet(fields.name?.trim() ?? '');
+        if (fields.moveLore) await this.storyModel.moveLoreToSet(story.id, set.id);
+        await this.storyModel.setLoreSetLinks(story.id, [...linked, set.id]);
+        return this.saved(storyId);
+    }
+
+    /**
+     * Replaces the Lore sets the Story links, in the order given: linking one that is the
+     * Account's, unlinking one left out. An unlinked set is kept, with its entries, for the
+     * Stories that still link it or to be linked again.
+     */
+    async linkLoreSets(storyId: number, ids: number[]): Promise<StoryDetail> {
+        const story = await this.load(storyId);
+        // A set named twice is linked once, where it first stands.
+        const loreSetIds = [...new Set(ids)];
+        if (loreSetIds.length > MAX_LORE_SETS_PER_STORY) throw new LoreSetLimitError(MAX_LORE_SETS_PER_STORY);
+        const own = await this.storyModel.ownLoreSetIds(loreSetIds);
+        if (loreSetIds.some((id) => !own.has(id))) throw new LoreSetNotFoundError();
+        await this.storyModel.setLoreSetLinks(story.id, loreSetIds);
+        return this.saved(storyId);
+    }
+
+    /** Its new name shows in every Story that links it. */
+    async renameLoreSet(storyId: number, setId: number, name: string): Promise<StoryDetail> {
+        const story = await this.load(storyId);
+        await this.storyModel.renameLoreSet(this.findLoreSet(story, setId).id, name);
+        return this.saved(storyId);
+    }
+
+    /** Deletes the set for good: its entries go, and every Story that linked it reads on without them. */
+    async deleteLoreSet(storyId: number, setId: number): Promise<StoryDetail> {
+        const story = await this.load(storyId);
+        await this.storyModel.removeLoreSet(this.findLoreSet(story, setId).id);
+        return this.saved(storyId);
+    }
+
+    /** A new entry in a set this Story links; it reaches every Story that links the set. */
+    async addLoreSetEntry(storyId: number, setId: number, fields: LoreEntryFields & LoreTriggerFields): Promise<StoryDetail> {
+        const story = await this.load(storyId);
+        const set = this.findLoreSet(story, setId);
+        const position = Math.max(-1, ...(set.entries ?? []).map((other) => other.position)) + 1;
+        const entry = this.storyModel.createLoreEntry({ loreSetId: set.id, storyId: null, position, keywords: [] });
+        assignLore(entry, fields);
+        await this.storyModel.saveLoreEntry(entry);
+        return this.saved(storyId);
+    }
+
+    async updateLoreSetEntry(storyId: number, setId: number, entryId: number, fields: LoreEntryFields & LoreTriggerFields): Promise<StoryDetail> {
+        const story = await this.load(storyId);
+        const entry = this.findLoreSetEntry(this.findLoreSet(story, setId), entryId);
+        assignLore(entry, fields);
+        await this.storyModel.saveLoreEntry(entry);
+        return this.saved(storyId);
+    }
+
+    async removeLoreSetEntry(storyId: number, setId: number, entryId: number): Promise<StoryDetail> {
+        const story = await this.load(storyId);
+        await this.storyModel.removeLoreEntry(this.findLoreSetEntry(this.findLoreSet(story, setId), entryId));
+        return this.saved(storyId);
+    }
+
+    /** A Lore set this Story links: only through such a Story is a set changed. */
+    private findLoreSet(story: StoryEntity, setId: number): LoreSetEntity {
+        const set = (story.loreSetLinks ?? []).find((link) => link.loreSetId === setId)?.loreSet;
+        if (!set) throw new LoreSetNotFoundError();
+        return set;
+    }
+
+    private findLoreSetEntry(set: LoreSetEntity, entryId: number): LoreEntryEntity {
+        const entry = (set.entries ?? []).find((other) => other.id === entryId);
+        if (!entry) throw new LoreEntryNotFoundError();
+        return entry;
     }
 
     private findLoreEntry(story: StoryEntity, loreId: number): LoreEntryEntity {

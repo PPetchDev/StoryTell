@@ -50,6 +50,7 @@ import { DiaryEntries1764200000000 } from './1764200000000-DiaryEntries.js';
 import { Endings1764210000000 } from './1764210000000-Endings.js';
 import { SuggestedEndings1764220000000 } from './1764220000000-SuggestedEndings.js';
 import { PersonaImage1764230000000 } from './1764230000000-PersonaImage.js';
+import { LoreSets1764240000000 } from './1764240000000-LoreSets.js';
 
 // Listed by hand, oldest first, so migrations load the same way from compiled JS, the
 // TypeORM CLI and Vitest. Add every new migration here.
@@ -106,4 +107,5 @@ export const migrations = [
     Endings1764210000000,
     SuggestedEndings1764220000000,
     PersonaImage1764230000000,
+    LoreSets1764240000000,
 ];

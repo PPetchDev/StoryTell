@@ -45,8 +45,12 @@ The story's closing passage in one Chat, written by the Narrator when the user a
 _Avoid_: Afterword, outro, final message, summary
 
 **Lore**:
-A Story's notes about its world, each a **Lore entry**: a name, keywords and a short text about a place, people, custom or object. An entry reaches the Narrator only when its triggers come up in the latest exchange or in another entry already chosen, for a few Messages after that when it is set to stay, or on every turn when it is set to always be included; the Setting stays the short core sent on every turn. Lore is common knowledge in the world, so every Character knows it; a Character's secrets stay on their card. It belongs to the Story and is shared by all its Chats, where a Memory belongs to one Chat.
+A Story's notes about its world, each a **Lore entry**: a name, keywords and a short text about a place, people, custom or object. An entry reaches the Narrator only when its triggers come up in the latest exchange or in another entry already chosen, for a few Messages after that when it is set to stay, or on every turn when it is set to always be included; the Setting stays the short core sent on every turn. Lore is common knowledge in the world, so every Character knows it; a Character's secrets stay on their card. A Story's own Lore belongs to that Story and is shared by all its Chats, where a Memory belongs to one Chat; a Story also reads the Lore of the Lore sets it links.
 _Avoid_: Lorebook, world info, codex, wiki
+
+**Lore set**:
+Lore entries kept apart from any one Story, belonging to the Account and linked to each Story that shares them, for a world more than one Story is told in. A Story reads a linked set's entries exactly as its own; a change to the set is the change in every Story that links it. Unlinking a set takes it off one Story and keeps it; deleting it takes it, and its entries, from all of them.
+_Avoid_: Shared lorebook, sourcebook, world, library, pack
 
 **Document**:
 A longer text the author attaches to a Story — pasted, uploaded or taken from a web page — whose passages reach the Narrator when they are close in meaning to the latest exchange. Like Lore it is common knowledge shared by all the Story's Chats, but it is found by meaning, not by keywords, and is never edited into entries.
@@ -81,7 +85,7 @@ The picture the author chooses for a Story, shown on its card on Home and at the
 _Avoid_: Thumbnail, banner, key art
 
 **Duplicate**:
-Making a new Story, "<title> (copy)", from everything the author wrote in another: its text, style, Narration voice and Backdrop choice, Role, Characters with their Reference images, Portraits, Expressions and Speaking voices, Scenes, Sudden events, Endings, Starting Bonds, Lore, Documents, its own Saved replies and Replace rules, and Cover, each image in a file of its own. No Chats or Snapshots come along, so a Cover that is a Snapshot is dropped.
+Making a new Story, "<title> (copy)", from everything the author wrote in another: its text, style, Narration voice and Backdrop choice, Role, Characters with their Reference images, Portraits, Expressions and Speaking voices, Scenes, Sudden events, Endings, Starting Bonds, its own Lore and its links to Lore sets (the sets themselves are shared, not copied), Documents, its own Saved replies and Replace rules, and Cover, each image in a file of its own. No Chats or Snapshots come along, so a Cover that is a Snapshot is dropped.
 _Avoid_: Clone, fork, template
 
 ## Playing

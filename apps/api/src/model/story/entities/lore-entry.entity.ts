@@ -1,6 +1,7 @@
 import { Column, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 import type { Relation } from 'typeorm';
 
+import type { LoreSetEntity } from './lore-set.entity.js';
 import type { StoryEntity } from './story.entity.js';
 
 /** How an entry's second keywords filter it (.scratch/lore-triggers/spec.md: "Matching"). */
@@ -45,20 +46,32 @@ export interface LoreEntryResponse extends LoreTriggers {
  * A short note about the Story's world (spec: "Lore"). It is sent in a turn only when its name
  * or a keyword comes up in the latest exchange, or on every turn when `alwaysOn`; its trigger
  * settings narrow that (.scratch/lore-triggers/spec.md). Ordered by `position` (add order)
- * within the Story, which only breaks ties.
+ * within the Story, which only breaks ties. An entry is a Story's own, or it is a Lore set's
+ * (.scratch/shared-lore/spec.md) and reaches every Story that links the set: exactly one of
+ * `storyId` and `loreSetId` is set.
  */
 @Entity('lore_entry')
 export class LoreEntryEntity {
     @PrimaryGeneratedColumn()
     id: number;
 
+    /** The Story whose own entry it is; NULL for a Lore set's. */
     @Index()
-    @Column({ name: 'story_id', type: 'integer' })
-    storyId: number;
+    @Column({ name: 'story_id', type: 'integer', nullable: true })
+    storyId: number | null;
 
-    @ManyToOne('StoryEntity', 'lore', { onDelete: 'CASCADE' })
+    @ManyToOne('StoryEntity', 'lore', { onDelete: 'CASCADE', nullable: true })
     @JoinColumn({ name: 'story_id' })
-    story: Relation<StoryEntity>;
+    story: Relation<StoryEntity> | null;
+
+    /** The Lore set it belongs to; NULL for a Story's own. */
+    @Index()
+    @Column({ name: 'lore_set_id', type: 'integer', nullable: true })
+    loreSetId: number | null;
+
+    @ManyToOne('LoreSetEntity', 'entries', { onDelete: 'CASCADE', nullable: true })
+    @JoinColumn({ name: 'lore_set_id' })
+    loreSet: Relation<LoreSetEntity> | null;
 
     @Column({ type: 'integer' })
     position: number;

@@ -24,9 +24,17 @@ export interface PromptLoreEntry extends Partial<LoreTriggers> {
     alwaysOn: boolean;
 }
 
-/** The Story's Lore as the prompts read it; takes a Story with its `lore` loaded. */
-export function promptLore(story: { lore: Array<PromptLoreEntry & LoreTriggers> }): PromptLoreEntry[] {
-    return story.lore.map((entry) => ({
+/**
+ * The Story's Lore as the prompts read it: its own entries, then those of the Lore sets it links,
+ * set by set (.scratch/shared-lore/spec.md). Takes a Story with its `lore` loaded, and its
+ * `loreSetLinks` with each set's entries; a Story read without them has only its own.
+ */
+export function promptLore(story: {
+    lore: Array<PromptLoreEntry & LoreTriggers>;
+    loreSetLinks?: Array<{ loreSet?: { entries?: Array<PromptLoreEntry & LoreTriggers> } | null }> | null;
+}): PromptLoreEntry[] {
+    const all = [...story.lore, ...(story.loreSetLinks ?? []).flatMap((link) => link.loreSet?.entries ?? [])];
+    return all.map((entry) => ({
         id: entry.id,
         name: entry.name,
         keywords: [...entry.keywords],

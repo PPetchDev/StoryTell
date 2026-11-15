@@ -18,6 +18,7 @@ import { DetailChangeEntity } from '../../model/ledger/entities/detail-change.en
 import { DiaryEntryEntity } from '../../model/ledger/entities/diary-entry.entity.js';
 import { EndingReachedEntity } from '../../model/ledger/entities/ending-reached.entity.js';
 import { EndingEntity } from '../../model/story/entities/ending.entity.js';
+import { LoreSetEntity, StoryLoreSetEntity } from '../../model/story/entities/lore-set.entity.js';
 import { SuddenEventEntity } from '../../model/story/entities/sudden-event.entity.js';
 import { MemoryKnownByEntity } from '../../model/memory/entities/memory-known-by.entity.js';
 import { MemoryEntity } from '../../model/memory/entities/memory.entity.js';
@@ -71,6 +72,8 @@ export const entities = [
     DiaryEntryEntity,
     EndingEntity,
     EndingReachedEntity,
+    LoreSetEntity,
+    StoryLoreSetEntity,
     ChatArcDirectionEntity,
     MemoryEntity,
     MemoryKnownByEntity,

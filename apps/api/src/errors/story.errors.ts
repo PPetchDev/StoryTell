@@ -203,6 +203,20 @@ export class EndingLimitError extends AppError {
     }
 }
 
+/** No Lore set with that id for this Account, or one this Story does not link (.scratch/shared-lore/spec.md). */
+export class LoreSetNotFoundError extends AppError {
+    constructor() {
+        super('404.003.030', 'Lore set not found.');
+    }
+}
+
+/** A Story already links the most Lore sets it can. */
+export class LoreSetLimitError extends AppError {
+    constructor(max: number) {
+        super('422.003.031', `A Story can link at most ${max} Lore sets.`);
+    }
+}
+
 export class InvalidBondGateError extends AppError {
     constructor(reason: string) {
         super('422.003.024', `That Bond gate can't be set: ${reason}`);

@@ -76,7 +76,7 @@ const unixSeconds = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 export function writeCard(story: StoryResponse, character: Character): CardDefinitions {
     const role = story.role.name;
     const u = (text: string) => userMacro(text.trim(), role);
-    const lore = story.lore.filter((entry) => entry.text.trim() !== '');
+    const lore = [...story.lore, ...(story.loreSets ?? []).flatMap((set) => set.entries)].filter((entry) => entry.text.trim() !== '');
     // The Lore trigger settings go where SillyTavern reads them (card-mapping.ts reads them back):
     // Patterns as `/source/i` keys, second keywords as selective second keys, the rest in extensions.
     const entries = lore.map((entry, index) => ({

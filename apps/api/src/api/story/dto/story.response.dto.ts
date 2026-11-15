@@ -16,6 +16,8 @@ import type { LoreSecondaryMode } from '../../../model/story/entities/lore-entry
 import { SceneResponse } from '../../../model/story/entities/scene.entity.js';
 import { GaugeDirection, SuddenEventResponse } from '../../../model/story/entities/sudden-event.entity.js';
 import { EndingResponse } from '../../../model/story/entities/ending.entity.js';
+import type { LoreSetResponse } from '../../../model/story/entities/lore-set.entity.js';
+import type { LoreSetSummary } from '../../../manager/story/story.service.js';
 import { StartingBeliefResponse } from '../../../model/story/entities/starting-belief.entity.js';
 import { StartingBondResponse } from '../../../model/story/entities/starting-bond.entity.js';
 import { SceneBondGateResponse } from '../../../model/story/entities/scene-bond-gate.entity.js';
@@ -472,6 +474,9 @@ export class StoryResponseBodyDTO implements StoryDetail {
     @ApiProperty({ type: [LoreEntryDTO], description: 'In add order.' })
     lore: LoreEntryDTO[];
 
+    @ApiProperty({ type: () => [LoreSetDTO], description: 'The Lore sets it links, in the order they were linked, each with its entries.' })
+    loreSets: LoreSetDTO[];
+
     @ApiProperty({ type: [DocumentSummaryDTO], description: 'In add order, without text or vectors.' })
     documents: DocumentSummaryDTO[];
 
@@ -501,4 +506,47 @@ export class StoryResponseBodyDTO implements StoryDetail {
 
     @ApiProperty()
     updatedAt: string;
+}
+
+/** A Lore set as a Story that links it reads it (.scratch/shared-lore/spec.md). */
+export class LoreSetDTO implements LoreSetResponse {
+    @ApiProperty()
+    id: number;
+
+    @ApiProperty({ description: 'May be empty.' })
+    name: string;
+
+    @ApiProperty({ type: [LoreEntryDTO], description: 'In add order.' })
+    entries: LoreEntryDTO[];
+
+    @ApiProperty({ description: 'How many Stories link it, this one included: a change to it reaches them all.' })
+    usedBy: number;
+}
+
+export class LoreSetStoryDTO {
+    @ApiProperty()
+    id: number;
+
+    @ApiProperty()
+    title: string;
+}
+
+/** A Lore set as the picker lists it. */
+export class LoreSetSummaryDTO implements LoreSetSummary {
+    @ApiProperty()
+    id: number;
+
+    @ApiProperty({ description: '"Lore set" where the author gave it no name.' })
+    name: string;
+
+    @ApiProperty({ description: 'How many entries it holds.' })
+    entries: number;
+
+    @ApiProperty({ type: [LoreSetStoryDTO], description: 'The Stories that link it.' })
+    stories: LoreSetStoryDTO[];
+}
+
+export class ListLoreSetsResponseBodyDTO {
+    @ApiProperty({ type: [LoreSetSummaryDTO], description: "The Account's Lore sets, oldest first." })
+    loreSets: LoreSetSummaryDTO[];
 }

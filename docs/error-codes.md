@@ -84,6 +84,8 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | `422.003.027` | `SuddenEventLimitError` | A ninth Sudden event on one Story. Nothing is added. |
 | `404.003.028` | `EndingNotFoundError` | No Ending with that id in this Story (`PATCH`/`DELETE /api/stories/:storyId/endings/:endingId`, `.scratch/endings/spec.md`). Nothing changes. |
 | `422.003.029` | `EndingLimitError` | A seventh Ending on one Story. Nothing is added. |
+| `404.003.030` | `LoreSetNotFoundError` | No Lore set with that id for this Account when linking (`PUT /api/stories/:storyId/lore-sets`), or one this Story does not link when renaming it, deleting it or changing its entries (`…/lore-sets/:setId…`, `.scratch/shared-lore/spec.md`). Another Account's set answers the same. Nothing changes. |
+| `422.003.031` | `LoreSetLimitError` | A sixth Lore set linked to one Story, by linking or by making a new one. Nothing changes. |
 | `422.003.025` | `EmptyStartingBeliefError` | Starting Beliefs (`PUT /api/stories/:storyId/starting-beliefs`) with one whose text is nothing but whitespace. The whole list is refused and nothing changes. A Character outside the cast is `CharacterNotFoundError`. |
 | `404.004.001` | `ChatNotFoundError` | No Chat with that id in this Story. |
 | `422.004.002` | `StoryNotPlayableError` | The Story has a required field empty. The message names the missing fields. Blocks starting a Chat, sending, Continue and Regenerate. |
