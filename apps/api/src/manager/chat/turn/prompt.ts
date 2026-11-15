@@ -11,6 +11,7 @@ import { loreBlock, PromptLoreEntry } from '../lore/lore-select.js';
 import { Roll, rollBlock } from '../roll.js';
 import { LINGERING_REPLIES } from '../scene-replies.js';
 import { PromptSuddenEvent, suddenEventBlock } from '../sudden-event/sudden-event.js';
+import { detailsReminder, PromptDetails } from '../details/details.js';
 import { estimateTokens } from './prompt-tokens.js';
 
 /**
@@ -178,6 +179,11 @@ export interface TurnPromptInput {
     present?: string[];
     /** The Chat's Time of day, stated in the reminder near the end; null or left out while there is none. */
     timeOfDay?: TimeOfDay | null;
+    /**
+     * The Chat's Place, Weather and Outfits (.scratch/info-box/spec.md), stated in the reminder near
+     * the end: the Outfits of the Characters in the latest exchange only. Null or left out for none.
+     */
+    details?: PromptDetails | null;
     /** Every Lore entry of the Story (spec: "Lore"); the Story so far reserves room for the most they can take. */
     lore?: PromptLoreEntry[];
     /**
@@ -533,14 +539,17 @@ export function turnFinalInstruction(identity: string): string {
  * essentials close.
  */
 export function stateReminder(
-    input: Pick<TurnPromptInput, 'story' | 'identity' | 'scene' | 'present' | 'timeOfDay' | 'sittingOut'>,
+    input: Pick<TurnPromptInput, 'story' | 'identity' | 'scene' | 'present' | 'timeOfDay' | 'sittingOut' | 'details'>,
 ): string {
     const sittingOut = input.sittingOut ?? [];
     // Someone sitting out is never "in the latest exchange", so the two hints never disagree.
     const present = (input.present ?? []).filter((name) => !sittingOut.includes(name));
     const lines = [input.scene ? `Scene: ${input.scene.name}.` : 'No Scene: the story unfolds freely.'];
     if (input.timeOfDay) lines.push(`Time: ${input.timeOfDay}.`);
+    const details = detailsReminder(input.details, present);
+    lines.push(...details.where);
     if (present.length > 0) lines.push(`In the latest exchange: ${present.join(', ')}.`);
+    if (details.wearing) lines.push(details.wearing);
     if (sittingOut.length > 0) lines.push(sittingOutSentence(sittingOut));
     lines.push(`Narrate in ${povAndTense(input.story, input.identity.name)}, and keep each Character as their card describes.`);
     lines.push(`Gender ${input.identity.name} only as their description or the user's own messages do, whatever earlier turns said.`);

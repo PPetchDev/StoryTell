@@ -134,7 +134,7 @@ describe('The Judge tags each line a Character speaks', () => {
         expect(calls).toHaveLength(1);
         expect(calls[0].messages[1].content).toContain('[1] @Mira: Better.\n\n[2] @Kai: She means thank you.\n\n[3] @Mira: I do not.');
         expect(calls[0].messages[0].content).toContain('Expression rule:');
-        expect(calls[0].maxTokens).toBe(900);
+        expect(calls[0].maxTokens).toBe(1020); // 700, 200 for the line tags and 120 for the Place, weather and outfits
         expect(t.gateway.textCalls().map((call) => call.kind).sort()).toEqual(['judge', 'memory_extraction', 'turn']);
     });
 
@@ -178,7 +178,7 @@ describe('The Judge tags each line a Character speaks', () => {
         expect(call.messages[0].content).not.toContain('Expression');
         expect(call.messages[0].content).not.toContain('"expressions"');
         expect(call.messages[1].content).toContain('Mira watches the boots.\n\n@Mira: Better.\n\n@Kai: She means thank you.\n\n@Mira: I do not.');
-        expect(call.maxTokens).toBe(700);
+        expect(call.maxTokens).toBe(820); // 700 and the 120 the Place, weather and outfits answer takes
         expect(emotions(lastAi(played))).toEqual([null, null, null, null]);
         // Speech always answers the field, null while untagged; narration has none.
         expect(lastAi(played).parts!.slice(0, 2)).toEqual([

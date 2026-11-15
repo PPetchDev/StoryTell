@@ -202,6 +202,19 @@ export const DiceIcon = icon(
         <circle cx="15.4" cy="15.4" r="0.9" fill="currentColor" />
     </>,
 );
+/** 🏠 A Place: a house. */
+export const PlaceIcon = icon(
+    'PlaceIcon',
+    <>
+        <path d="M4 11.5 12 4.5l8 7" />
+        <path d="M6.5 10v9.5h11V10" />
+        <path d="M10.5 19.5v-5h3v5" />
+    </>,
+);
+/** ☁ The Weather: a cloud. */
+export const WeatherIcon = icon('WeatherIcon', <path d="M7.5 18.5a4 4 0 0 1-.6-7.95 5.5 5.5 0 0 1 10.7 1.2 3.4 3.4 0 0 1-.6 6.75z" />);
+/** 👕 An Outfit: a shirt. */
+export const OutfitIcon = icon('OutfitIcon', <path d="M9 4.5 4 7l1.8 4 2.2-1v9.5h8V10l2.2 1L20 7l-5-2.5a3 3 0 0 1-6 0z" />);
 /** ⚡ A Sudden event: a bolt. */
 export const BoltIcon = icon('BoltIcon', <path d="M13 2.5 4.5 13.5H11l-1 8 8.5-11H12z" />);
 /** 🔒 Locked: a padlock. */

@@ -134,6 +134,12 @@ export interface Chat extends ChatSummary {
     suddenEvent: ChatSuddenEvent | null;
     /** The number a Roll sent now must reach, from the Story's Difficulty. */
     rollTarget: number;
+    /** Where the story is now (CONTEXT.md, "Place"); null until the story makes it clear. */
+    place: string | null;
+    /** The weather in the story now; null until the story shows it. */
+    weather: string | null;
+    /** What each Character is wearing now (CONTEXT.md, "Outfit"), for those the story has shown, in cast order. */
+    outfits: Array<{ characterId: number; outfit: string }>;
     /** The worn identity, under which the next User Message shows. */
     identityName: string;
     /** The worn Persona; null while the Chat wears its Story's Role. */

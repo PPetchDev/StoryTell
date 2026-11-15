@@ -166,6 +166,15 @@ export class ChatSuddenEventDTO implements SuddenEventView {
     reason: string;
 }
 
+/** What one Character is wearing now in the Chat (.scratch/info-box/spec.md). */
+export class ChatOutfitDTO {
+    @ApiProperty()
+    characterId: number;
+
+    @ApiProperty({ description: 'A short phrase.' })
+    outfit: string;
+}
+
 export class MessageDTO {
     @ApiProperty()
     id: number;
@@ -301,6 +310,15 @@ export class ChatResponseBodyDTO extends ChatSummaryDTO implements Omit<ChatDeta
 
     @ApiProperty({ description: "The number a Roll sent now must reach, from the Story's Difficulty." })
     rollTarget: number;
+
+    @ApiProperty({ type: String, nullable: true, description: 'Where the story is now; null until the story makes it clear.' })
+    place: string | null;
+
+    @ApiProperty({ type: String, nullable: true, description: 'The weather in the story now; null until the story shows it.' })
+    weather: string | null;
+
+    @ApiProperty({ type: [ChatOutfitDTO], description: 'What each Character is wearing now, for those the story has shown, in cast order.' })
+    outfits: ChatOutfitDTO[];
 
     @ApiProperty({ description: 'The worn identity, under which the next User Message shows.' })
     identityName: string;

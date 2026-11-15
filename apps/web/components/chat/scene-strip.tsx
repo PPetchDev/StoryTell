@@ -12,8 +12,11 @@ import {
     MorningIcon,
     NightIcon,
     NoonIcon,
+    OutfitIcon,
     PinIcon,
+    PlaceIcon,
     TargetIcon,
+    WeatherIcon,
 } from '@/components/icons';
 import { bondGateInWords } from '@/lib/bonds';
 import { Chat, TimeOfDay } from '@/lib/chat';
@@ -24,6 +27,12 @@ interface SceneStripProps {
     current: Chat['currentScene'];
     /** The Chat's Time of day; null while the story has not made one clear. */
     timeOfDay: TimeOfDay | null;
+    /** Where the story is now (CONTEXT.md, "Place"); null until the story makes it clear. */
+    place?: string | null;
+    /** The weather in the story now; null until the story shows it. */
+    weather?: string | null;
+    /** What the Characters are wearing now (CONTEXT.md, "Outfit"), for those the story has shown. */
+    outfits?: Chat['outfits'];
     /** The Story's Scenes, which hold each one's goal; empty while the Story can't be read. */
     scenes: Scene[];
     /** The Story's Characters, to name a Scene's Bond gates; empty while the Story can't be read. */
@@ -45,13 +54,14 @@ const STRIP_ICON = 'mr-1 inline-block shrink-0 align-[-0.2em]';
 
 /**
  * A thin strip under the top bar (spec: "Scene strip"): the current Scene's name, the Time of day
- * once there is one (spec: "Story clock"), and the Scene's goal (its situation), or "Free play",
- * then what its Bond gates wait for.
+ * once there is one (spec: "Story clock"), the Place once the story has one (.scratch/info-box/spec.md),
+ * and the Scene's goal (its situation), or "Free play", then what its Bond gates wait for. Opened,
+ * it also shows the Weather and what each Character is wearing.
  * The Chat re-reads until each turn's background calls settle, so a Scene or time the judge moved
  * on to shows then. A tap opens it to read the goal whole and closes it again; its own ✕ hides it,
  * and ⋯ brings it back (audit M30: a tap used to hide it, with the goal cut off and no way to read it).
  */
-export function SceneStrip({ current, timeOfDay, scenes, characters = [], onHide }: SceneStripProps) {
+export function SceneStrip({ current, timeOfDay, place = null, weather = null, outfits = [], scenes, characters = [], onHide }: SceneStripProps) {
     const [open, setOpen] = useState(false);
     const scene = current ? scenes.find((candidate) => candidate.id === current.id) : undefined;
     const goal = scene?.situation ?? '';
@@ -60,6 +70,11 @@ export function SceneStrip({ current, timeOfDay, scenes, characters = [], onHide
         characterId === null ? 'you' : (characters.find((character) => character.id === characterId)?.name ?? 'someone');
     const waiting = (scene?.gates ?? []).map((gate) => bondGateInWords(nameOf(gate.fromCharacterId), nameOf(gate.toCharacterId), gate.axis, gate.atLeast));
     const time = timeOfDay ? TIME_OF_DAY[timeOfDay] : null;
+    // Only the Characters the Story still has, under their names.
+    const wearing = outfits.flatMap((entry) => {
+        const name = characters.find((character) => character.id === entry.characterId)?.name;
+        return name ? [{ ...entry, name }] : [];
+    });
     return (
         // Half-way into the page's side padding, like the top bar.
         <div className={`-mx-2 flex shrink-0 items-start border-b border-line bg-surface ${COLUMN}`}>
@@ -82,9 +97,25 @@ export function SceneStrip({ current, timeOfDay, scenes, characters = [], onHide
                         {time.label}
                     </span>
                 )}
+                {place && (
+                    // Where the story is: one line while closed, whole once opened.
+                    <span className={`min-w-0 text-text [overflow-wrap:anywhere] ${open ? '' : 'flex-1 truncate'}`}>
+                        <span className="sr-only">Place: </span>
+                        <PlaceIcon size={14} className={STRIP_ICON} />
+                        {place}
+                    </span>
+                )}
+                {open && weather && (
+                    <span className="min-w-0 text-text [overflow-wrap:anywhere]">
+                        <span className="sr-only">Weather: </span>
+                        <WeatherIcon size={14} className={STRIP_ICON} />
+                        {weather}
+                    </span>
+                )}
                 {goal !== '' && (
-                    // Two lines at most while closed; whole once opened.
-                    <span className={`min-w-0 flex-1 [overflow-wrap:anywhere] ${open ? '' : 'line-clamp-2'}`}>
+                    // Two lines at most while closed; whole once opened. Beside a Place it takes a row of its own, one line while closed,
+                    // so the two never squeeze each other into a sliver.
+                    <span className={`min-w-0 [overflow-wrap:anywhere] ${place ? 'flex-[1_0_100%]' : 'flex-1'} ${open ? '' : place ? 'line-clamp-1' : 'line-clamp-2'}`}>
                         <span className="sr-only">Goal: </span>
                         <TargetIcon size={14} className={STRIP_ICON} />
                         {goal}
@@ -92,6 +123,15 @@ export function SceneStrip({ current, timeOfDay, scenes, characters = [], onHide
                 )}
                 {/* What the Scene's Bond gates wait for (.scratch/bond-axes/spec.md): a line of its own, wrapping, never cut off. */}
                 {waiting.length > 0 && <span className="min-w-0 flex-[1_0_100%] [overflow-wrap:anywhere]">Waiting for: {waiting.join('; ')}</span>}
+                {/* What each Character is wearing now (.scratch/info-box/spec.md), once opened: a line each. */}
+                {open &&
+                    wearing.map((entry) => (
+                        <span key={entry.characterId} className="min-w-0 flex-[1_0_100%] [overflow-wrap:anywhere]" data-outfit>
+                            <OutfitIcon size={14} className={STRIP_ICON} />
+                            <span className="font-semibold text-text">{entry.name}</span> <span className="sr-only">is wearing </span>
+                            {entry.outfit}
+                        </span>
+                    ))}
             </button>
             <button
                 type="button"

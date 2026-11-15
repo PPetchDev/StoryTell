@@ -87,7 +87,7 @@ One entry in a Chat's history: either what the user wrote, shown under the Role 
 _Avoid_: Post, reply, bubble, entry
 
 **Branch**:
-A new Chat copied from another up to one of its Messages, with everything that Chat knew at that Message — Memory, Bonds, Arcs, Scene, Time of day, a Sudden event under way — so the story can go another way while the original stays as it was. A Branch remembers which Chat it came from.
+A new Chat copied from another up to one of its Messages, with everything that Chat knew at that Message — Memory, Bonds, Arcs, Scene, Time of day, Place, Weather, Outfits, a Sudden event under way — so the story can go another way while the original stays as it was. A Branch remembers which Chat it came from.
 _Avoid_: Fork, checkpoint, clone, copy
 
 **Author's note**:
@@ -181,6 +181,18 @@ _Avoid_: Summary, recap, chat history
 **Time of day**:
 Where a Chat's story is in the day — dawn, morning, noon, afternoon, evening or night — or none until the story makes it clear; it changes only when an AI Message moves the story on to a new time, and editing or regenerating that Message takes the change back.
 _Avoid_: Clock, hour, daytime
+
+**Place**:
+Where a Chat's story is right now, in a few words ("the lamp room"), or none until the story makes it clear; like the Time of day it changes only when an AI Message moves the story somewhere else, and taking that Message back takes the change back. A Place is a spot in the story at this moment, where the Setting is the world the whole Story happens in.
+_Avoid_: Location, setting, scene, map
+
+**Weather**:
+What the weather is doing in a Chat's story right now, in a few words, or none until the story shows it; kept and taken back as the Place is.
+_Avoid_: Climate, conditions
+
+**Outfit**:
+What a Character is wearing right now in one Chat, in a short phrase, set when the story first describes it or changes it; none until then. It is the moment's clothes, where a Character's Appearance is how they usually look, and Snapshots draw the Character in it.
+_Avoid_: Costume, clothes, skin, look
 
 **Bond**:
 A Character's feelings toward the user or toward another Character within one Chat, which change as the story unfolds: a short label and description in words, and a level on each of four **Bond axes** — Trust, Affection, Desire and Tension. In play they show only through how the Character behaves; the user can look at them, and how they moved over time, but never edit them, and never sees a level as a number.

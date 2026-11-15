@@ -15,6 +15,7 @@ import { StoryNotFoundError } from '../../errors/story.errors.js';
 import { ChatModelService } from '../../model/chat/chat.service.js';
 import { ChatEntity } from '../../model/chat/entities/chat.entity.js';
 import { MessageEntity, MessageKind } from '../../model/chat/entities/message.entity.js';
+import { LedgerModelService } from '../../model/ledger/ledger.service.js';
 import { BeliefModelService } from '../../model/memory/belief.service.js';
 import { MemoryModelService } from '../../model/memory/memory.service.js';
 import { SnapshotEntity, SnapshotResponse } from '../../model/snapshot/entities/snapshot.entity.js';
@@ -24,6 +25,7 @@ import { StoryEntity } from '../../model/story/entities/story.entity.js';
 import { StoryModelService } from '../../model/story/story.service.js';
 import { ImageData, ModelGateway } from '../../service/model-gateway/model-gateway.js';
 import { ImageStoreService, StoredImage } from '../../store/image/image-store.service.js';
+import { currentDetails } from '../chat/details/details.js';
 import { wornIdentity } from '../chat/identity.js';
 import { chosenLore, promptLore, selectLoreAt } from '../chat/lore/lore-select.js';
 import { renderUser } from '../chat/memory/render-user.js';
@@ -125,7 +127,8 @@ const HELD_PROMPT_TTL_MS = 60 * 60_000;
  * image is drawn until Draw. Draw starts a transient job and answers at once, so play continues
  * while the image is made; the client polls the Chat's Snapshots. Only a successful image becomes
  * a Snapshot record: a failure leaves the job with its typed error for Retry, and nothing is
- * stored. Snapshots never reach the text model and never touch the ledger.
+ * stored. Snapshots never reach the text model and never change the ledger; the scene writer reads
+ * the Place, the Weather and the Outfits from it (.scratch/info-box/spec.md).
  */
 @Injectable()
 export class SnapshotManagerService {
@@ -137,6 +140,7 @@ export class SnapshotManagerService {
     constructor(
         private readonly storyModel: StoryModelService,
         private readonly chatModel: ChatModelService,
+        private readonly ledger: LedgerModelService,
         private readonly memoryModel: MemoryModelService,
         private readonly beliefModel: BeliefModelService,
         private readonly snapshotModel: SnapshotModelService,
@@ -421,13 +425,23 @@ export class SnapshotManagerService {
         const lore = chosenLore(
             selectLoreAt(promptLore(story), upToMoment, { extraScan: hint, scanLength: SNAPSHOT_RECENT_MESSAGES }),
         );
+        // The Place, the Weather and the Outfits as they stood at this moment (.scratch/info-box/spec.md):
+        // only what the Messages up to the one shown had set, so a retake of an earlier moment is dressed as it was.
+        const upTo = new Set(chat.messages.slice(0, index + 1).map((message) => message.id));
+        const details = currentDetails((await this.ledger.detailChangesOf(chat.id)).filter((change) => upTo.has(change.messageId)));
         const written = await this.gateway.completeText({
             kind: 'snapshot_prompt',
             messages: snapshotPromptMessages({
                 identity,
                 setting: story.setting,
                 imageStyle: story.imageStyle,
-                cast,
+                cast: cast.map((character) => ({
+                    name: character.name,
+                    appearance: character.appearance,
+                    outfit: details.outfits.find((entry) => entry.characterId === character.id)?.outfit ?? null,
+                })),
+                place: details.place,
+                weather: details.weather,
                 memories,
                 messages: recent,
                 hint: hint,

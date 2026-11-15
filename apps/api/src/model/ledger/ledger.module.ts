@@ -8,6 +8,7 @@ import { ChatArcDirectionEntity } from './entities/chat-arc-direction.entity.js'
 import { MemoryChangeEntity } from './entities/memory-change.entity.js';
 import { SceneAdvanceEntity } from './entities/scene-advance.entity.js';
 import { SuddenEventStepEntity } from './entities/sudden-event-step.entity.js';
+import { DetailChangeEntity } from './entities/detail-change.entity.js';
 import { TimeChangeEntity } from './entities/time-change.entity.js';
 import { LedgerModelService } from './ledger.service.js';
 
@@ -19,6 +20,7 @@ import { LedgerModelService } from './ledger.service.js';
             SceneAdvanceEntity,
             TimeChangeEntity,
             SuddenEventStepEntity,
+            DetailChangeEntity,
             ChatArcDirectionEntity,
             MemoryChangeEntity,
             BeliefChangeEntity,

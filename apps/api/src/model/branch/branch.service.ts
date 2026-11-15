@@ -235,6 +235,13 @@ const copyLedger: CopyStep = async ({ manager, sourceChatId, chatId, messageIds 
          FROM "sudden_event_step" s JOIN ${remap} WHERE s."chat_id" = $2 ORDER BY s."id"`,
         params,
     );
+    // The Place, the Weather and the Outfits (.scratch/info-box/spec.md): the rollback drops those the Messages after N set.
+    await manager.query(
+        `INSERT INTO "detail_change" ("chat_id", "kind", "character_id", "value", "message_id", "created_at")
+         SELECT $1, s."kind", s."character_id", s."value", msg."new_id", s."created_at"
+         FROM "detail_change" s JOIN ${remap} WHERE s."chat_id" = $2 ORDER BY s."id"`,
+        params,
+    );
     await manager.query(
         `INSERT INTO "chat_arc_direction" ("chat_id", "character_id", "text")
          SELECT $1, s."character_id", s."text" FROM "chat_arc_direction" s WHERE s."chat_id" = $2 ORDER BY s."id"`,

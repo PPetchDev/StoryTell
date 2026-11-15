@@ -77,6 +77,10 @@ export function ChatGlance({ chat, cast, portraits }: { chat: Chat; cast: Cast; 
                             Where the story is
                         </h3>
                         <p className="m-0 [overflow-wrap:anywhere]">{dashboard.scene.current ? dashboard.scene.current.name : 'Free play'}</p>
+                        {/* The Place and the Weather (.scratch/info-box/spec.md), from the Chat itself, once the story has them. */}
+                        {(chat.place || chat.weather) && (
+                            <p className="m-0 mt-1 text-sm text-muted [overflow-wrap:anywhere]">{[chat.place, chat.weather].filter(Boolean).join(' · ')}</p>
+                        )}
                     </section>
                     <section className="mb-5" aria-labelledby={feelingsId}>
                         <h3 id={feelingsId} className={H3}>
@@ -95,6 +99,11 @@ export function ChatGlance({ chat, cast, portraits }: { chat: Chat; cast: Cast; 
                                     <span className="grid min-w-0">
                                         <strong className="text-md [overflow-wrap:anywhere]">{character.name}</strong>
                                         <span className="text-sm text-muted [overflow-wrap:anywhere]">{bondsLine(character)}</span>
+                                        {chat.outfits.some((entry) => entry.characterId === character.id) && (
+                                            <span className="text-sm text-muted [overflow-wrap:anywhere]">
+                                                Wearing: {chat.outfits.find((entry) => entry.characterId === character.id)!.outfit}
+                                            </span>
+                                        )}
                                     </span>
                                 </li>
                             ))}

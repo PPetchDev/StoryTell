@@ -22,6 +22,8 @@ export const SNAPSHOT_PROMPT_TEXT_MAX = 2_000;
 export interface SnapshotCastMember {
     name: string;
     appearance: string;
+    /** What they are wearing right now in this Chat (.scratch/info-box/spec.md); left out or empty when the story has not shown it. */
+    outfit?: string | null;
 }
 
 export interface SnapshotPromptInput {
@@ -40,6 +42,9 @@ export interface SnapshotPromptInput {
     hintNames: string[];
     /** The Chat's Time of day (spec: "Story clock"); null or left out while there is none. */
     timeOfDay?: string | null;
+    /** The Chat's Place and Weather (.scratch/info-box/spec.md); null or left out while the story has not made them clear. */
+    place?: string | null;
+    weather?: string | null;
     /** The Lore the moment brings up (spec: "Lore"), already selected; left out or empty for none. */
     lore?: PromptLoreEntry[];
 }
@@ -76,12 +81,19 @@ ${template}`;
             ? [`Lore this moment brings up (how these places, peoples and things are in this world):\n${input.lore.map(loreEntryText).join('\n\n')}`]
             : []),
         `The art style, in pieces:\n${stylePieces(input.imageStyle).map((piece) => `- ${piece}`).join('\n')}`,
-        `Characters:\n${input.cast.map((member) => `- ${member.name}: ${member.appearance.trim() || '(no Appearance written)'}`).join('\n')}`,
+        `Characters:\n${input.cast
+            .map((member) => `- ${member.name}: ${member.appearance.trim() || '(no Appearance written)'}${member.outfit?.trim() ? ` Wearing right now: ${member.outfit.trim()}.` : ''}`)
+            .join('\n')}`,
         `${name} (never shown beyond glimpses): ${input.identity.description.trim() || '(no description)'}`,
         `Memory:\n${input.memories.length > 0 ? input.memories.map((text) => `- ${text}`).join('\n') : '(none)'}`,
         `The latest Messages, oldest first; the image shows the end of the last one:\n${input.messages.map((message) => `[${message.speaker}]\n${message.text}`).join('\n\n')}`,
     ];
     if (input.timeOfDay) sections.push(`The time of day at this moment is ${input.timeOfDay}: the light must match it.`);
+    if (input.place?.trim()) sections.push(`The story is at this place now: ${input.place.trim()}.`);
+    if (input.weather?.trim()) sections.push(`The weather at this moment: ${input.weather.trim()}.`);
+    if (input.cast.some((member) => member.outfit?.trim())) {
+        sections.push('Where a Character has "Wearing right now", that is what they wear in the image, unless the latest Messages change it.');
+    }
     if (input.hint.trim() !== '') {
         sections.push(`The user's hint for this image, which you follow: ${input.hint.trim()}`);
     }

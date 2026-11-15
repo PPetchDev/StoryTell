@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { ChatBackdrop } from '@/components/chat/backdrop';
+import { useProfileOutfits } from '@/components/chat/character-profile';
 import { CharacterRow } from '@/components/chat/character-row';
 import { ChatComposer } from '@/components/chat/chat-composer';
 import { ChatThread, OpenAt, PendingLine } from '@/components/chat/chat-thread';
@@ -202,6 +203,9 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
         }, BACKGROUND_POLL_MS);
         return () => clearTimeout(timer);
     }, [chat, reportUnreachable]);
+
+    // A Character's profile shows what they are wearing now in this Chat (.scratch/info-box/spec.md).
+    useProfileOutfits(chat.outfits);
 
     // A Sudden event that began, moved or ended is said once, when the re-read Chat shows it (the banner shows the same).
     const eventRef = useRef(initial.suddenEvent);
@@ -581,6 +585,9 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                 <SceneStrip
                     current={chat.currentScene}
                     timeOfDay={chat.timeOfDay}
+                    place={chat.place}
+                    weather={chat.weather}
+                    outfits={chat.outfits}
                     scenes={scenes}
                     characters={characters}
                     onHide={() => {

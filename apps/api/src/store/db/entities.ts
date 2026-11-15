@@ -14,6 +14,7 @@ import { BeliefEntity } from '../../model/memory/entities/belief.entity.js';
 import { SceneAdvanceEntity } from '../../model/ledger/entities/scene-advance.entity.js';
 import { TimeChangeEntity } from '../../model/ledger/entities/time-change.entity.js';
 import { SuddenEventStepEntity } from '../../model/ledger/entities/sudden-event-step.entity.js';
+import { DetailChangeEntity } from '../../model/ledger/entities/detail-change.entity.js';
 import { SuddenEventEntity } from '../../model/story/entities/sudden-event.entity.js';
 import { MemoryKnownByEntity } from '../../model/memory/entities/memory-known-by.entity.js';
 import { MemoryEntity } from '../../model/memory/entities/memory.entity.js';
@@ -63,6 +64,7 @@ export const entities = [
     TimeChangeEntity,
     SuddenEventEntity,
     SuddenEventStepEntity,
+    DetailChangeEntity,
     ChatArcDirectionEntity,
     MemoryEntity,
     MemoryKnownByEntity,

@@ -96,6 +96,7 @@ import { TurnStoppedError, TurnStream } from './turn/turn-stream.js';
 import { Dice } from '../../service/dice/dice.js';
 import { Roll, ROLL_SIDES, ROLL_TARGETS } from './roll.js';
 import { eventReady, eventState, promptSuddenEvent, SuddenEventView, suddenEventView } from './sudden-event/sudden-event.js';
+import { currentDetails, promptDetails } from './details/details.js';
 
 /** A Chat as a Story's Chat list shows it (spec: "Lists and Home"). */
 export interface ChatListItem extends ChatSummary {
@@ -123,6 +124,12 @@ export interface ChatDetail extends ChatSummary {
     suddenEvent: SuddenEventView | null;
     /** The number a Roll sent now must reach (.scratch/roll/spec.md), from the Story's Difficulty. */
     rollTarget: number;
+    /** Where the story is now (.scratch/info-box/spec.md); null until the story makes it clear. */
+    place: string | null;
+    /** The weather in the story now; null until the story shows it. */
+    weather: string | null;
+    /** What each Character is wearing now, for those the story has shown, in cast order. */
+    outfits: Array<{ characterId: number; outfit: string }>;
     /** The worn identity's name, under which the next User Message shows. */
     identityName: string;
     /** The worn Persona; null while the Chat wears its Story's Role. */
@@ -1062,6 +1069,7 @@ export class ChatManagerService {
             ...promptMemoryLayer(choice, choiceMemories(story, memories), beliefs),
             storySoFar: promptStorySoFar(chat),
             timeOfDay: chat.timeOfDay,
+            details: detailsFor(story, state),
             lore: promptLore(story),
             // The one selection, once per turn, at the reply's point: the user's new Message is before it.
             chosenLore: chosenLore(selectLoreAt(promptLore(story), promptHistory(chat.messages))),
@@ -1197,6 +1205,7 @@ export class ChatManagerService {
             ...promptMemoryLayer(choice, choiceMemories(story, memories), beliefs),
             storySoFar: promptStorySoFar(chat),
             timeOfDay: chat.timeOfDay,
+            details: detailsFor(story, state),
             lore: promptLore(story),
             hasDocuments: hasDocumentPassages(story),
             hasSuddenEvents: (story.suddenEvents ?? []).some(eventReady),
@@ -1283,7 +1292,7 @@ export class ChatManagerService {
     }
 
     private async detail(story: StoryEntity, chat: ChatEntity): Promise<ChatDetail> {
-        const [settings, creditOut, source, readings, appSavedReplies, appReplaceRules, bondChanges, beliefs, eventSteps] = await Promise.all([
+        const [settings, creditOut, source, readings, appSavedReplies, appReplaceRules, bondChanges, beliefs, eventSteps, detailChanges] = await Promise.all([
             this.settingsModel.get(),
             this.creditOut(),
             // Read live, so a rename of the source shows.
@@ -1295,7 +1304,9 @@ export class ChatManagerService {
             this.beliefModel.findByChat(chat.id),
             // Only a Story with Sudden events has steps to read.
             (story.suddenEvents ?? []).length > 0 ? this.ledger.suddenEventStepsOf(chat.id) : [],
+            this.ledger.detailChangesOf(chat.id),
         ]);
+        const details = currentDetails(detailChanges);
         const scene = story.scenes.find((candidate) => candidate.id === chat.currentSceneId);
         const lastModel = lastAiModel(chat);
         const identity = wornIdentity(story, chat);
@@ -1305,6 +1316,13 @@ export class ChatManagerService {
             timeOfDay: chat.timeOfDay,
             suddenEvent: suddenEventView(eventState(story.suddenEvents ?? [], eventSteps), newestAiMessage(chat)?.id ?? null),
             rollTarget: ROLL_TARGETS[story.difficulty],
+            place: details.place,
+            weather: details.weather,
+            // In cast order, by id: a Character gone from the cast is left out.
+            outfits: story.characters.flatMap((character) => {
+                const outfit = details.outfits.find((entry) => entry.characterId === character.id)?.outfit;
+                return outfit ? [{ characterId: character.id, outfit }] : [];
+            }),
             identityName: identity.name,
             personaId: identity.personaId,
             roleName: story.role.name,
@@ -1509,6 +1527,11 @@ function withThaiReadings(messages: MessageResponse[], readings: ThaiReadingEnti
  * null for none. Checked before anything is stored: an id outside the cast is
  * `CharacterNotFoundError`, a Character sitting out is `NudgeSittingOutError`.
  */
+/** The Chat's Place, Weather and Outfits as the prompts name them (.scratch/info-box/spec.md). */
+function detailsFor(story: StoryEntity, state: LedgerState) {
+    return promptDetails(currentDetails(state.detailChanges), story.characters);
+}
+
 /** A User Message's Roll as the prompt reads it; null without one. */
 function rollOf(message: MessageEntity | undefined): Roll | null {
     if (!message || message.roll === null || message.roll === undefined || message.rollTarget === null || message.rollTarget === undefined) return null;
