@@ -311,6 +311,115 @@ opt out of providers that train. Stricter options exist (OpenRouter's "ZDR only"
 models marked "private"), but check first that the pinned hosts and the image models qualify:
 with fallbacks off, a request to a host that doesn't qualify fails instead of rerouting.
 
+## Live on the Oracle VM
+
+Since 2026-11-13 the live app runs on a small Oracle Cloud VM (Ubuntu, Caddy in front) and not
+on the home PC; "Running live" above describes the PC flow it replaced. On the VM everything
+belongs to the `storytell` user under `/srv/storytell` (`app` is the running release, `app-prev`
+the one before, `images`, `speech`, `backup`, `logs`), settings are in `/etc/storytell/api.env`,
+and systemd runs `storytell-api` and `storytell-web`. The files for it are in `scripts/vm/`.
+
+### Deploying a commit
+
+```bash
+git archive --format=tar.gz -o release.tar.gz <commit>
+scp release.tar.gz scripts/vm/deploy.sh ubuntu@<vm>:/tmp/
+ssh ubuntu@<vm> "bash /tmp/deploy.sh <commit>"
+```
+
+`deploy.sh` builds the release beside the running one, makes a backup of what is live, stops
+the app, runs the migrations, swaps the folders and starts the app. It prints `BUILD_OK`,
+`BACKUP_OK`, `MIGRATE_OK`, the units' state, the commit and the health check.
+
+### Backups
+
+The same job as on the PC (`scripts/backup.mjs`, see "Daily backup"), copied to
+`/srv/storytell/backup.mjs` by each deploy. `storytell-backup.timer` runs it every hour; it makes
+one backup a day and the other runs only retry a failed day. Its settings are in
+`/srv/storytell/live.env` (`scripts/vm/live.env.example`); `DATABASE_URL` is not there, the unit
+hands it over from `api.env`. Backups go to `/var/backups/storytell`, the newest 14 kept, and a
+failed one shows as the banner on Usage and Settings (`BACKUP_STATUS_FILE`, set by the API unit's
+drop-in).
+
+**`/var/backups/storytell` is on the VM's own disk.** It guards against a bad deploy or a mistake,
+not against losing the VM. Two off-site copies do: the NAS at home, which is the main one ("A copy on
+the NAS" below), and Google Drive, a second one, through an rclone crypt remote, so only encrypted
+files leave the VM ([ADR 0003](docs/adr/0003-backups-are-full-copies-encrypted-by-rclone-crypt.md)).
+Set it up once from the PC, in Git Bash: `bash scripts/vm/setup-drive-backup.sh` walks you through the
+Google sign-in (over an SSH tunnel to rclone on the VM) and the passphrase and salt, which you keep in
+your password manager: without them no backup on Drive can be read. Then set
+`BACKUP_REMOTE=storytell-backup:` in `live.env`.
+
+The upload is slow: rclone signs in to Google with its own shared client ID, whose request quota
+is used by every rclone user (`RATE_LIMIT_EXCEEDED` in `rclone -vv`). On 2026-11-15 a backup of 85
+files (17 MB) took 9 minutes to reach Drive, against 2 seconds to the disk folder, and the time grows
+with the Gallery, since every backup sends every image. The cure rclone documents is a Google client
+ID of your own (`client_id` and `client_secret` on the `gdrive` remote); until then a slow backup is
+normal and a failed one shows in the banner. With the NAS as the main copy, a slow or failed Drive
+upload costs nothing but the second copy of that day.
+
+#### A copy on the NAS
+
+The main off-site copy, in the clear, on the Synology NAS at home, which is on day and night: the
+NAS pulls the backups from the VM over SSH once a day (`scripts/vm/nas-pull.sh`). The NAS connects out, so nothing at home is
+opened to the internet, and it keeps its own newest 30: a backup the VM has dropped, or lost, stays
+on the NAS. On the VM the NAS signs in as `storytell-pull`, whose one key may only read
+`/var/backups/storytell` (`rrsync -ro`; no shell, no writing).
+
+1. In DSM: Control Panel → Task Scheduler → Create → Scheduled Task → User-defined script. User
+   `root`; daily at 09:00 (the VM makes the day's backup just after 07:00 Thai time); as the
+   command, paste the whole of `scripts/vm/nas-pull.sh`, with `SHARE` set to the shared folder to use.
+2. Run the task once. It makes the NAS's SSH key and stops, leaving the public half in
+   `<share>/StorytellBackup/storytell-pull.pub`.
+3. On the VM: `bash authorize-nas-pull.sh "<that public key>"` (`scripts/vm/authorize-nas-pull.sh`).
+4. Run the task again. `StorytellBackup/backups` now holds the backups and `last-pull.txt` says
+   which is newest. A failed run ends with `FAILED: …` and a non-zero status, which DSM can email.
+
+If a DSM update removes `/root/.ssh`, the next run makes a new key and fails until step 3 is
+done again with the new public key.
+
+One-time install, as the `ubuntu` user, with the files of `scripts/vm/` and `scripts/backup.mjs`
+uploaded to `/tmp`:
+
+```bash
+sudo install -d -o storytell -g storytell -m 700 /var/backups/storytell
+sudo install -o storytell -g storytell -m 644 /tmp/backup.mjs /srv/storytell/backup.mjs
+sudo install -o storytell -g storytell -m 640 /tmp/live.env.example /srv/storytell/live.env
+sudo install -m 644 /tmp/storytell-backup.service /tmp/storytell-backup.timer /etc/systemd/system/
+sudo install -d /etc/systemd/system/storytell-api.service.d
+sudo install -m 644 /tmp/storytell-api-backup-status.conf /etc/systemd/system/storytell-api.service.d/backup-status.conf
+sudo systemctl daemon-reload
+sudo systemctl enable --now storytell-backup.timer
+sudo systemctl restart storytell-api
+```
+
+`sudo systemctl start storytell-backup.service` runs the job now (it does nothing if today's
+backup exists); `sudo tail /srv/storytell/logs/backup.log` says what happened.
+
+### Restoring
+
+A backup is a folder `storytell-YYYYMMDD-HHMMSS` holding `storytell.dump`, `images/` and
+`manifest.json`. To put one back, as the `ubuntu` user:
+
+```bash
+B=/var/backups/storytell/storytell-YYYYMMDD-HHMMSS
+sudo systemctl stop storytell-web storytell-api
+sudo -u postgres psql -c "alter database storytell_live rename to storytell_before_restore"
+sudo -u postgres psql -c "create database storytell_live owner storytell"
+sudo cat $B/storytell.dump | sudo -u postgres pg_restore --no-owner --role=storytell --dbname storytell_live
+sudo -u storytell -H bash -c "mv /srv/storytell/images /srv/storytell/images-before-restore && cp -r $B/images /srv/storytell/images"
+sudo systemctl start storytell-api storytell-web
+```
+
+The app's release must be the one that made the backup, or a newer one whose deploy then runs the
+missing migrations. Once the app is checked, drop `storytell_before_restore` and remove
+`images-before-restore`. Thumbnails and Read aloud audio are not in a backup; they are made again
+when next asked for.
+
+To check a backup without touching live, restore it into a scratch database
+(`create database storytell_restore_drill`, the `pg_restore` line with that name, then
+`drop database`) and compare its row counts with `storytell_live`.
+
 ## Tests
 
 There are two test seams (spec: Testing Decisions). Both fake only the **Model Gateway**.

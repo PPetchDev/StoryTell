@@ -1,0 +1,13 @@
+# Runs the backup job every hour. The job makes at most one backup a day (its last-run stamp), so
+# the other runs only retry a day whose backup failed. Persistent: a run missed while the VM was
+# down happens at the next boot.
+[Unit]
+Description=Storytell backup, hourly (one backup a day)
+
+[Timer]
+OnCalendar=hourly
+RandomizedDelaySec=300
+Persistent=true
+
+[Install]
+WantedBy=timers.target

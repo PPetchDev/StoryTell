@@ -1,0 +1,19 @@
+# The daily backup on the Oracle VM: scripts/backup.mjs, copied to /srv/storytell/backup.mjs by
+# each deploy. Install: /etc/systemd/system/storytell-backup.service (see README, "Live on the VM").
+[Unit]
+Description=Storytell backup (database dump and images)
+After=postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=oneshot
+User=storytell
+Group=storytell
+# DATABASE_URL comes from the API's settings, so the database password lives in one file only.
+EnvironmentFile=/etc/storytell/api.env
+ExecStart=/usr/local/bin/node /srv/storytell/backup.mjs
+# 2: another backup is still running. Not a failure.
+SuccessExitStatus=2
+Nice=10
+NoNewPrivileges=true
+PrivateTmp=true

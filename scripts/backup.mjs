@@ -9,6 +9,10 @@
 // (BACKUP_REMOTE), meant to be a crypt remote over Google Drive so only ciphertext leaves the PC.
 // Each target keeps the newest BACKUP_KEEP backups. A failed target never stops the other one;
 // the outcome goes to <LIVE_HOME>/backup/status.json, which the app shows as a banner.
+//
+// On the Oracle VM (scripts/vm/) a systemd timer runs it hourly the same way. There DATABASE_URL
+// is not in live.env: the unit hands it over from the API's own settings file, so the database
+// password is kept in one place.
 import { execFileSync } from 'node:child_process';
 import {
     appendFileSync,
@@ -56,6 +60,8 @@ const keep = env.BACKUP_KEEP === undefined ? 14 : Number(env.BACKUP_KEEP);
 const diskDir = env.BACKUP_DISK_DIR ? path.resolve(env.BACKUP_DISK_DIR) : undefined;
 const remote = env.BACKUP_REMOTE?.trim() || undefined;
 const rclone = env.RCLONE || 'rclone';
+// live.env first; else the environment the job was started with (the VM's systemd unit).
+const databaseUrl = env.DATABASE_URL || process.env.DATABASE_URL;
 
 /** Is `child` the folder `parent` or inside it? Case-insensitive on Windows, like the file system. */
 function inside(child, parent) {
@@ -65,7 +71,7 @@ function inside(child, parent) {
 
 // Settings that would make a backup wrong or destructive stop the run, and the banner says why.
 const problems = [];
-if (!env.DATABASE_URL) problems.push(`DATABASE_URL is not set in ${envFile}`);
+if (!databaseUrl) problems.push(`DATABASE_URL is not set in ${envFile} or the environment`);
 if (!Number.isInteger(keep) || keep < 1) problems.push(`BACKUP_KEEP must be a whole number of at least 1, got "${env.BACKUP_KEEP}"`);
 // A disk folder inside the images would back itself up; one inside LIVE_HOME could be swept away.
 if (diskDir && (inside(diskDir, imageDir) || inside(diskDir, home))) {
@@ -228,7 +234,7 @@ async function backUp() {
         const pgBin = findPgBin();
         const pgDump = pgBin ? path.join(pgBin, process.platform === 'win32' ? 'pg_dump.exe' : 'pg_dump') : 'pg_dump';
         // The password goes in the environment, not the command line other processes can read.
-        const url = new URL(env.DATABASE_URL);
+        const url = new URL(databaseUrl);
         const password = decodeURIComponent(url.password) || url.searchParams.get('password') || '';
         url.password = '';
         url.searchParams.delete('password');
