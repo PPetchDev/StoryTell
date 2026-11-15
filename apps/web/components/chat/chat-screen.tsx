@@ -13,6 +13,7 @@ import { ChatGlance } from '@/components/chat/chat-glance';
 import { CueSheet } from '@/components/chat/cue-sheet';
 import { MemoryDrawer } from '@/components/chat/memory-drawer';
 import { NovelRequest, NovelView } from '@/components/chat/novel-view';
+import { PersonaPictures } from '@/components/chat/persona-pictures';
 import { SceneStrip } from '@/components/chat/scene-strip';
 import { SuddenEventBanner, suddenEventAnnouncement } from '@/components/chat/sudden-event-banner';
 import { EndingBanner, endingAnnouncement, epilogueWritten } from '@/components/chat/ending-banner';
@@ -429,7 +430,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
         // The Roll rides on this send and no other; a send the API never stored arms it again with the draft.
         const rolled = roll;
         setRoll(false);
-        setPending({ text, identityName: chat.identityName, roll: rolled });
+        setPending({ text, identityName: chat.identityName, personaId: chat.personaId, roll: rolled });
         void runTurn(
             (stream) => chatApi.send(chat.storyId, chat.id, text, stream, { nudge, cue, roll: rolled }),
             () => {
@@ -564,6 +565,8 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
         });
 
     return (
+        // The user's lines look their Persona's picture up here (.scratch/persona-image/spec.md).
+        <PersonaPictures images={chat.personaImages ?? []}>
         <main className={SCREEN}>
             <ChatBackdrop picture={backdrop} />
             <ChatTopBar
@@ -621,7 +624,16 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                 />
             )}
             {chat.suddenEvent && <SuddenEventBanner event={chat.suddenEvent} />}
-            {chat.ending && <EndingBanner ending={chat.ending} written={epilogueWritten(chat)} canWrite={canEndStory} onWrite={writeEpilogue} />}
+            {chat.ending && (
+                <EndingBanner
+                    ending={chat.ending}
+                    written={epilogueWritten(chat)}
+                    canWrite={canEndStory}
+                    busy={writing || busy}
+                    onWrite={writeEpilogue}
+                    onDismiss={() => void runWrite(() => chatApi.dismissEnding(chat.storyId, chat.id))}
+                />
+            )}
 
             {/*
              * The low-credit line (audit M3) and the "Memory added" toasts lie over the top of the
@@ -809,5 +821,6 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
              */}
             {!drawer.open && <ChatGlance chat={chat} cast={cast} portraits={portraits} />}
         </main>
+        </PersonaPictures>
     );
 }

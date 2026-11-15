@@ -24,8 +24,8 @@ export interface ChatListItem extends ChatSummary {
     latestLine: string;
     /** Shown as "Branched from <title>"; null when never branched, or once that Chat is deleted. */
     branchedFrom: { chatId: number; title: string } | null;
-    /** The Ending the Chat reached (CONTEXT.md, "Ending"); null when it reached none. */
-    ending: { id: number; name: string } | null;
+    /** The Ending the Chat reached (CONTEXT.md, "Ending"), its id null for one the AI suggested; null when it reached none. */
+    ending: { id: number | null; name: string } | null;
 }
 
 /** A Story's Chats, and the Endings they have found between them (mirrors ListChatsResponseBodyDTO). */
@@ -36,8 +36,11 @@ export interface ChatListResponse {
 
 /** The Ending a Chat reached, as the Chat screen shows it (mirrors ChatEndingDTO). */
 export interface ChatEnding {
-    id: number;
+    /** The author's Ending; null for one the AI suggested. */
+    id: number | null;
     name: string;
+    /** The AI suggested it, in a Story with no Endings of its own: the user may say "Not yet". */
+    suggested: boolean;
     /** What brought the story there, in a sentence; may be empty. */
     reason: string;
     /** The AI Message the story reached it with. */
@@ -166,6 +169,8 @@ export interface Chat extends ChatSummary {
     identityName: string;
     /** The worn Persona; null while the Chat wears its Story's Role. */
     personaId: number | null;
+    /** The pictures of the Personas this Chat shows: the worn one and those its User Messages were written as, where they have one. */
+    personaImages: Array<{ personaId: number; imagePath: string }>;
     roleName: string;
     messages: Message[];
     /** The last Message is a User Message whose turn failed: show Retry. */
@@ -414,6 +419,8 @@ export const chatApi = {
         turn<Chat>('POST', `/stories/${storyId}/chats/${chatId}/continue`, withExtras(undefined, extras), stream),
     /** Closes the story: the Narrator writes its Epilogue, for the Ending reached or an end the user chose. An AI Message like any other. */
     epilogue: (storyId: number, chatId: number, stream?: TurnStream) => turn<Chat>('POST', `/stories/${storyId}/chats/${chatId}/epilogue`, undefined, stream),
+    /** "Not yet": takes the Chat's suggested Ending away, and the AI suggests no more in this Chat. */
+    dismissEnding: (storyId: number, chatId: number) => apiSend<Chat>('DELETE', `/stories/${storyId}/chats/${chatId}/ending`),
     /** Three things the user might write next, as the worn identity. Nothing is stored. */
     suggest: (storyId: number, chatId: number) =>
         apiSend<{ suggestions: SuggestedReply[] }>('POST', `/stories/${storyId}/chats/${chatId}/suggestions`),

@@ -175,6 +175,16 @@ export class ChatApiController {
     }
 
     /**
+     * .scratch/endings/spec.md, "An Ending the Judge suggests": dismisses the Chat's suggested
+     * Ending and stops the Judge suggesting another in this Chat. Refused where the Chat has none.
+     */
+    @Delete(':chatId/ending')
+    @ApiOkResponse({ type: ChatResponseBodyDTO })
+    dismissEnding(@Id('storyId') storyId: number, @Id('chatId') chatId: number): Promise<ChatResponseBodyDTO> {
+        return this.chatManager.dismissEnding(storyId, chatId);
+    }
+
+    /**
      * Rewrites a Message, deletes every Message after it and rolls back the changes they
      * caused. A User Message gets a fresh reply (on a failed turn the error is the
      * gateway's); an AI Message is re-split from its `@Name:` text, judged again, and no

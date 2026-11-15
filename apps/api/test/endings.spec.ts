@@ -27,22 +27,42 @@ const DRAFT: EndingDefinition = { id: 3, name: 'Unfinished', condition: '  ', ep
 
 describe('Endings: the state, the Judge and the Epilogue (pure)', () => {
     it('reads the Chat as having reached its first recorded Ending, and otherwise watches the ready ones', () => {
-        expect(endingState([LIGHT, DARK, DRAFT], [])).toEqual({ reached: null, waiting: [LIGHT, DARK] });
+        expect(endingState([LIGHT, DARK, DRAFT], [])).toEqual({ reached: null, waiting: [LIGHT, DARK], canSuggest: false });
         const reached = endingState([LIGHT, DARK], [{ endingId: 2, reason: 'He took the boat.', messageId: 9 }]);
-        expect(reached).toEqual({ reached: { ending: DARK, reason: 'He took the boat.', messageId: 9 }, waiting: [] });
-        expect(endingView(reached)).toEqual({ id: 2, name: 'An ending', reason: 'He took the boat.', messageId: 9 });
+        expect(reached).toEqual({ reached: { ending: DARK, name: 'An ending', reason: 'He took the boat.', messageId: 9 }, waiting: [], canSuggest: false });
+        expect(endingView(reached)).toEqual({ id: 2, name: 'An ending', reason: 'He took the boat.', messageId: 9, suggested: false });
         // A record of an Ending the author removed is no Ending at all.
-        expect(endingState([LIGHT], [{ endingId: 2, reason: '', messageId: 9 }])).toEqual({ reached: null, waiting: [LIGHT] });
+        expect(endingState([LIGHT], [{ endingId: 2, reason: '', messageId: 9 }])).toEqual({ reached: null, waiting: [LIGHT], canSuggest: false });
         expect(endingView({ reached: null })).toBeNull();
     });
 
-    it('asks the Judge only while an Ending waits, after the exchange, with its rule in the section', () => {
-        expect(judgeEndingSection({ waiting: [] })).toBeNull();
-        const section = judgeEndingSection({ waiting: [LIGHT, DARK] })!;
+    it('lets the Judge suggest one only where the Story has none of its own that can be reached and the Chat allows it', () => {
+        expect(endingState([], [], { suggestions: true })).toEqual({ reached: null, waiting: [], canSuggest: true });
+        expect(endingState([DRAFT], [], { suggestions: true }).canSuggest).toBe(true);
+        expect(endingState([], []).canSuggest).toBe(false);
+        expect(endingState([], [], { suggestions: false }).canSuggest).toBe(false);
+        expect(endingState([LIGHT], [], { suggestions: true }).canSuggest).toBe(false);
+
+        const suggested = endingState([], [{ endingId: null, name: 'A quiet watch', reason: 'The storm passed.', messageId: 4 }], { suggestions: true });
+        expect(suggested).toEqual({ reached: { ending: null, name: 'A quiet watch', reason: 'The storm passed.', messageId: 4 }, waiting: [], canSuggest: false });
+        expect(endingView(suggested)).toEqual({ id: null, name: 'A quiet watch', reason: 'The storm passed.', messageId: 4, suggested: true });
+        expect(promptEpilogue(suggested)).toEqual({ endingName: 'A quiet watch', note: '' });
+    });
+
+    it('asks the Judge only while there is something to ask, after the exchange, with its rule in the section', () => {
+        expect(judgeEndingSection({ waiting: [], canSuggest: false })).toBeNull();
+        const section = judgeEndingSection({ waiting: [LIGHT, DARK], canSuggest: false })!;
         expect(section).toContain('# Endings\nThe story has not reached an ending.');
         expect(section).toContain('1. The light returns — reached when: The lamp is lit again.\n2. An ending — reached when: Ash leaves the island for good.');
         expect(section).toContain('Ending rule: add "ending": {"reason": "...", "reached": 1}');
         expect(section).toContain('when in doubt, leave "ending" out');
+        expect(section).not.toContain('"suggest"');
+
+        const asking = judgeEndingSection({ waiting: [], canSuggest: true })!;
+        expect(asking).toContain('# Ending\nThe story has not ended.\nEnding rule: add "ending": {"reason": "...", "suggest": "..."}');
+        expect(asking).toContain('only when the latest exchange brings the whole story to a natural close');
+        expect(asking).toContain('when in doubt, leave "ending" out');
+        expect(asking).not.toContain('"reached"');
 
         const input = JUDGE_FIXTURE_INPUTS[0];
         const without = buildJudgePrompt(input);
@@ -54,24 +74,43 @@ describe('Endings: the state, the Judge and the Epilogue (pure)', () => {
         expect(buildJudgePrompt({ ...input, endingSection: section }).maxTokens).toBe(without.maxTokens + 80);
     });
 
-    it('reads the answer loosely and takes only a waiting Ending', () => {
-        expect(readJudgedEnding({ reason: ' The lamp burns. ', reached: 1 })).toEqual({ reached: 1, reason: 'The lamp burns.' });
+    it('reads the answer loosely and takes only a waiting Ending, or a suggestion where one may be made', () => {
+        expect(readJudgedEnding({ reason: ' The lamp burns. ', reached: 1 })).toEqual({ reached: 1, suggest: null, reason: 'The lamp burns.' });
+        expect(readJudgedEnding({ reason: 'Done.', suggest: ' A quiet watch ' })).toEqual({ reached: null, suggest: 'A quiet watch', reason: 'Done.' });
         expect(readJudgedEnding({ reached: '1' })).toBeNull();
+        expect(readJudgedEnding({ suggest: '  ' })).toBeNull();
         expect(readJudgedEnding(null)).toBeNull();
         expect(readJudgedEnding([1])).toBeNull();
 
-        const waiting = { reached: null, waiting: [LIGHT, DARK] };
+        const waiting = { reached: null, waiting: [LIGHT, DARK], canSuggest: false };
         expect(applyEnding(waiting, null)).toEqual({ reached: null, rejected: [] });
-        expect(applyEnding(waiting, { reached: 2, reason: 'He took\n the boat.' })).toEqual({ reached: { endingId: 2, reason: 'He took the boat.' }, rejected: [] });
-        expect(applyEnding(waiting, { reached: 3, reason: '' })).toEqual({ reached: null, rejected: ['Ending: no waiting Ending numbered 3'] });
-        expect(applyEnding({ reached: { ending: LIGHT, reason: '', messageId: 1 }, waiting: [] }, { reached: 1, reason: '' }).rejected).toEqual([
-            'Ending: one is already reached in this Chat',
-        ]);
-        expect(applyEnding(waiting, { reached: 1, reason: 'x'.repeat(400) }).reached!.reason).toHaveLength(240);
+        expect(applyEnding(waiting, { reached: 2, suggest: null, reason: 'He took\n the boat.' })).toEqual({
+            reached: { endingId: 2, name: null, reason: 'He took the boat.' },
+            rejected: [],
+        });
+        expect(applyEnding(waiting, { reached: 3, suggest: null, reason: '' })).toEqual({ reached: null, rejected: ['Ending: no waiting Ending numbered 3'] });
+        // The author's Endings are the Story's: no suggestion is taken beside them.
+        expect(applyEnding(waiting, { reached: null, suggest: 'Another way', reason: '' }).rejected).toEqual(['Ending: a suggestion where the Story has its own Endings']);
+        expect(
+            applyEnding({ reached: { ending: LIGHT, name: 'The light returns', reason: '', messageId: 1 }, waiting: [], canSuggest: false }, { reached: 1, suggest: null, reason: '' }).rejected,
+        ).toEqual(['Ending: one is already reached in this Chat']);
+        expect(applyEnding(waiting, { reached: 1, suggest: null, reason: 'x'.repeat(400) }).reached!.reason).toHaveLength(240);
+
+        const open = { reached: null, waiting: [], canSuggest: true };
+        expect(applyEnding(open, { reached: null, suggest: '"A Quiet Watch."', reason: 'The storm passed.' })).toEqual({
+            reached: { endingId: null, name: 'A Quiet Watch', reason: 'The storm passed.' },
+            rejected: [],
+        });
+        expect(applyEnding(open, { reached: null, suggest: 'x'.repeat(100), reason: '' }).reached!.name).toHaveLength(60);
+        expect(applyEnding(open, { reached: 1, suggest: null, reason: '' }).rejected).toEqual(['Ending: a suggestion without a name']);
+        expect(applyEnding({ reached: null, waiting: [], canSuggest: false }, { reached: null, suggest: 'Too soon', reason: '' })).toEqual({
+            reached: null,
+            rejected: ['Ending: none was asked for'],
+        });
     });
 
     it("words the Epilogue for the Ending reached, or for an end of the user's own", () => {
-        const reached = promptEpilogue({ reached: { ending: LIGHT, reason: '', messageId: 1 } });
+        const reached = promptEpilogue({ reached: { ending: LIGHT, name: 'The light returns', reason: '', messageId: 1 } });
         expect(reached).toEqual({ endingName: 'The light returns', note: 'Tell of the first ship to pass safely.' });
         const told = epilogueInstruction('Ash', reached);
         expect(told).toContain('(The story ends here. Ash does nothing new.) Write the epilogue');
@@ -97,7 +136,7 @@ interface Message {
 
 interface Chat {
     id: number;
-    ending: { id: number; name: string; reason: string; messageId: number } | null;
+    ending: { id: number | null; name: string; reason: string; messageId: number; suggested: boolean } | null;
     messages: Message[];
 }
 
@@ -222,7 +261,7 @@ describe('Endings: authoring and play (HTTP)', () => {
         expect((removed.body.endings as Ending[]).map((left) => left.name)).toEqual(['Ending 2', 'Ending 3', 'Ending 4', 'Ending 5', 'Ending 6']);
     });
 
-    it('a Story without Endings asks the Judge nothing, and its Chats have none', async () => {
+    it('a Story without Endings asks the Judge nothing in its first replies, and its Chats have none', async () => {
         const { storyId } = await createStory(false);
         const chat = await createChat(storyId);
         expect(chat.ending).toBeNull();
@@ -250,7 +289,7 @@ describe('Endings: authoring and play (HTTP)', () => {
         expect((await play(storyId, chat.id, 'I fetch oil.', judgement({ reason: 'No.', reached: 5 }))).ending).toBeNull();
 
         const lit = await play(storyId, chat.id, 'I light the lamp.', judgement({ reason: 'Ash lit the lamp.', reached: 1 }));
-        expect(lit.ending).toEqual({ id: light, name: 'The light returns', reason: 'Ash lit the lamp.', messageId: lit.messages.at(-1)!.id });
+        expect(lit.ending).toEqual({ id: light, name: 'The light returns', reason: 'Ash lit the lamp.', messageId: lit.messages.at(-1)!.id, suggested: false });
 
         // Reached: the Judge is not asked again, whatever it says.
         const after = await play(storyId, chat.id, 'I watch the beam.', judgement({ reason: 'Again.', reached: 2 }));
@@ -282,7 +321,7 @@ describe('Endings: authoring and play (HTTP)', () => {
         const { body: before } = await t.http.post(`${chatPath(storyId, chat.id)}/messages/${one.messages.at(-1)!.id}/branch`).expect(201);
         expect(before.ending).toBeNull();
         const { body: at } = await t.http.post(`${chatPath(storyId, chat.id)}/messages/${lit.messages.at(-1)!.id}/branch`).expect(201);
-        expect(at.ending).toEqual({ id: light, name: 'The light returns', reason: 'Ash lit the lamp.', messageId: at.messages.at(-1).id });
+        expect(at.ending).toEqual({ id: light, name: 'The light returns', reason: 'Ash lit the lamp.', messageId: at.messages.at(-1).id, suggested: false });
 
         // Again: the new reply reaches another Ending, since the first is no longer reached.
         script('@Mira: Then go.', judgement({ reason: 'Ash took the boat.', reached: 2 }));
@@ -383,5 +422,86 @@ describe('Endings: authoring and play (HTTP)', () => {
         const refused = await t.http.post(`${chatPath(storyId, other.id)}/epilogue`).expect(409);
         expect(refused.body.error.code).toBe('409.004.013');
         expect(t.gateway.textCalls('turn').filter((call) => call.messages.at(-2)?.content.includes('Write the epilogue'))).toHaveLength(1);
+    });
+
+    it('in a Story with no Endings of its own, the Judge may suggest one from the sixth reply on; waving it away stops the suggestions until a Reset', async () => {
+        const { storyId } = await createStory(false);
+        const chat = await createChat(storyId);
+        for (let n = 1; n <= 5; n++) {
+            // Too early to ask: the prompt is as it always was, and an answer nobody asked for is dropped.
+            const early = await play(storyId, chat.id, `Turn ${n}.`, judgement({ reason: 'Too soon.', suggest: 'Too soon' }));
+            expect(judged()).not.toContain('# Ending');
+            expect(early.ending).toBeNull();
+        }
+        const sixth = await play(storyId, chat.id, 'The storm passes.', judgement({ reason: 'The storm passed and the lamp is safe.', suggest: '"A Quiet Watch."' }));
+        expect(judged()).toContain('# Ending\nThe story has not ended.\nEnding rule: add "ending": {"reason": "...", "suggest": "..."}');
+        expect(judged().indexOf('# LATEST EXCHANGE')).toBeLessThan(judged().indexOf('# Ending'));
+        expect(sixth.ending).toEqual({
+            id: null,
+            name: 'A Quiet Watch',
+            reason: 'The storm passed and the lamp is safe.',
+            messageId: sixth.messages.at(-1)!.id,
+            suggested: true,
+        });
+
+        // It is that Chat's own: shown on its row, never counted among the Story's Endings.
+        const list = await t.http.get(`/api/stories/${storyId}/chats`).expect(200);
+        expect(list.body.endings).toEqual({ total: 0, found: [] });
+        expect(list.body.chats[0].ending).toEqual({ id: null, name: 'A Quiet Watch' });
+
+        // A Branch carries it, and its Epilogue is written for it by name. The Epilogue is not asked whether the story has ended.
+        const { body: branch } = await t.http.post(`${chatPath(storyId, chat.id)}/messages/${sixth.messages.at(-1)!.id}/branch`).expect(201);
+        expect(branch.ending).toMatchObject({ id: null, name: 'A Quiet Watch', suggested: true });
+        script('The lamp burned on.', judgement({ reason: 'Again.', suggest: 'Again' }));
+        await t.http.post(`${chatPath(storyId, branch.id)}/epilogue`).expect(200);
+        expect(lastCall('turn').messages.at(-2)!.content).toContain('The story has reached its ending: "A Quiet Watch".');
+        expect(lastCall('turn').messages.at(-2)!.content).not.toContain('What the author wants');
+        await settled(storyId, branch.id);
+        expect(judged()).not.toContain('# Ending');
+
+        // "Not yet": the suggestion goes, and the Judge suggests no more in this Chat.
+        const dismissed = await t.http.delete(`${chatPath(storyId, chat.id)}/ending`).expect(200);
+        expect(dismissed.body.ending).toBeNull();
+        const nothing = await t.http.delete(`${chatPath(storyId, chat.id)}/ending`).expect(409);
+        expect(nothing.body.error).toMatchObject({ code: '409.004.030', message: 'This Chat has no suggested ending to dismiss.' });
+        const after = await play(storyId, chat.id, 'I sweep the stair.', judgement({ reason: 'Again.', suggest: 'Again' }));
+        expect(judged()).not.toContain('# Ending');
+        expect(after.ending).toBeNull();
+        // The Branch made before kept its own Ending; one made now keeps the choice.
+        expect((await getChat(storyId, branch.id)).ending?.name).toBe('A Quiet Watch');
+        const { body: quiet } = await t.http.post(`${chatPath(storyId, chat.id)}/messages/${after.messages.at(-1)!.id}/branch`).expect(201);
+        await play(storyId, quiet.id, 'I rest.', judgement({ reason: 'Again.', suggest: 'Again' }));
+        expect(judged()).not.toContain('# Ending');
+
+        // The user can still end it themselves; and an Epilogue of their own choosing is not judged for an Ending.
+        script('And that was that.', judgement({ reason: 'It closed.', suggest: 'That was that' }));
+        const own = await t.http.post(`${chatPath(storyId, chat.id)}/epilogue`).expect(200);
+        expect((own.body as Chat).messages.at(-1)).toMatchObject({ epilogue: true });
+        expect((await settled(storyId, chat.id)).ending).toBeNull();
+
+        // A Reset is a fresh start: from the sixth reply the Judge is asked again.
+        await t.http.post(`${chatPath(storyId, chat.id)}/reset`).expect(200);
+        for (let n = 1; n <= 5; n++) await play(storyId, chat.id, `Turn ${n}.`);
+        const again = await play(storyId, chat.id, 'The storm passes.', judgement({ reason: 'Calm at last.', suggest: 'Calm at last' }));
+        expect(judged()).toContain('# Ending\nThe story has not ended.');
+        expect(again.ending).toMatchObject({ name: 'Calm at last', suggested: true });
+        // Regenerate takes a suggestion back like any Ending.
+        script('@Mira: Not done yet.');
+        await t.http.post(`${chatPath(storyId, chat.id)}/messages/${again.messages.at(-1)!.id}/regenerate`).expect(200);
+        expect((await settled(storyId, chat.id)).ending).toBeNull();
+    });
+
+    it("the author's Endings stand: where a Story has its own, the Judge suggests none and the reached one can't be waved away", async () => {
+        const { storyId, light } = await createStory();
+        const chat = await createChat(storyId);
+        for (let n = 1; n <= 6; n++) await play(storyId, chat.id, `Turn ${n}.`, judgement({ reason: 'Made up.', suggest: 'Made up' }));
+        expect(judged()).toContain('# Endings\nThe story has not reached an ending.');
+        expect(judged()).not.toContain('"suggest"');
+        expect((await getChat(storyId, chat.id)).ending).toBeNull();
+
+        const lit = await play(storyId, chat.id, 'I light the lamp.', judgement({ reason: 'Lit.', reached: 1 }));
+        expect(lit.ending).toMatchObject({ id: light, suggested: false });
+        await t.http.delete(`${chatPath(storyId, chat.id)}/ending`).expect(409);
+        expect((await getChat(storyId, chat.id)).ending?.id).toBe(light);
     });
 });

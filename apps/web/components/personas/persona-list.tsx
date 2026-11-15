@@ -1,10 +1,14 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { ChangeEvent, useRef, useState } from 'react';
 
+import { useConnection } from '@/components/connection';
+import { initialOf } from '@/components/portrait/character-portrait';
 import { Autosave } from '@/components/story-editor/autosave';
 import { ConfirmButton } from '@/components/story-editor/fields';
-import { Persona, personaApi } from '@/lib/persona';
+import { ApiError, ApiUnreachableError } from '@/lib/api';
+import { preparedForUpload } from '@/lib/cover';
+import { Persona, personaApi, personaImageUrl } from '@/lib/persona';
 
 interface PersonaCardProps {
     persona: Persona;
@@ -19,13 +23,49 @@ interface PersonaCardProps {
 
 /**
  * One Persona, its Name and Description saved as they are typed (spec: "Saving"). What was
- * typed stays in the fields whatever the API answers, so a failed save loses nothing.
+ * typed stays in the fields whatever the API answers, so a failed save loses nothing. Its picture
+ * (.scratch/persona-image/spec.md) is uploaded from the phone and saved at once, apart from the
+ * autosave: it shows beside the user's lines in a Chat that wears the Persona.
  */
 function PersonaCard({ persona, autosave, justCreated, onSaved, onDelete, focusAfterDelete }: PersonaCardProps) {
     const [name, setName] = useState(persona.name);
     const [description, setDescription] = useState(persona.description);
     const idPrefix = `persona-${persona.id}`;
     const nameMissing = name.trim() === '';
+    const { reportUnreachable } = useConnection();
+    const [picture, setPicture] = useState(persona.imagePath);
+    /** What is happening to the picture, in words, while it is: "Uploading…", "Removing…". */
+    const [pictureBusy, setPictureBusy] = useState<string | null>(null);
+    const [pictureError, setPictureError] = useState<string | null>(null);
+    const fileInput = useRef<HTMLInputElement>(null);
+    const pictureButton = useRef<HTMLButtonElement>(null);
+
+    const savePicture = async (doing: string, save: () => Promise<Persona>) => {
+        setPictureBusy(doing);
+        setPictureError(null);
+        try {
+            const savedPersona = await save();
+            setPicture(savedPersona.imagePath);
+            onSaved(savedPersona);
+        } catch (caught) {
+            if (caught instanceof ApiUnreachableError) reportUnreachable();
+            setPictureError(caught instanceof ApiError ? caught.message : "Couldn't save the picture. Try again.");
+        } finally {
+            setPictureBusy(null);
+        }
+    };
+
+    const upload = (event: ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        // Cleared, so choosing the same file again still counts as a change.
+        event.target.value = '';
+        // Re-encoded first, as a Cover is: that drops what a phone writes into a photo, where it was taken included.
+        if (file)
+            void savePicture('Uploading…', async () => {
+                const prepared = await preparedForUpload(file);
+                return personaApi.uploadImage(persona.id, prepared.picture, prepared.filename);
+            });
+    };
 
     const changeName = (value: string) => {
         setName(value);
@@ -42,6 +82,66 @@ function PersonaCard({ persona, autosave, justCreated, onSaved, onDelete, focusA
 
     return (
         <li id={idPrefix} className="card m-0 grid gap-2" aria-label={persona.name}>
+            <div className="flex items-center gap-3">
+                {picture ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- served by the API from the image folder, as a thumbnail
+                    <img
+                        className="size-16 shrink-0 rounded-full bg-surface-raised object-cover"
+                        src={personaImageUrl(picture, 320)}
+                        alt={`Picture of ${persona.name}`}
+                        draggable={false}
+                    />
+                ) : (
+                    <span className="grid size-16 shrink-0 place-items-center rounded-full bg-accent-fill text-2xl leading-none font-bold text-accent-text" aria-hidden="true">
+                        {initialOf(name)}
+                    </span>
+                )}
+                <div className="grid min-w-0 gap-1.5">
+                    <div className="toolbar">
+                        <button
+                            ref={pictureButton}
+                            type="button"
+                            className="button button-quiet button-small"
+                            disabled={pictureBusy !== null}
+                            aria-label={`${picture ? 'Change picture' : 'Add a picture'} of ${persona.name}`}
+                            onClick={() => fileInput.current?.click()}
+                        >
+                            {picture ? 'Change picture' : 'Add a picture'}
+                        </button>
+                        {picture && (
+                            <ConfirmButton
+                                label="Remove picture"
+                                ariaLabel={`Remove picture of ${persona.name}`}
+                                danger
+                                disabled={pictureBusy !== null}
+                                question="Remove the picture?"
+                                confirmLabel="Remove"
+                                className="button-small"
+                                onConfirm={() => savePicture('Removing…', () => personaApi.clearImage(persona.id))}
+                                focusAfter={() => pictureButton.current}
+                            />
+                        )}
+                    </div>
+                    <p className="hint m-0">Shown beside your lines in a Chat that wears this Persona.</p>
+                </div>
+                <input
+                    ref={fileInput}
+                    className="visually-hidden"
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    aria-label={`Picture for ${persona.name}`}
+                    tabIndex={-1}
+                    onChange={upload}
+                />
+            </div>
+            <p className={pictureBusy ? 'm-0 text-md text-muted' : 'sr-only'} role="status">
+                {pictureBusy}
+            </p>
+            {pictureError && (
+                <p className="field-error" role="alert">
+                    {pictureError}
+                </p>
+            )}
             <div className="field">
                 <label htmlFor={`${idPrefix}-name`}>Name</label>
                 <input

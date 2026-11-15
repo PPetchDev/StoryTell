@@ -37,7 +37,7 @@ What a Sudden event measures, named by the author ("Suspicion", "Nerve"): a numb
 _Avoid_: Meter, stat, score, bar, HP
 
 **Ending**:
-An optional, author-written way a Story can end: a name, when it is reached in plain language, and what its Epilogue should tell. A Chat **reaches** an Ending when that has happened there, and reaches at most one; another Chat, or a Branch from before it, can find another. Reaching one closes nothing: the Chat can be played on. The Narrator is never told the Endings, so they are found by how the story is played, where a Scene steers it.
+A way a Story can end. The author may write a Story's Endings: each a name, when it is reached in plain language, and what its Epilogue should tell. In a Story with none of its own, the AI may **suggest** one, with a name, when the story comes to a natural close; the user can say "not yet", and then none is suggested again in that Chat. A Chat **reaches** an Ending when its condition has happened there, or when one is suggested, and reaches at most one; another Chat, or a Branch from before it, can find another. Reaching one closes nothing: the Chat can be played on. The Narrator is never told the Endings, so they are found by how the story is played, where a Scene steers it.
 _Avoid_: Finale, outcome, route, win condition, game over
 
 **Epilogue**:
@@ -73,7 +73,7 @@ The part a Story defines for the user to play; every Story has one.
 _Avoid_: Player character, protagonist
 
 **Persona**:
-The user's own reusable self-description, which can be worn in place of a Story's Role.
+The user's own reusable self-description, which can be worn in place of a Story's Role. It may have a picture the user uploads, its **Persona image**, which shows beside the user's lines in a Chat that wears it; unlike a Character's Reference image no model ever sees it.
 _Avoid_: Profile, avatar, user character
 
 **Cover**:

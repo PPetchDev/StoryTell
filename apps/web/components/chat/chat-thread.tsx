@@ -736,6 +736,8 @@ export interface OpenAt {
 export interface PendingLine {
     text: string;
     identityName: string;
+    /** The Persona worn as it was sent; null or left out for the Role. */
+    personaId?: number | null;
     /** Sent with a Roll (CONTEXT.md, "Roll"): shown as "Rolling…" until the API answers with the number. */
     roll?: boolean;
 }
@@ -975,7 +977,7 @@ export function ChatThread(props: ChatThreadProps) {
                 />
                 {pending && (
                     <article className="mb-5" aria-label={`${pending.identityName} said`} aria-busy="true">
-                        <UserLine identityName={pending.identityName} text={pending.text} roll={pending.roll ? 'pending' : null} />
+                        <UserLine identityName={pending.identityName} text={pending.text} roll={pending.roll ? 'pending' : null} personaId={pending.personaId} />
                     </article>
                 )}
                 {streaming && (

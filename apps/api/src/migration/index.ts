@@ -48,6 +48,8 @@ import { SuddenEventsAndRolls1764180000000 } from './1764180000000-SuddenEventsA
 import { DetailChanges1764190000000 } from './1764190000000-DetailChanges.js';
 import { DiaryEntries1764200000000 } from './1764200000000-DiaryEntries.js';
 import { Endings1764210000000 } from './1764210000000-Endings.js';
+import { SuggestedEndings1764220000000 } from './1764220000000-SuggestedEndings.js';
+import { PersonaImage1764230000000 } from './1764230000000-PersonaImage.js';
 
 // Listed by hand, oldest first, so migrations load the same way from compiled JS, the
 // TypeORM CLI and Vitest. Add every new migration here.
@@ -102,4 +104,6 @@ export const migrations = [
     DetailChanges1764190000000,
     DiaryEntries1764200000000,
     Endings1764210000000,
+    SuggestedEndings1764220000000,
+    PersonaImage1764230000000,
 ];

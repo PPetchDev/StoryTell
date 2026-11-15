@@ -84,6 +84,14 @@ export class ChatListItemDTO extends ChatSummaryDTO implements ChatListItem {
 }
 
 export class EndingNameDTO {
+    @ApiProperty({ type: Number, nullable: true, description: "The author's Ending; null for one the Judge suggested." })
+    id: number | null;
+
+    @ApiProperty()
+    name: string;
+}
+
+export class FoundEndingDTO {
     @ApiProperty()
     id: number;
 
@@ -92,11 +100,11 @@ export class EndingNameDTO {
 }
 
 export class EndingsFoundDTO {
-    @ApiProperty({ description: 'How many Endings the Story has that can be reached.' })
+    @ApiProperty({ description: "How many Endings of its own the Story has that can be reached. Suggested Endings are not counted." })
     total: number;
 
-    @ApiProperty({ type: [EndingNameDTO], description: "The ones reached in at least one of the Story's Chats, in the author's order." })
-    found: EndingNameDTO[];
+    @ApiProperty({ type: [FoundEndingDTO], description: "The ones reached in at least one of the Story's Chats, in the author's order." })
+    found: FoundEndingDTO[];
 }
 
 export class ListChatsResponseBodyDTO implements ChatList {
@@ -107,10 +115,22 @@ export class ListChatsResponseBodyDTO implements ChatList {
     endings: EndingsFoundDTO;
 }
 
+/** A Persona's picture, for the user's lines written as it (.scratch/persona-image/spec.md). */
+export class ChatPersonaImageDTO {
+    @ApiProperty()
+    personaId: number;
+
+    @ApiProperty({ description: 'Served by `GET /api/images/{path}`.' })
+    imagePath: string;
+}
+
 /** The Ending a Chat reached, as the Chat screen shows it (.scratch/endings/spec.md). */
 export class ChatEndingDTO implements EndingView {
-    @ApiProperty()
-    id: number;
+    @ApiProperty({ type: Number, nullable: true, description: "The author's Ending; null for one the Judge suggested." })
+    id: number | null;
+
+    @ApiProperty({ description: 'The Judge suggested it, in a Story with no Endings of its own: the user may dismiss it.' })
+    suggested: boolean;
 
     @ApiProperty()
     name: string;
@@ -370,6 +390,12 @@ export class ChatResponseBodyDTO extends ChatSummaryDTO implements Omit<ChatDeta
 
     @ApiProperty({ type: Number, nullable: true, description: "The worn Persona; null while the Chat wears its Story's Role." })
     personaId: number | null;
+
+    @ApiProperty({
+        type: [ChatPersonaImageDTO],
+        description: 'The pictures of the Personas in this Chat: the worn one and those its User Messages were written as, where they still exist and have one.',
+    })
+    personaImages: ChatPersonaImageDTO[];
 
     @ApiProperty({ description: "The Story's Role's name, which the swap offers beside the Personas." })
     roleName: string;

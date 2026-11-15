@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, In, MoreThanOrEqual, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, IsNull, MoreThanOrEqual, Repository } from 'typeorm';
 
 import { ChatEntity, TimeOfDay } from '../chat/entities/chat.entity.js';
 import { BackgroundStatus, MessageEntity } from '../chat/entities/message.entity.js';
@@ -98,7 +98,10 @@ export interface PartEmotion {
 
 /** A Chat reaching an Ending, as a judged reply showed it (.scratch/endings/spec.md), after the apply rules. */
 export interface NewEndingReached {
-    endingId: number;
+    /** The author's Ending; null for one the Judge suggested. */
+    endingId: number | null;
+    /** A suggested Ending's name; null for the author's. */
+    name: string | null;
     reason: string;
 }
 
@@ -269,6 +272,19 @@ export class LedgerModelService {
     endingsReachedOf(chatIds: number[]): Promise<EndingReachedEntity[]> {
         if (chatIds.length === 0) return Promise.resolve([]);
         return this.endingsReached.find({ where: { chatId: In(chatIds) }, order: { id: 'ASC' } });
+    }
+
+    /**
+     * Waves away the Chat's suggested Ending (.scratch/endings/spec.md): its record goes, and the
+     * Judge suggests no more in this Chat. Answers false when the Chat has none.
+     */
+    dismissSuggestedEnding(chatId: number): Promise<boolean> {
+        return this.dataSource.transaction(async (manager) => {
+            const result = await manager.delete(EndingReachedEntity, { chatId, endingId: IsNull() });
+            if ((result.affected ?? 0) === 0) return false;
+            await manager.update(ChatEntity, { id: chatId }, { endingSuggestions: false });
+            return true;
+        });
     }
 
     /** The Chat's Diary entries (.scratch/diary/spec.md), every Character's, oldest first. */
@@ -521,7 +537,8 @@ export class LedgerModelService {
     clear(chatId: number): Promise<void> {
         return this.dataSource.transaction(async (manager: EntityManager) => {
             await manager.delete(TimeChangeEntity, { chatId });
-            await manager.update(ChatEntity, { id: chatId }, { timeOfDay: null });
+            // A fresh start: the Judge may suggest an Ending again (.scratch/endings/spec.md).
+            await manager.update(ChatEntity, { id: chatId }, { timeOfDay: null, endingSuggestions: true });
             await manager.delete(SuddenEventStepEntity, { chatId });
             await manager.delete(DetailChangeEntity, { chatId });
             await manager.delete(DiaryEntryEntity, { chatId });

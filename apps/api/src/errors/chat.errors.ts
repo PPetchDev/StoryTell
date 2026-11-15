@@ -175,6 +175,13 @@ export class DiaryEntryNotFoundError extends AppError {
     }
 }
 
+/** A suggested Ending waved away in a Chat that has none: it reached no Ending, or the author's (.scratch/endings/spec.md). Nothing changes. */
+export class NoSuggestedEndingError extends AppError {
+    constructor() {
+        super('409.004.030', 'This Chat has no suggested ending to dismiss.');
+    }
+}
+
 /** An Epilogue asked for right after one (.scratch/endings/spec.md). No call; nothing stored. */
 export class AlreadyEpilogueError extends AppError {
     constructor() {

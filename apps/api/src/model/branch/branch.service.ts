@@ -90,6 +90,8 @@ async function copyChat(manager: EntityManager, sourceChatId: number, through: n
         authorsNote: source.authorsNote,
         // A setting, not story state: copied as it stands (.scratch/read-aloud/spec.md, "Auto-read").
         autoRead: source.autoRead,
+        // Whether the user waved suggested Endings away (.scratch/endings/spec.md): the Branch keeps their choice.
+        endingSuggestions: source.endingSuggestions,
         ...(keepStorySoFar
             ? {
                   storySoFar: source.storySoFar,
@@ -244,8 +246,8 @@ const copyLedger: CopyStep = async ({ manager, sourceChatId, chatId, messageIds 
     );
     // The Ending reached (.scratch/endings/spec.md): the rollback drops it when a Message after N reached it.
     await manager.query(
-        `INSERT INTO "ending_reached" ("chat_id", "ending_id", "reason", "message_id", "created_at")
-         SELECT $1, s."ending_id", s."reason", msg."new_id", s."created_at"
+        `INSERT INTO "ending_reached" ("chat_id", "ending_id", "name", "reason", "message_id", "created_at")
+         SELECT $1, s."ending_id", s."name", s."reason", msg."new_id", s."created_at"
          FROM "ending_reached" s JOIN ${remap} WHERE s."chat_id" = $2 ORDER BY s."id"`,
         params,
     );

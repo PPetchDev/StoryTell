@@ -14,7 +14,8 @@ import { exchangeIdentityName } from '../identity.js';
 import { repliesInScene } from '../scene-replies.js';
 import { applySuddenEvent, eventState, judgeSuddenEventSection } from '../sudden-event/sudden-event.js';
 import { applyDetails, currentDetails, judgeDetailsSection } from '../details/details.js';
-import { applyEnding, endingState, judgeEndingSection } from '../ending/ending.js';
+import { applyEnding, ENDING_SUGGEST_AFTER_REPLIES, endingState, judgeEndingSection } from '../ending/ending.js';
+import { AUTHOR_MODEL } from '../../../model/chat/entities/message.entity.js';
 import { Attempt, BackgroundRuns } from '../background-runs.js';
 import { partsToText } from '../turn/reply-parser.js';
 import { applyJudgement, emotionsOfParts } from './apply-judgement.js';
@@ -149,6 +150,14 @@ export class JudgeManagerService {
             const endings = endingState(
                 story.endings ?? [],
                 state.endingsReached.filter((record) => record.messageId !== message.id),
+                {
+                    // An Ending of the Judge's own, only once the story has had room to run, and never on the Epilogue itself.
+                    suggestions:
+                        chat.endingSuggestions &&
+                        !message.epilogue &&
+                        chat.messages.slice(0, index + 1).filter((written) => written.kind === MessageKind.Ai && written.model !== AUTHOR_MODEL).length >=
+                            ENDING_SUGGEST_AFTER_REPLIES,
+                },
             );
             const replyParts = message.parts.map((part) => part.toResponse());
             // Lines are tagged only where a tag can show (.scratch/expressions/spec.md): otherwise the prompt is as before.

@@ -4,13 +4,16 @@ export interface PersonaResponse {
     id: number;
     name: string;
     description: string;
+    /** Its picture, as a path under `/api/images/` (.scratch/persona-image/spec.md); null without one. */
+    imagePath: string | null;
     createdAt: string;
     updatedAt: string;
 }
 
 /**
- * The user's own reusable self-description (spec: "Personas"), app-level, Name and
- * Description only. A Chat can wear one in place of its Story's Role.
+ * The user's own reusable self-description (spec: "Personas"), app-level: a Name, a
+ * Description and, when the user gives it one, a picture. A Chat can wear one in place of its
+ * Story's Role.
  */
 @Entity('persona')
 export class PersonaEntity {
@@ -27,6 +30,10 @@ export class PersonaEntity {
     @Column({ type: 'text', default: '' })
     description: string;
 
+    /** The picture it owns, uploaded by the user (.scratch/persona-image/spec.md); NULL without one. The file goes with the Persona. */
+    @Column({ name: 'image_path', type: 'text', nullable: true })
+    imagePath: string | null;
+
     @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
     createdAt: Date;
 
@@ -38,6 +45,7 @@ export class PersonaEntity {
             id: this.id,
             name: this.name,
             description: this.description,
+            imagePath: this.imagePath ?? null,
             createdAt: this.createdAt.toISOString(),
             updatedAt: this.updatedAt.toISOString(),
         };

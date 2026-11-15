@@ -2,11 +2,13 @@ import { CSSProperties, ReactNode, useContext, useId } from 'react';
 
 import { MessageTabStop } from '@/components/chat/chat-classes';
 import { useCastCharacter, useCharacterProfile } from '@/components/chat/character-profile';
+import { usePersonaPicture } from '@/components/chat/persona-pictures';
 import { CharacterPortrait } from '@/components/portrait/character-portrait';
 import { Cast, characterColour, Portrait, Portraits } from '@/lib/character-colour';
 import { DiceIcon } from '@/components/icons';
 import { Message, MessagePart, MessageRoll, ROLL_OUTCOME_LABELS } from '@/lib/chat';
 import { linePicture } from '@/lib/expressions';
+import { personaImageUrl } from '@/lib/persona';
 
 import { useShownText } from './shown-text';
 
@@ -72,7 +74,19 @@ export function RollLine({ roll }: { roll: MessageRoll | 'pending' }) {
     );
 }
 
-export function UserLine({ identityName, text, roll = null }: { identityName: string; text: string; roll?: MessageRoll | 'pending' | null }) {
+export function UserLine({
+    identityName,
+    text,
+    roll = null,
+    personaId = null,
+}: {
+    identityName: string;
+    text: string;
+    roll?: MessageRoll | 'pending' | null;
+    /** The Persona it was written as: its picture shows in place of the initial (.scratch/persona-image/spec.md). */
+    personaId?: number | null;
+}) {
+    const picture = usePersonaPicture(personaId);
     return (
         <div className={`flex items-start justify-end gap-2 ${STORY_SIZE}`}>
             <div className="flex max-w-[calc(100%_-_2.75rem)] min-w-0 flex-col items-end">
@@ -82,7 +96,12 @@ export function UserLine({ identityName, text, roll = null }: { identityName: st
                 </p>
                 {roll && <RollLine roll={roll} />}
             </div>
-            <Avatar name={identityName} colour="var(--accent-fill)" light />
+            {picture ? (
+                // eslint-disable-next-line @next/next/no-img-element -- served by the API from the image folder, as a thumbnail
+                <img className={`${AVATAR} bg-surface-raised`} src={personaImageUrl(picture, 320)} alt="" draggable={false} data-persona-picture />
+            ) : (
+                <Avatar name={identityName} colour="var(--accent-fill)" light />
+            )}
         </div>
     );
 }
@@ -192,7 +211,7 @@ export interface ReadingNow {
  * its speaker's bubble; a User Message as a bubble on the right.
  */
 export function MessageBody({ message, cast, portraits = {}, readingNow = null }: MessageBodyProps) {
-    if (message.kind === 'user') return <UserLine identityName={message.identityName} text={message.text} roll={message.roll} />;
+    if (message.kind === 'user') return <UserLine identityName={message.identityName} text={message.text} roll={message.roll} personaId={message.personaId} />;
     return <AiMessageParts parts={message.parts} cast={cast} portraits={portraits} readingNow={readingNow} />;
 }
 

@@ -136,6 +136,13 @@ export class ChatEntity {
     @Column({ name: 'auto_read', type: 'boolean', default: false })
     autoRead: boolean;
 
+    /**
+     * Whether the Judge may suggest an Ending in this Chat (.scratch/endings/spec.md). On by
+     * default; waving a suggested Ending away turns it off, Reset turns it on, a Branch copies it.
+     */
+    @Column({ name: 'ending_suggestions', type: 'boolean', default: true })
+    endingSuggestions: boolean;
+
     // Loaded only through ChatModelService.findWithMessages(); never auto-loaded.
     @OneToMany('MessageEntity', 'chat')
     messages: Relation<MessageEntity[]>;

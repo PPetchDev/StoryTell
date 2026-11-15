@@ -12,6 +12,9 @@ export class PersonaResponseBodyDTO implements PersonaResponse {
     @ApiProperty({ description: 'May be empty.' })
     description: string;
 
+    @ApiProperty({ type: String, nullable: true, description: 'Its picture, served by `GET /api/images/{path}`; null without one.' })
+    imagePath: string | null;
+
     @ApiProperty({ description: 'ISO 8601.' })
     createdAt: string;
 

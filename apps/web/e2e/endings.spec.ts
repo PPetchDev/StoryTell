@@ -184,3 +184,68 @@ test('the Scenes tab adds an Ending, saves each field, keeps it through a reload
         await request.delete(`/api/stories/${storyId}`);
     }
 });
+
+/** Plays `count` turns through the API, the last one judged with `lastJudge`, and waits for that judgement. */
+async function playThrough(request: APIRequestContext, storyId: number, chatId: number, count: number, lastJudge: string) {
+    for (let n = 1; n <= count; n++) {
+        await scriptTurn(request, `@Mira: Reply ${n}.`, n === count ? lastJudge : judgement());
+        const sent = await request.post(`/api/stories/${storyId}/chats/${chatId}/messages`, { data: { text: `Turn ${n}.` } });
+        expect(sent.ok()).toBe(true);
+        await expect
+            .poll(async () => {
+                const chat = await (await request.get(`/api/stories/${storyId}/chats/${chatId}`)).json();
+                return chat.messages.at(-1).judge?.status;
+            })
+            .toBe('done');
+    }
+}
+
+test('in a Story with no Endings the AI suggests one when the story closes: "Not yet" waves it away, or its Epilogue is written', async ({ page, request }) => {
+    const storyId = await createStory(request);
+    const waved = await createChat(request, storyId);
+    const closed = await createChat(request, storyId);
+    await request.delete('/api/testing/fake-gateway');
+    try {
+        // The Judge is asked from the sixth reply on.
+        const suggestion = judgement({ reason: 'The storm passed and the lamp is safe.', suggest: 'A quiet watch' });
+        await playThrough(request, storyId, waved, 6, suggestion);
+        await playThrough(request, storyId, closed, 6, suggestion);
+
+        await page.goto(`/stories/${storyId}/chats/${waved}`);
+        const banner = page.getByRole('region', { name: 'Ending', exact: true });
+        await expect(banner).toContainText('The story may have reached its end');
+        await expect(banner.getByRole('heading', { name: 'A quiet watch' })).toBeVisible();
+        await expect(banner).toContainText('The storm passed and the lamp is safe.');
+        await expect(banner).toHaveAttribute('data-suggested', 'true');
+        await noSidewaysScroll(page);
+
+        // "Not yet": it goes, and stays gone through the next reply, whatever the Judge would say.
+        await banner.getByRole('button', { name: 'Not yet: this is not the end' }).tap();
+        await expect(banner).toHaveCount(0);
+        await scriptTurn(request, '@Mira: One more watch, then.', suggestion);
+        await send(page, 'I stay on.');
+        await expect(page.getByRole('article', { name: 'AI reply' }).last()).toContainText('One more watch, then.');
+        await expect
+            .poll(async () => (await (await request.get(`/api/stories/${storyId}/chats/${waved}`)).json()).messages.at(-1).judge?.status)
+            .toBe('done');
+        await expect(banner).toHaveCount(0);
+        expect((await (await request.get(`/api/stories/${storyId}/chats/${waved}`)).json()).ending).toBeNull();
+
+        // In the other Chat the suggestion is taken: its Epilogue is written for it by name.
+        await page.goto(`/stories/${storyId}/chats/${closed}`);
+        await expect(banner.getByRole('heading', { name: 'A quiet watch' })).toBeVisible();
+        await scriptTurn(request, 'The lamp burned on, and the reef kept its peace.');
+        await banner.getByRole('button', { name: 'Write the epilogue' }).tap();
+        await expect(page.getByRole('article', { name: 'Epilogue' })).toContainText('the reef kept its peace');
+        expect(await lastTurnAsked(request)).toContain('The story has reached its ending: "A quiet watch".');
+        await expect(banner).toHaveAttribute('data-epilogue', 'written');
+        await expect(banner).toContainText('Ending: A quiet watch');
+
+        // Its row says how it ended; a suggested Ending is not one of the Story's to be found.
+        await page.goto(`/stories/${storyId}/chats`);
+        await expect(page.locator('[data-chat-ending]')).toHaveText('Ending: A quiet watch');
+        await expect(page.locator('[data-endings-found]')).toHaveCount(0);
+    } finally {
+        await request.delete(`/api/stories/${storyId}`);
+    }
+});

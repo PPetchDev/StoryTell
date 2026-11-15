@@ -13,6 +13,7 @@ import {
     NothingNewForDiaryError,
     NoFailedExtractionError,
     NoFailedJudgeError,
+    NoSuggestedEndingError,
     NoTurnToRetryError,
     NotRegenerableError,
     NudgeSittingOutError,
@@ -102,7 +103,7 @@ import { CastName, ParseOptions, parseReply, partsToText, releasedText, ReplyPar
 import { TurnStoppedError, TurnStream } from './turn/turn-stream.js';
 import { Dice } from '../../service/dice/dice.js';
 import { Roll, ROLL_SIDES, ROLL_TARGETS } from './roll.js';
-import { endingName, endingState, EndingView, endingView, promptEpilogue } from './ending/ending.js';
+import { endingName, endingReady, endingState, EndingView, endingView, promptEpilogue } from './ending/ending.js';
 import { eventReady, eventState, promptSuddenEvent, SuddenEventView, suddenEventView } from './sudden-event/sudden-event.js';
 import { currentDetails, promptDetails } from './details/details.js';
 
@@ -114,8 +115,8 @@ export interface ChatListItem extends ChatSummary {
     latestLine: string;
     /** The Chat it was branched from, with that Chat's title now; null when never branched or that Chat is gone. */
     branchedFrom: { chatId: number; title: string } | null;
-    /** The Ending the Chat reached (.scratch/endings/spec.md); null when it reached none. */
-    ending: { id: number; name: string } | null;
+    /** The Ending the Chat reached (.scratch/endings/spec.md), its id null for one the Judge suggested; null when it reached none. */
+    ending: { id: number | null; name: string } | null;
 }
 
 /** A Story's Chats, and how many of its Endings they have found between them. */
@@ -177,6 +178,11 @@ export interface ChatDetail extends ChatSummary {
      * there (null once that Message is gone); null when never branched or that Chat is gone.
      */
     branchedFrom: { chatId: number; title: string; messageId: number | null } | null;
+    /**
+     * The pictures of the Personas in this Chat (.scratch/persona-image/spec.md): the worn one and
+     * those its User Messages were written as, where they still exist and have one.
+     */
+    personaImages: Array<{ personaId: number; imagePath: string }>;
     /** The Author's note (.scratch/authors-note/spec.md); empty when there is none. */
     authorsNote: string;
     /** Read replies aloud (.scratch/read-aloud/spec.md, "Auto-read"); off by default. */
@@ -355,13 +361,12 @@ export class ChatManagerService {
         const story = await this.loadStory(storyId);
         const chats = await this.chatModel.findByStory(storyId);
         const latest = await this.chatModel.findLatestMessages(chats.map((chat) => chat.id));
-        // Only a Story with Endings has any to read (.scratch/endings/spec.md).
+        // The Ending each Chat reached (.scratch/endings/spec.md): the author's, or one the Judge suggested.
         const endings = story.endings ?? [];
-        const records = endings.length > 0 ? await this.ledger.endingsReachedOf(chats.map((chat) => chat.id)) : [];
-        const reachedBy = new Map(
-            chats.map((chat) => [chat.id, endingState(endings, records.filter((record) => record.chatId === chat.id)).reached?.ending ?? null]),
-        );
-        const foundIds = new Set([...reachedBy.values()].flatMap((ending) => (ending ? [ending.id] : [])));
+        const records = await this.ledger.endingsReachedOf(chats.map((chat) => chat.id));
+        const reachedBy = new Map(chats.map((chat) => [chat.id, endingState(endings, records.filter((record) => record.chatId === chat.id)).reached]));
+        // Only the author's count as found: a suggested one is that Chat's alone.
+        const foundIds = new Set([...reachedBy.values()].flatMap((reached) => (reached?.ending ? [reached.ending.id] : [])));
         const latestOf = new Map(latest.map((message) => [message.chatId, message]));
         const titleOf = new Map(chats.map((chat) => [chat.id, chat.title]));
         const items = chats.map((chat) => {
@@ -372,13 +377,13 @@ export class ChatManagerService {
                 sceneName: story.scenes.find((scene) => scene.id === chat.currentSceneId)?.name ?? null,
                 latestLine: latestLine(latestOf.get(chat.id)),
                 branchedFrom: sourceTitle === undefined ? null : { chatId: chat.branchedFromChatId!, title: sourceTitle },
-                ending: reached ? { id: reached.id, name: endingName(reached) } : null,
+                ending: reached ? { id: reached.ending?.id ?? null, name: reached.name } : null,
             };
         });
         return {
             chats: items,
             endings: {
-                total: endings.filter((ending) => ending.condition.trim() !== '' || foundIds.has(ending.id)).length,
+                total: endings.filter((ending) => endingReady(ending) || foundIds.has(ending.id)).length,
                 found: endings.filter((ending) => foundIds.has(ending.id)).map((ending) => ({ id: ending.id, name: endingName(ending) })),
             },
         };
@@ -851,6 +856,18 @@ export class ChatManagerService {
             await this.writeTurn(story, chat, stream, undefined, null, null, true);
             return this.getChat(storyId, chatId);
         });
+    }
+
+    /**
+     * .scratch/endings/spec.md, "An Ending the Judge suggests": the user says the story has not
+     * ended. The suggested Ending goes, and the Judge suggests no more in this Chat until a Reset;
+     * "End the story" still ends it. Only a suggested Ending can be waved away: the author's stands.
+     */
+    async dismissEnding(storyId: number, chatId: number): Promise<ChatDetail> {
+        const { chat } = await this.load(storyId, chatId);
+        if (this.inFlight.has(chat.id)) throw new TurnInProgressError();
+        if (!(await this.ledger.dismissSuggestedEnding(chat.id))) throw new NoSuggestedEndingError();
+        return this.getChat(storyId, chatId);
     }
 
     /**
@@ -1429,7 +1446,7 @@ export class ChatManagerService {
     }
 
     private async detail(story: StoryEntity, chat: ChatEntity): Promise<ChatDetail> {
-        const [settings, creditOut, source, readings, appSavedReplies, appReplaceRules, bondChanges, beliefs, eventSteps, detailChanges, endingsReached] = await Promise.all([
+        const [settings, creditOut, source, readings, appSavedReplies, appReplaceRules, bondChanges, beliefs, eventSteps, detailChanges, endingsReached, personas] = await Promise.all([
             this.settingsModel.get(),
             this.creditOut(),
             // Read live, so a rename of the source shows.
@@ -1442,9 +1459,11 @@ export class ChatManagerService {
             // Only a Story with Sudden events has steps to read.
             (story.suddenEvents ?? []).length > 0 ? this.ledger.suddenEventStepsOf(chat.id) : [],
             this.ledger.detailChangesOf(chat.id),
-            // Only a Story with Endings has a record to read.
-            (story.endings ?? []).length > 0 ? this.ledger.endingsReachedOf([chat.id]) : [],
+            this.ledger.endingsReachedOf([chat.id]),
+            // The Account's Personas: few, and only those this Chat shows are answered.
+            this.personaModel.findAll(),
         ]);
+        const inChat = new Set([chat.personaId, ...chat.messages.map((message) => message.personaId)]);
         const details = currentDetails(detailChanges);
         const scene = story.scenes.find((candidate) => candidate.id === chat.currentSceneId);
         const lastModel = lastAiModel(chat);
@@ -1466,6 +1485,9 @@ export class ChatManagerService {
             identityName: identity.name,
             personaId: identity.personaId,
             roleName: story.role.name,
+            personaImages: personas.flatMap((persona) =>
+                persona.imagePath && inChat.has(persona.id) ? [{ personaId: persona.id, imagePath: persona.imagePath }] : [],
+            ),
             messages: withThaiReadings(
                 chat.messages.map((message) => message.toResponse()),
                 readings,
