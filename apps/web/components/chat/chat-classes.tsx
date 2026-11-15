@@ -38,8 +38,10 @@ export const ACTION_ICON = 'shrink-0 text-text';
  */
 export const TOOL_CHIP = [
     'bare-button inline-flex shrink-0 items-center gap-1',
-    // px-2: five tools fit one row on a 390px phone (the Cue tool is the fifth).
-    'min-h-11 rounded-full px-2 text-xs font-semibold',
+    // Five tools on one row: at px-2 they are 352px wide, which wrapped the fifth (Cue) on a 360px
+    // phone, so below 400px each gives up 4px a side (312px), and below 350px a little more, which
+    // fits a 320px one (282px). The row never wraps; see the composer.
+    'min-h-11 rounded-full px-1 text-xs font-semibold min-[400px]:px-2 max-[349px]:gap-0.5 max-[349px]:px-0.5',
     'text-muted',
     'cursor-pointer press focus-ring',
     'active:bg-surface-raised',

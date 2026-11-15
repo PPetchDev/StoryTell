@@ -90,3 +90,57 @@ test('the composer stacks the panel, the Character row, the tool row and the box
         await request.delete(`/api/stories/${storyId}`);
     }
 });
+
+// A real phone, 360px wide, wrapped the fifth tool (Cue) onto a row of its own, which took 48px
+// from the Chat (2026-11-15). The tools are one row at every phone width, all of them in sight.
+for (const width of [320, 360, 390, 412]) {
+    test(`the five tools stay on one row, all in sight, on a ${width}px phone`, async ({ page, request }) => {
+        await page.setViewportSize({ width, height: 800 });
+        const created = await request.post('/api/stories', { data: { title: 'The Herd', setting: 'A summer road.', opening: OPENING } });
+        expect(created.ok()).toBe(true);
+        const storyId = (await created.json()).id as number;
+        await request.patch(`/api/stories/${storyId}/role`, { data: { name: 'Petch', description: 'A traveller.' } });
+        for (const name of ['Mira', 'Dulcie', 'Tavri', 'Morra']) {
+            await request.post(`/api/stories/${storyId}/characters`, { data: { name, appearance: 'Tall.', personality: 'Calm.', voice: 'Measured.' } });
+        }
+        const chatId = (await (await request.post(`/api/stories/${storyId}/chats`)).json()).id as number;
+        try {
+            await page.goto(`/stories/${storyId}/chats/${chatId}`);
+            const composer = page.getByRole('form', { name: 'Composer' });
+            const tools = composer.getByRole('toolbar', { name: 'Composer tools' });
+            await expect(tools.getByRole('button')).toHaveCount(5);
+
+            // One row: every tool has the same top, and the row is one tool tall.
+            const places = await tools.getByRole('button').evaluateAll((items) =>
+                items.map((item) => {
+                    const rect = item.getBoundingClientRect();
+                    return { top: Math.round(rect.top), left: rect.left, right: rect.right, width: rect.width, height: rect.height };
+                }),
+            );
+            expect(new Set(places.map((place) => place.top)).size).toBe(1);
+            expect((await box(tools)).height).toBeLessThanOrEqual(46);
+            // All in sight, none scrolled off the row's end, and each still a thumb's size.
+            const row = await box(tools);
+            expect(places.at(-1)!.right).toBeLessThanOrEqual(row.x + row.width + 0.5);
+            expect(places[0].left).toBeGreaterThanOrEqual(row.x - 0.5);
+            await expect(tools).toHaveAttribute('data-fade', 'none');
+            for (const place of places) {
+                expect(place.height).toBeGreaterThanOrEqual(44);
+                expect(place.width).toBeGreaterThanOrEqual(44);
+            }
+
+            // The empty box is one line with its whole placeholder on it, and has no scrollbar.
+            const text = composer.getByRole('textbox', { name: 'Write as Petch' });
+            expect((await box(text)).height).toBeLessThanOrEqual(46);
+            expect(await text.evaluate((el) => getComputedStyle(el).overflowY)).toBe('hidden');
+            // It scrolls only once the text is taller than five lines.
+            await text.fill(Array.from({ length: 9 }, (_, line) => `Line ${line + 1}`).join('\n'));
+            expect(await text.evaluate((el) => getComputedStyle(el).overflowY)).toBe('auto');
+            await text.fill('');
+            expect(await text.evaluate((el) => getComputedStyle(el).overflowY)).toBe('hidden');
+            await expectNoSidewaysScroll(page);
+        } finally {
+            await request.delete(`/api/stories/${storyId}`);
+        }
+    });
+}

@@ -9,6 +9,7 @@ import { CloseIcon, DiceIcon, PencilIcon, PlayIcon, StopIcon, UndoIcon } from '@
 import { ApiUnreachableError } from '@/lib/api';
 import { backgroundNotice, Chat, chatApi, SuggestedReply } from '@/lib/chat';
 import { insertSavedReply, SavedReply, TraySavedReply } from '@/lib/saved-replies';
+import { SCROLL_FADES, useScrollFade } from '@/lib/scroll-fade';
 import { DictateButton, dictationNote, hasDictationStatus, RecordingBar, useDictation } from './dictation';
 import { SavedRepliesTray } from './saved-replies-tray';
 
@@ -260,11 +261,17 @@ function useSavedRepliesTray(chat: Chat) {
     return { open, setOpen, lines: lines.lines, saved };
 }
 
-/** Sets the box's height to its text's, which the CSS max-height caps. */
+/**
+ * Sets the box's height to its text's, which the CSS max-height caps. The box scrolls only once
+ * the text is taller than that: left to scroll whenever it could, a phone whose pixels don't
+ * divide evenly rounded the fitted height a hair short and drew a scrollbar down the side of an
+ * empty box (seen on a 360px phone, 2026-11-15).
+ */
 function fitToText(box: HTMLTextAreaElement) {
     box.style.height = 'auto';
     const borders = box.offsetHeight - box.clientHeight;
     box.style.height = `${box.scrollHeight + borders}px`;
+    box.style.overflowY = box.scrollHeight > box.clientHeight + 1 ? 'auto' : 'hidden';
 }
 
 /**
@@ -322,6 +329,8 @@ const BOX = [
     'max-h-[calc(5*1.4em_+_1.25rem_+_2px)]',
     'rounded-2xl border border-field-line bg-surface px-3.5 py-2.5',
     'font-[inherit] text-base leading-[1.4] text-text',
+    // The placeholder stays on its one line: the box is sized by its text, so a wrapped placeholder was cut in half.
+    'placeholder:overflow-hidden placeholder:text-ellipsis placeholder:whitespace-nowrap',
     'focus-ring',
 ].join(' ');
 
@@ -433,6 +442,9 @@ export function ChatComposer({
 
     // Whether the user was last in the composer: a tap anywhere else, or focus elsewhere, says not.
     const footerRef = useRef<HTMLElement>(null);
+    // The tool row scrolls sideways where a phone is too narrow for all five tools; it fades at an end that hides more.
+    const toolRow = useRef<HTMLDivElement>(null);
+    const toolFade = useScrollFade(toolRow);
     const ownsFocus = useRef(false);
     useEffect(() => {
         const onDown = (event: Event) => {
@@ -577,13 +589,39 @@ export function ChatComposer({
                         </span>
                     </p>
                 )}
+                {/* Write for me's way back, only while the box holds exactly what it wrote; puts the draft back, empty included. */}
+                {writer.offered && (
+                    <div className="flex min-w-0 items-center justify-between gap-2 rounded-md bg-accent-soft pl-3 text-sm" data-band="undo">
+                        <span className="min-w-0 truncate font-semibold text-rewrite-text">Written for you</span>
+                        <button
+                            type="button"
+                            className="bare-button inline-flex min-h-11 shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-3 text-md text-text press focus-ring"
+                            onClick={writer.restore}
+                        >
+                            <UndoIcon size={16} />
+                            Undo
+                        </button>
+                    </div>
+                )}
+                {!dictation.recording && (
+                    <label htmlFor={boxId} className="sr-only">
+                        Write as {chat.identityName}
+                    </label>
+                )}
                 {/*
-                 * Band 3: the tools as 44px chips with a word each (audit H28; docs/ui-audit-2026-11-13.md M3),
-                 * and at the right end Undo. Who the box writes as is its placeholder and name (L14); the label
-                 * stays for screen readers but no longer squeezes beside the chips.
+                 * Band 3: the tools as 44px chips with a word each (audit H28; docs/ui-audit-2026-11-13.md M3).
+                 * Always one row: the chips spread across a phone's width, and on one too narrow for them
+                 * all (under about 345px) the row scrolls sideways and fades at the end that hides more,
+                 * like the Character row. It never wraps: a second row took 48px from the Chat on a 360px
+                 * phone. Who the box writes as is its placeholder and name (L14); the label stays for screen readers.
                  */}
-                {/* No gap between the tools: each has its own padding, and five then fit one row on a 390px phone. */}
-                <div className="flex min-w-0 flex-wrap items-center gap-y-1" role="toolbar" aria-label="Composer tools">
+                <div
+                    ref={toolRow}
+                    className={`flex min-w-0 flex-nowrap items-center justify-between overflow-x-auto [scrollbar-width:none] sm:justify-start sm:gap-1 [&::-webkit-scrollbar]:hidden ${SCROLL_FADES[toolFade]}`}
+                    role="toolbar"
+                    aria-label="Composer tools"
+                    data-fade={toolFade}
+                >
                     {/* Spec: "Suggested replies". Asks only when tapped, so they never spend credit unasked. */}
                     <button
                         type="button"
@@ -683,24 +721,6 @@ export function ChatComposer({
                         </svg>
                         <span>Cue</span>
                     </button>
-                    <span className="ml-auto flex min-w-0 items-center gap-2" data-slot="tools-end">
-                        {/* Only while the box holds exactly what ✍️ wrote; puts the draft back, empty included. */}
-                        {writer.offered && (
-                            <button
-                                type="button"
-                                className="bare-button inline-flex min-h-11 shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-2.5 text-md text-muted press focus-ring"
-                                onClick={writer.restore}
-                            >
-                                <UndoIcon size={16} />
-                                Undo
-                            </button>
-                        )}
-                        {!dictation.recording && (
-                            <label htmlFor={boxId} className="sr-only">
-                                Write as {chat.identityName}
-                            </label>
-                        )}
-                    </span>
                 </div>
                 {/* Band 4: the box, 🎤 and the send slot; while recording, the recording bar. */}
                 {dictation.recording ? (
