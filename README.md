@@ -324,12 +324,14 @@ and systemd runs `storytell-api` and `storytell-web`. The files for it are in `s
 ```bash
 git archive --format=tar.gz -o release.tar.gz <commit>
 scp release.tar.gz scripts/vm/deploy.sh ubuntu@<vm>:/tmp/
-ssh ubuntu@<vm> "bash /tmp/deploy.sh <commit>"
+ssh -o ServerAliveInterval=30 ubuntu@<vm> "bash /tmp/deploy.sh <commit>"
 ```
 
 `deploy.sh` builds the release beside the running one, makes a backup of what is live, stops
 the app, runs the migrations, swaps the folders and starts the app. It prints `BUILD_OK`,
-`BACKUP_OK`, `MIGRATE_OK`, the units' state, the commit and the health check.
+`BACKUP_OK`, `MIGRATE_OK`, the units' state, the commit and the health check. The work runs detached
+from the SSH session, so a dropped connection never stops a deploy halfway (the backup step is
+minutes of silence): it carries on, and `tail -f /tmp/st-deploy.log` on the VM shows the rest.
 
 ### Backups
 

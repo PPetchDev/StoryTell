@@ -3,14 +3,29 @@
 #
 #   git archive --format=tar.gz -o release.tar.gz <commit>
 #   scp release.tar.gz scripts/vm/deploy.sh ubuntu@<vm>:/tmp/
-#   ssh ubuntu@<vm> "bash /tmp/deploy.sh <commit>"
+#   ssh -o ServerAliveInterval=30 ubuntu@<vm> "bash /tmp/deploy.sh <commit>"
 #
 # It builds the release beside the running one, backs up what is live, stops the app, runs the
 # migrations, swaps the folders and starts the app. /srv/storytell/app-prev is the release before,
 # for going back (only safe before a migration the old code can't run on; else restore the backup).
+#
+# The work runs detached from the SSH session, with its output in /tmp/st-deploy.log: the backup
+# step is minutes of silence, a quiet connection gets dropped (it was, on 2026-11-15), and a deploy
+# must never stop between stopping the app and starting it. If the connection goes, the deploy
+# carries on; `tail -f /tmp/st-deploy.log` shows the rest.
 set -euo pipefail
 
 COMMIT=${1:?usage: deploy.sh <commit>}
+LOG=/tmp/st-deploy.log
+if [[ "${DEPLOY_DETACHED:-}" != 1 ]]; then
+    DEPLOY_DETACHED=1 setsid nohup bash "$0" "$@" >"$LOG" 2>&1 </dev/null &
+    worker=$!
+    # Shows the log until the worker ends; ends with the worker's own status.
+    tail --pid="$worker" -n +1 -f "$LOG" || true
+    wait "$worker"
+    exit $?
+fi
+
 HOME_DIR=/srv/storytell
 as_app() { sudo -u storytell -H bash -lc "$1"; }
 
