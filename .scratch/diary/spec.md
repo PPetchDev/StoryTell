@@ -49,7 +49,7 @@ The Diary is for the user to read. The Narrator never reads it, so nothing in it
 ## Testing Decisions
 
 - API (`apps/api/test/diary.spec.ts`): the moment, the Messages an entry tells of and the budget, the whole prompt and what it leaves out, and reading the answer, as pure logic; then through HTTP with the fake gateway: an entry written from a Story with Secrets, an Arc direction, Starting Bonds and a Starting Belief (the Secrets, the direction and another Character's Bond are not in the call); the refusal of a second entry with no call; the next entry telling only what is new; an unknown Character, an empty answer, credit out and a missing entry; Regenerate, an edit and Reset; a Branch; a removed Character. The turn after an entry is checked not to contain it.
-- Browser (`apps/web/e2e/diary.spec.ts`, phone size): the empty Diary, asking, the "up to date" line, the next entry after a turn, earlier entries folding, Again taking an entry back, a failed ask, Delete, and an accessibility check of the open profile.
+- Browser (`apps/web/e2e/diary.spec.ts`, phone size): the empty Diary, asking, the "up to date" line, the next entry after a turn, earlier entries folding, Again taking an entry back, a failed ask and Delete. The open profile was checked with axe in both themes by hand while building; that check is not in the spec file, since the axe package is not one of the project's dependencies and the production build type-checks the e2e folder.
 
 ## Out of Scope
 

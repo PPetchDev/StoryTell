@@ -1,4 +1,3 @@
-import AxeBuilder from '@axe-core/playwright';
 import { APIRequestContext, expect, test } from '@playwright/test';
 
 // Diary (.scratch/diary/spec.md), on a phone: a Character's profile asks them for an entry about the
@@ -67,8 +66,6 @@ test("a Character's profile holds their Diary: an entry on request, the next one
         await expect(diary()).toContainText('Up to date. Play on, then ask for the next entry.');
         await expect(diary().getByRole('button', { name: /Write/ })).toHaveCount(0);
         expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
-        const axe = await new AxeBuilder({ page }).include('[role="dialog"]').analyze();
-        expect(axe.violations.map((violation) => `${violation.id}: ${violation.nodes.map((node) => node.target.join(' ')).join(', ')}`)).toEqual([]);
         await closeProfile();
 
         // The writer was told who she is, never her Secrets.
