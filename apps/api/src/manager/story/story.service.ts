@@ -32,8 +32,11 @@ import { SceneEntity } from '../../model/story/entities/scene.entity.js';
 import { StartingBondEntity } from '../../model/story/entities/starting-bond.entity.js';
 import {
     Backdrop,
+    Balance,
     CoverFocus,
     CoverSource,
+    Difficulty,
+    Pacing,
     Pov,
     ReplyLength,
     StoryEntity,
@@ -89,6 +92,9 @@ export interface StoryFields {
     pov?: Pov;
     tense?: Tense;
     replyLength?: ReplyLength;
+    pacing?: Pacing;
+    balance?: Balance;
+    difficulty?: Difficulty;
     imageStyle?: string;
     /** A voice id from the voice list, or null for the default. */
     narrationVoice?: string | null;
@@ -278,6 +284,9 @@ export class StoryManagerService {
             'pov',
             'tense',
             'replyLength',
+            'pacing',
+            'balance',
+            'difficulty',
             'imageStyle',
             'narrationVoice',
             'backdrop',

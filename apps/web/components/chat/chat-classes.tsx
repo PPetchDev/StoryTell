@@ -38,11 +38,13 @@ export const ACTION_ICON = 'shrink-0 text-text';
  */
 export const TOOL_CHIP = [
     'bare-button inline-flex shrink-0 items-center gap-1',
-    'min-h-11 rounded-full px-2.5 text-xs font-semibold',
+    // px-2: five tools fit one row on a 390px phone (the Cue tool is the fifth).
+    'min-h-11 rounded-full px-2 text-xs font-semibold',
     'text-muted',
     'cursor-pointer press focus-ring',
     'active:bg-surface-raised',
-    'aria-pressed:bg-accent-soft aria-pressed:text-accent',
+    // The pressed label is small text, so it takes the accent made for text (4.5:1 on the tint in both themes), not the icon accent.
+    'aria-pressed:bg-accent-soft aria-pressed:text-rewrite-text',
     'disabled:cursor-not-allowed disabled:text-faint aria-disabled:cursor-not-allowed aria-disabled:text-faint',
 ].join(' ');
 

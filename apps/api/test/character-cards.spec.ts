@@ -298,7 +298,7 @@ interface Story {
     title: string;
     setting: string;
     opening: string;
-    style: { pov: string; tense: string; replyLength: string; imageStyle: string };
+    style: { pov: string; tense: string; replyLength: string; pacing?: string; balance?: string; difficulty?: string; imageStyle: string };
     role: { name: string; description: string };
     characters: Array<{ id: number; name: string; personality: string; background: string; exampleLines: string[]; referenceImagePath: string | null }>;
     lore: Array<{ name: string; keywords: string[]; text: string; alwaysOn: boolean }>;
@@ -340,7 +340,7 @@ describe('Character cards: import through the API', () => {
         expect(story.setting).toBe('Ash arrives on the supply boat as the new assistant keeper.');
         expect(story.opening).toBe('Rain hammers the gallery windows. "You\'re Ash? You\'re late."');
         expect(story.role).toMatchObject({ name: 'Ash', description: '' });
-        expect(story.style).toEqual({ pov: 'second', tense: 'past', replyLength: 'medium', imageStyle: '' });
+        expect(story.style).toEqual({ pov: 'second', tense: 'past', replyLength: 'medium', pacing: 'natural', balance: 'balanced', difficulty: 'normal', imageStyle: '' });
         expect(story.characters).toHaveLength(1);
         expect(story.characters[0]).toMatchObject({
             name: 'Mira',

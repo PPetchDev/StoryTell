@@ -2,6 +2,7 @@ import { PromptMessage } from '../../../service/model-gateway/model-gateway.js';
 import {
     authorsNoteBlock,
     estimateTokens,
+    CUE_RESERVE_TOKENS,
     NUDGE_RESERVE_TOKENS,
     PromptHistoryMessage,
     PromptLayersInput,
@@ -61,6 +62,8 @@ export function storySoFarCoverage(layers: PromptLayersInput, history: PromptHis
         ) +
         // A Nudge line may ride on the next turn (.scratch/speaker-controls/spec.md): a small fixed allowance.
         NUDGE_RESERVE_TOKENS +
+        // And a Cue (CONTEXT.md): room for the longest one.
+        CUE_RESERVE_TOKENS +
         // The Author's note, as the Chat holds it when the check runs.
         estimateTokens(authorsNoteBlock(layers.authorsNote, layers.identity.name) ?? '') +
         estimateTokens(`${reminder}

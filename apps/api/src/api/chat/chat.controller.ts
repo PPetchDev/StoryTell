@@ -123,7 +123,7 @@ export class ChatApiController {
         @Res() response: Response,
     ): Promise<void> {
         return answerTurn<ChatResponseBodyDTO>(request, response, 201, (stream) =>
-            this.chatManager.send(storyId, chatId, body.text, stream, body.nudgeCharacterId),
+            this.chatManager.send(storyId, chatId, body.text, stream, body.nudgeCharacterId, body.cue),
         );
     }
 
@@ -138,7 +138,7 @@ export class ChatApiController {
         @Res() response: Response,
     ): Promise<void> {
         return answerTurn<ChatResponseBodyDTO>(request, response, 200, (stream) =>
-            this.chatManager.retry(storyId, chatId, stream, body?.nudgeCharacterId),
+            this.chatManager.retry(storyId, chatId, stream, body?.nudgeCharacterId, body?.cue),
         );
     }
 
@@ -157,7 +157,7 @@ export class ChatApiController {
         @Res() response: Response,
     ): Promise<void> {
         return answerTurn<ChatResponseBodyDTO>(request, response, 200, (stream) =>
-            this.chatManager.continueChat(storyId, chatId, stream, body?.nudgeCharacterId),
+            this.chatManager.continueChat(storyId, chatId, stream, body?.nudgeCharacterId, body?.cue),
         );
     }
 
@@ -179,7 +179,7 @@ export class ChatApiController {
         @Res() response: Response,
     ): Promise<void> {
         return answerTurn<EditMessageResponseBodyDTO>(request, response, 200, (stream) =>
-            this.chatManager.editMessage(storyId, chatId, messageId, body.text, stream, body.nudgeCharacterId),
+            this.chatManager.editMessage(storyId, chatId, messageId, body.text, stream, body.nudgeCharacterId, body.cue),
         );
     }
 
@@ -202,7 +202,7 @@ export class ChatApiController {
         @Res() response: Response,
     ): Promise<void> {
         return answerTurn<EditMessageResponseBodyDTO>(request, response, 200, (stream) =>
-            this.chatManager.regenerateMessage(storyId, chatId, messageId, stream, body?.nudgeCharacterId),
+            this.chatManager.regenerateMessage(storyId, chatId, messageId, stream, body?.nudgeCharacterId, body?.cue),
         );
     }
 

@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsArray, IsBoolean, IsInt, IsOptional, IsString, MaxLength, Min, ValidateIf } from 'class-validator';
 
 import type { ChatFields } from '../../../manager/chat/chat.service.js';
+import { CUE_MAX } from '../../../manager/chat/turn/prompt.js';
 import { WRITE_FOR_ME_DRAFT_MAX } from '../../../manager/chat/write-for-me/write-for-me-prompt.js';
 
 const TITLE_MAX = 200;
@@ -26,12 +27,22 @@ export class UpdateChatRequestBodyDTO implements ChatFields {
 const NUDGE_DESCRIPTION =
     'Optional: a Character of the Story to nudge in this turn. The Narrator is asked to give them a line if they could plausibly be there. Never stored. Left out or null: no nudge.';
 
+/** CONTEXT.md, "Cue": a few words to the Narrator for this one reply. */
+const CUE_DESCRIPTION =
+    'Optional: a Cue, a few words from the user to the Narrator for this one reply ("make her angrier", "skip to the next morning"). It steers that reply only, is never part of the story and is never stored. Left out, null or blank: no Cue.';
+
 /** The optional body of Retry, Continue and Regenerate: without one they behave as before. */
 export class TurnRequestBodyDTO {
     @ApiPropertyOptional({ type: Number, nullable: true, description: NUDGE_DESCRIPTION })
     @IsOptional()
     @IsInt()
     nudgeCharacterId?: number | null;
+
+    @ApiPropertyOptional({ type: String, nullable: true, maxLength: CUE_MAX, description: CUE_DESCRIPTION })
+    @IsOptional()
+    @IsString()
+    @MaxLength(CUE_MAX)
+    cue?: string | null;
 }
 
 export class SendMessageRequestBodyDTO extends TurnRequestBodyDTO {

@@ -1,6 +1,6 @@
 import { InvalidChangeSetError, UnreadableChangeSetError } from '../../errors/story-drafting.errors.js';
 import { CastFullError } from '../../errors/story.errors.js';
-import { Pov, ReplyLength, StoryResponse, Tense } from '../../model/story/entities/story.entity.js';
+import { Balance, Difficulty, Pacing, Pov, ReplyLength, StoryResponse, Tense } from '../../model/story/entities/story.entity.js';
 import {
     DraftCharacter,
     DraftLore,
@@ -30,7 +30,7 @@ export interface ChangeSet {
     changes: Change[];
 }
 
-export const STORY_SET_FIELDS = ['title', 'setting', 'opening', 'pov', 'tense', 'replyLength', 'imageStyle'] as const;
+export const STORY_SET_FIELDS = ['title', 'setting', 'opening', 'pov', 'tense', 'replyLength', 'pacing', 'balance', 'difficulty', 'imageStyle'] as const;
 export const ROLE_SET_FIELDS = ['name', 'description'] as const;
 export const CHARACTER_SET_FIELDS = [
     'name',
@@ -286,6 +286,9 @@ function validateSet(
                 pov: Object.values(Pov),
                 tense: Object.values(Tense),
                 replyLength: Object.values(ReplyLength),
+                pacing: Object.values(Pacing),
+                balance: Object.values(Balance),
+                difficulty: Object.values(Difficulty),
             };
             const allowed = sets[which];
             if (allowed && !allowed.includes(value)) {

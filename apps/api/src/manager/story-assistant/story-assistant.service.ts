@@ -61,6 +61,9 @@ const SET_FIELD_LABELS: Record<string, string> = {
     pov: 'POV',
     tense: 'Tense',
     replyLength: 'Reply length',
+    pacing: 'Pacing',
+    balance: 'Dialogue or action',
+    difficulty: 'Difficulty',
 };
 
 function excerpt(text: string): string {

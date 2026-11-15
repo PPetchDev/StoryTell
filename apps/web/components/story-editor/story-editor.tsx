@@ -18,10 +18,13 @@ import { AppliedChange } from '@/lib/story-assistant';
 import { DEFAULT_NARRATION_VOICE, useVoices, voiceName } from '@/lib/voices';
 import {
     BACKDROP_LABELS,
+    BALANCE_LABELS,
+    DIFFICULTY_LABELS,
     LoreEntry,
     LoreEntryFields,
     MAX_CHARACTERS,
     MissingField,
+    PACING_LABELS,
     POV_LABELS,
     REPLY_LENGTH_LABELS,
     RewriteRequest,
@@ -645,6 +648,34 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                         onChange={(v) => setStyle('replyLength', v)}
                                         highlighted={styleHighlighted('replyLength')}
                                         domId={fieldDomId({ target: 'story', field: 'replyLength' })}
+                                    />
+                                    {/* Style controls (.scratch/style-controls/spec.md): the middle choice leaves it to the Narrator. */}
+                                    <SegmentedField
+                                        label="Pacing"
+                                        value={story.style.pacing}
+                                        options={PACING_LABELS}
+                                        hint="How fast the story moves. Slow burn lets moments breathe."
+                                        onChange={(v) => setStyle('pacing', v)}
+                                        highlighted={styleHighlighted('pacing')}
+                                        domId={fieldDomId({ target: 'story', field: 'pacing' })}
+                                    />
+                                    <SegmentedField
+                                        label="Dialogue or action"
+                                        value={story.style.balance}
+                                        options={BALANCE_LABELS}
+                                        hint="What replies lean on: what Characters say, or what happens."
+                                        onChange={(v) => setStyle('balance', v)}
+                                        highlighted={styleHighlighted('balance')}
+                                        domId={fieldDomId({ target: 'story', field: 'balance' })}
+                                    />
+                                    <SegmentedField
+                                        label="Difficulty"
+                                        value={story.style.difficulty}
+                                        options={DIFFICULTY_LABELS}
+                                        hint="How readily the world lets what you try succeed."
+                                        onChange={(v) => setStyle('difficulty', v)}
+                                        highlighted={styleHighlighted('difficulty')}
+                                        domId={fieldDomId({ target: 'story', field: 'difficulty' })}
                                     />
                                     <TextField
                                         label="Image style"

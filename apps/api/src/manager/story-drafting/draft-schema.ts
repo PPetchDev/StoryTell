@@ -1,5 +1,5 @@
 import { InvalidDraftError, UnreadableDraftError } from '../../errors/story-drafting.errors.js';
-import { Pov, ReplyLength, Tense } from '../../model/story/entities/story.entity.js';
+import { Balance, Difficulty, Pacing, Pov, ReplyLength, Tense } from '../../model/story/entities/story.entity.js';
 import { MAX_CHARACTERS } from '../story/playable.js';
 
 /**
@@ -10,7 +10,7 @@ export interface DraftStory {
     title: string;
     setting: string;
     opening: string;
-    style: { pov: Pov; tense: Tense; replyLength: ReplyLength; imageStyle: string };
+    style: { pov: Pov; tense: Tense; replyLength: ReplyLength; pacing: Pacing; balance: Balance; difficulty: Difficulty; imageStyle: string };
     role: { name: string; description: string };
     characters: DraftCharacter[];
     startingBonds: DraftStartingBond[];
@@ -144,6 +144,10 @@ export function validateDraft(json: Json): DraftStory {
         pov: enumValue(styleJson, 'pov', Object.values(Pov), Pov.Second),
         tense: enumValue(styleJson, 'tense', Object.values(Tense), Tense.Past),
         replyLength: enumValue(styleJson, 'replyLength', Object.values(ReplyLength), ReplyLength.Medium),
+        // The style controls (.scratch/style-controls/spec.md): left out by a draft, each is its middle value.
+        pacing: enumValue(styleJson, 'pacing', Object.values(Pacing), Pacing.Natural),
+        balance: enumValue(styleJson, 'balance', Object.values(Balance), Balance.Balanced),
+        difficulty: enumValue(styleJson, 'difficulty', Object.values(Difficulty), Difficulty.Normal),
         imageStyle: optionalText(styleJson, 'imageStyle', 'Style'),
     };
 

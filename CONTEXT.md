@@ -90,6 +90,10 @@ _Avoid_: Director's note, system note, instruction
 Asking the Narrator to give one Character a line in the next turn; a hint it may pass over, never a forced speaker.
 _Avoid_: Force talk, mention, ping
 
+**Cue**:
+A few words from the user to the Narrator for the next reply only ("make her angrier", "skip to the next morning"), given with a Message, a Continue or a Regenerate. It steers that one reply; it is never a Message, a fact or a standing direction, and nothing keeps it.
+_Avoid_: Instruction, direction, hint, OOC, prompt
+
 **Sitting out**:
 A Character the user keeps out of a Chat's turns until bringing them back; the Narrator doesn't write them, but their Memories and Bonds stay as they were.
 _Avoid_: Mute, disable, remove

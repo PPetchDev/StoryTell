@@ -3,9 +3,9 @@
 import Link from 'next/link';
 import { FormEvent, ReactNode, RefObject, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 
-import { COLUMN, LABEL_CAPS, PANEL_NOTE, SEND_BUTTON, TOOL_CHIP } from '@/components/chat/chat-classes';
+import { COLUMN, ICON_BUTTON, LABEL_CAPS, PANEL_NOTE, SEND_BUTTON, TOOL_CHIP } from '@/components/chat/chat-classes';
 import { useConnection } from '@/components/connection';
-import { PencilIcon, PlayIcon, StopIcon, UndoIcon } from '@/components/icons';
+import { CloseIcon, PencilIcon, PlayIcon, StopIcon, UndoIcon } from '@/components/icons';
 import { ApiUnreachableError } from '@/lib/api';
 import { backgroundNotice, Chat, chatApi, SuggestedReply } from '@/lib/chat';
 import { insertSavedReply, SavedReply, TraySavedReply } from '@/lib/saved-replies';
@@ -350,6 +350,11 @@ interface ChatComposerProps {
     onRetryBackground(): void;
     /** The composer's second band: the Character row (Nudge), or nothing. */
     characterRow?: (writingForMe: boolean) => ReactNode;
+    /** The Cue set for the next reply (CONTEXT.md, "Cue"), or null. */
+    cue: string | null;
+    /** Opens the Cue sheet. */
+    onCue(): void;
+    onClearCue(): void;
 }
 
 /**
@@ -374,6 +379,9 @@ export function ChatComposer({
     onRetry,
     onRetryBackground,
     characterRow,
+    cue,
+    onCue,
+    onClearCue,
 }: ChatComposerProps) {
     const box = useAutoGrow(draft);
     const boxId = useId();
@@ -538,12 +546,29 @@ export function ChatComposer({
                 <div className="empty:hidden" data-band="characters">
                     {characterRow?.(writingForMe || dictating)}
                 </div>
+                {/* The Cue set for the next reply (CONTEXT.md, "Cue"), in sight until it is used or cleared. */}
+                {cue !== null && (
+                    <div
+                        className="flex min-w-0 items-center gap-1 rounded-md bg-accent-soft pl-3 text-sm"
+                        role="group"
+                        aria-label="Cue for the next reply"
+                        data-band="cue"
+                    >
+                        <span className="min-w-0 flex-1 truncate" title={cue}>
+                            <span className="font-semibold text-rewrite-text">Cue</span> {cue}
+                        </span>
+                        <button type="button" className={ICON_BUTTON} aria-label="Clear the Cue" disabled={writing} onClick={onClearCue}>
+                            <CloseIcon size={18} />
+                        </button>
+                    </div>
+                )}
                 {/*
                  * Band 3: the tools as 44px chips with a word each (audit H28; docs/ui-audit-2026-11-13.md M3),
                  * and at the right end Undo. Who the box writes as is its placeholder and name (L14); the label
                  * stays for screen readers but no longer squeezes beside the chips.
                  */}
-                <div className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-1" role="toolbar" aria-label="Composer tools">
+                {/* No gap between the tools: each has its own padding, and five then fit one row on a 390px phone. */}
+                <div className="flex min-w-0 flex-wrap items-center gap-y-1" role="toolbar" aria-label="Composer tools">
                     {/* Spec: "Suggested replies". Asks only when tapped, so they never spend credit unasked. */}
                     <button
                         type="button"
@@ -626,6 +651,22 @@ export function ChatComposer({
                             <path d="M12 4v16M5.1 8l13.8 8M5.1 16l13.8-8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                         </svg>
                         <span>Action</span>
+                    </button>
+                    {/* CONTEXT.md, "Cue": a few words to the Narrator for the next reply only; it rides on the next Send, Continue or Again. */}
+                    <button
+                        type="button"
+                        className={TOOL_CHIP}
+                        aria-label="Cue the Narrator"
+                        title="Cue the Narrator for the next reply"
+                        aria-pressed={cue !== null}
+                        disabled={writing || busy || blocked || writingForMe || dictating}
+                        onClick={onCue}
+                    >
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M4 10v4h3l6 4V6l-6 4H4z" />
+                            <path d="M16.5 9.5a3.5 3.5 0 0 1 0 5" />
+                        </svg>
+                        <span>Cue</span>
                     </button>
                     <span className="ml-auto flex min-w-0 items-center gap-2" data-slot="tools-end">
                         {/* Only while the box holds exactly what ✍️ wrote; puts the draft back, empty included. */}

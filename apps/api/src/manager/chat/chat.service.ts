@@ -390,6 +390,7 @@ export class ChatManagerService {
         text: string,
         stream?: TurnStream,
         nudgeCharacterId?: number | null,
+        cue?: string | null,
     ): Promise<EditResult> {
         if (text.trim() === '') throw new EmptyMessageError();
         const { story, chat: loaded } = await this.load(storyId, chatId);
@@ -409,6 +410,7 @@ export class ChatManagerService {
                     () => this.chatModel.rewriteUserMessage(found, text, wornIdentity(story, chat)),
                     stream,
                     nudge,
+                    cueOf(cue),
                 ),
             ));
         }
@@ -457,6 +459,7 @@ export class ChatManagerService {
         messageId: number,
         stream?: TurnStream,
         nudgeCharacterId?: number | null,
+        cue?: string | null,
     ): Promise<EditResult> {
         const { story, chat: loaded } = await this.load(storyId, chatId);
         // First: mid-turn, the Message may already be gone, deleted by the Regenerate under way.
@@ -480,7 +483,7 @@ export class ChatManagerService {
             const replaced = rewound.messages.find((candidate) => candidate.id === message.id) ?? message;
             rewound.messages = rewound.messages.filter((candidate) => candidate.id !== message.id);
             try {
-                await this.writeTurn(story, rewound, stream, replaced, nudge);
+                await this.writeTurn(story, rewound, stream, replaced, nudge, cueOf(cue));
             } catch (error) {
                 await this.rerunBackground(story, chat.id, message.id);
                 throw error;
@@ -572,6 +575,7 @@ export class ChatManagerService {
         change: () => Promise<void>,
         stream: TurnStream | undefined,
         nudge: string | null,
+        cue: string | null,
     ): Promise<EditResult> {
         // Stopped while the gate waited: nothing is rolled back or changed.
         if (stream?.signal.aborted) throw new TurnStoppedError();
@@ -579,7 +583,7 @@ export class ChatManagerService {
         await this.storySoFar.rewound(await this.reload(chatId), fromPosition);
         await change();
         // Reloaded: the rollback may have put the Chat back on an earlier Scene.
-        await this.writeTurn(story, await this.reload(chatId), stream, undefined, nudge);
+        await this.writeTurn(story, await this.reload(chatId), stream, undefined, nudge, cue);
         return { ...(await this.getChat(story.id, chatId)), rolledBack };
     }
 
@@ -706,7 +710,7 @@ export class ChatManagerService {
     }
 
     /** Spec: "Send flow". */
-    async send(storyId: number, chatId: number, text: string, stream?: TurnStream, nudgeCharacterId?: number | null): Promise<ChatDetail> {
+    async send(storyId: number, chatId: number, text: string, stream?: TurnStream, nudgeCharacterId?: number | null, cue?: string | null): Promise<ChatDetail> {
         if (text.trim() === '') throw new EmptyMessageError();
         const { story, chat: loaded } = await this.load(storyId, chatId);
         const nudge = nudgeOf(story, loaded, nudgeCharacterId);
@@ -724,20 +728,20 @@ export class ChatManagerService {
             chat.messages.push(userMessage);
             // The reply before it is settled on its shown version, even if this turn fails.
             await this.chatModel.dropReplyVersions(chat.id);
-            await this.writeTurn(story, chat, stream, undefined, nudge);
+            await this.writeTurn(story, chat, stream, undefined, nudge, cueOf(cue));
             return this.getChat(storyId, chatId);
         });
     }
 
     /** Runs the same turn again for a User Message whose turn failed. */
-    async retry(storyId: number, chatId: number, stream?: TurnStream, nudgeCharacterId?: number | null): Promise<ChatDetail> {
+    async retry(storyId: number, chatId: number, stream?: TurnStream, nudgeCharacterId?: number | null, cue?: string | null): Promise<ChatDetail> {
         const { story, chat: loaded } = await this.load(storyId, chatId);
         if (!awaitingReply(loaded)) throw new NoTurnToRetryError();
         const nudge = nudgeOf(story, loaded, nudgeCharacterId);
         const chat = await this.requireSendable(story, loaded);
 
         return this.writingTurn(chat.id, async () => {
-            await this.writeTurn(story, chat, stream, undefined, nudge);
+            await this.writeTurn(story, chat, stream, undefined, nudge, cueOf(cue));
             return this.getChat(storyId, chatId);
         });
     }
@@ -748,14 +752,14 @@ export class ChatManagerService {
      * from the last AI Message, the Opening included. A failed call stores nothing. (Not
      * named `continue`, beside `send` and `retry`, since that is a reserved word.)
      */
-    async continueChat(storyId: number, chatId: number, stream?: TurnStream, nudgeCharacterId?: number | null): Promise<ChatDetail> {
+    async continueChat(storyId: number, chatId: number, stream?: TurnStream, nudgeCharacterId?: number | null, cue?: string | null): Promise<ChatDetail> {
         const { story, chat: loaded } = await this.load(storyId, chatId);
         if (awaitingReply(loaded)) throw new AwaitingReplyError();
         const nudge = nudgeOf(story, loaded, nudgeCharacterId);
         const chat = await this.requireSendable(story, loaded);
 
         return this.writingTurn(chat.id, async () => {
-            await this.writeTurn(story, chat, stream, undefined, nudge);
+            await this.writeTurn(story, chat, stream, undefined, nudge, cueOf(cue));
             return this.getChat(storyId, chatId);
         });
     }
@@ -982,7 +986,14 @@ export class ChatManagerService {
      * With a `stream`, the reply is streamed to it as it is written; a stopped stream throws
      * `TurnStoppedError` with nothing stored.
      */
-    private async writeTurn(story: StoryEntity, chat: ChatEntity, stream?: TurnStream, replacing?: MessageEntity, nudge: string | null = null): Promise<void> {
+    private async writeTurn(
+        story: StoryEntity,
+        chat: ChatEntity,
+        stream?: TurnStream,
+        replacing?: MessageEntity,
+        nudge: string | null = null,
+        cue: string | null = null,
+    ): Promise<void> {
         const userText = exchangeUserText(chat.messages, chat.messages.length);
         const history: PromptHistoryMessage[] = (userText !== null ? chat.messages.slice(0, -1) : chat.messages)
             .map((message) => ({
@@ -1039,6 +1050,7 @@ export class ChatManagerService {
             present: inLatestExchange(story, chat, userText),
             sittingOut: sittingOut.map((character) => character.name),
             nudge,
+            cue,
         });
         if (prompt.trimmed > 0) {
             this.logger.log(`Chat ${chat.id}: left out the ${prompt.trimmed} oldest Messages to fit the prompt budget`);
@@ -1466,6 +1478,12 @@ function withThaiReadings(messages: MessageResponse[], readings: ThaiReadingEnti
  * null for none. Checked before anything is stored: an id outside the cast is
  * `CharacterNotFoundError`, a Character sitting out is `NudgeSittingOutError`.
  */
+/** The Cue a turn was sent with (CONTEXT.md, "Cue"), trimmed; null for none or a blank one. Never stored. */
+function cueOf(cue: string | null | undefined): string | null {
+    const text = cue?.trim() ?? '';
+    return text === '' ? null : text;
+}
+
 function nudgeOf(story: StoryEntity, chat: ChatEntity, characterId: number | null | undefined): string | null {
     if (characterId === null || characterId === undefined) return null;
     const character = story.characters.find((candidate) => candidate.id === characterId);

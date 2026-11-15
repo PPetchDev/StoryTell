@@ -1,4 +1,4 @@
-import { Pov, ReplyLength, Tense } from '../../../model/story/entities/story.entity.js';
+import { Balance, Difficulty, Pacing, Pov, ReplyLength, Tense } from '../../../model/story/entities/story.entity.js';
 import type { TimeOfDay } from '../../../model/chat/entities/chat.entity.js';
 import { BondLevels, bondLevelsInWords } from '../../../model/ledger/bond-axes.js';
 import { PromptMessage } from '../../../service/model-gateway/model-gateway.js';
@@ -62,6 +62,10 @@ export interface PromptStory {
     pov: Pov;
     tense: Tense;
     replyLength: ReplyLength;
+    /** Style controls (.scratch/style-controls/spec.md); left out, each is its middle value, which says nothing. */
+    pacing?: Pacing;
+    balance?: Balance;
+    difficulty?: Difficulty;
     characters: PromptCharacter[];
 }
 
@@ -147,6 +151,11 @@ export interface TurnPromptInput {
      * null or left out for none. Turn-only: never one of the shared layers.
      */
     nudge?: string | null;
+    /**
+     * The user's Cue for this turn (CONTEXT.md, "Cue"): a few words to the Narrator for this one
+     * reply; null, empty or left out for none. Turn-only: never one of the shared layers.
+     */
+    cue?: string | null;
     /** Total prompt budget in tokens; recent Messages are trimmed from the oldest to fit. */
     tokenBudget?: number;
     /**
@@ -258,11 +267,45 @@ You are the Narrator of an interactive story. You describe the Setting and actio
 - Most turns, one or two Characters speak, and a speaker may say several sentences. The others react in narration or stay quiet; don't let everyone talk every turn.`;
 }
 
+/**
+ * The Style lines of the three style controls (.scratch/style-controls/spec.md). The middle value
+ * of each says nothing, so a Story that sets none has the Style layer it always had.
+ */
+const PACING_LINES: Record<Pacing, string | null> = {
+    [Pacing.Fast]: 'Pacing: brisk. Move the scene forward in every reply and skip over what is routine.',
+    [Pacing.Natural]: null,
+    [Pacing.Slow]: "Pacing: slow burn. Let moments breathe, and don't hurry toward a resolution, a confession or a change of scene.",
+};
+
+const BALANCE_LINES: Record<Balance, string | null> = {
+    [Balance.Dialogue]: 'Lean on dialogue: let the Characters talk, with only the narration the talk needs.',
+    [Balance.Balanced]: null,
+    [Balance.Action]: 'Lean on action and description: show what happens and what is there, with speech only where it counts.',
+};
+
+const DIFFICULTY_LINES: Record<Difficulty, ((identity: string) => string) | null> = {
+    [Difficulty.Easy]: (identity) => `The world is forgiving: what ${identity} attempts tends to work, and setbacks are light and soon past.`,
+    [Difficulty.Normal]: null,
+    [Difficulty.Hard]: (identity) =>
+        `The world is hard: what ${identity} attempts can fail or cost something, and nobody gives way easily. Don't soften a failure the story has earned.`,
+};
+
+export function styleControlLines(story: Pick<PromptStory, 'pacing' | 'balance' | 'difficulty'>, identity: string): string[] {
+    return [
+        PACING_LINES[story.pacing ?? Pacing.Natural],
+        BALANCE_LINES[story.balance ?? Balance.Balanced],
+        DIFFICULTY_LINES[story.difficulty ?? Difficulty.Normal]?.(identity) ?? null,
+    ].filter((line): line is string => line !== null);
+}
+
 function styleLayer(story: PromptStory, identity: string): string {
     const words = REPLY_LENGTH_WORDS[story.replyLength];
-    return `${PROMPT_LAYERS.style}
-- Write in English, ${povAndTense(story, identity)}.
-- Reply length: ${words.min}–${words.max} words in total.`;
+    return [
+        PROMPT_LAYERS.style,
+        `- Write in English, ${povAndTense(story, identity)}.`,
+        `- Reply length: ${words.min}–${words.max} words in total.`,
+        ...styleControlLines(story, identity).map((line) => `- ${line}`),
+    ].join('\n');
 }
 
 function castCard(character: PromptCharacter): string {
@@ -424,7 +467,7 @@ export function continueInstruction(identity: string): string {
 }
 
 /** The layers a prompt is built on: everything of a turn's input but the Messages. */
-export type PromptLayersInput = Omit<TurnPromptInput, 'history' | 'userText' | 'tokenBudget' | 'nudge'>;
+export type PromptLayersInput = Omit<TurnPromptInput, 'history' | 'userText' | 'tokenBudget' | 'nudge' | 'cue'>;
 
 /**
  * Layers 1–9 as the one system message, shared by the turn and by Suggested replies so they
@@ -512,6 +555,25 @@ export function nudgeLine(name: string): string {
 /** What the Story so far trigger reserves for a Nudge line, which it can't know in advance. */
 export const NUDGE_RESERVE_TOKENS = 60;
 
+/** The longest Cue the API takes, in characters. */
+export const CUE_MAX = 300;
+
+/**
+ * The Cue block (CONTEXT.md, "Cue"), or null when there is none. It sits after the Nudge and before
+ * the final instruction: the last thing said about this reply but the rules for writing it. Like
+ * the Author's note it steers and is never a fact, so it is never quoted, and it never lifts the
+ * rule about the worn identity; unlike the note it is for this one reply and is not kept.
+ */
+export function cueBlock(cue: string | null | undefined, identity: string): string | null {
+    const text = cue?.trim() ?? '';
+    if (text === '') return null;
+    return `The user's cue for this reply only: ${text}
+Follow it in this one reply. It is a steer, not something that happened: never quote it or mention it, and write the story in English whatever language the cue is in. It never overrides the rules about ${identity}: never write anything ${identity} says, thinks, feels, decides or does.`;
+}
+
+/** What the Story so far trigger reserves for a Cue, which it can't know in advance: a full-length one and its wording. */
+export const CUE_RESERVE_TOKENS = 160;
+
 /**
  * The Author's note block (.scratch/authors-note/spec.md), or null when the note is empty. It
  * sits after the Lore and before "Where things stand" in the turn's trailing message, and before
@@ -555,13 +617,13 @@ export function buildTurnPrompt(input: TurnPromptInput): TurnPrompt {
     const userText = input.userText ?? continueInstruction(identity);
     const system = systemPrompt(input);
     const lore = loreBlock(input.chosenLore ?? []);
-    // One order (.scratch/sillytavern-gaps/integration.md): Lore, Documents, Author's note, Where things stand, Nudge, the final instruction.
+    // One order (.scratch/sillytavern-gaps/integration.md): Lore, Documents, Author's note, Where things stand, Nudge, Cue, the final instruction.
     const finalInstruction = joinBlocks([
         lore,
         documentsBlock(input.documentPassages ?? []),
         authorsNoteBlock(input.authorsNote, identity),
-        // Without a nudge, exactly the reminder and the final instruction as before.
-        [stateReminder(input), input.nudge ? nudgeLine(input.nudge) : null, turnFinalInstruction(identity)]
+        // Without a nudge or a cue, exactly the reminder and the final instruction as before.
+        [stateReminder(input), input.nudge ? nudgeLine(input.nudge) : null, cueBlock(input.cue, identity), turnFinalInstruction(identity)]
             .filter((line): line is string => line !== null)
             .join('\n'),
     ]);

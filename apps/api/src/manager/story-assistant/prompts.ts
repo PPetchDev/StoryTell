@@ -19,8 +19,8 @@ const ASSISTANT_INSTRUCTIONS = `The author gives you one instruction about this 
 "reply" is one or two sentences to the author: what you changed, or why there was nothing to change.
 
 Each <change> is one of:
-- { "op": "set", "target": "story", "field": "title" | "setting" | "opening" | "imageStyle" | "pov" | "tense" | "replyLength", "value": string }
-  pov is "first", "second" or "third"; tense "past" or "present"; replyLength "short", "medium" or "long".
+- { "op": "set", "target": "story", "field": "title" | "setting" | "opening" | "imageStyle" | "pov" | "tense" | "replyLength" | "pacing" | "balance" | "difficulty", "value": string }
+  pov is "first", "second" or "third"; tense "past" or "present"; replyLength "short", "medium" or "long"; pacing "fast", "natural" or "slow"; balance "dialogue", "balanced" or "action" (what replies lean on); difficulty "easy", "normal" or "hard" (how readily the world lets the Role succeed).
 - { "op": "set", "target": "role", "field": "name" | "description", "value": string }
 - { "op": "set", "target": "character", "name": <Character name>, "field": "name" | "appearance" | "personality" | "voice" | "background" | "secrets" | "arcDirections", "value": string }
 - { "op": "set", "target": "character", "name": <Character name>, "field": "exampleLines", "value": [string] } (the whole list)

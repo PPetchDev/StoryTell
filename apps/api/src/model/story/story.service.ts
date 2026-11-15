@@ -128,9 +128,23 @@ export class StoryModelService {
      */
     async duplicate(source: StoryEntity, title: string): Promise<{ storyId: number; characterIds: Map<number, number> }> {
         return this.dataSource.transaction(async (manager) => {
-            const { setting, opening, pov, tense, replyLength, imageStyle, narrationVoice, backdrop } = source;
+            const { setting, opening, pov, tense, replyLength, pacing, balance, difficulty, imageStyle, narrationVoice, backdrop } = source;
             const story = await manager.save(
-                manager.create(StoryEntity, { title, setting, opening, pov, tense, replyLength, imageStyle, narrationVoice, backdrop, userId: this.accounts.currentId() }),
+                manager.create(StoryEntity, {
+                    title,
+                    setting,
+                    opening,
+                    pov,
+                    tense,
+                    replyLength,
+                    pacing,
+                    balance,
+                    difficulty,
+                    imageStyle,
+                    narrationVoice,
+                    backdrop,
+                    userId: this.accounts.currentId(),
+                }),
             );
             await manager.save(
                 manager.create(RoleEntity, { storyId: story.id, name: source.role.name, description: source.role.description }),
@@ -224,10 +238,10 @@ export class StoryModelService {
      * writer, and a whole-entity save from an older read would put an older Cover back.
      */
     async saveStory(story: StoryEntity): Promise<void> {
-        const { title, setting, opening, pov, tense, replyLength, imageStyle, narrationVoice, backdrop } = story;
+        const { title, setting, opening, pov, tense, replyLength, pacing, balance, difficulty, imageStyle, narrationVoice, backdrop } = story;
         await this.stories.update(
             { id: story.id },
-            { title, setting, opening, pov, tense, replyLength, imageStyle, narrationVoice, backdrop, updatedAt: () => 'now()' },
+            { title, setting, opening, pov, tense, replyLength, pacing, balance, difficulty, imageStyle, narrationVoice, backdrop, updatedAt: () => 'now()' },
         );
     }
 

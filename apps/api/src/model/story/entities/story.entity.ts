@@ -39,6 +39,27 @@ export enum ReplyLength {
     Long = 'long',
 }
 
+/** How fast the story moves (.scratch/style-controls/spec.md). `natural` adds nothing to the prompt. */
+export enum Pacing {
+    Fast = 'fast',
+    Natural = 'natural',
+    Slow = 'slow',
+}
+
+/** Whether replies lean on what Characters say or on what happens. `balanced` adds nothing to the prompt. */
+export enum Balance {
+    Dialogue = 'dialogue',
+    Balanced = 'balanced',
+    Action = 'action',
+}
+
+/** How readily the world lets the user's attempts succeed. `normal` adds nothing to the prompt. */
+export enum Difficulty {
+    Easy = 'easy',
+    Normal = 'normal',
+    Hard = 'hard',
+}
+
 /** What sits behind a Story's Chats (.scratch/chat-looks/spec.md, "Backdrop"). */
 export enum Backdrop {
     None = 'none',
@@ -83,7 +104,7 @@ export interface StorySummary {
 export interface StoryResponse extends StorySummary {
     setting: string;
     opening: string;
-    style: { pov: Pov; tense: Tense; replyLength: ReplyLength; imageStyle: string };
+    style: { pov: Pov; tense: Tense; replyLength: ReplyLength; pacing: Pacing; balance: Balance; difficulty: Difficulty; imageStyle: string };
     role: RoleResponse;
     characters: CharacterResponse[];
     startingBonds: StartingBondResponse[];
@@ -138,6 +159,15 @@ export class StoryEntity {
         default: ReplyLength.Medium,
     })
     replyLength: ReplyLength;
+
+    @Column({ type: 'enum', enum: Pacing, enumName: 'story_pacing_enum', default: Pacing.Natural })
+    pacing: Pacing;
+
+    @Column({ type: 'enum', enum: Balance, enumName: 'story_balance_enum', default: Balance.Balanced })
+    balance: Balance;
+
+    @Column({ type: 'enum', enum: Difficulty, enumName: 'story_difficulty_enum', default: Difficulty.Normal })
+    difficulty: Difficulty;
 
     @Column({ name: 'image_style', type: 'text', default: '' })
     imageStyle: string;
@@ -227,6 +257,9 @@ export class StoryEntity {
                 pov: this.pov,
                 tense: this.tense,
                 replyLength: this.replyLength,
+                pacing: this.pacing,
+                balance: this.balance,
+                difficulty: this.difficulty,
                 imageStyle: this.imageStyle,
             },
             role: this.role.toResponse(),

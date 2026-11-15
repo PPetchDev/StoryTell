@@ -582,7 +582,7 @@ Further gateway rules:
 - Character avatar images.
 - User-directed speaker choice (e.g. @mentions). The Narrator decides who speaks.
 - Native mobile apps.
-- Separate world notes or lore entries, Story tags, and genre or pacing presets. The Setting holds these in plain language.
+- Separate world notes or lore entries, Story tags, and genre or pacing presets. The Setting holds these in plain language. (Pacing, the balance of dialogue and action, and Difficulty were brought in by [Spec: Style controls](../style-controls/spec.md).)
 - Skipping or rewinding Scenes by hand. Editing or regenerating a Message is the only undo.
 - System-defined Story endings.
 - Export and import of Stories and Chats, Trash, Chat-as-text download, Tavern cards and Duplicate Story. The daily disaster backup covers recovery and moving PCs.

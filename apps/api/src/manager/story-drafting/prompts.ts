@@ -17,7 +17,7 @@ What a Story holds:
 - Title.
 - Setting: the place, situation and premise the Story takes place in, with its tone, in plain language.
 - Opening: the passage that begins every Chat. It sets the first moment and leaves the Role about to act. It never writes the Role's words, thoughts or decisions.
-- Style: pov (first, second or third person, as the Narrator addresses the Role), tense (past or present), replyLength (short, medium or long), and an optional imageStyle: one look for every Snapshot image, e.g. "anime, soft colours".
+- Style: pov (first, second or third person, as the Narrator addresses the Role), tense (past or present), replyLength (short, medium or long), pacing (fast, natural or slow), balance (dialogue, balanced or action: what replies lean on), difficulty (easy, normal or hard: how readily the world lets the Role succeed), and an optional imageStyle: one look for every Snapshot image, e.g. "anime, soft colours".
 - Role: the part the author plays, with a name and a description the Characters know them by.
 - Characters: ${1} to ${MAX_CHARACTERS} AI-played figures, each with name, appearance (also used to draw them), personality, voice (how they talk), optional exampleLines (a few lines in their voice), optional background, optional secrets (what only this Character knows at the start) and optional arcDirections (how they might change, and what would cause it).
 - StartingBonds, optional: how a Character feels toward the Role or toward another Character when a Chat starts, as a short label and a description. At most one per Character per direction; a Character with none starts as a stranger.
@@ -30,7 +30,7 @@ const DRAFT_INSTRUCTIONS = `Turn the author's idea into one complete Story, as a
   "title": string,
   "setting": string,
   "opening": string,
-  "style": { "pov": "first" | "second" | "third", "tense": "past" | "present", "replyLength": "short" | "medium" | "long", "imageStyle": string },
+  "style": { "pov": "first" | "second" | "third", "tense": "past" | "present", "replyLength": "short" | "medium" | "long", "pacing": "fast" | "natural" | "slow", "balance": "dialogue" | "balanced" | "action", "difficulty": "easy" | "normal" | "hard", "imageStyle": string },
   "role": { "name": string, "description": string },
   "characters": [ { "name": string, "appearance": string, "personality": string, "voice": string, "exampleLines": [string], "background": string, "secrets": string, "arcDirections": string } ],
   "startingBonds": [ { "from": <Character name>, "toward": <Character name> | "role", "label": string, "description": string } ],
@@ -40,7 +40,7 @@ const DRAFT_INSTRUCTIONS = `Turn the author's idea into one complete Story, as a
 
 Rules:
 - Fill title, setting, opening, style, role and every Character's name, appearance, personality and voice. Use what the idea gives and invent the rest in its spirit.
-- Choose the Style the idea implies; when it implies nothing, use second person, past tense, medium replies.
+- Choose the Style the idea implies; when it implies nothing, use second person, past tense, medium replies. Leave pacing "natural", balance "balanced" and difficulty "normal" unless the idea asks for something else (a slow burn, a talky drama, a brutal survival story).
 - Give the cast only as many Characters as the idea needs, at least one and at most ${MAX_CHARACTERS}, each with a distinct name and voice.
 - Add exampleLines, background, secrets, arcDirections, startingBonds and scenes only when the idea implies them. Otherwise leave the text fields as "" and the lists empty. Never pad.
 - Add lore, at most ${MAX_DRAFT_LORE} entries of a few sentences each, only when the idea implies a world with its own places, peoples, customs or objects worth remembering. Otherwise leave it empty.
@@ -100,7 +100,7 @@ export function renderStory(story: StoryResponse, options: { loreTriggers?: bool
         line('Title', story.title),
         line('Setting', story.setting),
         line('Opening', story.opening),
-        `Style: ${story.style.pov} person, ${story.style.tense} tense, ${story.style.replyLength} replies. ${line('Image style', story.style.imageStyle)}`,
+        `Style: ${story.style.pov} person, ${story.style.tense} tense, ${story.style.replyLength} replies, ${story.style.pacing} pacing, ${story.style.balance} between dialogue and action, ${story.style.difficulty} difficulty. ${line('Image style', story.style.imageStyle)}`,
         `Role (the part the author plays):\n  ${line('Name', story.role.name)}\n  ${line('Description', story.role.description)}`,
     ];
     if (story.characters.length === 0) {

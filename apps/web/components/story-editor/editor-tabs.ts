@@ -82,7 +82,7 @@ export function neededIds(missing: MissingField[], story: Story): Set<string> {
 }
 
 /** The Story's fields shown on the Style tab; its other fields are on the Story tab. */
-const STYLE_FIELDS: ReadonlySet<string> = new Set(['pov', 'tense', 'replyLength', 'imageStyle']);
+const STYLE_FIELDS: ReadonlySet<string> = new Set(['pov', 'tense', 'replyLength', 'pacing', 'balance', 'difficulty', 'imageStyle']);
 
 const TAB_OF_TARGET: Record<Exclude<RewriteTarget, 'story'>, TabKey> = {
     role: 'role',

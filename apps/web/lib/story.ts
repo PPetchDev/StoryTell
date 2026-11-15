@@ -10,6 +10,10 @@ import type { ReplaceRule } from './replace-rules';
 export type Pov = 'first' | 'second' | 'third';
 export type Tense = 'past' | 'present';
 export type ReplyLength = 'short' | 'medium' | 'long';
+/** Style controls (.scratch/style-controls/spec.md): the middle value of each leaves it to the Narrator. */
+export type Pacing = 'fast' | 'natural' | 'slow';
+export type Balance = 'dialogue' | 'balanced' | 'action';
+export type Difficulty = 'easy' | 'normal' | 'hard';
 
 /** A Story's most recently played Chat (mirrors LatestChatDTO). */
 export interface LatestChat {
@@ -42,6 +46,9 @@ export interface Style {
     pov: Pov;
     tense: Tense;
     replyLength: ReplyLength;
+    pacing: Pacing;
+    balance: Balance;
+    difficulty: Difficulty;
     imageStyle: string;
 }
 
@@ -253,6 +260,9 @@ export const REPLY_LENGTH_LABELS: Record<ReplyLength, string> = {
     medium: 'Medium',
     long: 'Long',
 };
+export const PACING_LABELS: Record<Pacing, string> = { fast: 'Fast', natural: 'Natural', slow: 'Slow burn' };
+export const BALANCE_LABELS: Record<Balance, string> = { dialogue: 'More dialogue', balanced: 'Balanced', action: 'More action' };
+export const DIFFICULTY_LABELS: Record<Difficulty, string> = { easy: 'Easy', normal: 'Normal', hard: 'Hard' };
 
 export const MAX_CHARACTERS = 6;
 

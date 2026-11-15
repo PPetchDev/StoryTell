@@ -1,6 +1,6 @@
 import { InvalidGreetingError } from '../../errors/character-card.errors.js';
 import { LORE_GROUP_MAX, LORE_TIMED_MAX, LoreSecondaryMode, LoreTriggers } from '../../model/story/entities/lore-entry.entity.js';
-import { Backdrop, Pov, ReplyLength, Tense } from '../../model/story/entities/story.entity.js';
+import { Backdrop, Balance, Difficulty, Pacing, Pov, ReplyLength, Tense } from '../../model/story/entities/story.entity.js';
 import { cleanPatterns, compileLorePattern } from '../chat/lore/lore-pattern.js';
 import { CharacterFields, cleanKeywords, LoreEntryFields, StoryFields } from '../story/story.service.js';
 import { CardBookEntry, CardData } from './card-reader.js';
@@ -32,7 +32,7 @@ export type CardLoreEntry = Required<LoreEntryFields> & LoreTriggers;
 
 export interface CardStoryPlan {
     story: Required<Pick<StoryFields, 'title' | 'setting' | 'opening'>> &
-        Pick<StoryFields, 'pov' | 'tense' | 'replyLength' | 'imageStyle'> & { narrationVoice: string | null; backdrop: Backdrop };
+        Pick<StoryFields, 'pov' | 'tense' | 'replyLength' | 'pacing' | 'balance' | 'difficulty' | 'imageStyle'> & { narrationVoice: string | null; backdrop: Backdrop };
     role: { name: string; description: string };
     character: Required<Omit<CharacterFields, 'speakingVoice'>> & { speakingVoice: string | null };
     lore: CardLoreEntry[];
@@ -54,7 +54,17 @@ export interface StorytellBlock {
         speakingVoice?: unknown;
     };
     role: { name: string; description: string };
-    style: { pov?: Pov; tense?: Tense; replyLength?: ReplyLength; imageStyle: string; narrationVoice?: unknown; backdrop?: unknown };
+    style: {
+        pov?: Pov;
+        tense?: Tense;
+        replyLength?: ReplyLength;
+        pacing?: Pacing;
+        balance?: Balance;
+        difficulty?: Difficulty;
+        imageStyle: string;
+        narrationVoice?: unknown;
+        backdrop?: unknown;
+    };
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -94,6 +104,9 @@ export function storytellBlock(card: CardData): StorytellBlock | null {
             pov: oneOf(Pov, style.pov),
             tense: oneOf(Tense, style.tense),
             replyLength: oneOf(ReplyLength, style.replyLength),
+            pacing: oneOf(Pacing, style.pacing),
+            balance: oneOf(Balance, style.balance),
+            difficulty: oneOf(Difficulty, style.difficulty),
             imageStyle: str(style.imageStyle),
             narrationVoice: style.narrationVoice,
             backdrop: style.backdrop,
@@ -207,6 +220,9 @@ export function mapCard(card: CardData, choices: CardChoices, knownVoice: (voice
             ...(block.style.pov && { pov: block.style.pov }),
             ...(block.style.tense && { tense: block.style.tense }),
             ...(block.style.replyLength && { replyLength: block.style.replyLength }),
+            ...(block.style.pacing && { pacing: block.style.pacing }),
+            ...(block.style.balance && { balance: block.style.balance }),
+            ...(block.style.difficulty && { difficulty: block.style.difficulty }),
             imageStyle: field('The Image style', block.style.imageStyle),
         });
     }

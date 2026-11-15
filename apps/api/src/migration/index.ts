@@ -43,6 +43,7 @@ import { MemoriesUsed1764130000000 } from './1764130000000-MemoriesUsed.js';
 import { Beliefs1764140000000 } from './1764140000000-Beliefs.js';
 import { StartingBeliefs1764150000000 } from './1764150000000-StartingBeliefs.js';
 import { Accounts1764160000000 } from './1764160000000-Accounts.js';
+import { StoryStyleControls1764170000000 } from './1764170000000-StoryStyleControls.js';
 
 // Listed by hand, oldest first, so migrations load the same way from compiled JS, the
 // TypeORM CLI and Vitest. Add every new migration here.
@@ -92,4 +93,5 @@ export const migrations = [
     Beliefs1764140000000,
     StartingBeliefs1764150000000,
     Accounts1764160000000,
+    StoryStyleControls1764170000000,
 ];

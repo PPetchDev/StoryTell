@@ -21,8 +21,11 @@ import { BOND_AXES } from '../../../model/ledger/bond-axes.js';
 import type { BondAxis } from '../../../model/ledger/bond-axes.js';
 import {
     Backdrop,
+    Balance,
     CoverFocus,
     CoverSource,
+    Difficulty,
+    Pacing,
     Pov,
     ReplyLength,
     StoryCover,
@@ -132,6 +135,15 @@ export class StyleDTO {
 
     @ApiProperty({ enum: ReplyLength })
     replyLength: ReplyLength;
+
+    @ApiProperty({ enum: Pacing })
+    pacing: Pacing;
+
+    @ApiProperty({ enum: Balance })
+    balance: Balance;
+
+    @ApiProperty({ enum: Difficulty })
+    difficulty: Difficulty;
 
     @ApiProperty({ description: 'Image style in plain language. Empty when unset.' })
     imageStyle: string;

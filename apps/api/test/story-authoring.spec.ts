@@ -7,7 +7,7 @@ interface Story {
     title: string;
     setting: string;
     opening: string;
-    style: { pov: string; tense: string; replyLength: string; imageStyle: string };
+    style: { pov: string; tense: string; replyLength: string; pacing: string; balance: string; difficulty: string; imageStyle: string };
     role: { id: number; name: string; description: string };
     characters: Array<{ id: number; name: string; exampleLines: string[] }>;
     startingBonds: Array<{ id: number; fromCharacterId: number; toCharacterId: number | null }>;
@@ -76,6 +76,9 @@ describe('Story authoring', () => {
             pov: 'second',
             tense: 'past',
             replyLength: 'medium',
+            pacing: 'natural',
+            balance: 'balanced',
+            difficulty: 'normal',
             imageStyle: '',
         });
         expect(story.characters).toEqual([]);
@@ -105,13 +108,16 @@ describe('Story authoring', () => {
             pov: 'first',
             tense: 'present',
             replyLength: 'long',
+            pacing: 'slow',
+            balance: 'dialogue',
+            difficulty: 'hard',
             imageStyle: 'anime, soft colours',
         });
         expect(updated).toMatchObject({
             title: 'Renamed',
             setting: 'A city.',
             opening: 'Rain.',
-            style: { pov: 'first', tense: 'present', replyLength: 'long', imageStyle: 'anime, soft colours' },
+            style: { pov: 'first', tense: 'present', replyLength: 'long', pacing: 'slow', balance: 'dialogue', difficulty: 'hard', imageStyle: 'anime, soft colours' },
         });
 
         const role = await patch(`/api/stories/${story.id}/role`, { name: 'Detective' });
@@ -119,6 +125,11 @@ describe('Story authoring', () => {
 
         const bad = await t.http.patch(`/api/stories/${story.id}`).send({ pov: 'fourth' }).expect(400);
         expect(bad.body.error.code).toBe('400.000.000');
+        // The style controls take only their own three values each.
+        for (const wrong of [{ pacing: 'glacial' }, { balance: 'talky' }, { difficulty: 'nightmare' }]) {
+            await t.http.patch(`/api/stories/${story.id}`).send(wrong).expect(400);
+        }
+        expect((await t.http.get(`/api/stories/${story.id}`).expect(200)).body.style).toMatchObject({ pacing: 'slow', balance: 'dialogue', difficulty: 'hard' });
     });
 
     describe('playable status', () => {

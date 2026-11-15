@@ -31,7 +31,7 @@ import { BOND_AXES, BOND_AXIS_RANGE } from '../../../model/ledger/bond-axes.js';
 import type { BondAxis } from '../../../model/ledger/bond-axes.js';
 import { LORE_GROUP_MAX, LORE_SECONDARY_MODES, LORE_TIMED_MAX } from '../../../model/story/entities/lore-entry.entity.js';
 import type { LoreSecondaryMode } from '../../../model/story/entities/lore-entry.entity.js';
-import { Backdrop, Pov, ReplyLength, Tense } from '../../../model/story/entities/story.entity.js';
+import { Backdrop, Balance, Difficulty, Pacing, Pov, ReplyLength, Tense } from '../../../model/story/entities/story.entity.js';
 
 // Long enough for any passage an author writes, short enough to refuse a runaway client.
 const TEXT_MAX = 20_000;
@@ -72,6 +72,21 @@ export class StoryRequestBodyDTO implements StoryFields {
     @IsOptional()
     @IsEnum(ReplyLength)
     replyLength?: ReplyLength;
+
+    @ApiPropertyOptional({ enum: Pacing, description: 'Style: how fast the story moves. `natural` leaves it to the Narrator.' })
+    @IsOptional()
+    @IsEnum(Pacing)
+    pacing?: Pacing;
+
+    @ApiPropertyOptional({ enum: Balance, description: 'Style: lean on dialogue, or on action and description. `balanced` leaves it to the Narrator.' })
+    @IsOptional()
+    @IsEnum(Balance)
+    balance?: Balance;
+
+    @ApiPropertyOptional({ enum: Difficulty, description: "Style: how readily the world lets the user's attempts succeed. `normal` leaves it to the Narrator." })
+    @IsOptional()
+    @IsEnum(Difficulty)
+    difficulty?: Difficulty;
 
     @ApiPropertyOptional({ description: 'Style: Image style, in plain language.' })
     @IsOptional()

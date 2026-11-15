@@ -9,6 +9,7 @@ import { ChatComposer } from '@/components/chat/chat-composer';
 import { ChatThread, OpenAt, PendingLine } from '@/components/chat/chat-thread';
 import { ChatTopBar } from '@/components/chat/chat-top-bar';
 import { ChatGlance } from '@/components/chat/chat-glance';
+import { CueSheet } from '@/components/chat/cue-sheet';
 import { MemoryDrawer } from '@/components/chat/memory-drawer';
 import { NovelRequest, NovelView } from '@/components/chat/novel-view';
 import { SceneStrip } from '@/components/chat/scene-strip';
@@ -22,7 +23,7 @@ import { backdropOf } from '@/lib/backdrop';
 import { handOffBranch, takeBranchHandoff } from '@/lib/branch';
 import { Cast, Portraits } from '@/lib/character-colour';
 import { setChatView, useChatView } from '@/lib/chat-view';
-import { backgroundPending, Chat, chatApi, EditedChat, latestReply, Message, MessagePart, rollbackNotice, TurnStream } from '@/lib/chat';
+import { backgroundPending, Chat, chatApi, EditedChat, isOpening, latestReply, Message, MessagePart, rollbackNotice, TurnStream } from '@/lib/chat';
 import { Memory, memoryApi, renderUser } from '@/lib/memory';
 import { setSceneStripHidden, useSceneStripHidden } from '@/lib/scene-strip';
 import { inThreadOrder, Snapshot, snapshotApi } from '@/lib/snapshot';
@@ -128,6 +129,13 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
      * the next send, Continue, Retry, Again or User Message edit, never stored, gone on leaving.
      */
     const [nudge, setNudge] = useState<number | null>(null);
+    /**
+     * The Cue for the next turn (CONTEXT.md, "Cue"): a few words to the Narrator for one reply. Like
+     * the nudge it rides on the next send, Continue, Retry, Again or User Message edit, is never
+     * stored, and is gone on leaving.
+     */
+    const [cue, setCue] = useState<string | null>(null);
+    const [cueSheet, setCueSheet] = useState(false);
     /** Each tap on the Character row's "Who's here" opens the sheet in the top bar. */
     const [whoRequest, setWhoRequest] = useState(0);
     const [editing, setEditing] = useState<number | null>(null);
@@ -232,6 +240,10 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
     const novelToggleRef = useRef<HTMLButtonElement>(null);
 
     const blocked = !chat.playable || chat.textCreditOut;
+    /** The reply ↺ Again would write again now: the newest Message, when a model wrote it. The Cue sheet offers it. */
+    const newestMessage = chat.messages.at(-1);
+    const againTarget =
+        newestMessage && newestMessage.kind === 'ai' && !isOpening(newestMessage) && !blocked && !writing && !busy ? newestMessage.id : null;
     // A Character set sitting out can't stay nudged (.scratch/speaker-controls/spec.md).
     useEffect(() => {
         if (nudge !== null && chat.sittingOut.includes(nudge)) setNudge(null);
@@ -301,8 +313,9 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
             const next = await turn({ signal: stop.signal, onParts });
             cancelAnimationFrame(frame);
             setChat(next);
-            // The nudge rode on this turn, which answered with its reply; a failed or stopped one keeps it for Retry.
+            // The nudge and the Cue rode on this turn, which answered with its reply; a failed or stopped one keeps them for Retry.
             setNudge(null);
+            setCue(null);
             // Once, when the turn is over: never each streamed piece (audit H7).
             const said = replyAnnouncement(next.messages.at(-1));
             if (said) announce(said);
@@ -386,7 +399,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
         player.unlock();
         setPending({ text, identityName: chat.identityName });
         void runTurn(
-            (stream) => chatApi.send(chat.storyId, chat.id, text, stream, nudge),
+            (stream) => chatApi.send(chat.storyId, chat.id, text, stream, { nudge, cue }),
             () => setDraft((current) => (current === '' ? typed : current)),
         );
     };
@@ -395,7 +408,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
     const continueStory = () => {
         if (writing || busy || blocked || chat.awaitingReply) return;
         player.unlock();
-        void runTurn((stream) => chatApi.continue(chat.storyId, chat.id, stream, nudge));
+        void runTurn((stream) => chatApi.continue(chat.storyId, chat.id, stream, { nudge, cue }));
     };
 
     /**
@@ -404,7 +417,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
      * reply is kept as a Reply version (‹ n/m ›). A failed turn keeps the reply it had, so the
      * re-read Chat shows it again; the Memory and Snapshots re-read either way.
      */
-    const again = (messageId: number) => {
+    const again = (messageId: number, withCue: string | null = cue) => {
         if (writing || busy || blocked) return;
         stopReading(messageId);
         player.unlock();
@@ -413,7 +426,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
         // Shown again only once the turn has settled, so the old reply never flashes back first.
         void runTurn(async (stream) => {
             try {
-                return refreshMemory(noteRollback(await chatApi.regenerate(chat.storyId, chat.id, messageId, stream, nudge)));
+                return refreshMemory(noteRollback(await chatApi.regenerate(chat.storyId, chat.id, messageId, stream, { nudge, cue: withCue })));
             } catch (caught) {
                 if (!(caught instanceof ApiUnreachableError)) refreshMemory(chat);
                 throw caught;
@@ -442,7 +455,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
         // An edited User Message gets a fresh reply, so it runs as a turn; an AI Message does not.
         if (message.kind === 'user') {
             player.unlock();
-            void runTurn(async (stream) => edited(await chatApi.edit(chat.storyId, chat.id, message.id, text, stream, nudge)));
+            void runTurn(async (stream) => edited(await chatApi.edit(chat.storyId, chat.id, message.id, text, stream, { nudge, cue })));
         } else {
             void runWrite(async () => edited(await chatApi.edit(chat.storyId, chat.id, message.id, text)));
         }
@@ -664,9 +677,12 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                 onStop={stopTurn}
                 onRetry={() => {
                     player.unlock();
-                    void runTurn((stream) => chatApi.retry(chat.storyId, chat.id, stream, nudge));
+                    void runTurn((stream) => chatApi.retry(chat.storyId, chat.id, stream, { nudge, cue }));
                 }}
                 onRetryBackground={retryBackground}
+                cue={cue}
+                onCue={() => setCueSheet(true)}
+                onClearCue={() => setCue(null)}
                 characterRow={(writingForMe) => (
                     <CharacterRow
                         characters={characters}
@@ -680,6 +696,24 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                     />
                 )}
             />
+
+            {cueSheet && (
+                <CueSheet
+                    cue={cue ?? ''}
+                    canAgain={againTarget !== null}
+                    onSet={(text) => {
+                        setCue(text === '' ? null : text);
+                        setCueSheet(false);
+                        announce(text === '' ? 'Cue cleared.' : 'Cue set for the next reply.');
+                    }}
+                    onAgain={(text) => {
+                        setCue(text);
+                        setCueSheet(false);
+                        if (againTarget !== null) again(againTarget, text);
+                    }}
+                    onClose={() => setCueSheet(false)}
+                />
+            )}
 
             {snapshotSheet && (
                 <SnapshotSheet

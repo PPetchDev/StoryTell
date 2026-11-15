@@ -30,7 +30,8 @@ const BAR_TOGGLE = [
     'bare-button inline-flex min-h-11 shrink-0 items-center gap-1 rounded-full px-2.5',
     'text-xs font-semibold text-text',
     'cursor-pointer press focus-ring active:bg-surface-raised',
-    'aria-pressed:bg-accent-soft aria-pressed:text-accent',
+    // Small text on the tint: the accent made for text, as the composer's pressed tools use.
+    'aria-pressed:bg-accent-soft aria-pressed:text-rewrite-text',
 ].join(' ');
 
 /** A row of the ⋯ menu, a link or a button: 44px, its ring inside (the sheet's edge would clip one outside). */

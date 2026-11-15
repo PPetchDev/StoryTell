@@ -1,4 +1,4 @@
-import { Backdrop, StoryResponse } from '../../model/story/entities/story.entity.js';
+import { Backdrop, Balance, Difficulty, Pacing, StoryResponse } from '../../model/story/entities/story.entity.js';
 import { SELECTIVE_LOGIC } from './card-mapping.js';
 
 /**
@@ -138,6 +138,10 @@ export function writeCard(story: StoryResponse, character: Character): CardDefin
                     pov: story.style.pov,
                     tense: story.style.tense,
                     replyLength: story.style.replyLength,
+                    // The style controls: written only when set, like the Backdrop, so a card of a Story that sets none is as before.
+                    ...(story.style.pacing !== Pacing.Natural && { pacing: story.style.pacing }),
+                    ...(story.style.balance !== Balance.Balanced && { balance: story.style.balance }),
+                    ...(story.style.difficulty !== Difficulty.Normal && { difficulty: story.style.difficulty }),
                     imageStyle: u(story.style.imageStyle),
                     ...(story.narrationVoice !== null && { narrationVoice: story.narrationVoice }),
                     ...(story.backdrop !== Backdrop.None && { backdrop: story.backdrop }),

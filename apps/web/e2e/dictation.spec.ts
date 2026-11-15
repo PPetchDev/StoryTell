@@ -479,7 +479,7 @@ test('while recording, the whole tool row waits', async ({ page, request }) => {
     await page.goto(`/stories/${storyId}/chats/${chatId}`);
     const { composer, mic, bar } = composerParts(page);
     const tools = composer.getByRole('toolbar', { name: 'Composer tools' });
-    const names = ['Suggest replies', 'Write for me', 'Saved replies', 'Write an action'];
+    const names = ['Suggest replies', 'Write for me', 'Saved replies', 'Write an action', 'Cue the Narrator'];
     await expect(tools.getByRole('button')).toHaveCount(names.length);
     for (const name of names) await expect(tools.getByRole('button', { name })).toBeEnabled();
 
