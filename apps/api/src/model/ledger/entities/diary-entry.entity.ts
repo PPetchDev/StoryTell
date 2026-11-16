@@ -58,6 +58,13 @@ export class DiaryEntryEntity {
     @Column({ type: 'text' })
     text: string;
 
+    /**
+     * How the diarist feels and what they mean to do, in a sentence or two, written with the entry
+     * (.scratch/diary/spec.md): the only part the Narrator reads, and never shown. NULL when none was written.
+     */
+    @Column({ name: 'inner_life', type: 'text', nullable: true })
+    innerLife: string | null;
+
     @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
     createdAt: Date;
 

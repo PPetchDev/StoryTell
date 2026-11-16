@@ -140,6 +140,11 @@ export interface TurnPromptInput {
     /** The active Beliefs the Memory choice picked, of the Characters present, oldest first; left out, none. */
     beliefs?: PromptBelief[];
     /**
+     * The newest Diary entries in play (.scratch/diary/spec.md), freshest first: the "Inner life"
+     * layer. None, or left out, and the prompt is as before.
+     */
+    diaries?: PromptDiary[];
+    /**
      * The most the Memory layer may take on the next turn, which the Story so far trigger reserves
      * (spec: "The budget is reserved"); left out, only the layer as it stands is counted.
      */
@@ -256,8 +261,38 @@ export const PROMPT_LAYERS = {
     feelings: '# Feelings',
     arcs: '# Arcs',
     memory: '# Memory',
+    innerLife: '# Inner life',
     storySoFar: '# Story so far',
 } as const;
+
+/** A Character's inner-life line from their newest Diary entry (.scratch/diary/spec.md): feelings, never facts. */
+export interface PromptDiary {
+    characterName: string;
+    /** The line: how they feel and what they mean to do. Never the entry's own text. */
+    text: string;
+    /** Model-written replies since the Message it was written at. */
+    repliesAgo: number;
+}
+
+/** The most of one line the Narrator reads; it is asked for in one or two sentences. */
+const DIARY_IN_PLAY_CHARACTERS = 400;
+
+/**
+ * Spec: "The Narrator reads them, as feelings only". Right after Memory, which changes every turn
+ * anyway, so the cached prefix is as it was. The guard rails are its words: the entries colour
+ * how a Character feels and acts, and are never a record of what happened.
+ */
+function innerLifeLayer(diaries: PromptDiary[]): string {
+    const entries = diaries.map((diary) => {
+        const when = diary.repliesAgo === 0 ? 'just now' : diary.repliesAgo === 1 ? '1 reply ago' : `${diary.repliesAgo} replies ago`;
+        const text = diary.text.trim().slice(0, DIARY_IN_PLAY_CHARACTERS);
+        return `- ${diary.characterName} (as of ${when}): ${text}`;
+    });
+    return `${PROMPT_LAYERS.innerLife} (what Characters feel and mean to do, kept to themselves)
+Let these colour how each Character speaks and acts. They are feelings and intentions only: nothing here happened, nobody here said or did anything, and no one recalls, mentions or acts on anything as if it had. What happened is the story and the Memories above. Nobody else knows a Character's inner life, and they never speak of a diary.
+
+${entries.join('\n')}`;
+}
 
 export { estimateTokens };
 
@@ -511,6 +546,7 @@ export function systemPrompt(input: PromptLayersInput): { text: string; memories
         feelingsLayer(input.bonds, identity),
         arcsLayer(input.arcs),
         memory.text,
+        ...(input.diaries && input.diaries.length > 0 ? [innerLifeLayer(input.diaries)] : []),
         ...(input.storySoFar ? [storySoFarLayer(input.storySoFar)] : []),
     ].join('\n\n');
     return { text, memoriesLeftOut: memory.leftOut };

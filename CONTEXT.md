@@ -215,7 +215,7 @@ An intended, lasting change to a Character's personality within one Chat, always
 _Avoid_: Drift, character development, evolution
 
 **Diary**:
-What one Character writes in private, in their own voice, about one Chat's story: an **entry** now and then as the story goes (when a Scene ends, at an Ending or the Epilogue, and every so often between), or when the user asks, telling of what happened since their last one as they saw it, coloured by how they feel and what they know. It is for the user to read; the Narrator never reads it, so nothing in it becomes a fact (a Memory), and it never tells the Character's Secrets or Arc direction. An entry is written at the Chat's newest AI Message and goes when that Message is taken back.
+What one Character writes in private, in their own voice, about one Chat's story: an **entry** now and then as the story goes (when a Scene ends, at an Ending or the Epilogue, and every so often between), or when the user asks, telling of what happened since their last one as they saw it, coloured by how they feel and what they know. It is for the user to read. With each entry the Character also writes a line or two of how they feel and what they mean to do, never shown; the Narrator reads only that line from their newest recent entry, never the entry, so nothing an entry tells becomes part of the story or a fact (a Memory). It never tells the Character's Secrets or Arc direction, and the Character never speaks of it. An entry is written at the Chat's newest AI Message and goes when that Message is taken back.
 _Avoid_: Journal, inner thoughts, monologue, log
 
 **Drift**:

@@ -1,7 +1,7 @@
 import { UnreadableDiaryEntryError } from '../../../errors/chat.errors.js';
 import { BondLevels, bondLevelsInWords } from '../../../model/ledger/bond-axes.js';
 import { PromptMessage } from '../../../service/model-gateway/model-gateway.js';
-import { estimateTokens } from '../turn/prompt.js';
+import { estimateTokens, PromptDiary } from '../turn/prompt.js';
 
 /**
  * Diary (.scratch/diary/spec.md), as pure logic: what the writer is told, how its answer is read,
@@ -13,8 +13,11 @@ import { estimateTokens } from '../turn/prompt.js';
 /** The most an entry holds once read. The instruction asks for far less. */
 export const DIARY_ENTRY_MAX = 2_400;
 
-/** Room for the entry: about 150 words asked for, with slack for a talkative model. */
-export const DIARY_MAX_TOKENS = 500;
+/** Room for the entry and its inner-life line: about 150 words and two sentences asked for, with slack for a talkative model. */
+export const DIARY_MAX_TOKENS = 600;
+
+/** The most of an inner-life line kept once read. */
+export const DIARY_INNER_LIFE_MAX = 400;
 
 /** The most of the story since the last entry that the writer reads, newest kept. */
 export const DIARY_STORY_TOKEN_BUDGET = 6_000;
@@ -85,6 +88,45 @@ export function autoDiaryWriters(input: AutoDiaryInput): number[] {
         .sort((a, b) => b.behind - a.behind || a.order - b.order)
         .slice(0, DIARY_AUTO_MAX_AT_ONCE)
         .map((writer) => writer.characterId);
+}
+
+/** How many model-written replies an entry stays in the Narrator's view; an older one has had its say. */
+export const DIARY_IN_PLAY_REPLIES = 20;
+
+/** The most entries the Narrator reads in one turn. */
+export const DIARY_IN_PLAY_MAX = 3;
+
+export interface DiariesInPlayInput {
+    /** The Chat's entries, oldest first. Only the inner-life line is read: the entry's own text never is. */
+    entries: Array<{ characterId: number; messageId: number; innerLife: string | null }>;
+    /** The Chat's Messages, in order. */
+    messages: Array<{ id: number; position: number; written: boolean }>;
+    /** The Characters in play, in cast order: those sitting out are not here. */
+    cast: Array<{ id: number; name: string }>;
+}
+
+/**
+ * The entries the Narrator reads this turn (.scratch/diary/spec.md, "The Narrator reads them, as
+ * feelings only"): each Character's newest, written within `DIARY_IN_PLAY_REPLIES` replies, at
+ * most `DIARY_IN_PLAY_MAX`, freshest first.
+ */
+export function diariesInPlay(input: DiariesInPlayInput): PromptDiary[] {
+    const positionOf = new Map(input.messages.map((message) => [message.id, message.position]));
+    const newest = new Map<number, { messageId: number; innerLife: string | null }>();
+    for (const entry of input.entries) newest.set(entry.characterId, entry);
+    return input.cast
+        .flatMap((character, order) => {
+            const entry = newest.get(character.id);
+            const position = entry ? positionOf.get(entry.messageId) : undefined;
+            // Their newest entry's line, or nothing: an older entry's feelings have been overtaken.
+            if (!entry || position === undefined || entry.innerLife === null) return [];
+            const repliesAgo = input.messages.filter((message) => message.written && message.position > position).length;
+            if (repliesAgo > DIARY_IN_PLAY_REPLIES) return [];
+            return [{ diary: { characterName: character.name, text: entry.innerLife, repliesAgo }, order }];
+        })
+        .sort((a, b) => a.diary.repliesAgo - b.diary.repliesAgo || a.order - b.order)
+        .slice(0, DIARY_IN_PLAY_MAX)
+        .map(({ diary }) => diary);
 }
 
 /** How an Epilogue is marked in the passage the writer reads. */
@@ -216,7 +258,8 @@ export function diaryInstruction(input: Pick<DiaryPromptInput, 'character' | 'id
 - If ${name} was not there for any of it, write a short entry of their own thoughts from where they were, knowing nothing of what happened.
 - Keep the story's tone and how explicit it is. Everyone in it is an adult.
 - 80 to 150 words, in one to three short paragraphs of plain prose: no heading, no date, no signature, no *asterisks* and no "Name:" labels.
-Answer with only the entry.`;
+Then, on a line of its own, write --- and after it one or two sentences in the third person, beginning with ${name}'s name, of how ${name} feels toward each person now and what they mean to do next. Feelings and intentions only: nothing that happened, nothing anyone said or did, nothing ${name} learned or found out. Nobody but the story's writer reads that part.
+Answer with only the entry, the --- line and those sentences.`;
 }
 
 /**
@@ -255,12 +298,33 @@ export function buildDiaryPrompt(input: DiaryPromptInput): DiaryPrompt {
 
 const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+/** An entry as read: the text the user reads, and the inner-life line only the Narrator reads, or null. */
+export interface ReadDiaryEntry {
+    text: string;
+    innerLife: string | null;
+}
+
 /**
- * Reads the model's answer as the entry: trimmed, out of a wrapping code fence, without a leading
- * `Name:` label or a "Diary entry" heading line, and cut to `DIARY_ENTRY_MAX` at a word. Empty
- * throws `UnreadableDiaryEntryError`.
+ * Reads the model's answer: the entry, and the inner-life line after its last `---` line. The entry
+ * is trimmed, out of a wrapping code fence, without a leading `Name:` label or a "Diary entry"
+ * heading line, and cut to `DIARY_ENTRY_MAX` at a word; an empty one throws
+ * `UnreadableDiaryEntryError`. The line loses an "Inner life:" label and is cut to
+ * `DIARY_INNER_LIFE_MAX`; none, or an empty one, is null and the Narrator reads nothing.
  */
-export function readDiaryEntry(text: string, characterName: string): string {
+export function readDiaryEntry(text: string, characterName: string): ReadDiaryEntry {
+    let answer = text.trim();
+    const fencedAnswer = answer.match(/^```[^\n]*\n([\s\S]*?)\n?```$/);
+    if (fencedAnswer) answer = fencedAnswer[1].trim();
+    const rules = [...answer.matchAll(/^[ \t]*-{3,}[ \t]*$/gm)];
+    const rule = rules.at(-1);
+    const inner = rule ? answer.slice(rule.index + rule[0].length).trim() : '';
+    if (rule) answer = answer.slice(0, rule.index);
+    // "Inner life:", "**Inner life:**" or "**Inner life**:", the label the instruction never asked for.
+    const line = inner.replace(/^(?:\*\*)?inner[ -]life(?:\*\*)?\s*:\s*(?:\*\*)?\s*/i, '').replace(/\s+/g, ' ').trim();
+    return { text: readEntryText(answer, characterName), innerLife: line === '' ? null : line.slice(0, DIARY_INNER_LIFE_MAX).trim() };
+}
+
+function readEntryText(text: string, characterName: string): string {
     let entry = text.trim();
     const fenced = entry.match(/^```[^\n]*\n([\s\S]*?)\n?```$/);
     if (fenced) entry = fenced[1].trim();

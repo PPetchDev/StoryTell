@@ -293,7 +293,7 @@ export class LedgerModelService {
     }
 
     /** Keeps an entry a Character wrote, against the AI Message the story stood at. */
-    addDiaryEntry(entry: { chatId: number; characterId: number; messageId: number; moment: string | null; text: string }): Promise<DiaryEntryEntity> {
+    addDiaryEntry(entry: { chatId: number; characterId: number; messageId: number; moment: string | null; text: string; innerLife: string | null }): Promise<DiaryEntryEntity> {
         return this.diaryEntries.save(this.diaryEntries.create(entry));
     }
 

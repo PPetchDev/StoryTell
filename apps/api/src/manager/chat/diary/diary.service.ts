@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 
 import { UnreadableDiaryEntryError } from '../../../errors/chat.errors.js';
 import { ModelGateway, ServedFor } from '../../../service/model-gateway/model-gateway.js';
-import { buildDiaryPrompt, DiaryPromptInput, readDiaryEntry } from './diary.js';
+import { buildDiaryPrompt, DiaryPromptInput, ReadDiaryEntry, readDiaryEntry } from './diary.js';
 
 /**
  * .scratch/diary/spec.md: one play-model call that writes a Character's Diary entry, under its own
@@ -15,7 +15,7 @@ export class DiaryManagerService {
     constructor(private readonly gateway: ModelGateway) {}
 
     /** Throws the gateway's typed error, or `UnreadableDiaryEntryError` for an answer with nothing in it. */
-    async write(input: DiaryPromptInput, servedFor: ServedFor): Promise<string> {
+    async write(input: DiaryPromptInput, servedFor: ServedFor): Promise<ReadDiaryEntry> {
         const prompt = buildDiaryPrompt(input);
         const result = await this.gateway.completeText({ kind: 'diary_entry', messages: prompt.messages, maxTokens: prompt.maxTokens, servedFor });
         try {

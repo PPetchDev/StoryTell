@@ -74,7 +74,7 @@ import { promptStorySoFar, StorySoFarManagerService } from './story-so-far/story
 import { SuggestedRepliesManagerService } from './suggestions/suggested-replies.service.js';
 import { DiaryManagerService } from './diary/diary.service.js';
 import { renderUser } from './memory/render-user.js';
-import { autoDiaryWriters, DIARY_AFTER_THE_ENDING, diaryMoment, storySince } from './diary/diary.js';
+import { autoDiaryWriters, diariesInPlay, DIARY_AFTER_THE_ENDING, diaryMoment, storySince } from './diary/diary.js';
 import type { DiaryEntryEntity, DiaryEntryResponse } from '../../model/ledger/entities/diary-entry.entity.js';
 import { WriteForMeManagerService } from './write-for-me/write-for-me.service.js';
 import { ThaiReadingManagerService } from './thai-reading/thai-reading.service.js';
@@ -89,6 +89,7 @@ import {
     PromptArc,
     PromptBelief,
     PromptBond,
+    PromptDiary,
     PromptHistoryMessage,
     PromptLayersInput,
     PromptMemory,
@@ -1218,7 +1219,7 @@ export class ChatManagerService {
                 id === null ? identity.name : (story.characters.find((candidate) => candidate.id === id)?.name ?? null);
             // At an Epilogue the Chat's Time and Place are where the story stood before it, not where the Epilogue ends.
             const moment = at.epilogue ? DIARY_AFTER_THE_ENDING : diaryMoment(chat.timeOfDay, currentDetails(state.detailChanges).place);
-            const text = await this.diaryWriter.write(
+            const { text, innerLife } = await this.diaryWriter.write(
                 {
                     character: { name: character.name, personality: character.personality, voice: character.voice, background: character.background },
                     identityName: identity.name,
@@ -1248,7 +1249,7 @@ export class ChatManagerService {
                 },
                 { storyId: story.id, chatId: chat.id },
             );
-            return this.ledger.addDiaryEntry({ chatId: chat.id, characterId: character.id, messageId: at.id, moment, text });
+            return this.ledger.addDiaryEntry({ chatId: chat.id, characterId: character.id, messageId: at.id, moment, text, innerLife });
         }
     }
 
@@ -1312,10 +1313,11 @@ export class ChatManagerService {
             }));
         const identity: WornIdentity = wornIdentity(story, chat);
         const sittingOut = sittingOutOf(story, chat);
-        const [state, memories, held] = await Promise.all([
+        const [state, memories, held, entries] = await Promise.all([
             this.ledger.state(chat.id),
             this.memoryModel.findByChat(chat.id),
             this.beliefModel.findByChat(chat.id),
+            this.ledger.diaryEntriesOf(chat.id),
         ]);
         const beliefs = choiceBeliefs(story, held);
         // Before the prompt is built (.scratch/documents/spec.md): out of text credit fails the turn here, with nothing stored.
@@ -1344,6 +1346,7 @@ export class ChatManagerService {
             scene: promptScene(story, chat, state, identity.name),
             ...promptLayers(story, state),
             ...promptMemoryLayer(choice, choiceMemories(story, memories), beliefs),
+            diaries: promptDiaries(story, chat, entries),
             storySoFar: promptStorySoFar(chat),
             timeOfDay: chat.timeOfDay,
             details: detailsFor(story, state),
@@ -1458,12 +1461,13 @@ export class ChatManagerService {
      */
     private async promptLayersFor(story: StoryEntity, chat: ChatEntity): Promise<PromptLayersInput> {
         const newest = newestAiMessage(chat);
-        const [state, memories, held, query] = await Promise.all([
+        const [state, memories, held, query, entries] = await Promise.all([
             this.ledger.state(chat.id),
             this.memoryModel.findByChat(chat.id),
             this.beliefModel.findByChat(chat.id),
             // The last turn's query: the same choice, with no search call of its own (.scratch/memory-by-meaning/spec.md).
             newest ? this.chatModel.contextQueryOf(newest.id) : null,
+            this.ledger.diaryEntriesOf(chat.id),
         ]);
         const beliefs = choiceBeliefs(story, held);
         const identity = wornIdentity(story, chat);
@@ -1481,6 +1485,7 @@ export class ChatManagerService {
             scene: promptScene(story, chat, state, identity.name),
             ...promptLayers(story, state),
             ...promptMemoryLayer(choice, choiceMemories(story, memories), beliefs),
+            diaries: promptDiaries(story, chat, entries),
             storySoFar: promptStorySoFar(chat),
             timeOfDay: chat.timeOfDay,
             details: detailsFor(story, state),
@@ -1745,6 +1750,23 @@ function memoriesUsedOf(choice: MemoryChoice): MemoriesUsed {
 function sittingOutOf(story: StoryEntity, chat: ChatEntity): CastName[] {
     const ids = new Set(chat.sittingOutIds());
     return story.characters.filter((character) => ids.has(character.id)).map((character) => ({ id: character.id, name: character.name }));
+}
+
+/**
+ * The Diary entries the Narrator reads this turn (.scratch/diary/spec.md, "The Narrator reads
+ * them, as feelings only"): the Characters not sitting out, at the Chat's Messages as they are now.
+ */
+function promptDiaries(story: StoryEntity, chat: ChatEntity, entries: Array<{ characterId: number; messageId: number; innerLife: string | null }>): PromptDiary[] {
+    const out = new Set(chat.sittingOutIds());
+    return diariesInPlay({
+        entries,
+        messages: chat.messages.map((message) => ({
+            id: message.id,
+            position: message.position,
+            written: message.kind === MessageKind.Ai && message.model !== AUTHOR_MODEL,
+        })),
+        cast: story.characters.filter((character) => !out.has(character.id)).map((character) => ({ id: character.id, name: character.name })),
+    });
 }
 
 /**

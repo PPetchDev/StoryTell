@@ -2,7 +2,9 @@ import {
     AutoDiaryInput,
     autoDiaryWriters,
     buildDiaryPrompt,
+    diariesInPlay,
     DIARY_AUTO_EVERY_REPLIES,
+    DIARY_IN_PLAY_REPLIES,
     DIARY_ENTRY_MAX,
     DiaryPromptInput,
     diaryMoment,
@@ -11,6 +13,8 @@ import {
     storySince,
 } from '../src/manager/chat/diary/diary.js';
 import { ChatManagerService } from '../src/manager/chat/chat.service.js';
+import { buildTurnPrompt, TurnPromptInput } from '../src/manager/chat/turn/prompt.js';
+import { Pov, ReplyLength, Tense } from '../src/model/story/entities/story.entity.js';
 import { UnreadableDiaryEntryError } from '../src/errors/chat.errors.js';
 import { TextCompletionRequest } from '../src/service/model-gateway/model-gateway.js';
 import { startTestApp, TestApp } from './harness/test-app.js';
@@ -89,7 +93,7 @@ describe('Diary: what the writer is told (pure)', () => {
         );
         expect(user).not.toContain("story's Epilogue");
         expect(user).toContain('80 to 150 words');
-        expect(user.endsWith('Answer with only the entry.')).toBe(true);
+        expect(user.endsWith('Answer with only the entry, the --- line and those sentences.')).toBe(true);
     });
 
     it('says nothing of what is not there', () => {
@@ -191,19 +195,112 @@ describe('Diary: who writes by themselves at a reply (pure)', () => {
     });
 });
 
+describe('Diary: the Narrator reads the newest entries as feelings only (pure)', () => {
+    const turnInput = (overrides: Partial<TurnPromptInput> = {}): TurnPromptInput => ({
+        story: {
+            setting: 'A lighthouse.',
+            pov: Pov.First,
+            tense: Tense.Present,
+            replyLength: ReplyLength.Medium,
+            characters: [
+                { name: 'Mira', appearance: 'Tall.', personality: 'Guarded.', voice: 'Short.', exampleLines: [], background: '', secrets: '' },
+                { name: 'Kai', appearance: 'Wiry.', personality: 'Nosy.', voice: 'Rambling.', exampleLines: [], background: '', secrets: '' },
+            ],
+        },
+        identity: { name: 'Ash', description: 'The new keeper.' },
+        scene: null,
+        bonds: [],
+        arcs: [],
+        memories: [],
+        history: [{ role: 'assistant', text: '@Mira: Late.' }],
+        userText: 'I knock.',
+        ...overrides,
+    });
+    // Mira (1), Kai (2), Lio (3); the Opening at 0, replies at odd positions.
+    const messages = Array.from({ length: 30 }, (_, n) => ({ id: 100 + n, position: n, written: n % 2 === 1 }));
+    const cast = [
+        { id: 1, name: 'Mira' },
+        { id: 2, name: 'Kai' },
+        { id: 3, name: 'Lio' },
+    ];
+
+    it('takes the inner-life line of each Character\'s newest entry from the last twenty replies, at most three, freshest first', () => {
+        expect(DIARY_IN_PLAY_REPLIES).toBe(20);
+        const entries = [
+            { characterId: 1, messageId: 103, innerLife: 'Old Mira.' },
+            { characterId: 2, messageId: 121, innerLife: 'Kai, a while ago.' },
+            { characterId: 1, messageId: 127, innerLife: 'Mira now.' },
+        ];
+        expect(diariesInPlay({ entries, messages, cast })).toEqual([
+            { characterName: 'Mira', text: 'Mira now.', repliesAgo: 1 },
+            { characterName: 'Kai', text: 'Kai, a while ago.', repliesAgo: 4 },
+        ]);
+        // Sitting out is not being in the cast; an entry whose Message is gone is nothing.
+        expect(diariesInPlay({ entries, messages, cast: [cast[1]] })).toEqual([{ characterName: 'Kai', text: 'Kai, a while ago.', repliesAgo: 4 }]);
+        expect(diariesInPlay({ entries: [{ characterId: 1, messageId: 999, innerLife: 'Gone.' }], messages, cast })).toEqual([]);
+        // A newest entry with no line gives nothing, and an older one's line is overtaken.
+        expect(diariesInPlay({ entries: [...entries, { characterId: 2, messageId: 127, innerLife: null }], messages, cast })).toEqual([
+            { characterName: 'Mira', text: 'Mira now.', repliesAgo: 1 },
+        ]);
+        // More than twenty replies ago, it has had its say.
+        const longAgo = [...Array.from({ length: 20 }, (_, n) => ({ id: 200 + n, position: 30 + n, written: true }))];
+        expect(diariesInPlay({ entries, messages: [...messages, ...longAgo], cast })).toEqual([]);
+        // At most three.
+        const many = [1, 2, 3, 4].map((id) => ({ characterId: id, messageId: 129, innerLife: `Line ${id}.` }));
+        expect(diariesInPlay({ entries: many, messages, cast: [...cast, { id: 4, name: 'Bo' }] }).map((diary) => diary.characterName)).toEqual(['Mira', 'Kai', 'Lio']);
+    });
+
+    it('tells them after Memory as inner life, never as what happened, and leaves the prompt as it was without any', () => {
+        expect(buildTurnPrompt(turnInput({ diaries: [] }))).toEqual(buildTurnPrompt(turnInput()));
+        const plain = buildTurnPrompt(turnInput()).messages[0].content;
+        expect(plain).not.toContain('# Inner life');
+        const system = buildTurnPrompt(
+            turnInput({
+                diaries: [
+                    { characterName: 'Mira', text: 'Mira is wary of Ash and means to watch them.', repliesAgo: 2 },
+                    { characterName: 'Kai', text: 'Kai is fond of Ash.', repliesAgo: 0 },
+                ],
+            }),
+        ).messages[0].content;
+        expect(system).toContain(
+            '# Inner life (what Characters feel and mean to do, kept to themselves)\nLet these colour how each Character speaks and acts. They are feelings and intentions only: nothing here happened, nobody here said or did anything, and no one recalls, mentions or acts on anything as if it had. What happened is the story and the Memories above. Nobody else knows a Character\'s inner life, and they never speak of a diary.\n\n- Mira (as of 2 replies ago): Mira is wary of Ash and means to watch them.\n- Kai (as of just now): Kai is fond of Ash.',
+        );
+        expect(system.indexOf('# Memory')).toBeLessThan(system.indexOf('# Inner life'));
+        // Everything before it is as it was, so the cached prefix holds.
+        expect(system.startsWith(plain.slice(0, plain.indexOf('# Memory')))).toBe(true);
+    });
+});
+
 describe('Diary: reading the answer (pure)', () => {
     it('takes off a fence, a name label and a heading, and keeps a salutation', () => {
-        expect(readDiaryEntry('  He stayed.  ', 'Mira')).toBe('He stayed.');
-        expect(readDiaryEntry('```\nHe stayed.\n```', 'Mira')).toBe('He stayed.');
-        expect(readDiaryEntry('Mira: He stayed.', 'Mira')).toBe('He stayed.');
-        expect(readDiaryEntry("**Mira's Diary Entry**\n\nHe stayed.", 'Mira')).toBe('He stayed.');
-        expect(readDiaryEntry('# Diary\nHe stayed.', 'Mira')).toBe('He stayed.');
-        expect(readDiaryEntry('Dear diary,\nHe stayed.', 'Mira')).toBe('Dear diary,\nHe stayed.');
-        expect(readDiaryEntry('Dear diary\n\nHe stayed.', 'Mira')).toBe('Dear diary\n\nHe stayed.');
+        const text = (answer: string) => readDiaryEntry(answer, 'Mira').text;
+        expect(text('  He stayed.  ')).toBe('He stayed.');
+        expect(text('```\nHe stayed.\n```')).toBe('He stayed.');
+        expect(text('Mira: He stayed.')).toBe('He stayed.');
+        expect(text("**Mira's Diary Entry**\n\nHe stayed.")).toBe('He stayed.');
+        expect(text('# Diary\nHe stayed.')).toBe('He stayed.');
+        expect(text('Dear diary,\nHe stayed.')).toBe('Dear diary,\nHe stayed.');
+        expect(text('Dear diary\n\nHe stayed.')).toBe('Dear diary\n\nHe stayed.');
+    });
+
+    it('splits off the inner-life line after the last --- line, and asks for it as feelings only', () => {
+        expect(readDiaryEntry('He stayed.\n---\nMira is warming to Ash and means to say so.', 'Mira')).toEqual({
+            text: 'He stayed.',
+            innerLife: 'Mira is warming to Ash and means to say so.',
+        });
+        expect(readDiaryEntry('He stayed.\n\n---\n**Inner life:** Mira is wary.\nShe means to watch.', 'Mira')).toEqual({ text: 'He stayed.', innerLife: 'Mira is wary. She means to watch.' });
+        expect(readDiaryEntry('```\nHe stayed.\n---\nMira is wary.\n```', 'Mira')).toEqual({ text: 'He stayed.', innerLife: 'Mira is wary.' });
+        // None, or an empty one: the entry is kept, and the Narrator reads nothing.
+        expect(readDiaryEntry('He stayed.', 'Mira')).toEqual({ text: 'He stayed.', innerLife: null });
+        expect(readDiaryEntry('He stayed.\n---\n  ', 'Mira')).toEqual({ text: 'He stayed.', innerLife: null });
+        expect(readDiaryEntry('He stayed.\n---\n' + 'warm '.repeat(200), 'Mira').innerLife!.length).toBeLessThanOrEqual(400);
+        const user = buildDiaryPrompt(INPUT).messages[1].content;
+        expect(user).toContain("Then, on a line of its own, write --- and after it one or two sentences in the third person, beginning with Mira's name, of how Mira feels toward each person now and what they mean to do next. Feelings and intentions only: nothing that happened, nothing anyone said or did, nothing Mira learned or found out.");
+        expect(user.endsWith('Answer with only the entry, the --- line and those sentences.')).toBe(true);
     });
 
     it('cuts a runaway answer at a word, and refuses an empty one', () => {
-        const long = readDiaryEntry('word '.repeat(1_000), 'Mira');
+        const long = readDiaryEntry('word '.repeat(1_000), 'Mira').text;
         expect(long.length).toBeLessThanOrEqual(DIARY_ENTRY_MAX + 1);
         expect(long.endsWith('word…')).toBe(true);
         expect(() => readDiaryEntry(' \n ', 'Mira')).toThrow(UnreadableDiaryEntryError);
@@ -344,8 +441,10 @@ describe('Diary: asking, keeping and taking back (HTTP)', () => {
         );
         const newest = played.messages.at(-1)!;
 
-        const entry = await write(storyId, chat.id, mira, '  He came up the stair like he owned it.  ');
+        const entry = await write(storyId, chat.id, mira, '  He came up the stair like he owned it.  \n---\nMira is wary of Ash and means to watch them closely.');
         expect(entry).toMatchObject({ characterId: mira, messageId: newest.id, moment: 'The lamp room', text: 'He came up the stair like he owned it.' });
+        // The line is never shown.
+        expect(JSON.stringify(entry)).not.toContain('watch them closely');
         expect(await entries(storyId, chat.id)).toEqual([entry]);
 
         const call = lastDiaryCall();
@@ -365,10 +464,26 @@ describe('Diary: asking, keeping and taking back (HTTP)', () => {
         // The whole story so far, in the Transcript's layout, the Opening included.
         expect(user).toContain('<story>\nThe lamp is out.\n\nMira: Boots off, keeper.\n\nAsh: I climb the stair.\n\nMira: I climb the stair. Heard.\n</story>');
         expect(user).toContain('It is now: The lamp room.');
-        // The turn's own prompt never reads the Diary.
+        // The next turn reads her entry as her inner life; the Judge and Memory extraction never do, so it becomes no fact.
         await play(storyId, chat.id, 'I light the lamp.');
         const turn = t.gateway.textCalls('turn').at(-1)!;
+        expect(turn.messages[0].content).toContain('- Mira (as of just now): Mira is wary of Ash and means to watch them closely.');
+        // Never the entry's own text, which may tell of events.
         expect(JSON.stringify(turn.messages)).not.toContain('like he owned it');
+        for (const kind of ['judge', 'memory_extraction'] as const) {
+            expect(JSON.stringify(t.gateway.textCalls(kind).at(-1)!.messages)).not.toContain('watch them closely');
+            expect(JSON.stringify(t.gateway.textCalls(kind).at(-1)!.messages)).not.toContain('like he owned it');
+        }
+        // The turn before any entry had no such layer.
+        expect(t.gateway.textCalls('turn')[0].messages[0].content).not.toContain('# Inner life');
+        // Sitting out, she is not read; and a deleted entry is gone from the next turn.
+        await t.http.put(`/api/stories/${storyId}/chats/${chat.id}/sitting-out`).send({ characterIds: [mira] }).expect(200);
+        await play(storyId, chat.id, 'I trim the wick.');
+        expect(t.gateway.textCalls('turn').at(-1)!.messages[0].content).not.toContain('# Inner life');
+        await t.http.put(`/api/stories/${storyId}/chats/${chat.id}/sitting-out`).send({ characterIds: [] }).expect(200);
+        await t.http.delete(`${diaryPath(storyId, chat.id)}/${entry.id}`).expect(204);
+        await play(storyId, chat.id, 'I sit.');
+        expect(t.gateway.textCalls('turn').at(-1)!.messages[0].content).not.toContain('# Inner life');
     });
 
     it('refuses a second entry about the same moment before any call, and the next one tells only what is new', async () => {
