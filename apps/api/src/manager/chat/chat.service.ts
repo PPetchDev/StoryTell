@@ -74,6 +74,9 @@ import { promptStorySoFar, StorySoFarManagerService } from './story-so-far/story
 import { SuggestedRepliesManagerService } from './suggestions/suggested-replies.service.js';
 import { DiaryManagerService } from './diary/diary.service.js';
 import { ThoughtsManagerService } from './thoughts/thoughts.service.js';
+import { SpeechRepairManagerService } from './speech/speech-repair.service.js';
+import { repeatedOpenings } from './speech/repeated-openings.js';
+import { spokenPart } from './speech/speech-repair.js';
 import { thinkers, ThoughtPromptInput } from './thoughts/thoughts.js';
 import type { MessageThoughtEntity } from '../../model/chat/entities/message-thought.entity.js';
 import { renderUser } from './memory/render-user.js';
@@ -382,6 +385,7 @@ export class ChatManagerService {
         private readonly thaiReadings: ThaiReadingManagerService,
         private readonly diaryWriter: DiaryManagerService,
         private readonly thinker: ThoughtsManagerService,
+        private readonly speechRepair: SpeechRepairManagerService,
         private readonly storySoFar: StorySoFarManagerService,
         private readonly documentSearch: DocumentSearchManagerService,
         private readonly gateway: ModelGateway,
@@ -747,6 +751,33 @@ export class ChatManagerService {
             }),
         );
         return thoughts.filter((thought): thought is { characterId: number; name: string; text: string } => thought !== null);
+    }
+
+    /**
+     * Line repair (.scratch/natural-speech/line-repair.md): each speech line with runs of sentences
+     * that open the same way is sent back alone, in parallel, to be said the way its Character would
+     * say it. A repair that fails, is late or is no better leaves the line as written.
+     */
+    private async repairSpeech(story: StoryEntity, chatId: number, parts: ReplyPart[]): Promise<ReplyPart[]> {
+        const flagged = parts.flatMap((part, index) => {
+            if (part.kind !== 'speech') return [];
+            const { aside, spoken } = spokenPart(part.text);
+            const found = spoken === null ? [] : repeatedOpenings(spoken);
+            return spoken !== null && found.length > 0 ? [{ part, index, found, aside, spoken }] : [];
+        });
+        if (flagged.length === 0) return parts;
+        const repaired = [...parts];
+        await Promise.all(
+            flagged.map(async ({ part, index, found, aside, spoken }) => {
+                const voice = story.characters.find((character) => character.id === part.characterId)?.voice ?? '';
+                const result = await this.speechRepair.repair({ speakerName: part.speakerName, voice, line: spoken, found }, { storyId: story.id, chatId });
+                if (result.line !== null) repaired[index] = { ...part, text: `${aside}${result.line}` };
+                else this.logger.log(`Chat ${chatId}: ${part.speakerName}'s line kept as written (${result.reason})`);
+            }),
+        );
+        const changed = repaired.filter((part, index) => part !== parts[index]).length;
+        this.logger.log(`Chat ${chatId}: repaired ${changed} of ${flagged.length} speech lines with repeated openings`);
+        return repaired;
     }
 
     /** Spec: "Start both background calls in parallel, with their status set to pending." */
@@ -1487,8 +1518,9 @@ export class ChatManagerService {
             this.logger.warn(`Chat ${chat.id}: the reply wrote a line as ${identity.name}; cut off there`);
         }
 
-        const parts: ReplyPart[] = reply.parts;
-        // A Stop that came while the reply was parsed still stores nothing.
+        // Line repair (.scratch/natural-speech/line-repair.md): a speech line with the repeated-sentence habit is said again, alone.
+        const parts: ReplyPart[] = await this.repairSpeech(story, chat.id, reply.parts);
+        // A Stop that came while the reply was parsed or repaired still stores nothing.
         if (stream?.signal.aborted) throw new TurnStoppedError();
         let aiMessageId: number;
         if (replacing) {

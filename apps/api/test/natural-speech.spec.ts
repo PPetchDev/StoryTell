@@ -84,6 +84,8 @@ describe('Natural speech: the turn (HTTP)', () => {
         const system = turn.messages[0].content;
         expect(system).toContain("They rarely name their own feelings outright, and they don't make speeches.");
         expect(system).toContain('Avoid the tics of written dialogue: lists of three');
+        // Shown, not only named: the habit went on while the rules only described it (2026-11-16).
+        expect(system).toContain('- Written, then spoken, the way to write it:\n  Written: "I had a whole speech ready. I had stages. I had a sequence. I was going to make you beg." Spoken: "I had a whole speech ready. Stages and everything. You were going to beg."');
         expect(system).toContain("bystanders don't remark on every moment, and nobody chimes in just to be funny");
         expect(turn.messages.at(-1)!.content).toContain('Keep the speech plain and natural, the way people actually talk.');
         // Read last, where it holds best: the history is full of the tic, as it was of asides.

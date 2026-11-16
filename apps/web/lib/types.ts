@@ -72,6 +72,7 @@ export type CallKind =
     | 'thai_reading'
     | 'diary_entry'
     | 'character_thought'
+    | 'speech_repair'
     | 'snapshot_image'
     | 'reference_image'
     | 'expression_image'
@@ -98,6 +99,7 @@ export const CALL_KIND_LABEL: Record<CallKind, string> = {
     thai_reading: 'Thai readings',
     diary_entry: 'Diary entries',
     character_thought: 'Character thoughts',
+    speech_repair: 'Speech repairs',
     snapshot_image: 'Snapshots',
     reference_image: 'Reference images',
     expression_image: 'Expression pictures',

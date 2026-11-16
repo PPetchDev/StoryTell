@@ -67,7 +67,8 @@ export type TextCallKind =
     | 'write_for_me'
     | 'thai_reading'
     | 'diary_entry'
-    | 'character_thought';
+    | 'character_thought'
+    | 'speech_repair';
 
 /** `expression_image`: a Character's Expression, drawn from their Reference image (.scratch/expressions/spec.md). */
 export type ImageCallKind = 'snapshot_image' | 'reference_image' | 'expression_image';

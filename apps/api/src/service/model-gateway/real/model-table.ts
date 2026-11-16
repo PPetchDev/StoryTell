@@ -173,6 +173,8 @@ const PLAY_MODEL_KINDS: ReadonlySet<TextCallKind> = new Set<TextCallKind>([
     'suggested_replies',
     'write_for_me',
     'diary_entry',
+    // A speech line said again in the Character's own voice (.scratch/natural-speech/line-repair.md).
+    'speech_repair',
 ]);
 
 export function isPlayModelKind(kind: TextCallKind): boolean {
