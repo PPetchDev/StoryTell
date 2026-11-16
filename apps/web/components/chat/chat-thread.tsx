@@ -652,6 +652,14 @@ function useTappedMessage(canEdit: boolean) {
 
 /** How close to the end, in pixels, still counts as reading at the end. */
 const AT_END_SLACK = 48;
+/**
+ * The same, while the user is the one scrolling: any move up of their own leaves the end. With the
+ * wider slack a drag had to clear 48px before the thread stopped following, and a thread that
+ * changed size under the finger went back to its end each time, so it could not be scrolled at all.
+ */
+const AT_END_SLACK_BY_HAND = 4;
+/** How long after the user's last touch, wheel or key a scroll still counts as theirs: a fling goes on that long. */
+const BY_HAND_MS = 1_500;
 
 /**
  * Keeps the thread at its end (spec: "Scrolling"). It opens at the end, or on the Message a
@@ -661,6 +669,11 @@ const AT_END_SLACK = 48;
  * a streamed reply growing), unless the user has scrolled up to read. A streamed reply that
  * finishes while the user reads further up leaves them where they are (spec: streaming
  * replies, story 4).
+ *
+ * The thread never moves under the user's finger: while a touch is on it nothing puts it back at
+ * its end, and a scroll of the user's own (touch, wheel, keys) leaves the end as soon as it moves
+ * up at all. On a phone the thread can change size while it is dragged (the composer, the
+ * keyboard, the browser's own bars), and following the end through that undid every drag.
  */
 function useFollowEnd(followKey: string, streaming: boolean, writing: boolean, openAt: OpenAt | null) {
     const threadRef = useRef<HTMLElement>(null);
@@ -708,17 +721,46 @@ function useFollowEnd(followKey: string, streaming: boolean, writing: boolean, o
         const thread = threadRef.current;
         const content = contentRef.current;
         if (!thread || !content) return;
+        let touching = false;
+        let byHandUntil = 0;
+        const byHand = () => {
+            byHandUntil = performance.now() + BY_HAND_MS;
+        };
         const onScroll = () => {
-            atEndRef.current = thread.scrollHeight - thread.scrollTop - thread.clientHeight <= AT_END_SLACK;
+            const fromEnd = thread.scrollHeight - thread.scrollTop - thread.clientHeight;
+            const slack = touching || performance.now() < byHandUntil ? AT_END_SLACK_BY_HAND : AT_END_SLACK;
+            atEndRef.current = fromEnd <= slack;
+        };
+        const onTouchStart = () => {
+            touching = true;
+            byHand();
+        };
+        const onTouchEnd = (event: TouchEvent) => {
+            // The last finger off: a fling may carry on, and is still the user's.
+            touching = event.touches.length > 0;
+            byHand();
         };
         const observer = new ResizeObserver(() => {
-            if (atEndRef.current) thread.scrollTop = thread.scrollHeight;
+            if (atEndRef.current && !touching) thread.scrollTop = thread.scrollHeight;
         });
-        thread.addEventListener('scroll', onScroll, { passive: true });
+        const passive = { passive: true } as const;
+        thread.addEventListener('scroll', onScroll, passive);
+        thread.addEventListener('touchstart', onTouchStart, passive);
+        thread.addEventListener('touchmove', byHand, passive);
+        thread.addEventListener('touchend', onTouchEnd, passive);
+        thread.addEventListener('touchcancel', onTouchEnd, passive);
+        thread.addEventListener('wheel', byHand, passive);
+        thread.addEventListener('keydown', byHand);
         observer.observe(thread);
         observer.observe(content);
         return () => {
             thread.removeEventListener('scroll', onScroll);
+            thread.removeEventListener('touchstart', onTouchStart);
+            thread.removeEventListener('touchmove', byHand);
+            thread.removeEventListener('touchend', onTouchEnd);
+            thread.removeEventListener('touchcancel', onTouchEnd);
+            thread.removeEventListener('wheel', byHand);
+            thread.removeEventListener('keydown', byHand);
             observer.disconnect();
         };
     }, []);
