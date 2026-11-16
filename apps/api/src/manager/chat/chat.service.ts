@@ -74,8 +74,8 @@ import { promptStorySoFar, StorySoFarManagerService } from './story-so-far/story
 import { SuggestedRepliesManagerService } from './suggestions/suggested-replies.service.js';
 import { DiaryManagerService } from './diary/diary.service.js';
 import { renderUser } from './memory/render-user.js';
-import { DIARY_AFTER_THE_ENDING, diaryMoment, storySince } from './diary/diary.js';
-import type { DiaryEntryResponse } from '../../model/ledger/entities/diary-entry.entity.js';
+import { autoDiaryWriters, DIARY_AFTER_THE_ENDING, diaryMoment, storySince } from './diary/diary.js';
+import type { DiaryEntryEntity, DiaryEntryResponse } from '../../model/ledger/entities/diary-entry.entity.js';
 import { WriteForMeManagerService } from './write-for-me/write-for-me.service.js';
 import { ThaiReadingManagerService } from './thai-reading/thai-reading.service.js';
 import { sourceFingerprint, thaiReadingSource } from './thai-reading/thai-reading.js';
@@ -192,6 +192,12 @@ export interface ChatDetail extends ChatSummary {
      * the Story has Endings of its author's, which are then the only ones the Chat can reach.
      */
     endingSuggestions: boolean | null;
+    /** Whether the Characters write Diary entries by themselves in this Chat (.scratch/diary/spec.md). */
+    autoDiary: boolean;
+    /** Entries are being written by themselves right now: the Chat screen re-reads until they are done. */
+    diaryWriting: boolean;
+    /** Each Character's newest Diary entry, in cast order: a new one is shown to the user. */
+    diaryLatest: Array<{ characterId: number; entryId: number }>;
     /** The ids of the Characters sitting out (.scratch/speaker-controls/spec.md), in cast order. */
     sittingOut: number[];
     /** The composer tray's lines (.scratch/saved-replies-and-replace-rules/spec.md): the Story's, then the app-wide ones. */
@@ -324,6 +330,8 @@ export interface ChatFields {
     autoRead?: boolean;
     /** Whether the Judge may suggest an Ending (.scratch/endings/spec.md): "Not yet" turns it off, this turns it back on. */
     endingSuggestions?: boolean;
+    /** Whether the Characters write Diary entries by themselves (.scratch/diary/spec.md). */
+    autoDiary?: boolean;
 }
 @Injectable()
 export class ChatManagerService {
@@ -337,6 +345,8 @@ export class ChatManagerService {
      * is let go, so the answer always shows them pending, however fast they run.
      */
     private readonly startAfterTurn = new Map<number, () => void>();
+    /** Each Chat's Diary entries being written by themselves after a reply (.scratch/diary/spec.md); play never waits on them. */
+    private readonly diaryRuns = new Map<number, Promise<void>>();
 
     constructor(
         private readonly chatModel: ChatModelService,
@@ -662,9 +672,15 @@ export class ChatManagerService {
         const judged = this.judge.run(story, chatId, messageId);
         const extracted = this.extraction.run(story, chatId, messageId);
         // Spec: "Story so far". Once both are done, so it measures the Memory they leave; never awaited.
-        const chain = Promise.allSettled([judged, extracted]).then(() =>
-            this.storySoFar.start(story, chatId, (chat) => this.promptLayersFor(story, chat)),
-        );
+        // The Characters' own Diary entries then too: they need the Judge's word on the Scene and the Ending.
+        const settled = Promise.allSettled([judged, extracted]);
+        // Registered now, not once both are done: the Chat says entries may be on the way from the moment the
+        // reply's calls start, so a screen reading it between the two never stops looking too soon.
+        const diaries = this.writeDiariesAfter(story, chatId, messageId, settled);
+        const chain = settled.then(() => {
+            this.storySoFar.start(story, chatId, (chat) => this.promptLayersFor(story, chat));
+            return diaries;
+        });
         this.background.set(chatId, chain);
         void chain.finally(() => {
             if (this.background.get(chatId) === chain) this.background.delete(chatId);
@@ -673,12 +689,80 @@ export class ChatManagerService {
 
     /**
      * Resolves once everything a turn started in the background has finished: the judge, the
-     * extraction and the Story so far check they lead to, with any update it ran. For tests and
-     * shutdown; play never waits on it.
+     * extraction, the Story so far check they lead to, with any update it ran, and the Diary
+     * entries written by themselves. For tests and shutdown; play never waits on it.
      */
     async backgroundIdle(chatId: number): Promise<void> {
         while (this.background.has(chatId)) await this.background.get(chatId);
         await this.storySoFar.idle(chatId);
+        while (this.diaryRuns.has(chatId)) await this.diaryRuns.get(chatId);
+    }
+
+    /**
+     * The Diary entries the Characters write by themselves at a reply (.scratch/diary/spec.md,
+     * "Entries the Characters write by themselves"), after any run before it for the Chat. Never
+     * rejects: a failure is logged, and the next due reply tries again.
+     */
+    private writeDiariesAfter(story: StoryEntity, chatId: number, messageId: number, ready: Promise<unknown>): Promise<void> {
+        const before = this.diaryRuns.get(chatId) ?? Promise.resolve();
+        // After the reply's Judge and Memory extraction: the Scene, the Ending and the Memories it writes from.
+        const run = Promise.all([before, ready])
+            .then(() => this.autoDiaries(story, chatId, messageId))
+            .catch((error: unknown) => {
+                this.logger.warn(`Chat ${chatId}, Message ${messageId}: Diary entries not written: ${error instanceof Error ? error.message : String(error)}`);
+            });
+        this.diaryRuns.set(chatId, run);
+        void run.finally(() => {
+            if (this.diaryRuns.get(chatId) === run) this.diaryRuns.delete(chatId);
+        });
+        return run;
+    }
+
+    private async autoDiaries(story: StoryEntity, chatId: number, messageId: number): Promise<void> {
+        const chat = await this.reload(chatId);
+        if (!chat.autoDiary) return;
+        // Only at the newest reply a model wrote: one overtaken by the next turn, or taken back, is past.
+        const at = newestAiMessage(chat);
+        if (!at || at.id !== messageId || at.model === AUTHOR_MODEL) return;
+        if (await this.textCreditOut()) return;
+        const [entries, state] = await Promise.all([this.ledger.diaryEntriesOf(chat.id), this.ledger.state(chat.id)]);
+        const positionOf = new Map(chat.messages.map((message) => [message.id, message.position]));
+        // Oldest first, so each Character's newest entry is the one left.
+        const lastEntryAt = new Map<number, number>();
+        for (const entry of entries) {
+            const position = positionOf.get(entry.messageId);
+            if (position !== undefined) lastEntryAt.set(entry.characterId, position);
+        }
+        const sittingOut = new Set(chat.sittingOutIds());
+        const writers = autoDiaryWriters({
+            messages: chat.messages.map((message) => ({
+                position: message.position,
+                written: message.kind === MessageKind.Ai && message.model !== AUTHOR_MODEL,
+                speakers: (message.parts ?? []).flatMap((part) => (part.characterId === null ? [] : [part.characterId])),
+            })),
+            at: {
+                position: at.position,
+                epilogue: at.epilogue,
+                sceneMoved: state.sceneAdvances.some((advance) => advance.messageId === at.id),
+                endingReached: state.endingsReached.some((record) => record.messageId === at.id),
+            },
+            cast: story.characters.filter((character) => !sittingOut.has(character.id)).map((character) => character.id),
+            lastEntryAt,
+        });
+        for (const characterId of writers) {
+            const character = story.characters.find((candidate) => candidate.id === characterId);
+            if (!character) continue;
+            try {
+                // Read again for each: a later turn may have moved on or taken the reply back meanwhile.
+                const now = await this.reload(chatId);
+                if (newestAiMessage(now)?.id !== at.id) return;
+                const written = await this.ledger.diaryEntriesOf(chatId);
+                if (written.some((entry) => entry.characterId === characterId && entry.messageId === at.id)) continue;
+                await this.composeDiaryEntry(story, now, character, at, written);
+            } catch (error) {
+                this.logger.warn(`Chat ${chatId}, Message ${messageId}: ${character.name}'s Diary entry not written: ${error instanceof Error ? error.message : String(error)}`);
+            }
+        }
     }
 
     /** The Opening becomes Message 1 with model "author", split by the same parser as replies. */
@@ -726,6 +810,10 @@ export class ChatManagerService {
         if (fields.autoRead !== undefined) {
             chat.autoRead = fields.autoRead;
             await this.chatModel.setAutoRead(chat.id, chat.autoRead);
+        }
+        if (fields.autoDiary !== undefined) {
+            chat.autoDiary = fields.autoDiary;
+            await this.chatModel.setAutoDiary(chat.id, chat.autoDiary);
         }
         if (fields.endingSuggestions !== undefined) {
             // Chat state outside the ledger, like the title: no rollback turns it back. Reset does (the ledger's clear).
@@ -1084,8 +1172,9 @@ export class ChatManagerService {
      * the Chat's newest AI Message, written by the play model and kept against that Message.
      * Refused, before any call, when they already wrote one there, while a turn is in flight or
      * with text credit out. It holds the turn lock while it is written, so the Message it tells of
-     * can't be rewound or written again under it; like Suggested replies it does not wait for
-     * the previous reply's background calls.
+     * can't be rewound or written again under it. It waits for the entries the Characters may be
+     * writing by themselves after the last reply, and so for that reply's Judge and Memory
+     * extraction: the one asked for then reads what they left, or has nothing new.
      */
     async writeDiaryEntry(storyId: number, chatId: number, characterId: number): Promise<DiaryEntryResponse> {
         const { story, chat: loaded } = await this.load(storyId, chatId);
@@ -1093,19 +1182,36 @@ export class ChatManagerService {
         if (!character) throw new CharacterNotFoundError();
         if (this.inFlight.has(loaded.id)) throw new TurnInProgressError();
         if (await this.textCreditOut()) throw new OutOfCreditError('text');
+        // Entries being written by themselves go first: the one asked for may then have nothing new.
+        while (this.diaryRuns.has(loaded.id)) await this.diaryRuns.get(loaded.id);
 
         return this.writingTurn(loaded.id, async () => {
             // Read again inside the lock: a turn that ended meanwhile may have added or taken Messages.
             const chat = await this.reload(loaded.id);
             const at = newestAiMessage(chat);
             if (!at) throw new MessageNotFoundError();
-            const [entries, state, held] = await Promise.all([
-                this.ledger.diaryEntriesOf(chat.id),
-                this.ledger.state(chat.id),
-                this.beliefModel.findByChat(chat.id),
-            ]);
+            const entries = await this.ledger.diaryEntriesOf(chat.id);
             const previous = entries.filter((entry) => entry.characterId === character.id).at(-1) ?? null;
             if (previous?.messageId === at.id) throw new NothingNewForDiaryError(character.name);
+            return (await this.composeDiaryEntry(story, chat, character, at, entries)).toResponse();
+        });
+    }
+
+    /** Writes and keeps a Character's entry at `at`, about the story since their last one in `entries`. */
+    private async composeDiaryEntry(
+        story: StoryEntity,
+        chat: ChatEntity,
+        character: StoryEntity['characters'][number],
+        at: ChatEntity['messages'][number],
+        entries: DiaryEntryEntity[],
+    ): Promise<DiaryEntryEntity> {
+        {
+            const [state, held, memories] = await Promise.all([
+                this.ledger.state(chat.id),
+                this.beliefModel.findByChat(chat.id),
+                this.memoryModel.findByChatWithoutVectors(chat.id),
+            ]);
+            const previous = entries.filter((entry) => entry.characterId === character.id).at(-1) ?? null;
             const previousPosition = previous === null ? null : (chat.messages.find((message) => message.id === previous.messageId)?.position ?? null);
             const identity = wornIdentity(story, chat);
             const nameOf = (id: number | null): string | null =>
@@ -1125,6 +1231,10 @@ export class ChatManagerService {
                         return [{ towardName, label: bond.label, description: bond.description, levels: bond.levels() }];
                     }),
                     beliefs: held.filter((belief) => belief.active && belief.characterId === character.id).map((belief) => renderUser(belief.text, identity.name)),
+                    // Only what they know: a Memory is the Characters' in its Known by.
+                    memories: memories
+                        .filter((memory) => !memory.archived && memory.knownByIds().includes(character.id))
+                        .map((memory) => renderUser(memory.text, identity.name)),
                     previousEntry: previous?.text ?? null,
                     story: storySince(chat.messages, previousPosition, at.position).map((message) => ({
                         position: message.position,
@@ -1138,9 +1248,8 @@ export class ChatManagerService {
                 },
                 { storyId: story.id, chatId: chat.id },
             );
-            const entry = await this.ledger.addDiaryEntry({ chatId: chat.id, characterId: character.id, messageId: at.id, moment, text });
-            return entry.toResponse();
-        });
+            return this.ledger.addDiaryEntry({ chatId: chat.id, characterId: character.id, messageId: at.id, moment, text });
+        }
     }
 
     /** Deletes one Diary entry; the Character may then write about that moment again. */
@@ -1461,7 +1570,7 @@ export class ChatManagerService {
     }
 
     private async detail(story: StoryEntity, chat: ChatEntity): Promise<ChatDetail> {
-        const [settings, creditOut, source, readings, appSavedReplies, appReplaceRules, bondChanges, beliefs, eventSteps, detailChanges, endingsReached, personas] = await Promise.all([
+        const [settings, creditOut, source, readings, appSavedReplies, appReplaceRules, bondChanges, beliefs, eventSteps, detailChanges, endingsReached, personas, diaryEntries] = await Promise.all([
             this.settingsModel.get(),
             this.creditOut(),
             // Read live, so a rename of the source shows.
@@ -1477,7 +1586,10 @@ export class ChatManagerService {
             this.ledger.endingsReachedOf([chat.id]),
             // The Account's Personas: few, and only those this Chat shows are answered.
             this.personaModel.findAll(),
+            this.ledger.diaryEntriesOf(chat.id),
         ]);
+        // Oldest first, so each Character's newest entry is the one left.
+        const newestEntry = new Map(diaryEntries.map((entry) => [entry.characterId, entry.id]));
         const inChat = new Set([chat.personaId, ...chat.messages.map((message) => message.personaId)]);
         const details = currentDetails(detailChanges);
         const scene = story.scenes.find((candidate) => candidate.id === chat.currentSceneId);
@@ -1525,6 +1637,12 @@ export class ChatManagerService {
             authorsNote: chat.authorsNote,
             autoRead: chat.autoRead,
             endingSuggestions: (story.endings ?? []).some(endingReady) ? null : chat.endingSuggestions,
+            autoDiary: chat.autoDiary,
+            diaryWriting: this.diaryRuns.has(chat.id),
+            diaryLatest: story.characters.flatMap((character) => {
+                const entryId = newestEntry.get(character.id);
+                return entryId === undefined ? [] : [{ characterId: character.id, entryId }];
+            }),
             sittingOut: sittingOutOf(story, chat).map((character) => character.id),
             savedReplies: trayLines(story.savedReplies, appSavedReplies),
             replaceRules: chatReplaceRules(appReplaceRules, story.replaceRules),

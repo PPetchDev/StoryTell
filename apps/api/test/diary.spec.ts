@@ -1,4 +1,16 @@
-import { buildDiaryPrompt, DIARY_ENTRY_MAX, DiaryPromptInput, diaryMoment, fitStory, readDiaryEntry, storySince } from '../src/manager/chat/diary/diary.js';
+import {
+    AutoDiaryInput,
+    autoDiaryWriters,
+    buildDiaryPrompt,
+    DIARY_AUTO_EVERY_REPLIES,
+    DIARY_ENTRY_MAX,
+    DiaryPromptInput,
+    diaryMoment,
+    fitStory,
+    readDiaryEntry,
+    storySince,
+} from '../src/manager/chat/diary/diary.js';
+import { ChatManagerService } from '../src/manager/chat/chat.service.js';
 import { UnreadableDiaryEntryError } from '../src/errors/chat.errors.js';
 import { TextCompletionRequest } from '../src/service/model-gateway/model-gateway.js';
 import { startTestApp, TestApp } from './harness/test-app.js';
@@ -16,6 +28,7 @@ const INPUT: DiaryPromptInput = {
     arcSteps: ['She lets someone help.'],
     bonds: [{ towardName: 'Ash', label: 'wary', description: 'She watches the new keeper.', levels: null }],
     beliefs: ['Ash was sent by the harbour board.'],
+    memories: ['Ash carried the oil up the stair.', 'The lamp went out at midnight.'],
     previousEntry: null,
     story: [
         { position: 0, text: 'Mira: Boots off, keeper.' },
@@ -60,6 +73,12 @@ describe('Diary: what the writer is told (pure)', () => {
         expect(system).toContain('How this story has changed Mira so far: She lets someone help.');
         expect(system).toContain('- toward Ash: "wary" — She watches the new keeper.');
         expect(system).toContain('What Mira believes, which may be false (Mira does not doubt it):\n- Ash was sent by the harbour board.');
+        expect(system).toContain(
+            'What Mira knows of the story so far (their Memories; what is not here, they do not know):\n- Ash carried the oil up the stair.\n- The lamp went out at midnight.',
+        );
+        // Written the way she would, coloured by how she feels and what she knows.
+        expect(user).toContain('Write it the way Mira would: their Personality and Voice above decide the mood');
+        expect(user).toContain('How Mira feels about each person, and what they know and believe, colour what they notice and how they judge it');
         expect(system).toContain('Ash is the person the user plays.\nWho Ash is: The new keeper.');
         expect(user).toContain('What has happened since the story began, as the story told it. Lines labelled "Ash:" are Ash\'s own.\nIt is now: Night, the lamp room.\n<story>\nMira: Boots off, keeper.\n\nAsh: I climb the stair.\n</story>');
         expect(user).toContain("Write Mira's diary entry about the passage above.");
@@ -81,6 +100,7 @@ describe('Diary: what the writer is told (pure)', () => {
             arcSteps: [],
             bonds: [],
             beliefs: [],
+            memories: [],
             moment: null,
             character: { name: 'Mira', personality: '', voice: '', background: '' },
         });
@@ -88,6 +108,7 @@ describe('Diary: what the writer is told (pure)', () => {
         expect(system).not.toContain('Setting:');
         expect(system).toContain('The diarist is Mira.\nAsh is the person the user plays.');
         expect(system).not.toContain('Who Ash is');
+        expect(system).not.toContain('Memories');
         expect(user).not.toContain('It is now');
     });
 
@@ -122,6 +143,54 @@ describe('Diary: what the writer is told (pure)', () => {
     });
 });
 
+describe('Diary: who writes by themselves at a reply (pure)', () => {
+    // The Opening (0, the author's), then replies at odd positions; Mira (1) speaks in all, Kai (2) in the first only.
+    const replies = (count: number) => [
+        { position: 0, written: false, speakers: [1, 2] },
+        ...Array.from({ length: count }, (_, n) => [
+            { position: 2 * n + 1, written: true, speakers: n === 0 ? [1, 2] : [1] },
+            { position: 2 * n + 2, written: false, speakers: [] },
+        ]).flat(),
+    ];
+    const input = (count: number, at: Partial<AutoDiaryInput['at']> = {}, lastEntryAt = new Map<number, number>()): AutoDiaryInput => {
+        const messages = replies(count).filter((message) => message.position <= 2 * count - 1);
+        return {
+            messages,
+            at: { position: 2 * count - 1, epilogue: false, sceneMoved: false, endingReached: false, ...at },
+            cast: [1, 2, 3],
+            lastEntryAt,
+        };
+    };
+
+    it('writes after enough replies, only for those who spoke since their last entry, furthest behind first', () => {
+        expect(DIARY_AUTO_EVERY_REPLIES).toBe(10);
+        expect(autoDiaryWriters(input(9))).toEqual([]);
+        // Ten replies: Mira and Kai spoke since the Chat began; Lio (3) never did.
+        expect(autoDiaryWriters(input(10))).toEqual([1, 2]);
+        // Mira wrote at reply 5: she is not due yet, and Kai is.
+        expect(autoDiaryWriters(input(10, {}, new Map([[1, 9]])))).toEqual([2]);
+        // Kai wrote at reply 1 and has not spoken since: nothing to tell.
+        expect(autoDiaryWriters(input(12, {}, new Map([[2, 1]])))).toEqual([1]);
+    });
+
+    it('writes at once when the Scene moves on, an Ending is reached or it is the Epilogue', () => {
+        for (const milestone of [{ sceneMoved: true }, { endingReached: true }, { epilogue: true }]) {
+            expect(autoDiaryWriters(input(3, milestone))).toEqual([1, 2]);
+        }
+        // Not twice at the same reply.
+        expect(autoDiaryWriters(input(3, { epilogue: true }, new Map([[1, 5], [2, 5]])))).toEqual([]);
+    });
+
+    it('writes for at most three at once, those furthest behind first', () => {
+        const messages = [{ position: 1, written: true, speakers: [1, 2, 3, 4, 5] }];
+        const behind = new Map<number, number>();
+        const at = { position: 1, epilogue: true, sceneMoved: false, endingReached: false };
+        expect(autoDiaryWriters({ messages, at, cast: [1, 2, 3, 4, 5], lastEntryAt: behind })).toEqual([1, 2, 3]);
+        // Sitting out is not being in the cast.
+        expect(autoDiaryWriters({ messages, at, cast: [4, 5], lastEntryAt: behind })).toEqual([4, 5]);
+    });
+});
+
 describe('Diary: reading the answer (pure)', () => {
     it('takes off a fence, a name label and a heading, and keeps a salutation', () => {
         expect(readDiaryEntry('  He stayed.  ', 'Mira')).toBe('He stayed.');
@@ -152,6 +221,9 @@ interface Message {
 interface Chat {
     id: number;
     messages: Message[];
+    autoDiary: boolean;
+    diaryWriting: boolean;
+    diaryLatest: Array<{ characterId: number; entryId: number }>;
 }
 
 interface Entry {
@@ -261,6 +333,9 @@ describe('Diary: asking, keeping and taking back (HTTP)', () => {
         const chat = await createChat(storyId);
         expect(await entries(storyId, chat.id)).toEqual([]);
 
+        // Mira knows one Memory and Kai another: she is told only hers.
+        await t.http.post(`/api/stories/${storyId}/chats/${chat.id}/memories`).send({ text: '{user} carried the oil up alone.', knownBy: [mira] }).expect(201);
+        await t.http.post(`/api/stories/${storyId}/chats/${chat.id}/memories`).send({ text: 'Kai hid the spare wick.', knownBy: [kai] }).expect(201);
         const played = await play(
             storyId,
             chat.id,
@@ -281,6 +356,8 @@ describe('Diary: asking, keeping and taking back (HTTP)', () => {
         expect(system).toContain('How this story has changed Mira so far: She lets someone help.');
         expect(system).toContain('- toward Ash: "wary"');
         expect(system).toContain('- Ash was sent by the harbour board.');
+        expect(system).toContain('(their Memories; what is not here, they do not know):\n- Ash carried the oil up alone.');
+        expect(system).not.toContain('spare wick');
         // Never what the user may not read, nor anyone else's feelings.
         expect(`${system}\n${user}`).not.toContain('She put the lamp out herself.');
         expect(`${system}\n${user}`).not.toContain('her coldness thaws');
@@ -320,6 +397,77 @@ describe('Diary: asking, keeping and taking back (HTTP)', () => {
         expect((await entries(storyId, chat.id)).map((entry) => entry.id)).toEqual([second.id, kais.id, first.id]);
     });
 
+    it('the Characters write by themselves after ten replies and at an Epilogue, in the background, and the Chat says so', async () => {
+        const { storyId, mira, kai } = await createStory();
+        const chat = await createChat(storyId);
+        const idle = () => t.app.get(ChatManagerService).backgroundIdle(chat.id);
+        expect(await getChat(storyId, chat.id)).toMatchObject({ autoDiary: true, diaryWriting: false, diaryLatest: [] });
+
+        // Nine replies: nobody is due, and nothing is asked.
+        for (let n = 1; n <= 9; n++) await play(storyId, chat.id, `Turn ${n}.`);
+        await idle();
+        expect(t.gateway.textCalls('diary_entry')).toHaveLength(0);
+
+        // The tenth: Mira, who spoke in every one, writes; Kai, who never spoke, does not.
+        t.gateway.scriptText('diary_entry', 'Ten nights of that stair.');
+        await play(storyId, chat.id, 'Turn 10.');
+        // Read the moment the reply's calls are done: the entry is in, or the Chat says it is on the way.
+        const right = await getChat(storyId, chat.id);
+        expect(right.diaryWriting || right.diaryLatest.length === 1).toBe(true);
+        await idle();
+        const tenth = await entries(storyId, chat.id);
+        expect(tenth).toMatchObject([{ characterId: mira, text: 'Ten nights of that stair.' }]);
+        expect(tenth[0].messageId).toBe((await getChat(storyId, chat.id)).messages.at(-1)!.id);
+        expect(await getChat(storyId, chat.id)).toMatchObject({ diaryWriting: false, diaryLatest: [{ characterId: mira, entryId: tenth[0].id }] });
+
+        // One more reply is not enough again; asking still works, and is refused at the same reply.
+        await play(storyId, chat.id, 'Turn 11.');
+        await idle();
+        expect(t.gateway.textCalls('diary_entry')).toHaveLength(1);
+        await write(storyId, chat.id, kai, 'He talks too much.');
+        await t.http.post(writePath(storyId, chat.id, kai)).expect(409);
+
+        // The Epilogue: Mira spoke since her entry, so she writes, after the ending.
+        script('@Mira: The light never went out again.');
+        t.gateway.scriptText('diary_entry', 'It is over, and the lamp still burns.');
+        await t.http.post(`/api/stories/${storyId}/chats/${chat.id}/epilogue`).expect(200);
+        await idle();
+        const after = await entries(storyId, chat.id);
+        expect(after[0]).toMatchObject({ characterId: mira, moment: 'After the ending', text: 'It is over, and the lamp still burns.' });
+        expect(after.filter((entry) => entry.characterId === kai)).toHaveLength(1);
+        expect(lastDiaryCall().messages[1].content).toContain("The passage ends with the story's Epilogue");
+    });
+
+    it('a Chat can turn them off, a Branch copies the setting, and a failed entry is dropped without stopping play', async () => {
+        const { storyId } = await createStory();
+        const chat = await createChat(storyId);
+        const idle = () => t.app.get(ChatManagerService).backgroundIdle(chat.id);
+        await play(storyId, chat.id, 'I climb the stair.');
+
+        const off = await t.http.patch(`/api/stories/${storyId}/chats/${chat.id}`).send({ autoDiary: false }).expect(200);
+        expect(off.body.autoDiary).toBe(false);
+        script('The lamp burned on.');
+        await t.http.post(`/api/stories/${storyId}/chats/${chat.id}/epilogue`).expect(200);
+        await idle();
+        expect(t.gateway.textCalls('diary_entry')).toHaveLength(0);
+        await t.http.patch(`/api/stories/${storyId}/chats/${chat.id}`).send({ autoDiary: 'yes' }).expect(400);
+        const newest = (await getChat(storyId, chat.id)).messages.at(-1)!;
+        const { body: branch } = await t.http.post(`/api/stories/${storyId}/chats/${chat.id}/messages/${newest.id}/branch`).expect(201);
+        expect(branch.autoDiary).toBe(false);
+
+        // On again, with nothing scripted for the entry: the call fails, nothing is kept, and play goes on.
+        await t.http.patch(`/api/stories/${storyId}/chats/${chat.id}`).send({ autoDiary: true }).expect(200);
+        await play(storyId, chat.id, 'I climb on.');
+        script('@Mira: Again, then.');
+        await t.http.post(`/api/stories/${storyId}/chats/${chat.id}/epilogue`).expect(200);
+        await idle();
+        expect(t.gateway.textCalls('diary_entry')).toHaveLength(1);
+        expect(await entries(storyId, chat.id)).toEqual([]);
+        expect((await getChat(storyId, chat.id)).diaryWriting).toBe(false);
+        await play(storyId, chat.id, 'Still here.');
+        expect((await getChat(storyId, chat.id)).messages.at(-1)!.kind).toBe('ai');
+    });
+
     it('written at an Epilogue, an entry is dated after the ending, and the writer is told what the Epilogue is', async () => {
         const { storyId, mira } = await createStory();
         const chat = await createChat(storyId);
@@ -328,6 +476,8 @@ describe('Diary: asking, keeping and taking back (HTTP)', () => {
         await t.http.post(`/api/stories/${storyId}/chats/${chat.id}/epilogue`).expect(200);
         const ended = await settled(storyId, chat.id);
         const epilogue = ended.messages.at(-1)!;
+        // Mira's own entry at the Epilogue, with nothing scripted for it, fails first: then the one asked for is written.
+        await t.app.get(ChatManagerService).backgroundIdle(chat.id);
 
         const entry = await write(storyId, chat.id, mira, 'All those years, and the lamp still burns.');
         expect(entry).toMatchObject({ messageId: epilogue.id, moment: 'After the ending' });

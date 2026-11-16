@@ -29,6 +29,11 @@ export class UpdateChatRequestBodyDTO implements ChatFields {
     @IsOptional()
     @IsBoolean()
     endingSuggestions?: boolean;
+
+    @ApiPropertyOptional({ description: 'Whether the Characters write Diary entries by themselves as the story goes. Off, entries come only when asked.' })
+    @IsOptional()
+    @IsBoolean()
+    autoDiary?: boolean;
 }
 
 /** .scratch/speaker-controls/spec.md, "Nudge": who the user would like to hear from in this turn. */

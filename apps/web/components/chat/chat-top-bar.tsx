@@ -403,6 +403,8 @@ interface ChatTopBarProps {
     onSetAutoRead(autoRead: boolean): void;
     /** Turns the Judge's suggested Endings on or off in this Chat. */
     onSetEndingSuggestions(on: boolean): void;
+    /** Turns the Characters' own Diary entries on or off in this Chat. */
+    onSetAutoDiary(on: boolean): void;
     onReset(): void;
     /** Asks for the story's Epilogue (.scratch/endings/spec.md); the menu asks first. */
     onEndStory(): void;
@@ -440,6 +442,7 @@ export function ChatTopBar({
     onSetSittingOut,
     onSetAutoRead,
     onSetEndingSuggestions,
+    onSetAutoDiary,
     onReset,
     onEndStory,
     canEndStory,
@@ -661,6 +664,22 @@ export function ChatTopBar({
                                         </span>
                                     </button>
                                 )}
+                                {/* The Characters' own Diary entries (.scratch/diary/spec.md): on by default; off, they write only when asked. */}
+                                <button
+                                    type="button"
+                                    role="switch"
+                                    aria-checked={chat.autoDiary}
+                                    className={`${ITEM} flex-row items-center gap-3 text-text`}
+                                    disabled={busy}
+                                    onClick={() => onSetAutoDiary(!chat.autoDiary)}
+                                >
+                                    <span className="flex min-w-0 flex-1 flex-col items-start">
+                                        <MenuText label="Characters keep diaries" sub="They write now and then as you play" />
+                                    </span>
+                                    <span aria-hidden="true" className={SWITCH_TRACK}>
+                                        <span className={SWITCH_KNOB} />
+                                    </span>
+                                </button>
                             </section>
                             <div className="border-t border-line pt-1">
                                 <MenuButton onClick={choose(() => setEnding(true))} disabled={busy || !canEndStory}>

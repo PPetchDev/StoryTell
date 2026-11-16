@@ -6,6 +6,7 @@ import { useConnection } from '@/components/connection';
 import { ConfirmButton } from '@/components/story-editor/fields';
 import { ApiError, ApiUnreachableError } from '@/lib/api';
 import { chatApi, DiaryEntry, formatWhen } from '@/lib/chat';
+import { markDiaryEntrySeen } from '@/lib/diary-seen';
 
 /** The Chat a profile is opened over, as far as the Diary needs it. */
 export interface DiaryChat {
@@ -58,6 +59,8 @@ export function DiarySection({ chat, characterId, name }: { chat: DiaryChat; cha
         setProblem(null);
         try {
             const entry = await chatApi.writeDiaryEntry(storyId, chatId, characterId);
+            // Asked for here and read here: no toast for it on the Chat screen.
+            markDiaryEntrySeen(entry.id);
             setLoaded((current) => ({ status: 'ready', entries: [entry, ...(current.status === 'ready' ? current.entries : [])] }));
         } catch (caught) {
             fail(caught, "Couldn't write the diary entry. Try again.");
@@ -87,7 +90,7 @@ export function DiarySection({ chat, characterId, name }: { chat: DiaryChat; cha
             <h3 id={headingId} ref={heading} tabIndex={-1} className="mt-0 mb-1 text-sm font-semibold text-muted focus:outline-none">
                 Diary
             </h3>
-            <p className="mt-0 mb-2.5 text-sm leading-normal text-muted">What {name} writes in private about the story so far, when you ask. Each entry uses credit like one reply.</p>
+            <p className="mt-0 mb-2.5 text-sm leading-normal text-muted">What {name} writes in private about the story so far: now and then by themselves as you play, or when you ask. Each entry uses credit like one reply.</p>
 
             {loaded.status === 'loading' && (
                 <p role="status" className="m-0 text-sm text-muted motion-safe:animate-pulse-soft">

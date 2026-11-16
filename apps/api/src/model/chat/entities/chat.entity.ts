@@ -143,6 +143,13 @@ export class ChatEntity {
     @Column({ name: 'ending_suggestions', type: 'boolean', default: true })
     endingSuggestions: boolean;
 
+    /**
+     * Whether the Characters write Diary entries by themselves as the story goes (.scratch/diary/spec.md).
+     * On by default; the user turns it off or on, a Branch copies it, Reset keeps it.
+     */
+    @Column({ name: 'auto_diary', type: 'boolean', default: true })
+    autoDiary: boolean;
+
     // Loaded only through ChatModelService.findWithMessages(); never auto-loaded.
     @OneToMany('MessageEntity', 'chat')
     messages: Relation<MessageEntity[]>;

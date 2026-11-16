@@ -1,6 +1,7 @@
 import pg from 'pg';
 
 import { ProviderOutageError } from '../src/errors/model-gateway.errors.js';
+import { ChatManagerService } from '../src/manager/chat/chat.service.js';
 import { FAKE_TEXT_MODEL } from '../src/service/model-gateway/fake-model-gateway.js';
 import { TextCompletionRequest } from '../src/service/model-gateway/model-gateway.js';
 import { startTestApp, TestApp } from './harness/test-app.js';
@@ -480,6 +481,8 @@ describe('Branch', () => {
             const story = await createStory();
             const chat = await createChat(story.id);
             const source = await twoTurns(story.id, chat.id);
+            // The source's own background work first: its second turn moved the Scene on, so Mira writes in her Diary.
+            await t.app.get(ChatManagerService).backgroundIdle(chat.id);
             const calls = t.gateway.textCalls().length + t.gateway.imageCalls().length;
 
             const made = await branched(story.id, chat.id, source.messages[3].id);

@@ -83,6 +83,14 @@ export class ChatListItemDTO extends ChatSummaryDTO implements ChatListItem {
     ending: EndingNameDTO | null;
 }
 
+export class DiaryLatestDTO {
+    @ApiProperty()
+    characterId: number;
+
+    @ApiProperty()
+    entryId: number;
+}
+
 export class EndingNameDTO {
     @ApiProperty({ type: Number, nullable: true, description: "The author's Ending; null for one the Judge suggested." })
     id: number | null;
@@ -379,6 +387,15 @@ export class ChatResponseBodyDTO extends ChatSummaryDTO implements Omit<ChatDeta
         description: "Whether the Judge may suggest an Ending in this Chat; null when the Story has Endings of its author's, which are the only ones it can reach.",
     })
     endingSuggestions: boolean | null;
+
+    @ApiProperty({ description: 'Whether the Characters write Diary entries by themselves as the story goes. On by default.' })
+    autoDiary: boolean;
+
+    @ApiProperty({ description: 'Diary entries are being written by themselves right now; re-read the Chat until this is false.' })
+    diaryWriting: boolean;
+
+    @ApiProperty({ type: () => DiaryLatestDTO, isArray: true, description: "Each Character's newest Diary entry, in cast order; Characters with none are left out." })
+    diaryLatest: DiaryLatestDTO[];
 
     @ApiProperty({ description: "The number a Roll sent now must reach, from the Story's Difficulty." })
     rollTarget: number;

@@ -53,7 +53,7 @@ test("a Character's profile holds their Diary: an entry on request, the next one
         // An empty Diary: what it is, and one button.
         let profile = await openProfile();
         const diary = () => page.getByRole('dialog', { name: 'Mira' }).getByRole('region', { name: 'Diary' });
-        await expect(diary()).toContainText('What Mira writes in private about the story so far, when you ask. Each entry uses credit like one reply.');
+        await expect(diary()).toContainText('What Mira writes in private about the story so far: now and then by themselves as you play, or when you ask. Each entry uses credit like one reply.');
         await expect(diary().locator('[data-diary-entry]')).toHaveCount(0);
 
         await scriptEntry(request, 'A new keeper. Soft hands.\n\nWe will see how long he lasts.');
@@ -117,6 +117,48 @@ test("a Character's profile holds their Diary: an entry on request, the next one
         await expect(diary().getByRole('button', { name: 'Write an entry' })).toBeVisible();
         const left = await request.get(`/api/stories/${storyId}/chats/${chatId}/diary`);
         expect((await left.json()).entries).toEqual([]);
+    } finally {
+        await request.delete(`/api/stories/${storyId}`);
+    }
+});
+
+test('the Characters write by themselves at the Epilogue: a toast says so and opens the profile; the Chat menu turns it off', async ({ page, request }) => {
+    const { storyId, chatId } = await createChat(request);
+    await request.delete('/api/testing/fake-gateway');
+    try {
+        // A reply Mira speaks in, through the API.
+        await scriptTurn(request, '@Mira: Mind the oil.');
+        await request.post(`/api/stories/${storyId}/chats/${chatId}/messages`, { data: { text: 'I climb the stair.' } });
+        await expect
+            .poll(async () => (await (await request.get(`/api/stories/${storyId}/chats/${chatId}`)).json()).messages.at(-1).judge?.status, { timeout: 10_000 })
+            .toBe('done');
+        await page.goto(`/stories/${storyId}/chats/${chatId}`);
+        await expect(page.getByRole('article', { name: 'AI reply' }).last()).toContainText('Mind the oil.');
+
+        // The menu's switch is on by default.
+        await page.getByRole('button', { name: 'Chat menu' }).tap();
+        const keep = page.getByRole('dialog', { name: 'Chat menu' }).getByRole('switch', { name: /Characters keep diaries/ });
+        await expect(keep).toHaveAttribute('aria-checked', 'true');
+
+        // The Epilogue is a milestone: Mira writes by herself, and a toast says so.
+        await scriptTurn(request, 'The light never went out again.');
+        await scriptEntry(request, 'It is over. The lamp still burns.');
+        await page.getByRole('button', { name: /^End the story/ }).tap();
+        await page.getByRole('alertdialog', { name: /^End the story here\?/ }).getByRole('button', { name: 'Write the epilogue' }).tap();
+        await expect(page.getByRole('article', { name: 'Epilogue' })).toContainText('never went out');
+        const toast = page.locator('[data-diary-toast]');
+        await expect(toast).toHaveText(/Diary: Mira\s*A new entry\. Tap to read it\./);
+        await toast.tap();
+        const sheet = page.getByRole('dialog', { name: 'Mira' });
+        await expect(sheet.locator('[data-diary-entry]').first()).toContainText('It is over. The lamp still burns.');
+        await expect(sheet.locator('[data-diary-entry]').first()).toContainText('After the ending');
+        await page.keyboard.press('Escape');
+
+        // Off: it is the Chat's own setting.
+        await page.getByRole('button', { name: 'Chat menu' }).tap();
+        await keep.tap();
+        await expect(keep).toHaveAttribute('aria-checked', 'false');
+        expect((await (await request.get(`/api/stories/${storyId}/chats/${chatId}`)).json()).autoDiary).toBe(false);
     } finally {
         await request.delete(`/api/stories/${storyId}`);
     }

@@ -4,7 +4,8 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { ChatBackdrop } from '@/components/chat/backdrop';
-import { useProfileChat, useProfileOutfits } from '@/components/chat/character-profile';
+import { useOpenProfile, useProfileChat, useProfileOutfits } from '@/components/chat/character-profile';
+import { diaryEntrySeen, markDiaryEntrySeen } from '@/lib/diary-seen';
 import { CharacterRow } from '@/components/chat/character-row';
 import { ChatComposer } from '@/components/chat/chat-composer';
 import { ChatThread, OpenAt, PendingLine } from '@/components/chat/chat-thread';
@@ -39,17 +40,21 @@ import { applyReplaceRules, onMineRules } from '@/lib/replace-rules';
 import { ReadAloudProvider, useReadAloudPlayer } from './read-aloud';
 import { ShownTextProvider } from './shown-text';
 
-/** A "Memory added" toast (spec: story 83): one per Memory the AI added in the latest turn. */
-interface Toast {
-    memoryId: number;
-    text: string;
-}
+/**
+ * A "Memory added" toast (spec: story 83), one per Memory the AI added in the latest turn; or a
+ * "Diary: <name>" toast, one per entry a Character wrote by themselves (.scratch/diary/spec.md).
+ */
+type Toast = { kind: 'memory'; memoryId: number; text: string } | { kind: 'diary'; entryId: number; characterId: number; name: string };
 
 /**
  * How long the "Memory added" toasts stay before they go on their own; a tap before then opens the
  * Memory. Five seconds, and never while the pointer or focus is on them (audit M13).
  */
 const TOAST_MS = 5_000;
+
+/** A toast over the thread: a real button, which opens what it tells of. */
+const TOAST =
+    'bare-button grid w-full cursor-pointer gap-0.5 rounded-md border border-toast-line bg-toast-surface px-3.5 py-2.5 text-left text-text shadow-lg shadow-shadow-soft press focus-ring motion-safe:animate-fade-in';
 
 /**
  * What a screen reader hears when a reply lands (audit H7): that it came, and who speaks in it.
@@ -238,13 +243,33 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
         memoryApi.list(chat.storyId, chat.id).then(
             (list) => {
                 const added = list.memories.filter((memory: Memory) => memory.messageId === reply.id && memory.writtenBy === 'ai');
-                setToasts(added.map((memory) => ({ memoryId: memory.id, text: renderUser(memory.text, list.identityName) })));
+                setToasts((current) => [
+                    ...current.filter((toast) => toast.kind === 'diary'),
+                    ...added.map((memory) => ({ kind: 'memory' as const, memoryId: memory.id, text: renderUser(memory.text, list.identityName) })),
+                ]);
             },
             () => {
                 // The drawer shows the Memory either way; a missed toast is no loss.
             },
         );
     }, [chat]);
+
+    // An entry a Character wrote by themselves shows as a toast that opens their profile. Those there when the Chat
+    // opened, and those the user asked for, are seen already.
+    useEffect(() => {
+        for (const entry of initial.diaryLatest ?? []) markDiaryEntrySeen(entry.entryId);
+    }, [initial.diaryLatest]);
+    const openProfile = useOpenProfile();
+    useEffect(() => {
+        const fresh = (chat.diaryLatest ?? []).filter((entry) => !diaryEntrySeen(entry.entryId));
+        if (fresh.length === 0) return;
+        for (const entry of fresh) markDiaryEntrySeen(entry.entryId);
+        const named = fresh.flatMap((entry) => {
+            const name = characters.find((character) => character.id === entry.characterId)?.name;
+            return name ? [{ kind: 'diary' as const, entryId: entry.entryId, characterId: entry.characterId, name }] : [];
+        });
+        if (named.length > 0) setToasts((current) => [...current, ...named]);
+    }, [chat.diaryLatest, characters]);
 
     // The toasts announce, they don't wait to be dismissed: they go after TOAST_MS, and the drawer keeps the Memories.
     // They stay while the pointer or focus is on them, and go a moment after it leaves (audit M13).
@@ -285,7 +310,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
 
     const openMemory = (memoryId: number | null = null) => {
         setDrawer((current) => ({ open: true, focus: memoryId, version: current.version }));
-        if (memoryId !== null) setToasts((current) => current.filter((toast) => toast.memoryId !== memoryId));
+        if (memoryId !== null) setToasts((current) => current.filter((toast) => toast.kind !== 'memory' || toast.memoryId !== memoryId));
     };
 
     /** Scrolls to a Message and outlines it, from a Memory's jump link. */
@@ -598,6 +623,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                 }
                 onSetAutoRead={(autoRead) => void runWrite(() => chatApi.setAutoRead(chat.storyId, chat.id, autoRead))}
                 onSetEndingSuggestions={(on) => void runWrite(() => chatApi.setEndingSuggestions(chat.storyId, chat.id, on))}
+                onSetAutoDiary={(on) => void runWrite(() => chatApi.setAutoDiary(chat.storyId, chat.id, on))}
                 onSetSittingOut={(characterIds) =>
                     void runWrite(() => chatApi.setSittingOut(chat.storyId, chat.id, characterIds))
                 }
@@ -658,17 +684,28 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
             <div className={`relative z-sticky h-0 ${COLUMN}`}>
                 <div ref={toastsRef} role="status" className="absolute inset-x-0 top-2 grid gap-2">
                     <LowCreditLine />
-                    {toasts.map((toast) => (
-                        <button
-                            key={toast.memoryId}
-                            type="button"
-                            className="bare-button grid w-full cursor-pointer gap-0.5 rounded-md border border-toast-line bg-toast-surface px-3.5 py-2.5 text-left text-text shadow-lg shadow-shadow-soft press focus-ring motion-safe:animate-fade-in"
-                            onClick={() => openMemory(toast.memoryId)}
-                        >
-                            <strong>Memory added</strong>
-                            <span className="text-note text-muted">{toast.text}</span>
-                        </button>
-                    ))}
+                    {toasts.map((toast) =>
+                        toast.kind === 'memory' ? (
+                            <button key={`memory-${toast.memoryId}`} type="button" className={TOAST} onClick={() => openMemory(toast.memoryId)}>
+                                <strong>Memory added</strong>
+                                <span className="text-note text-muted">{toast.text}</span>
+                            </button>
+                        ) : (
+                            <button
+                                key={`diary-${toast.entryId}`}
+                                type="button"
+                                className={TOAST}
+                                data-diary-toast
+                                onClick={() => {
+                                    setToasts((current) => current.filter((other) => other !== toast));
+                                    openProfile?.(toast.characterId);
+                                }}
+                            >
+                                <strong>Diary: {toast.name}</strong>
+                                <span className="text-note text-muted">A new entry. Tap to read it.</span>
+                            </button>
+                        ),
+                    )}
                 </div>
             </div>
 

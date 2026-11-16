@@ -59,6 +59,12 @@ export function useCharacterProfile(characterId: number | null): (() => void) | 
     return () => profiles.open(characterId);
 }
 
+/** Opens a Character's profile from anywhere in a Chat, as a Diary toast does; null outside a Chat. */
+export function useOpenProfile(): ((characterId: number) => void) | null {
+    const profiles = useContext(ProfileContext);
+    return profiles ? (characterId: number) => profiles.has(characterId) && profiles.open(characterId) : null;
+}
+
 /**
  * A Character of the cast, for the picture beside their lines (lib/expressions.ts, `linePicture`);
  * undefined outside a Chat and for a speaker with no Character in the cast.

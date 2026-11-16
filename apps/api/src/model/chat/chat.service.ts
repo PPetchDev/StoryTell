@@ -193,6 +193,11 @@ export class ChatModelService {
         await this.chats.update({ id: chatId }, { autoRead });
     }
 
+    /** Whether the Characters write Diary entries by themselves in this Chat (.scratch/diary/spec.md). */
+    async setAutoDiary(chatId: number, autoDiary: boolean): Promise<void> {
+        await this.chats.update({ id: chatId }, { autoDiary });
+    }
+
     /** Whether the Judge may suggest an Ending in this Chat (.scratch/endings/spec.md). */
     async setEndingSuggestions(chatId: number, endingSuggestions: boolean): Promise<void> {
         await this.chats.update({ id: chatId }, { endingSuggestions });

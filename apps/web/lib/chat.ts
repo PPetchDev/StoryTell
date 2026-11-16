@@ -159,6 +159,12 @@ export interface Chat extends ChatSummary {
     ending: ChatEnding | null;
     /** Whether the Judge may suggest an Ending here; null when the Story has Endings of its author's (then it suggests none). */
     endingSuggestions: boolean | null;
+    /** Whether the Characters write Diary entries by themselves as the story goes (.scratch/diary/spec.md). */
+    autoDiary: boolean;
+    /** Entries are being written by themselves right now: the Chat screen re-reads until they are done. */
+    diaryWriting: boolean;
+    /** Each Character's newest Diary entry: a new one is shown as a toast. */
+    diaryLatest: Array<{ characterId: number; entryId: number }>;
     /** The number a Roll sent now must reach, from the Story's Difficulty. */
     rollTarget: number;
     /** Where the story is now (CONTEXT.md, "Place"); null until the story makes it clear. */
@@ -408,6 +414,8 @@ export const chatApi = {
     /** Whether the Judge may suggest an Ending in this Chat: "Not yet" turns it off, the Chat menu's switch sets it either way. */
     setEndingSuggestions: (storyId: number, chatId: number, endingSuggestions: boolean) =>
         apiSend<Chat>('PATCH', `/stories/${storyId}/chats/${chatId}`, { endingSuggestions }),
+    /** Whether the Characters write Diary entries by themselves in this Chat. */
+    setAutoDiary: (storyId: number, chatId: number, autoDiary: boolean) => apiSend<Chat>('PATCH', `/stories/${storyId}/chats/${chatId}`, { autoDiary }),
     /** Sets the Author's note, read from the next turn on; an empty text clears it. */
     setAuthorsNote: (storyId: number, chatId: number, text: string) =>
         apiSend<Chat>('PUT', `/stories/${storyId}/chats/${chatId}/authors-note`, { text }),
@@ -504,7 +512,8 @@ export function latestReply(chat: Chat): AiMessage | null {
 /** True while either background call of the latest reply is still running. */
 export function backgroundPending(chat: Chat): boolean {
     const reply = latestReply(chat);
-    return reply?.judge?.status === 'pending' || reply?.memory?.status === 'pending';
+    // Diary entries written by themselves come after the reply's calls: the screen re-reads until they are in.
+    return reply?.judge?.status === 'pending' || reply?.memory?.status === 'pending' || chat.diaryWriting === true;
 }
 
 /**

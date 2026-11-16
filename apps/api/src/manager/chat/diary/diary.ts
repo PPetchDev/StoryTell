@@ -19,6 +19,9 @@ export const DIARY_MAX_TOKENS = 500;
 /** The most of the story since the last entry that the writer reads, newest kept. */
 export const DIARY_STORY_TOKEN_BUDGET = 6_000;
 
+/** The most of the diarist's Memories the writer reads, newest kept. */
+export const DIARY_MEMORY_TOKEN_BUDGET = 1_200;
+
 /** One Message of the Chat as the writer reads it: its place in the Chat and its text in the Transcript's layout. */
 export interface DiaryStoryMessage {
     position: number;
@@ -33,6 +36,56 @@ export interface DiaryStoryMessage {
  * "Evening, the quay" told of what the Epilogue said happened a month later (2026-11-16).
  */
 export const DIARY_AFTER_THE_ENDING = 'After the ending';
+
+/** Model-written replies since a Character's last entry after which they write one by themselves. */
+export const DIARY_AUTO_EVERY_REPLIES = 10;
+
+/** The most entries written by themselves at one reply: a Scene's end can be due for the whole cast. */
+export const DIARY_AUTO_MAX_AT_ONCE = 3;
+
+/** One Message of the Chat as the automatic entries read it. */
+export interface AutoDiaryMessage {
+    position: number;
+    /** An AI Message a model wrote: the Opening, the author's, is not one. */
+    written: boolean;
+    /** The Characters who have a line in it. */
+    speakers: number[];
+}
+
+export interface AutoDiaryInput {
+    /** The Chat's Messages, in order. */
+    messages: AutoDiaryMessage[];
+    /** The reply just judged, the Chat's newest AI Message, and what happened at it. */
+    at: { position: number; epilogue: boolean; sceneMoved: boolean; endingReached: boolean };
+    /** The Characters in play, in cast order: those sitting out write nothing. */
+    cast: number[];
+    /** Each Character's newest entry, by the position of the Message it was written at; none for a Character with none. */
+    lastEntryAt: ReadonlyMap<number, number>;
+}
+
+/**
+ * Who writes an entry by themselves at a reply (.scratch/diary/spec.md, "Entries the Characters
+ * write by themselves"): a Character who spoke since their last entry, when at this reply the
+ * Scene moved on, an Ending was reached or it is the Epilogue, or when `DIARY_AUTO_EVERY_REPLIES`
+ * replies have passed since that entry. At most `DIARY_AUTO_MAX_AT_ONCE`, those furthest behind
+ * first, then in cast order.
+ */
+export function autoDiaryWriters(input: AutoDiaryInput): number[] {
+    const { at } = input;
+    const milestone = at.epilogue || at.sceneMoved || at.endingReached;
+    const due = input.cast.flatMap((characterId, order) => {
+        const since = input.lastEntryAt.get(characterId) ?? -Infinity;
+        if (since >= at.position) return [];
+        const replies = input.messages.filter((message) => message.written && message.position > since && message.position <= at.position);
+        if (!replies.some((message) => message.speakers.includes(characterId))) return [];
+        if (!milestone && replies.length < DIARY_AUTO_EVERY_REPLIES) return [];
+        return [{ characterId, behind: replies.length, order }];
+    });
+    return due
+        .sort((a, b) => b.behind - a.behind || a.order - b.order)
+        .slice(0, DIARY_AUTO_MAX_AT_ONCE)
+        .map((writer) => writer.characterId);
+}
 
 /** How an Epilogue is marked in the passage the writer reads. */
 const EPILOGUE_MARK = "[The story's Epilogue: what came after, perhaps long after]";
@@ -60,6 +113,8 @@ export interface DiaryPromptInput {
     bonds: DiaryBond[];
     /** What the diarist holds to be true, with the identity's name rendered; it may be false. */
     beliefs: string[];
+    /** The Memories the diarist knows (they are in its Known by), oldest first, with the identity's name rendered. */
+    memories: string[];
     /** Their entry before this one, for continuity; null for a first entry. */
     previousEntry: string | null;
     /** The story since that entry, oldest first, up to the Message this entry is written at. */
@@ -87,6 +142,19 @@ export function diaryMoment(timeOfDay: string | null | undefined, place: string 
  */
 export function storySince<T extends { position: number }>(messages: T[], previousPosition: number | null, throughPosition: number): T[] {
     return messages.filter((message) => message.position > (previousPosition ?? -Infinity) && message.position <= throughPosition);
+}
+
+/** The newest of the diarist's Memories that fit the budget, oldest first. */
+export function fitMemories(memories: string[], budget: number = DIARY_MEMORY_TOKEN_BUDGET): string[] {
+    let remaining = budget;
+    const kept: string[] = [];
+    for (let i = memories.length - 1; i >= 0; i--) {
+        const cost = estimateTokens(memories[i]);
+        if (cost > remaining) break;
+        remaining -= cost;
+        kept.unshift(memories[i]);
+    }
+    return kept;
 }
 
 /** The newest of `story` that fit the budget, oldest first, and whether older ones were left out. */
@@ -120,6 +188,11 @@ function diaristBlock(input: DiaryPromptInput): string {
         lines.push(`What ${character.name} believes, which may be false (${character.name} does not doubt it):`);
         for (const belief of input.beliefs) lines.push(`- ${belief}`);
     }
+    const memories = fitMemories(input.memories);
+    if (memories.length > 0) {
+        lines.push(`What ${character.name} knows of the story so far (their Memories; what is not here, they do not know):`);
+        for (const memory of memories) lines.push(`- ${memory}`);
+    }
     lines.push(`${identityName} is the person the user plays.`);
     if (input.identityDescription.trim()) lines.push(`Who ${identityName} is: ${input.identityDescription.trim()}`);
     return lines.join('\n');
@@ -134,7 +207,9 @@ export function diaryInstruction(input: Pick<DiaryPromptInput, 'character' | 'id
         ? `\n- The passage ends with the story's Epilogue, which tells what came after, perhaps long after. ${name} writes once it is all over, looking back on it, and keeps things in the order they happened.`
         : '';
     return `Write ${name}'s diary entry about the passage above${input.previousEntry ? ', following on from their last entry' : ''}.
-- First person, as ${name}, in their own voice, written in private where nobody will read it, in the past tense.
+- First person, as ${name}, written in private where nobody will read it, in the past tense.
+- Write it the way ${name} would: their Personality and Voice above decide the mood, what they dwell on or skip, how long or clipped their sentences run, and the words they reach for.
+- How ${name} feels about each person, and what they know and believe, colour what they notice and how they judge it; they know nothing beyond that and the passage.
 - Tell only of what ${name} saw, heard or took part in there: what it meant to them, what they felt and kept to themselves, what they noticed about ${identity}, and what they hope, fear or mean to do next.
 - Add no events, places or people that are not in the passage, and decide nothing for ${identity}. Do not copy lines of speech out of it.
 - Never guess ${identity}'s gender. Only who ${identity} is above, or ${identity}'s own lines, can state it; the narration and other characters' lines do not count, even where they guessed. Until it is stated, ${name} calls ${identity} by name or "they", never "he" or "she".${afterTheEnding}
