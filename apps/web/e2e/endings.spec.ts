@@ -72,6 +72,8 @@ test('a Chat that reaches an Ending shows it, writes its Epilogue on request, an
         await expect(banner).toContainText('Ending reached');
         const named = banner.getByRole('button', { name: /The light returns/ });
         await expect(named).toHaveAttribute('aria-expanded', 'true');
+        // Its name is a heading a screen reader can jump to, with the button that opens it inside.
+        await expect(banner.getByRole('heading', { level: 2, name: /The light returns/ }).getByRole('button')).toHaveCount(1);
         await expect(banner).toContainText('Ash lit the lamp.');
         await expect(banner).toContainText('Writing it uses credit like one long reply.');
         await expect(banner).toHaveAttribute('data-epilogue', 'none');
@@ -235,6 +237,7 @@ test('in a Story with no Endings the AI suggests one when the story closes: "Not
         await expect(banner).toContainText('Suggested ending');
         const named = banner.getByRole('button', { name: /A quiet watch/ });
         await expect(named).toHaveAttribute('aria-expanded', 'false');
+        await expect(banner.getByRole('heading', { level: 2, name: /A quiet watch/ })).toBeVisible();
         await expect(banner).toHaveAttribute('data-suggested', 'true');
         // Its name is whole on the row, with both buttons on a row under it at this width: half of the 180px it took.
         expect(await named.locator('span.truncate').last().evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);

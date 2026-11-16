@@ -86,20 +86,26 @@ export function EndingBanner({ ending, written, canWrite, whyNot, busy, fresh, o
             data-suggested={ending.suggested || undefined}
         >
             <div className="flex flex-wrap items-center gap-x-1.5 pr-2">
-                <button
-                    type="button"
-                    className="bare-button flex min-h-11 min-w-0 flex-[1_1_9rem] cursor-pointer items-center gap-1.5 px-2 py-1 text-left focus-ring-inset"
-                    aria-expanded={open}
-                    aria-controls={open ? detailsId : undefined}
-                    onClick={() => setOpen((was) => !was)}
-                >
-                    <EndingIcon size={16} className="shrink-0 text-accent" />
-                    <span className="min-w-0 flex-1">
-                        <span className="block truncate text-xs font-semibold text-muted">{ending.suggested ? 'Suggested ending' : 'Ending reached'}</span>
-                        <span className={`block text-sm font-semibold text-text ${open ? '[overflow-wrap:anywhere]' : 'truncate'}`}>{ending.name}</span>
-                    </span>
-                    <ChevronDownIcon size={16} className={`shrink-0 text-muted ${open ? 'rotate-180' : ''}`} />
-                </button>
+                {/*
+                  * The disclosure button inside a heading, as an accordion's is: the Ending's name stays a heading a
+                  * screen reader can jump to, as it was before the banner became one row.
+                  */}
+                <h2 className="m-0 flex min-w-0 flex-[1_1_9rem] text-base font-normal">
+                    <button
+                        type="button"
+                        className="bare-button flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-1.5 px-2 py-1 text-left focus-ring-inset"
+                        aria-expanded={open}
+                        aria-controls={open ? detailsId : undefined}
+                        onClick={() => setOpen((was) => !was)}
+                    >
+                        <EndingIcon size={16} className="shrink-0 text-accent" />
+                        <span className="min-w-0 flex-1">
+                            <span className="block truncate text-xs font-semibold text-muted">{ending.suggested ? 'Suggested ending' : 'Ending reached'}</span>
+                            <span className={`block text-sm font-semibold text-text ${open ? '[overflow-wrap:anywhere]' : 'truncate'}`}>{ending.name}</span>
+                        </span>
+                        <ChevronDownIcon size={16} className={`shrink-0 text-muted ${open ? 'rotate-180' : ''}`} />
+                    </button>
+                </h2>
                 {/* 44px tall, so the small buttons' touch areas fill it and no more, on the row or under it. */}
                 <div className="ml-auto flex h-11 shrink-0 items-center gap-2 pl-2">
                     {ending.suggested && (
