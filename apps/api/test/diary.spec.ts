@@ -11,6 +11,7 @@ import { startTestApp, TestApp } from './harness/test-app.js';
 const INPUT: DiaryPromptInput = {
     character: { name: 'Mira', personality: 'Guarded.', voice: 'Short sentences.', background: 'Kept the light for ten years.' },
     identityName: 'Ash',
+    identityDescription: 'The new keeper.',
     setting: 'A lighthouse on a storm-cut island.',
     arcSteps: ['She lets someone help.'],
     bonds: [{ towardName: 'Ash', label: 'wary', description: 'She watches the new keeper.', levels: null }],
@@ -59,20 +60,51 @@ describe('Diary: what the writer is told (pure)', () => {
         expect(system).toContain('How this story has changed Mira so far: She lets someone help.');
         expect(system).toContain('- toward Ash: "wary" — She watches the new keeper.');
         expect(system).toContain('What Mira believes, which may be false (Mira does not doubt it):\n- Ash was sent by the harbour board.');
-        expect(system).toContain('Ash is the person the user plays.');
+        expect(system).toContain('Ash is the person the user plays.\nWho Ash is: The new keeper.');
         expect(user).toContain('What has happened since the story began, as the story told it. Lines labelled "Ash:" are Ash\'s own.\nIt is now: Night, the lamp room.\n<story>\nMira: Boots off, keeper.\n\nAsh: I climb the stair.\n</story>');
         expect(user).toContain("Write Mira's diary entry about the passage above.");
         expect(user).toContain('decide nothing for Ash');
+        // The user's gender is theirs to say, as in the turn's own prompt (a real model's entry called Ash "he", 2026-11-16).
+        expect(user).toContain(
+            'Never guess Ash\'s gender. Only who Ash is above, or Ash\'s own lines, can state it; the narration and other characters\' lines do not count, even where they guessed. Until it is stated, Mira calls Ash by name or "they", never "he" or "she".',
+        );
+        expect(user).not.toContain("story's Epilogue");
         expect(user).toContain('80 to 150 words');
         expect(user.endsWith('Answer with only the entry.')).toBe(true);
     });
 
     it('says nothing of what is not there', () => {
-        const bare = buildDiaryPrompt({ ...INPUT, setting: ' ', arcSteps: [], bonds: [], beliefs: [], moment: null, character: { name: 'Mira', personality: '', voice: '', background: '' } });
+        const bare = buildDiaryPrompt({
+            ...INPUT,
+            identityDescription: ' ',
+            setting: ' ',
+            arcSteps: [],
+            bonds: [],
+            beliefs: [],
+            moment: null,
+            character: { name: 'Mira', personality: '', voice: '', background: '' },
+        });
         const [system, user] = bare.messages.map((message) => message.content);
         expect(system).not.toContain('Setting:');
         expect(system).toContain('The diarist is Mira.\nAsh is the person the user plays.');
+        expect(system).not.toContain('Who Ash is');
         expect(user).not.toContain('It is now');
+    });
+
+    it('marks an Epilogue in the passage, and written at one, looks back once it is all over', () => {
+        const story = [
+            { position: 1, text: 'Ash: We tie up at the quay.' },
+            { position: 2, text: 'Weeks pass. Ash takes the wheel.', epilogue: true },
+        ];
+        const at = buildDiaryPrompt({ ...INPUT, story, moment: 'After the ending' }).messages[1].content;
+        expect(at).toContain("It is now: After the ending.\n<story>\nAsh: We tie up at the quay.\n\n[The story's Epilogue: what came after, perhaps long after]\nWeeks pass. Ash takes the wheel.\n</story>");
+        expect(at).toContain(
+            "- The passage ends with the story's Epilogue, which tells what came after, perhaps long after. Mira writes once it is all over, looking back on it, and keeps things in the order they happened.",
+        );
+        // Played on after it: the Epilogue is still marked, but the entry is written where the story stands now.
+        const after = buildDiaryPrompt({ ...INPUT, story: [...story, { position: 3, text: 'Ash: A new season.' }] }).messages[1].content;
+        expect(after).toContain("[The story's Epilogue: what came after, perhaps long after]\nWeeks pass.");
+        expect(after).not.toContain("The passage ends with the story's Epilogue");
     });
 
     it('gives the last entry for continuity, and says when the older story is left out', () => {
@@ -286,6 +318,31 @@ describe('Diary: asking, keeping and taking back (HTTP)', () => {
         expect(user).not.toContain('Finally, someone new.');
         // Newest first.
         expect((await entries(storyId, chat.id)).map((entry) => entry.id)).toEqual([second.id, kais.id, first.id]);
+    });
+
+    it('written at an Epilogue, an entry is dated after the ending, and the writer is told what the Epilogue is', async () => {
+        const { storyId, mira } = await createStory();
+        const chat = await createChat(storyId);
+        await play(storyId, chat.id, 'I climb the stair.', judgement({ details: { place: 'the lamp room' } }));
+        script('Years pass. The light never goes out again.');
+        await t.http.post(`/api/stories/${storyId}/chats/${chat.id}/epilogue`).expect(200);
+        const ended = await settled(storyId, chat.id);
+        const epilogue = ended.messages.at(-1)!;
+
+        const entry = await write(storyId, chat.id, mira, 'All those years, and the lamp still burns.');
+        expect(entry).toMatchObject({ messageId: epilogue.id, moment: 'After the ending' });
+        const [system, user] = lastDiaryCall().messages.map((message) => message.content);
+        expect(system).toContain('Who Ash is: The new keeper.');
+        expect(user).toContain('It is now: After the ending.');
+        expect(user).toContain("[The story's Epilogue: what came after, perhaps long after]\nYears pass. The light never goes out again.");
+        expect(user).toContain("The passage ends with the story's Epilogue");
+        expect(user).not.toContain('the lamp room');
+
+        // Played on after it, the next entry is dated where the story stands again.
+        await play(storyId, chat.id, 'I trim the wick.', judgement({ details: { place: 'the gallery' } }));
+        const next = await write(storyId, chat.id, mira, 'Back to work.');
+        expect(next.moment).toBe('The gallery');
+        expect(lastDiaryCall().messages[1].content).not.toContain("[The story's Epilogue");
     });
 
     it('refuses an unknown Character, an empty answer, a missing entry and credit being out, keeping nothing', async () => {

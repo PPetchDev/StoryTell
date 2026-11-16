@@ -74,7 +74,7 @@ import { promptStorySoFar, StorySoFarManagerService } from './story-so-far/story
 import { SuggestedRepliesManagerService } from './suggestions/suggested-replies.service.js';
 import { DiaryManagerService } from './diary/diary.service.js';
 import { renderUser } from './memory/render-user.js';
-import { diaryMoment, storySince } from './diary/diary.js';
+import { DIARY_AFTER_THE_ENDING, diaryMoment, storySince } from './diary/diary.js';
 import type { DiaryEntryResponse } from '../../model/ledger/entities/diary-entry.entity.js';
 import { WriteForMeManagerService } from './write-for-me/write-for-me.service.js';
 import { ThaiReadingManagerService } from './thai-reading/thai-reading.service.js';
@@ -1110,11 +1110,13 @@ export class ChatManagerService {
             const identity = wornIdentity(story, chat);
             const nameOf = (id: number | null): string | null =>
                 id === null ? identity.name : (story.characters.find((candidate) => candidate.id === id)?.name ?? null);
-            const moment = diaryMoment(chat.timeOfDay, currentDetails(state.detailChanges).place);
+            // At an Epilogue the Chat's Time and Place are where the story stood before it, not where the Epilogue ends.
+            const moment = at.epilogue ? DIARY_AFTER_THE_ENDING : diaryMoment(chat.timeOfDay, currentDetails(state.detailChanges).place);
             const text = await this.diaryWriter.write(
                 {
                     character: { name: character.name, personality: character.personality, voice: character.voice, background: character.background },
                     identityName: identity.name,
+                    identityDescription: identity.description,
                     setting: story.setting,
                     arcSteps: state.arcSteps.filter((step) => step.characterId === character.id).map((step) => step.step),
                     bonds: currentBonds(state.bondChanges).flatMap((bond) => {
@@ -1130,6 +1132,7 @@ export class ChatManagerService {
                             message.kind === MessageKind.User
                                 ? `${message.identityName ?? identity.name}: ${(message.text ?? '').trim()}`
                                 : thaiReadingSource(message.toResponse()),
+                        epilogue: message.kind === MessageKind.Ai && message.epilogue,
                     })),
                     moment,
                 },

@@ -23,7 +23,19 @@ export const DIARY_STORY_TOKEN_BUDGET = 6_000;
 export interface DiaryStoryMessage {
     position: number;
     text: string;
+    /** The story's Epilogue: it tells what came after, perhaps long after, and is marked so. */
+    epilogue?: boolean;
 }
+
+/**
+ * The moment of an entry written at an Epilogue. The Chat's Time of day and Place are where the
+ * story stood before it, and an Epilogue may run weeks or years past them: an entry dated
+ * "Evening, the quay" told of what the Epilogue said happened a month later (2026-11-16).
+ */
+export const DIARY_AFTER_THE_ENDING = 'After the ending';
+
+/** How an Epilogue is marked in the passage the writer reads. */
+const EPILOGUE_MARK = "[The story's Epilogue: what came after, perhaps long after]";
 
 /** A Bond of the diarist's, as the writer is told it. */
 export interface DiaryBond {
@@ -39,6 +51,8 @@ export interface DiaryPromptInput {
     character: { name: string; personality: string; voice: string; background: string };
     /** The worn identity's name. */
     identityName: string;
+    /** Who the worn identity is, as the user wrote it: with their own lines, the only word on their gender. */
+    identityDescription: string;
     setting: string;
     /** How the diarist has changed in this Chat, oldest first: their Arc steps, never the direction. */
     arcSteps: string[];
@@ -107,17 +121,23 @@ function diaristBlock(input: DiaryPromptInput): string {
         for (const belief of input.beliefs) lines.push(`- ${belief}`);
     }
     lines.push(`${identityName} is the person the user plays.`);
+    if (input.identityDescription.trim()) lines.push(`Who ${identityName} is: ${input.identityDescription.trim()}`);
     return lines.join('\n');
 }
 
 /** The rules of an entry, after the story it tells of. */
-export function diaryInstruction(input: Pick<DiaryPromptInput, 'character' | 'identityName' | 'previousEntry'>): string {
+export function diaryInstruction(input: Pick<DiaryPromptInput, 'character' | 'identityName' | 'previousEntry' | 'story'>): string {
     const name = input.character.name;
     const identity = input.identityName;
+    // Written at an Epilogue: once it is over, looking back, in the order things happened.
+    const afterTheEnding = input.story.at(-1)?.epilogue
+        ? `\n- The passage ends with the story's Epilogue, which tells what came after, perhaps long after. ${name} writes once it is all over, looking back on it, and keeps things in the order they happened.`
+        : '';
     return `Write ${name}'s diary entry about the passage above${input.previousEntry ? ', following on from their last entry' : ''}.
 - First person, as ${name}, in their own voice, written in private where nobody will read it, in the past tense.
 - Tell only of what ${name} saw, heard or took part in there: what it meant to them, what they felt and kept to themselves, what they noticed about ${identity}, and what they hope, fear or mean to do next.
 - Add no events, places or people that are not in the passage, and decide nothing for ${identity}. Do not copy lines of speech out of it.
+- Never guess ${identity}'s gender. Only who ${identity} is above, or ${identity}'s own lines, can state it; the narration and other characters' lines do not count, even where they guessed. Until it is stated, ${name} calls ${identity} by name or "they", never "he" or "she".${afterTheEnding}
 - If ${name} was not there for any of it, write a short entry of their own thoughts from where they were, knowing nothing of what happened.
 - Keep the story's tone and how explicit it is. Everyone in it is an adult.
 - 80 to 150 words, in one to three short paragraphs of plain prose: no heading, no date, no signature, no *asterisks* and no "Name:" labels.
@@ -143,7 +163,7 @@ export function buildDiaryPrompt(input: DiaryPromptInput): DiaryPrompt {
         `What has happened since${input.previousEntry ? ' that entry' : ' the story began'}, as the story told it${
             cut ? ' (its earlier part is left out here)' : ''
         }. Lines labelled "${input.identityName}:" are ${input.identityName}'s own.${input.moment ? `\nIt is now: ${input.moment}.` : ''}\n<story>\n${kept
-            .map((message) => message.text)
+            .map((message) => (message.epilogue ? `${EPILOGUE_MARK}\n${message.text}` : message.text))
             .join('\n\n')}\n</story>`,
         diaryInstruction(input),
     ]
