@@ -155,7 +155,7 @@ export function buildThoughtPrompt(input: ThoughtPromptInput): ThoughtPrompt {
         `The latest of the story, as it was told. Lines labelled "${identity}:" are ${identity}'s own.\n<story>\n${story.join('\n\n')}\n</story>`,
         input.userText !== null ? `What ${identity} just said or did:\n${identity}: ${input.userText.trim()}` : null,
         `As ${name}, in the first person and in ${name}'s own voice, in one or two sentences of no more than about 35 words: how you feel about this moment and what you mean to do next.
-- Say what you mean to do, not the words you will say: don't draft your line.
+- Say what you feel and mean to do. Don't draft your line, and don't describe your own movements: the story tells those.
 - Think only from what you know and can see. Decide nothing for ${identity} or anyone else; nothing happens in a thought.
 - Never guess ${identity}'s gender: only who ${identity} is above, or ${identity}'s own lines, can state it. Until then, call ${identity} by name or "they".
 - Keep the story's tone. Everyone in it is an adult.

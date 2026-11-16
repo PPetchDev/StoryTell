@@ -86,5 +86,7 @@ describe('Natural speech: the turn (HTTP)', () => {
         expect(system).toContain('Avoid the tics of written dialogue: lists of three');
         expect(system).toContain("bystanders don't remark on every moment, and nobody chimes in just to be funny");
         expect(turn.messages.at(-1)!.content).toContain('Keep the speech plain and natural, the way people actually talk.');
+        // Read last, where it holds best: the history is full of the tic, as it was of asides.
+        expect(turn.messages.at(-1)!.content).toContain('Say each thing once: no run of sentences that open with the same words, as in "I had a plan. I had stages. I had a sequence.", and no lists of three.');
     });
 });

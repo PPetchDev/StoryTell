@@ -386,7 +386,7 @@ export function parseJudgement(text: string): Judgement {
         const emotion = str(item.emotion).toLowerCase();
         return isEmotion(emotion) ? [{ line: item.line, emotion }] : [];
     });
-    return { bondChanges, arcSteps, scenes, timeOfDay: readTimeOfDay(json.time_of_day), expressions, suddenEvent: readJudgedSuddenEvent(json.sudden_event), details: readJudgedDetails(json.details), ending: readJudgedEnding(json.ending) };
+    return { bondChanges, arcSteps, scenes, timeOfDay: readTimeOfDay(json.time_of_day), expressions, suddenEvent: readJudgedSuddenEvent(json.sudden_event), details: readJudgedDetails(detailsWithGoals(json.details, json.goals)), ending: readJudgedEnding(json.ending) };
 }
 
 /** Read loosely: an axis whose level is not a whole number in its range, or an unknown axis, is ignored. */
@@ -404,4 +404,14 @@ function readLevels(value: unknown): Partial<BondLevels> | null {
 function readTimeOfDay(value: unknown): TimeOfDay | null {
     const time = str(value).toLowerCase();
     return (TIMES_OF_DAY as readonly string[]).includes(time) ? (time as TimeOfDay) : null;
+}
+
+/**
+ * The judgement's details with any Goals it gave outside them (.scratch/character-minds/spec.md):
+ * the rule asks for "goals" inside "details", but a top-level "goals" means the same and is read too.
+ */
+function detailsWithGoals(details: unknown, goals: unknown): unknown {
+    if (!Array.isArray(goals)) return details;
+    const base = typeof details === 'object' && details !== null && !Array.isArray(details) ? (details as Record<string, unknown>) : {};
+    return { ...base, goals: [...(Array.isArray(base.goals) ? base.goals : []), ...goals] };
 }

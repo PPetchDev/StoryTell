@@ -255,7 +255,7 @@ describe('Regenerate', () => {
             ['user', 'I take my boots off.'],
             ['assistant', 'Mira grunts.'],
             ['user', CONTINUE_INSTRUCTION],
-            ['system', expect.stringMatching(/^Where things stand: [^\n]+\nWrite the next turn now. Do not write anything Ash says, thinks or does. Use @Name: lines for Character speech, spoken words only: no parentheses or \*\(stage directions\)\* inside them, even where earlier turns had them. Actions go in narration. Keep the speech plain and natural, the way people actually talk.$/)],
+            ['system', expect.stringMatching(/^Where things stand: [^\n]+\nWrite the next turn now. Do not write anything Ash says, thinks or does. Use @Name: lines for Character speech, spoken words only: no parentheses or \*\(stage directions\)\* inside them, even where earlier turns had them. Actions go in narration. Keep the speech plain and natural, the way people actually talk. Say each thing once: no run of sentences that open with the same words, as in "I had a plan. I had stages. I had a sequence.", and no lists of three.$/)],
         ]);
         // The same Continue as the one it replaces.
         expect(call.messages).toEqual(turnCalls()[1].messages);

@@ -86,7 +86,7 @@ describe('Turn prompt: the gender rule and the reminder near the end', () => {
             content:
                 'Where things stand: Scene: The milk stall. In the latest exchange: Nara, Dulcie. Narrate in first person as Petch ("I"), present tense, and keep each Character as their card describes. ' +
                 "Gender Petch only as their description or the user's own messages do, whatever earlier turns said.\n" +
-                'Write the next turn now. Do not write anything Petch says, thinks or does. Use @Name: lines for Character speech, spoken words only: no parentheses or *(stage directions)* inside them, even where earlier turns had them. Actions go in narration. Keep the speech plain and natural, the way people actually talk.',
+                'Write the next turn now. Do not write anything Petch says, thinks or does. Use @Name: lines for Character speech, spoken words only: no parentheses or *(stage directions)* inside them, even where earlier turns had them. Actions go in narration. Keep the speech plain and natural, the way people actually talk. Say each thing once: no run of sentences that open with the same words, as in "I had a plan. I had stages. I had a sequence.", and no lists of three.',
         });
     });
 

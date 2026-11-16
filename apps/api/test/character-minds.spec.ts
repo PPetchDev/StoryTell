@@ -59,7 +59,7 @@ describe('Thoughts: who thinks, what they are told, how it is read (pure)', () =
         expect(user).toContain('<story>\nMira: Boots off, keeper.\n\nAsh: I climb the stair.\n</story>');
         expect(user).toContain('What Ash just said or did:\nAsh: I hand her the oil.');
         expect(user).toContain('As Mira, in the first person and in Mira\'s own voice, in one or two sentences of no more than about 35 words: how you feel about this moment and what you mean to do next.');
-        expect(user).toContain("- Say what you mean to do, not the words you will say: don't draft your line.");
+        expect(user).toContain("- Say what you feel and mean to do. Don't draft your line, and don't describe your own movements: the story tells those.");
         expect(prompt.maxTokens).toBe(120);
         expect(user).toContain('Decide nothing for Ash or anyone else; nothing happens in a thought.');
         expect(user).toContain("Never guess Ash's gender");

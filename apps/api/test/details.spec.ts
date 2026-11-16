@@ -82,8 +82,12 @@ describe('Details: what the Judge is asked and how its answer is applied (pure)'
         expect(section).toContain(
             '# Place, weather, outfits and goals\nPlace: the lamp room\nWeather: not yet known\nWearing: Mira: an oilskin coat; Kai: not yet known\nGoals: Mira: none yet; Kai: climb the gallery\nDetails rule: add "details": {"place": "...", "weather": "...", "outfits": [{"character": "Name", "outfit": "..."}]}',
         );
-        expect(section).toContain('Goals rule: add "goals": [{"character": "Name", "goal": "..."}] inside "details" only for a Character the latest exchange gave a new aim, or saw reach or give up the one they had ("goal": "").');
+        // A Chat long under way has aims no single exchange gave: one is asked for where a Character has none (2026-11-16: none was ever set otherwise).
+        expect(section).toContain(
+            'Goals rule: add "goals": [{"character": "Name", "goal": "..."}] inside "details" for a Character in the latest exchange who has none yet ("none yet" above) once the story so far shows what they want, and for any Character the latest exchange gave a new aim, or saw reach or give up the one they had ("goal": "").',
+        );
         expect(section).toContain("never for the user's own character");
+        expect(section).toContain('Most characters in a story want something: when one in the latest exchange still has none, give theirs now.');
         expect(section).toContain('giving only what the latest exchange changed or first made clear');
         expect(section).toContain('never guess');
 
@@ -120,6 +124,19 @@ describe('Details: what the Judge is asked and how its answer is applied (pure)'
         expect(readJudgedDetails('the quay')).toBeNull();
         expect(parseJudgement('{"bond_changes":[],"arc_steps":[],"scene":null,"details":{"weather":"fog"}}').details).toEqual({ place: null, weather: 'fog', outfits: [], goals: [] });
         expect(parseJudgement('{"bond_changes":[],"arc_steps":[],"scene":null}').details).toBeNull();
+        // Goals given beside "details" rather than inside it are read the same.
+        expect(parseJudgement('{"bond_changes":[],"arc_steps":[],"scene":null,"goals":[{"character":"Mira","goal":"Keep the lamp lit"}]}').details).toEqual({
+            place: null,
+            weather: null,
+            outfits: [],
+            goals: [{ character: 'Mira', goal: 'Keep the lamp lit' }],
+        });
+        expect(
+            parseJudgement('{"bond_changes":[],"arc_steps":[],"scene":null,"details":{"place":"the quay","goals":[{"character":"Kai","goal":"win"}]},"goals":[{"character":"Mira","goal":"Keep the lamp lit"}]}').details!.goals,
+        ).toEqual([
+            { character: 'Kai', goal: 'win' },
+            { character: 'Mira', goal: 'Keep the lamp lit' },
+        ]);
     });
 
     it('takes what changed, tidied, and drops what is the same, unknown, sitting out or said twice', () => {
