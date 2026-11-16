@@ -143,6 +143,9 @@ export class JudgeManagerService {
                 story.suddenEvents ?? [],
                 state.suddenEventSteps.filter((step) => step.messageId !== message.id),
             );
+            // An Epilogue stands outside the Sudden events (docs/ui-audit-2026-11-16.md M6): it closes the story, so it is
+            // not one of an event's replies and starts none. The event is where it was if the user plays on.
+            const eventsJudged = !message.epilogue;
             // The Place, the Weather and the Outfits before this reply (.scratch/info-box/spec.md), read as the Sudden events are.
             const details = currentDetails(state.detailChanges.filter((change) => change.messageId !== message.id));
             const detailsCast = story.characters.map((character) => ({ id: character.id, name: character.name }));
@@ -199,7 +202,7 @@ export class JudgeManagerService {
                 userText,
                 aiText: partsToText(replyParts),
                 ...(tagLines ? { expressionParts: replyParts } : {}),
-                suddenEventSection: judgeSuddenEventSection(events),
+                suddenEventSection: eventsJudged ? judgeSuddenEventSection(events) : null,
                 detailsSection: judgeDetailsSection(details, detailsCast),
                 endingSection: judgeEndingSection(endings),
             });
@@ -236,7 +239,7 @@ export class JudgeManagerService {
                 },
                 judgement,
             );
-            const stepped = applySuddenEvent(events, judgement.suddenEvent ?? null);
+            const stepped = eventsJudged ? applySuddenEvent(events, judgement.suddenEvent ?? null) : { step: null, rejected: [] };
             const detailed = applyDetails({ current: details, cast: detailsCast, sittingOut }, judgement.details ?? null);
             const ended = applyEnding(endings, judgement.ending ?? null);
             for (const reason of [...applied.rejected, ...stepped.rejected, ...detailed.rejected, ...ended.rejected]) {

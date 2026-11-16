@@ -137,6 +137,7 @@ interface Message {
 interface Chat {
     id: number;
     ending: { id: number | null; name: string; reason: string; messageId: number; suggested: boolean } | null;
+    endingSuggestions: boolean | null;
     messages: Message[];
 }
 
@@ -489,6 +490,44 @@ describe('Endings: authoring and play (HTTP)', () => {
         script('@Mira: Not done yet.');
         await t.http.post(`${chatPath(storyId, chat.id)}/messages/${again.messages.at(-1)!.id}/regenerate`).expect(200);
         expect((await settled(storyId, chat.id)).ending).toBeNull();
+    });
+
+    it('the Chat keeps whether the Judge may suggest an Ending: "Not yet" turns it off, and the Chat can turn it either way itself', async () => {
+        const { storyId } = await createStory(false);
+        const chat = await createChat(storyId);
+        expect(chat.endingSuggestions).toBe(true);
+
+        // Turned off by hand before any suggestion: the Judge is never asked.
+        const off = await t.http.patch(chatPath(storyId, chat.id)).send({ endingSuggestions: false }).expect(200);
+        expect(off.body.endingSuggestions).toBe(false);
+        for (let n = 1; n <= 6; n++) await play(storyId, chat.id, `Turn ${n}.`, judgement({ reason: 'Made up.', suggest: 'Made up' }));
+        expect(judged()).not.toContain('# Ending');
+        expect((await getChat(storyId, chat.id)).ending).toBeNull();
+
+        // On again: the next reply is asked about, and a suggestion shows.
+        const on = await t.http.patch(chatPath(storyId, chat.id)).send({ endingSuggestions: true }).expect(200);
+        expect(on.body.endingSuggestions).toBe(true);
+        const suggested = await play(storyId, chat.id, 'The storm passes.', judgement({ reason: 'The storm passed.', suggest: 'A quiet watch' }));
+        expect(judged()).toContain('# Ending\nThe story has not ended.');
+        expect(suggested.ending).toMatchObject({ name: 'A quiet watch', suggested: true });
+
+        // "Not yet" is the same setting, turned off; turning it on again is the way back, short of a Reset.
+        const waved = await t.http.delete(`${chatPath(storyId, chat.id)}/ending`).expect(200);
+        expect(waved.body.endingSuggestions).toBe(false);
+        await play(storyId, chat.id, 'I sweep the stair.', judgement({ reason: 'Again.', suggest: 'Again' }));
+        expect(judged()).not.toContain('# Ending');
+        await t.http.patch(chatPath(storyId, chat.id)).send({ endingSuggestions: true }).expect(200);
+        const again = await play(storyId, chat.id, 'I bank the fire.', judgement({ reason: 'The night is done.', suggest: 'The night is done' }));
+        expect(again.ending).toMatchObject({ name: 'The night is done', suggested: true });
+
+        // The other settings are untouched by it, and it takes only a yes or a no.
+        const renamed = await t.http.patch(chatPath(storyId, chat.id)).send({ title: 'The long night' }).expect(200);
+        expect(renamed.body).toMatchObject({ title: 'The long night', endingSuggestions: true });
+        await t.http.patch(chatPath(storyId, chat.id)).send({ endingSuggestions: 'yes' }).expect(400);
+
+        // A Story with Endings of its author's has no such setting: those are the only ones its Chats reach.
+        const authored = await createStory();
+        expect((await createChat(authored.storyId)).endingSuggestions).toBeNull();
     });
 
     it("the author's Endings stand: where a Story has its own, the Judge suggests none and the reached one can't be waved away", async () => {

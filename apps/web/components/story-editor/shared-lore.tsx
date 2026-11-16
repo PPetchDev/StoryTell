@@ -8,10 +8,11 @@ import { ApiUnreachableError } from '@/lib/api';
 import { LoreEntry, LoreSet, LoreSetSummary, MAX_LORE_SETS_PER_STORY, Story, storyApi } from '@/lib/story';
 import { ADD_BUTTON } from './add-button';
 import { Autosave } from './autosave';
-import { ConfirmButton, TextField, Toolbar } from './fields';
+import { ConfirmButton, TextField } from './fields';
 import { NOTE, openAdded } from './folding-card';
 import { LoreCard, LoreTriggerKey } from './lore-card';
 import { FieldRewrites } from './rewrite';
+import { UndoNotice, useUndo } from './undo-notice';
 
 /** What a Lore set is called where its name is blank (mirrors the API's `loreSetName`). */
 export function loreSetLabel(set: Pick<LoreSet, 'name'>): string {
@@ -44,12 +45,39 @@ interface SharedLoreProps {
  * is kept apart from any one Story, so a change made here reaches every Story that links it; each
  * set says how many do. A set is made here, linked from the picker, unlinked (it stays for the
  * others) or deleted for good, and its entries are edited with the same card as the Story's own.
+ *
+ * Unlink acts at once and offers an Undo; Delete asks first and stands at the other end of the row
+ * (docs/ui-audit-2026-11-16.md M5: the two were 8px apart, and a slip on Unlink went unsaid).
  */
 export function SharedLore({ storyId, sets, ownEntries, rewrites, commit, applyWhole, onName, onEntry, onEntryPatterns, onInvalidNumber }: SharedLoreProps) {
     const [picking, setPicking] = useState(false);
     const full = sets.length >= MAX_LORE_SETS_PER_STORY;
     const linkButton = useRef<HTMLButtonElement>(null);
     const linkedIds = sets.map((set) => set.id);
+    // What the Story links now, for an Undo pressed after the list has changed again.
+    const linkedNow = useRef(linkedIds);
+    linkedNow.current = linkedIds;
+    const undo = useUndo();
+    /** Unlinks at once; Undo links it again where it was. The set itself is untouched either way. */
+    const unlink = (set: LoreSet, at: number) =>
+        void commit(() => storyApi.linkLoreSets(storyId, linkedIds.filter((id) => id !== set.id)), applyWhole).then((saved) => {
+            if (!saved) return;
+            undo.offer({
+                message: `Unlinked ${loreSetLabel(set)}. It is still in your Lore sets.`,
+                undo: () => {
+                    const now = linkedNow.current.filter((id) => id !== set.id);
+                    void commit(() => storyApi.linkLoreSets(storyId, [...now.slice(0, at), set.id, ...now.slice(at)]), applyWhole);
+                },
+                focusAfterUndo: () => linkButton.current,
+            });
+        });
+    /** "Its 2 entries go with it, from all 3 Stories that link it. " for the set about to be deleted; empty for an empty set only this Story links. */
+    const whatGoes = (set: LoreSet) => {
+        const count = set.entries.length;
+        const fromAll = set.usedBy > 1 ? `from all ${stories(set.usedBy)} that link it` : '';
+        if (count === 0) return fromAll === '' ? '' : `It goes ${fromAll}. `;
+        return `Its ${entriesOf(count)} ${count === 1 ? 'goes' : 'go'} with it${fromAll === '' ? '' : `, ${fromAll}`}. `;
+    };
 
     return (
         // A group, not a region: the tab it sits in is the one landmark named "Lore".
@@ -61,8 +89,24 @@ export function SharedLore({ storyId, sets, ownEntries, rewrites, commit, applyW
                 Optional. A Lore set is Lore kept apart from any one Story, for worlds you tell more than one Story in. Link a set to each Story
                 that needs it: a change to the set reaches them all. Up to {MAX_LORE_SETS_PER_STORY} sets a Story.
             </p>
+            {/*
+              * Right under the Story's own Lore, which is what it moves, and named for what it does
+              * (docs/ui-audit-2026-11-16.md M3: "Share this Story's Lore" read as sharing with other people).
+              */}
+            {ownEntries > 0 && !full && (
+                <div className="mt-3">
+                    <ConfirmButton
+                        label="Move this Story’s Lore into a set"
+                        question={`Move this Story’s ${entriesOf(ownEntries)} into a new Lore set?`}
+                        warning="This Story reads them as before, through the set, and your other Stories can then link the set too."
+                        confirmLabel="Move"
+                        onConfirm={() => commit(() => storyApi.createLoreSet(storyId, { moveLore: true }), applyWhole)}
+                        focusAfter={() => linkButton.current}
+                    />
+                </div>
+            )}
 
-            {sets.map((set) => {
+            {sets.map((set, at) => {
                 const label = loreSetLabel(set);
                 return (
                     <div key={set.id} role="group" className="mt-4 border-l-3 border-accent pl-3" aria-label={`Lore set: ${label}`} data-lore-set={set.id}>
@@ -107,37 +151,34 @@ export function SharedLore({ storyId, sets, ownEntries, rewrites, commit, applyW
                                     },
                                 )
                             }
+                            // The set's name is in the field above; the whole of it made the button two lines (audit M4).
+                            aria-label={`+ Add entry to ${label}`}
                         >
-                            + Add entry to {label}
+                            + Add entry
                         </button>
-                        <Toolbar>
-                            <button
-                                type="button"
-                                className="button button-quiet button-small"
-                                aria-label={`Unlink ${label} from this Story`}
-                                onClick={() =>
-                                    void commit(() => storyApi.linkLoreSets(storyId, linkedIds.filter((id) => id !== set.id)), applyWhole).then(() => linkButton.current?.focus())
-                                }
-                            >
+                        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+                            <button type="button" className="button button-quiet button-small" aria-label={`Unlink ${label} from this Story`} onClick={() => unlink(set, at)}>
                                 Unlink
                             </button>
                             <ConfirmButton
                                 label="Delete set"
                                 ariaLabel={`Delete set ${label}`}
                                 danger
-                                className="button-small"
+                                small
                                 question={`Delete ${label} for good?`}
-                                warning={`Its ${entriesOf(set.entries.length)} go with it${set.usedBy > 1 ? `, from all ${stories(set.usedBy)} that link it` : ''}. To keep the set and only take it off this Story, use Unlink.`}
+                                warning={`${whatGoes(set)}To keep the set and only take it off this Story, use Unlink.`}
                                 confirmLabel="Delete"
                                 onConfirm={() => commit(() => storyApi.deleteLoreSet(storyId, set.id), applyWhole)}
                                 focusAfter={() => linkButton.current}
                             />
-                        </Toolbar>
+                        </div>
                     </div>
                 );
             })}
 
-            <div className="mt-4 flex flex-wrap gap-2">
+            <UndoNotice undo={undo} />
+            {/* Making a set and linking one, as a pair on one row: apart from "+ Add entry", which belongs to a set (audit M4). */}
+            <div className="mt-4 grid grid-cols-2 gap-2">
                 <button type="button" className={ADD_BUTTON} disabled={full} onClick={() => void commit(() => storyApi.createLoreSet(storyId), applyWhole)}>
                     + New Lore set
                 </button>
@@ -146,19 +187,6 @@ export function SharedLore({ storyId, sets, ownEntries, rewrites, commit, applyW
                 </button>
             </div>
             {full && <p className={NOTE}>This Story links the most sets it can. Unlink one to link another.</p>}
-            {ownEntries > 0 && !full && (
-                <div className="mt-2">
-                    <ConfirmButton
-                        label="Share this Story’s Lore"
-                        className="button-small"
-                        question={`Move this Story’s ${entriesOf(ownEntries)} into a new Lore set?`}
-                        warning="This Story reads them as before, through the set, and your other Stories can then link the set too."
-                        confirmLabel="Move"
-                        onConfirm={() => commit(() => storyApi.createLoreSet(storyId, { moveLore: true }), applyWhole)}
-                        focusAfter={() => linkButton.current}
-                    />
-                </div>
-            )}
 
             {picking && (
                 <LinkSheet

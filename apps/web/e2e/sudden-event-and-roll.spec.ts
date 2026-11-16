@@ -74,7 +74,7 @@ test('a Roll is armed for one Message: the app throws the dice, the Message keep
 
         await dice.tap();
         await expect(dice).toHaveAttribute('aria-pressed', 'true');
-        await expect(composer.locator('[data-band="roll"]')).toContainText('The dice decide your next message: 11 or more succeeds.');
+        await expect(composer.locator('[data-band="roll"]')).toContainText('Roll 11 or more succeeds');
         await noSidewaysScroll(page);
         // A second tap takes it back, and a third arms it again.
         await dice.tap();
@@ -138,6 +138,27 @@ test('a Sudden event shows its Gauge from its trigger to its end: each reply mov
         await expect(banner).toContainText('The ledger backs you up.');
         // The reply was written with the event under way.
         expect(await lastTurnTrailing(request)).toContain('A sudden event is under way: The interrogation. Suspicion stands at 60 of 100');
+
+        // On a short screen (a phone's keyboard up) it is one line with the Gauge's number in it, and the bar is back when there is room (docs/ui-audit-2026-11-16.md H1).
+        await page.setViewportSize({ width: 390, height: 520 });
+        await expect(gauge).toBeHidden();
+        await expect(banner.getByText('Suspicion 40 ·')).toBeVisible();
+        await expect(banner).toContainText('2 replies left');
+        expect((await banner.boundingBox())!.height).toBeLessThanOrEqual(34);
+        await page.setViewportSize({ width: 390, height: 844 });
+        await expect(gauge).toBeVisible();
+
+        // An Epilogue stands outside the event (audit M6): the banner gives way while it is the newest reply, and the event loses no reply to it.
+        await scriptTurn(request, 'The lamp burned on for forty winters.', judgement({ gauge: 90, reason: 'Not asked.' }));
+        await page.getByRole('button', { name: 'Chat menu' }).tap();
+        await page.getByRole('button', { name: /^End the story/ }).tap();
+        await page.getByRole('alertdialog', { name: /^End the story here\?/ }).getByRole('button', { name: 'Write the epilogue' }).tap();
+        await expect(page.getByRole('article', { name: 'Epilogue' })).toContainText('forty winters');
+        await expect(banner).toHaveCount(0);
+        await expect
+            .poll(async () => (await (await request.get(`/api/stories/${storyId}/chats/${chatId}`)).json()).messages.at(-1).judge?.status)
+            .toBe('done');
+        expect((await (await request.get(`/api/stories/${storyId}/chats/${chatId}`)).json()).suddenEvent).toMatchObject({ status: 'active', value: 40, turnsLeft: 2 });
 
         await scriptTurn(request, '@Mira: Fine.', judgement({ gauge: 12, reason: 'She believes you.' }));
         await send(page, 'I tell her the truth.');

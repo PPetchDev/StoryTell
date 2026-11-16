@@ -87,7 +87,7 @@ export function DiarySection({ chat, characterId, name }: { chat: DiaryChat; cha
             <h3 id={headingId} ref={heading} tabIndex={-1} className="mt-0 mb-1 text-sm font-semibold text-muted focus:outline-none">
                 Diary
             </h3>
-            <p className="mt-0 mb-2.5 text-sm leading-normal text-muted">What {name} writes in private about the story so far, when you ask.</p>
+            <p className="mt-0 mb-2.5 text-sm leading-normal text-muted">What {name} writes in private about the story so far, when you ask. Each entry uses credit like one reply.</p>
 
             {loaded.status === 'loading' && (
                 <p role="status" className="m-0 text-sm text-muted motion-safe:animate-pulse-soft">
@@ -124,10 +124,12 @@ export function DiarySection({ chat, characterId, name }: { chat: DiaryChat; cha
                 <ol className="m-0 mt-3 flex list-none flex-col gap-3 p-0" aria-label={`${name}'s diary entries, newest first`}>
                     {shown.map((entry) => (
                         <li key={entry.id} className="border-l-3 border-(color:--speaker-colour) pl-3" data-diary-entry>
-                            <p className="mt-0 mb-1 text-sm text-muted">
+                            {/* The date keeps to one line: it broke in the middle, "Nov 16," over "2026, 7:41 AM" (docs/ui-audit-2026-11-16.md L3). */}
+                            <p className="mt-0 mb-1 flex flex-wrap gap-x-2 text-sm text-muted">
                                 {entry.moment ? <span className="font-semibold">{entry.moment}</span> : null}
-                                {entry.moment ? ' · ' : ''}
-                                <time dateTime={entry.createdAt}>{formatWhen(entry.createdAt)}</time>
+                                <time className="whitespace-nowrap" dateTime={entry.createdAt}>
+                                    {formatWhen(entry.createdAt)}
+                                </time>
                             </p>
                             <p className="mt-0 mb-2 leading-normal whitespace-pre-wrap [overflow-wrap:anywhere]">{entry.text}</p>
                             <ConfirmButton
@@ -140,7 +142,7 @@ export function DiarySection({ chat, characterId, name }: { chat: DiaryChat; cha
                                 focusAfter={() => heading.current}
                                 disabled={writing}
                                 busyLabel="Deleting…"
-                                className="button-small"
+                                small
                             />
                         </li>
                     ))}

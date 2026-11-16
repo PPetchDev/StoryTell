@@ -193,6 +193,11 @@ export class ChatModelService {
         await this.chats.update({ id: chatId }, { autoRead });
     }
 
+    /** Whether the Judge may suggest an Ending in this Chat (.scratch/endings/spec.md). */
+    async setEndingSuggestions(chatId: number, endingSuggestions: boolean): Promise<void> {
+        await this.chats.update({ id: chatId }, { endingSuggestions });
+    }
+
     async setAuthorsNote(chatId: number, authorsNote: string): Promise<void> {
         await this.chats.update({ id: chatId }, { authorsNote });
     }

@@ -81,13 +81,27 @@ test('a Lore set made in one Story is linked from another, edited once for both,
         await set.getByRole('button', { name: 'Unlink The Steppe from this Story' }).tap();
         await expect(set).toHaveCount(0);
         expect((await storyOf(request, second)).loreSets).toEqual([]);
+        // It acted at once, so it offers the way back (docs/ui-audit-2026-11-16.md M5): Undo links the set again, and Unlink is there again.
+        await expect(shared).toContainText('Unlinked The Steppe. It is still in your Lore sets.');
+        const undo = shared.getByRole('button', { name: 'Undo' });
+        await expect(undo).toBeFocused();
+        await undo.tap();
+        await expect(set).toHaveCount(1);
+        await expect.poll(async () => (await storyOf(request, second)).loreSets).toMatchObject([{ name: 'The Steppe', usedBy: 2 }]);
+        // Unlink and Delete set stand at the two ends of their row, not side by side.
+        const unlinkBox = (await set.getByRole('button', { name: 'Unlink The Steppe from this Story' }).boundingBox())!;
+        const deleteBox = (await set.getByRole('button', { name: 'Delete set The Steppe' }).boundingBox())!;
+        expect(deleteBox.x - (unlinkBox.x + unlinkBox.width)).toBeGreaterThan(40);
+        await set.getByRole('button', { name: 'Unlink The Steppe from this Story' }).tap();
+        await expect(set).toHaveCount(0);
+        await expect.poll(async () => (await storyOf(request, second)).loreSets).toEqual([]);
         expect((await storyOf(request, first)).loreSets).toMatchObject([{ name: 'The Steppe', usedBy: 1 }]);
 
         // Delete for good, from the Story that still links it: it asks first, and says what goes.
         await openLoreTab(page, first);
         await set.getByRole('button', { name: 'Delete set The Steppe' }).tap();
         const ask = page.getByRole('group', { name: 'Delete The Steppe for good?' });
-        await expect(ask).toContainText('Its 1 entry go with it');
+        await expect(ask).toContainText('Its 1 entry goes with it.');
         await ask.getByRole('button', { name: 'Delete' }).tap();
         await expect(set).toHaveCount(0);
         await expect.poll(async () => (await storyOf(request, first)).loreSets).toEqual([]);
@@ -110,7 +124,7 @@ test("a Story's own Lore is moved into a new set, and a Chat of another Story th
         await expect(panel.getByRole('region', { name: 'Lore 1' })).toBeVisible();
         const shared = page.getByRole('group', { name: 'Shared Lore' });
 
-        await shared.getByRole('button', { name: 'Share this Story’s Lore' }).tap();
+        await shared.getByRole('button', { name: 'Move this Story’s Lore into a set' }).tap();
         const ask = page.getByRole('group', { name: 'Move this Story’s 2 entries into a new Lore set?' });
         await expect(ask).toContainText('This Story reads them as before');
         await ask.getByRole('button', { name: 'Move' }).tap();
@@ -119,7 +133,7 @@ test("a Story's own Lore is moved into a new set, and a Chat of another Story th
         const set = shared.getByRole('group', { name: 'Lore set: Lore set' });
         await expect(set.getByRole('region', { name: 'Lore set entry 2' })).toBeVisible();
         await expect(panel.getByRole('region', { name: 'Lore 1', exact: true })).toHaveCount(0);
-        await expect(shared.getByRole('button', { name: 'Share this Story’s Lore' })).toHaveCount(0);
+        await expect(shared.getByRole('button', { name: 'Move this Story’s Lore into a set' })).toHaveCount(0);
         const moved = await storyOf(request, world);
         expect(moved.lore).toEqual([]);
         expect(moved.loreSets[0].entries.map((entry: { name: string }) => entry.name)).toEqual(['Tents', 'Salt']);

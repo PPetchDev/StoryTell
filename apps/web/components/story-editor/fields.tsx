@@ -425,6 +425,12 @@ interface ConfirmButtonProps {
     busyLabel?: string;
     /** Utilities for the button that asks, e.g. a quieter look at the foot of a page. */
     className?: string;
+    /**
+     * The small size, for a row inside a card: the button that asks, and Cancel and the confirming
+     * button too. With only the first small, the question came back with two full-size buttons and
+     * the second fell to a row of its own on a 360px phone (docs/ui-audit-2026-11-16.md L4).
+     */
+    small?: boolean;
 }
 
 /**
@@ -444,6 +450,7 @@ export function ConfirmButton({
     focusAfter,
     busyLabel,
     className,
+    small,
 }: ConfirmButtonProps) {
     const [asking, setAsking] = useState(false);
     const [working, setWorking] = useState(false);
@@ -489,7 +496,7 @@ export function ConfirmButton({
                 type="button"
                 // Asking is quiet even for a destructive action, in the danger colour; the danger fill waits for
                 // the step that does it (docs/ui-audit-2026-11-13.md, M13: Remove outshone everything but Play).
-                className={classes('button button-quiet', danger && 'text-danger', className)}
+                className={classes('button button-quiet', small && 'button-small', danger && 'text-danger', className)}
                 onClick={working ? undefined : () => setAsking(true)}
                 disabled={disabled}
                 aria-disabled={working || undefined}
@@ -518,10 +525,10 @@ export function ConfirmButton({
                     {warning}
                 </span>
             )}
-            <button ref={cancel} type="button" className="button button-quiet" onClick={stop}>
+            <button ref={cancel} type="button" className={classes('button button-quiet', small && 'button-small')} onClick={stop}>
                 Cancel
             </button>
-            <button type="button" className="button button-danger" onClick={confirm}>
+            <button type="button" className={classes('button button-danger', small && 'button-small')} onClick={confirm}>
                 {confirmLabel}
             </button>
         </span>

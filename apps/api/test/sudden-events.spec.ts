@@ -485,6 +485,29 @@ describe('Sudden events: authoring and play (HTTP)', () => {
         expect(trailing()).not.toContain('sudden event');
     });
 
+    it('an Epilogue stands outside the event: it uses none of its replies, the Judge is not asked about it, and play goes on from where it stood', async () => {
+        const storyId = await createStory();
+        await addEvent(storyId);
+        const chat = await createChat(storyId);
+        const started = await play(storyId, chat.id, 'Where is the oil?', judgement({ start: 1, reason: 'Mira asks about the oil.' }));
+        expect(started.suddenEvent).toMatchObject({ status: 'active', value: 60, turnsLeft: 3 });
+
+        // The Judge would move the Gauge here, but an Epilogue is not one of the event's replies (docs/ui-audit-2026-11-16.md M6).
+        script('The lamp burned on for forty winters.', judgement({ gauge: 30, reason: 'It closed.' }));
+        await t.http.post(`/api/stories/${storyId}/chats/${chat.id}/epilogue`).expect(200);
+        const closed = await settled(storyId, chat.id);
+        expect(closed.messages.at(-1)).toMatchObject({ kind: 'ai', epilogue: true });
+        expect(trailing()).not.toContain('sudden event');
+        expect(judged()).not.toContain('Sudden event');
+        expect(closed.suddenEvent).toMatchObject({ status: 'active', value: 60, turnsLeft: 3, reason: 'Mira asks about the oil.' });
+
+        // Played on, the event is where it was: this reply is its first after the start.
+        const on = await play(storyId, chat.id, 'I show her the ledger.', judgement({ gauge: 40, reason: 'The ledger backs you up.' }));
+        expect(judged()).toContain('# Sudden event under way\nThe interrogation.');
+        expect(judged()).toContain('Replies left after this one: 2.');
+        expect(on.suddenEvent).toMatchObject({ status: 'active', value: 40, turnsLeft: 2 });
+    });
+
     it('fails when the replies run out, and at once at the far end of the Gauge', async () => {
         const storyId = await createStory();
         await addEvent(storyId, { turns: 2 });

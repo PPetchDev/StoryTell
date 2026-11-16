@@ -373,6 +373,13 @@ export class ChatResponseBodyDTO extends ChatSummaryDTO implements Omit<ChatDeta
     @ApiProperty({ type: ChatEndingDTO, nullable: true, description: 'The Ending the Chat reached; null when it reached none.' })
     ending: ChatEndingDTO | null;
 
+    @ApiProperty({
+        type: Boolean,
+        nullable: true,
+        description: "Whether the Judge may suggest an Ending in this Chat; null when the Story has Endings of its author's, which are the only ones it can reach.",
+    })
+    endingSuggestions: boolean | null;
+
     @ApiProperty({ description: "The number a Roll sent now must reach, from the Story's Difficulty." })
     rollTarget: number;
 

@@ -138,6 +138,22 @@ for (const width of [320, 360, 390, 412]) {
             expect(await text.evaluate((el) => getComputedStyle(el).overflowY)).toBe('auto');
             await text.fill('');
             expect(await text.evaluate((el) => getComputedStyle(el).overflowY)).toBe('hidden');
+
+            // A Cue and a Roll set for the next turn share one row (docs/ui-audit-2026-11-16.md M2: a band each took 104px at 360px).
+            await composer.getByRole('button', { name: 'Cue the Narrator' }).tap();
+            const sheet = page.getByRole('dialog', { name: 'Cue the Narrator' });
+            await sheet.getByRole('textbox', { name: 'Cue' }).fill('Make Mira angrier, and bring the herd in before the rain comes.');
+            await sheet.getByRole('button', { name: 'Use for the next reply' }).tap();
+            await composer.getByRole('button', { name: 'Roll the dice for this message' }).tap();
+            const next = await box(composer.locator('[data-band="next"]'));
+            const cueBand = await box(composer.locator('[data-band="cue"]'));
+            const rollBand = await box(composer.locator('[data-band="roll"]'));
+            expect(next.height).toBeLessThanOrEqual(46);
+            expect(Math.round(cueBand.y)).toBe(Math.round(rollBand.y));
+            expect(rollBand.x + rollBand.width).toBeLessThanOrEqual(next.x + next.width + 0.5);
+            // The Roll keeps its words whole; the Cue is the one that gives way.
+            await expect(composer.locator('[data-band="roll"]')).toContainText(/Roll \d+\+/);
+            expect(cueBand.width).toBeGreaterThan(120);
             await expectNoSidewaysScroll(page);
         } finally {
             await request.delete(`/api/stories/${storyId}`);

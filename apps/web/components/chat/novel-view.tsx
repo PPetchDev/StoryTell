@@ -318,7 +318,11 @@ export function NovelView(props: NovelViewProps) {
                                     {waiting ? (
                                         <WritingLine className="m-0" />
                                     ) : (
-                                        <StepText step={step} cast={props.cast} />
+                                        <StepText
+                                            step={step}
+                                            cast={props.cast}
+                                            epilogue={step.kind !== 'user' && messages.some((message) => message.id === step.messageId && message.kind === 'ai' && message.epilogue)}
+                                        />
                                     )}
                                 </section>
                                 {!waiting && (
@@ -367,18 +371,28 @@ function SpeakerPicture({ step, cast }: { step: Extract<NovelStep, { kind: 'spee
 }
 
 /** The box's words: the speaker's name in their colour (the worn name for the user's line, none for narration), then the text. */
-function StepText({ step, cast }: { step: Exclude<NovelStep, { kind: 'snapshot' }>; cast: Cast }) {
+function StepText({ step, cast, epilogue = false }: { step: Exclude<NovelStep, { kind: 'snapshot' }>; cast: Cast; epilogue?: boolean }) {
+    // The thread marks an Epilogue's reply; so does each of its steps here (docs/ui-audit-2026-11-16.md L6).
+    const label = epilogue ? (
+        <p className="mt-0 mb-1 text-xs font-bold tracking-widest text-muted uppercase" data-epilogue-label>
+            Epilogue
+        </p>
+    ) : null;
     if (step.kind === 'narration') {
         return (
-            <p className={`${STEP_TEXT} italic`} data-line="">
-                {step.text}
-            </p>
+            <>
+                {label}
+                <p className={`${STEP_TEXT} italic`} data-line="">
+                    {step.text}
+                </p>
+            </>
         );
     }
     const colour = step.kind === 'user' ? 'var(--accent)' : characterColour(step.characterId, cast);
     const name = step.kind === 'user' ? step.identityName : step.speakerName;
     return (
         <>
+            {label}
             <p className="mt-0 mb-1 text-md font-bold" style={{ color: colour }} data-speaker="">
                 {name}
             </p>

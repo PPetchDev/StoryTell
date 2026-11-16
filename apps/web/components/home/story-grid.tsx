@@ -109,35 +109,29 @@ export function StoryGrid({ stories: all, onOpen }: { stories: StorySummary[]; o
 }
 
 function StoryCard({ story, onOpen }: { story: StorySummary; onOpen(story: StorySummary): void }) {
-    const id = `story-card-${story.id}`;
     return (
-        // Named by its title and badge; the hook and last played are its description.
-        <button
-            type="button"
-            className={CARD}
-            aria-labelledby={`${id}-title ${id}-badge`}
-            aria-describedby={`${id}-hook ${id}-meta`}
-            onClick={() => onOpen(story)}
-        >
+        // Named by all it shows: the badge, the title, the hook and when it was last played. A name of the
+        // title and badge alone left out words the card shows, which a voice user may say to press it
+        // (docs/ui-audit-2026-11-16.md L1; WCAG 2.5.3).
+        <button type="button" className={CARD} onClick={() => onOpen(story)}>
             <CoverPicture story={story} className="mb-1 aspect-[3/4] w-full rounded-lg">
                 {!story.playable && (
                     <span
-                        id={`${id}-badge`}
                         className="absolute top-2 left-2 rounded-full bg-picture-badge px-2 text-xs font-bold text-on-picture-warning"
                     >
                         Draft
                     </span>
                 )}
             </CoverPicture>
-            <strong id={`${id}-title`} className="text-note leading-snug [overflow-wrap:anywhere]">
+            <strong className="text-note leading-snug [overflow-wrap:anywhere]">
                 {storyTitle(story)}
             </strong>
             {story.hook && (
-                <span id={`${id}-hook`} className="line-clamp-2 text-sm leading-snug text-muted">
+                <span className="line-clamp-2 text-sm leading-snug text-muted">
                     {story.hook}
                 </span>
             )}
-            <span id={`${id}-meta`} className="text-xs text-muted">
+            <span className="text-xs text-muted">
                 {story.lastPlayedAt ? `Played ${playedAgo(story.lastPlayedAt)}` : 'Not played yet'}
             </span>
         </button>

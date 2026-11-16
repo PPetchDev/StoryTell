@@ -113,3 +113,15 @@ export function Spinner({ size = 16 }: { size?: number }) {
  * and the composer keep about 48rem in the middle while the thread scrolls across the page.
  */
 export const COLUMN = 'lg:mx-auto lg:w-[min(100%_-_3rem,48rem)]';
+
+/**
+ * What stands between the top bar and the thread gives way on a short screen
+ * (docs/ui-audit-2026-11-16.md H1): the keyboard shrinks the page, and the strip, the Sudden event
+ * and the Ending together left the thread no room at all. Under 560px of height (a phone with its
+ * keyboard up) the Ending goes and the Sudden event is one line; under 440px (a phone on its side,
+ * a small phone's keyboard) they all go, the Scene strip too. They are back as soon as there is room.
+ */
+export const SHORT_HIDDEN = '[@media(max-height:560px)]:hidden';
+/** Shown only on that short screen: what the one line says in place of what went. */
+export const SHORT_ONLY = 'hidden [@media(max-height:560px)]:inline';
+export const SHORTEST_HIDDEN = '[@media(max-height:440px)]:hidden';

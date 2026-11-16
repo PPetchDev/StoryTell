@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { FormEvent, ReactNode, Ref, useEffect, useId, useState } from 'react';
 
 import { COLUMN, TEXT_BOX } from '@/components/chat/chat-classes';
+import { EPILOGUE_COST } from '@/components/chat/ending-banner';
 import { useApiQuery } from '@/components/connection';
 import { ChevronLeftIcon, ChevronRightIcon, MoreIcon } from '@/components/icons';
 import { CharacterPortrait } from '@/components/portrait/character-portrait';
@@ -14,7 +15,8 @@ import { Chat, messageHref } from '@/lib/chat';
 import { PersonaList } from '@/lib/persona';
 
 const RESET_QUESTION = 'Clear every Message and start this Chat over from the Opening?';
-const END_QUESTION = 'End the story here? The Narrator writes an epilogue from where it stands. You can still play on after it.';
+// It says what it costs (docs/ui-audit-2026-11-16.md L7): an Epilogue is a reply from the play model, and a long one.
+const END_QUESTION = `End the story here? The Narrator writes an epilogue from where it stands. You can still play on after it. ${EPILOGUE_COST}`;
 
 /** A round 44px icon button in the bar: ‹ back and ⋯. */
 const BAR_ICON = [
@@ -399,6 +401,8 @@ interface ChatTopBarProps {
     onSetSittingOut(characterIds: number[]): void;
     /** Turns Read replies aloud on or off. */
     onSetAutoRead(autoRead: boolean): void;
+    /** Turns the Judge's suggested Endings on or off in this Chat. */
+    onSetEndingSuggestions(on: boolean): void;
     onReset(): void;
     /** Asks for the story's Epilogue (.scratch/endings/spec.md); the menu asks first. */
     onEndStory(): void;
@@ -435,6 +439,7 @@ export function ChatTopBar({
     onSetAuthorsNote,
     onSetSittingOut,
     onSetAutoRead,
+    onSetEndingSuggestions,
     onReset,
     onEndStory,
     canEndStory,
@@ -635,6 +640,27 @@ export function ChatTopBar({
                                         <span className={SWITCH_KNOB} />
                                     </span>
                                 </button>
+                                {/*
+                                  * The way back from "Not yet" (docs/ui-audit-2026-11-16.md M1): it stopped the suggestions in this
+                                  * Chat and only a Reset brought them back. Not there in a Story with Endings of its author's.
+                                  */}
+                                {chat.endingSuggestions !== null && (
+                                    <button
+                                        type="button"
+                                        role="switch"
+                                        aria-checked={chat.endingSuggestions}
+                                        className={`${ITEM} flex-row items-center gap-3 text-text`}
+                                        disabled={busy}
+                                        onClick={() => onSetEndingSuggestions(!chat.endingSuggestions)}
+                                    >
+                                        <span className="flex min-w-0 flex-1 flex-col items-start">
+                                            <MenuText label="Suggest an ending" sub="When the story seems to have closed" />
+                                        </span>
+                                        <span aria-hidden="true" className={SWITCH_TRACK}>
+                                            <span className={SWITCH_KNOB} />
+                                        </span>
+                                    </button>
+                                )}
                             </section>
                             <div className="border-t border-line pt-1">
                                 <MenuButton onClick={choose(() => setEnding(true))} disabled={busy || !canEndStory}>

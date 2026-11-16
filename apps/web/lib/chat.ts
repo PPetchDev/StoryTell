@@ -157,6 +157,8 @@ export interface Chat extends ChatSummary {
     suddenEvent: ChatSuddenEvent | null;
     /** The Ending the Chat reached; null when it reached none. */
     ending: ChatEnding | null;
+    /** Whether the Judge may suggest an Ending here; null when the Story has Endings of its author's (then it suggests none). */
+    endingSuggestions: boolean | null;
     /** The number a Roll sent now must reach, from the Story's Difficulty. */
     rollTarget: number;
     /** Where the story is now (CONTEXT.md, "Place"); null until the story makes it clear. */
@@ -403,6 +405,9 @@ export const chatApi = {
     /** Read replies aloud (.scratch/read-aloud/spec.md, "Auto-read"), on or off. */
     setAutoRead: (storyId: number, chatId: number, autoRead: boolean) =>
         apiSend<Chat>('PATCH', `/stories/${storyId}/chats/${chatId}`, { autoRead }),
+    /** Whether the Judge may suggest an Ending in this Chat: "Not yet" turns it off, the Chat menu's switch sets it either way. */
+    setEndingSuggestions: (storyId: number, chatId: number, endingSuggestions: boolean) =>
+        apiSend<Chat>('PATCH', `/stories/${storyId}/chats/${chatId}`, { endingSuggestions }),
     /** Sets the Author's note, read from the next turn on; an empty text clears it. */
     setAuthorsNote: (storyId: number, chatId: number, text: string) =>
         apiSend<Chat>('PUT', `/stories/${storyId}/chats/${chatId}/authors-note`, { text }),

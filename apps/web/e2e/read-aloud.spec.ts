@@ -348,7 +348,11 @@ test.describe('Read replies aloud', () => {
         const labels = await rows.evaluateAll((items) => items.map((item) => item.textContent ?? ''));
         const at = labels.findIndex((label) => label.startsWith('Read replies aloud'));
         expect(labels[at - 1]).toMatch(/^Who's in this Chat/);
-        expect(labels.slice(at + 1).map((label) => label.replace(/^(End the story|Reset Chat).*$/, '$1'))).toEqual(['End the story', 'Reset Chat']);
+        expect(labels.slice(at + 1).map((label) => label.replace(/^(Suggest an ending|End the story|Reset Chat).*$/, '$1'))).toEqual([
+            'Suggest an ending',
+            'End the story',
+            'Reset Chat',
+        ]);
         await page.keyboard.press('Escape');
 
         await setSwitch(page, true);

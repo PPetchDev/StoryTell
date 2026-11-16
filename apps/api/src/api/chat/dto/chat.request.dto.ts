@@ -21,6 +21,14 @@ export class UpdateChatRequestBodyDTO implements ChatFields {
     @IsOptional()
     @IsBoolean()
     autoRead?: boolean;
+
+    @ApiPropertyOptional({
+        description:
+            'Whether the Judge may suggest an Ending in this Chat. "Not yet" on a suggested Ending turns it off; this turns it back on, or off without waiting for one.',
+    })
+    @IsOptional()
+    @IsBoolean()
+    endingSuggestions?: boolean;
 }
 
 /** .scratch/speaker-controls/spec.md, "Nudge": who the user would like to hear from in this turn. */

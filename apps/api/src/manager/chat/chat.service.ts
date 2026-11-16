@@ -187,6 +187,11 @@ export interface ChatDetail extends ChatSummary {
     authorsNote: string;
     /** Read replies aloud (.scratch/read-aloud/spec.md, "Auto-read"); off by default. */
     autoRead: boolean;
+    /**
+     * Whether the Judge may suggest an Ending in this Chat (.scratch/endings/spec.md); null when
+     * the Story has Endings of its author's, which are then the only ones the Chat can reach.
+     */
+    endingSuggestions: boolean | null;
     /** The ids of the Characters sitting out (.scratch/speaker-controls/spec.md), in cast order. */
     sittingOut: number[];
     /** The composer tray's lines (.scratch/saved-replies-and-replace-rules/spec.md): the Story's, then the app-wide ones. */
@@ -317,6 +322,8 @@ export interface ChatFields {
     title?: string;
     /** Read replies aloud (.scratch/read-aloud/spec.md, "Auto-read"). */
     autoRead?: boolean;
+    /** Whether the Judge may suggest an Ending (.scratch/endings/spec.md): "Not yet" turns it off, this turns it back on. */
+    endingSuggestions?: boolean;
 }
 @Injectable()
 export class ChatManagerService {
@@ -706,8 +713,8 @@ export class ChatManagerService {
     }
 
     /**
-     * The Chat's own settings: its title (whitespace only keeps the current one) and Read replies
-     * aloud. Each is written only when sent.
+     * The Chat's own settings: its title (whitespace only keeps the current one), Read replies
+     * aloud, and whether the Judge may suggest an Ending. Each is written only when sent.
      */
     async updateChat(storyId: number, chatId: number, fields: ChatFields): Promise<ChatDetail> {
         const { story, chat } = await this.load(storyId, chatId);
@@ -719,6 +726,11 @@ export class ChatManagerService {
         if (fields.autoRead !== undefined) {
             chat.autoRead = fields.autoRead;
             await this.chatModel.setAutoRead(chat.id, chat.autoRead);
+        }
+        if (fields.endingSuggestions !== undefined) {
+            // Chat state outside the ledger, like the title: no rollback turns it back. Reset does (the ledger's clear).
+            chat.endingSuggestions = fields.endingSuggestions;
+            await this.chatModel.setEndingSuggestions(chat.id, chat.endingSuggestions);
         }
         return this.detail(story, chat);
     }
@@ -1509,6 +1521,7 @@ export class ChatManagerService {
             branchedFrom: source ? { chatId: source.id, title: source.title, messageId: chat.branchedFromMessageId } : null,
             authorsNote: chat.authorsNote,
             autoRead: chat.autoRead,
+            endingSuggestions: (story.endings ?? []).some(endingReady) ? null : chat.endingSuggestions,
             sittingOut: sittingOutOf(story, chat).map((character) => character.id),
             savedReplies: trayLines(story.savedReplies, appSavedReplies),
             replaceRules: chatReplaceRules(appReplaceRules, story.replaceRules),

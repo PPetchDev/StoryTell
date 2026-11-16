@@ -56,3 +56,7 @@ When the trigger happens in a Chat, the event begins. The Chat shows its name, t
 - AI drafts, the Story assistant and Character cards writing or carrying Sudden events.
 - A list of past events on the Dashboard, and the event in the wide-screen "At a glance" panel.
 - Suggested replies and Write for me knowing the event's goal.
+
+## Further Notes
+
+- An Epilogue is not one of an event's replies (2026-11-16, see [Spec: Endings](../endings/spec.md)): the Judge is not asked about Sudden events on it, no step is recorded, and the event is where it was if the user plays on. The Chat screen leaves the banner out while the Epilogue is the newest reply, and on a short screen (a phone's keyboard up) the banner is one line.

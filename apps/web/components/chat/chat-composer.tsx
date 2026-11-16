@@ -323,6 +323,12 @@ const STOP_BUTTON = [
 ].join(' ');
 
 /** The box: one row that grows to about five lines, then scrolls; 1rem text keeps a phone from zooming in. */
+/**
+ * The longest name the box's placeholder says ("Write as Petch…"): a longer one was cut off with no
+ * "…" on a phone (docs/ui-audit-2026-11-16.md L5), so the placeholder is just "Write…" then. The top
+ * bar says who the user plays, and the box's name for a screen reader keeps the whole of it.
+ */
+const PLACEHOLDER_NAME_MAX = 12;
 const BOX = [
     'min-w-0 flex-1 resize-none overflow-y-auto',
     // One line is 44px tall, a phone's smallest comfortable field; five lines at most.
@@ -563,31 +569,49 @@ export function ChatComposer({
                 <div className="empty:hidden" data-band="characters">
                     {characterRow?.(writingForMe || dictating)}
                 </div>
-                {/* The Cue set for the next reply (CONTEXT.md, "Cue"), in sight until it is used or cleared. */}
-                {cue !== null && (
-                    <div
-                        className="flex min-w-0 items-center gap-1 rounded-md bg-accent-soft pl-3 text-sm"
-                        role="group"
-                        aria-label="Cue for the next reply"
-                        data-band="cue"
-                    >
-                        <span className="min-w-0 flex-1 truncate" title={cue}>
-                            <span className="font-semibold text-rewrite-text">Cue</span> {cue}
-                        </span>
-                        <button type="button" className={ICON_BUTTON} aria-label="Clear the Cue" disabled={writing} onClick={onClearCue}>
-                            <CloseIcon size={18} />
-                        </button>
+                {/*
+                 * What is set for the next turn, on one row (docs/ui-audit-2026-11-16.md M2): the Cue and the Roll each
+                 * had a band, 104px between them on a 360px phone. The Cue gives way and the Roll keeps its few words.
+                 */}
+                {(cue !== null || roll) && (
+                    <div className="flex min-w-0 items-stretch gap-1" data-band="next">
+                        {/* The Cue set for the next reply (CONTEXT.md, "Cue"), in sight until it is used or cleared. */}
+                        {cue !== null && (
+                            <div
+                                className="flex min-w-0 flex-1 items-center gap-1 rounded-md bg-accent-soft pl-3 text-sm"
+                                role="group"
+                                aria-label="Cue for the next reply"
+                                data-band="cue"
+                            >
+                                <span className="min-w-0 flex-1 truncate" title={cue}>
+                                    <span className="font-semibold text-rewrite-text">Cue</span> {cue}
+                                </span>
+                                <button type="button" className={ICON_BUTTON} aria-label="Clear the Cue" disabled={writing} onClick={onClearCue}>
+                                    <CloseIcon size={18} />
+                                </button>
+                            </div>
+                        )}
+                        {/* The Roll armed for the next Message (CONTEXT.md, "Roll"): what it will need, in sight until it is sent or turned off. */}
+                        {roll && (
+                            <p
+                                className={`m-0 flex min-h-11 items-center gap-1.5 rounded-md bg-accent-soft px-3 text-sm ${cue !== null ? 'shrink-0' : 'min-w-0 flex-1'}`}
+                                data-band="roll"
+                            >
+                                <DiceIcon size={16} className="shrink-0 text-rewrite-text" />
+                                <span className="min-w-0 truncate">
+                                    <span className="font-semibold text-rewrite-text">Roll</span> {chat.rollTarget}
+                                    {cue !== null ? (
+                                        <>
+                                            <span aria-hidden="true">+</span>
+                                            <span className="sr-only"> or more succeeds</span>
+                                        </>
+                                    ) : (
+                                        ' or more succeeds'
+                                    )}
+                                </span>
+                            </p>
+                        )}
                     </div>
-                )}
-                {/* The Roll armed for the next Message (CONTEXT.md, "Roll"): what it will need, in sight until it is sent or turned off. */}
-                {roll && (
-                    <p className="m-0 flex min-w-0 items-center gap-1.5 rounded-md bg-accent-soft px-3 py-1.5 text-sm" data-band="roll">
-                        <DiceIcon size={16} className="shrink-0 text-rewrite-text" />
-                        <span className="min-w-0">
-                            <span className="font-semibold text-rewrite-text">Roll</span> The dice decide your next message: {chat.rollTarget} or more
-                            succeeds.
-                        </span>
-                    </p>
                 )}
                 {/* Write for me's way back, only while the box holds exactly what it wrote; puts the draft back, empty included. */}
                 {writer.offered && (
@@ -732,7 +756,7 @@ export function ChatComposer({
                             id={boxId}
                             className={BOX}
                             aria-label={`Write as ${chat.identityName}`}
-                            placeholder={`Write as ${chat.identityName}…`}
+                            placeholder={chat.identityName.length > PLACEHOLDER_NAME_MAX ? 'Write…' : `Write as ${chat.identityName}…`}
                             value={draft}
                             rows={1}
                             disabled={blocked}

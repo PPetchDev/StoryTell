@@ -221,6 +221,8 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
 
     // An Ending reached is said once too (.scratch/endings/spec.md); the banner shows it.
     const endingRef = useRef(initial.ending);
+    // The Ending the Chat already had when it was opened: its banner is one row. One reached while playing opens to say why.
+    const [endingAtOpen] = useState(initial.ending);
     useEffect(() => {
         const said = endingAnnouncement(endingRef.current, chat.ending);
         endingRef.current = chat.ending;
@@ -443,6 +445,14 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
     // An Epilogue can be asked for like a Continue, but not right after one: Again writes that one anew.
     const newestIsEpilogue = newestMessage?.kind === 'ai' && newestMessage.epilogue;
     const canEndStory = !writing && !busy && !blocked && !chat.awaitingReply && !newestIsEpilogue;
+    // Why it can't be, when the reason lasts (audit L8); a turn in flight only makes it wait.
+    const epilogueWhyNot = !chat.playable
+        ? 'The epilogue waits: the Story has empty fields.'
+        : chat.textCreditOut
+          ? 'The epilogue waits: text credit is used up.'
+          : chat.awaitingReply
+            ? 'The epilogue waits: your last message has no reply yet.'
+            : null;
     /** The story's Epilogue (.scratch/endings/spec.md): a turn with no User Message, streamed like any reply. */
     const writeEpilogue = () => {
         if (!canEndStory) return;
@@ -587,6 +597,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                     void runWrite(() => chatApi.setAuthorsNote(chat.storyId, chat.id, text))
                 }
                 onSetAutoRead={(autoRead) => void runWrite(() => chatApi.setAutoRead(chat.storyId, chat.id, autoRead))}
+                onSetEndingSuggestions={(on) => void runWrite(() => chatApi.setEndingSuggestions(chat.storyId, chat.id, on))}
                 onSetSittingOut={(characterIds) =>
                     void runWrite(() => chatApi.setSittingOut(chat.storyId, chat.id, characterIds))
                 }
@@ -623,12 +634,16 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                     }}
                 />
             )}
-            {chat.suddenEvent && <SuddenEventBanner event={chat.suddenEvent} />}
+            {/* An Epilogue stands outside a Sudden event (docs/ui-audit-2026-11-16.md M6): right after one, only the Ending shows. */}
+            {chat.suddenEvent && !newestIsEpilogue && <SuddenEventBanner event={chat.suddenEvent} />}
             {chat.ending && (
                 <EndingBanner
+                    key={`${chat.ending.messageId}:${chat.ending.name}`}
                     ending={chat.ending}
                     written={epilogueWritten(chat)}
                     canWrite={canEndStory}
+                    whyNot={epilogueWhyNot}
+                    fresh={!(endingAtOpen && endingAtOpen.messageId === chat.ending.messageId && endingAtOpen.name === chat.ending.name)}
                     busy={writing || busy}
                     onWrite={writeEpilogue}
                     onDismiss={() => void runWrite(() => chatApi.dismissEnding(chat.storyId, chat.id))}

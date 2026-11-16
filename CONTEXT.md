@@ -37,11 +37,11 @@ What a Sudden event measures, named by the author ("Suspicion", "Nerve"): a numb
 _Avoid_: Meter, stat, score, bar, HP
 
 **Ending**:
-A way a Story can end. The author may write a Story's Endings: each a name, when it is reached in plain language, and what its Epilogue should tell. In a Story with none of its own, the AI may **suggest** one, with a name, when the story comes to a natural close; the user can say "not yet", and then none is suggested again in that Chat. A Chat **reaches** an Ending when its condition has happened there, or when one is suggested, and reaches at most one; another Chat, or a Branch from before it, can find another. Reaching one closes nothing: the Chat can be played on. The Narrator is never told the Endings, so they are found by how the story is played, where a Scene steers it.
+A way a Story can end. The author may write a Story's Endings: each a name, when it is reached in plain language, and what its Epilogue should tell. In a Story with none of its own, the AI may **suggest** one, with a name, when the story comes to a natural close; the user can say "not yet", and then none is suggested again in that Chat until they turn suggestions back on there. A Chat **reaches** an Ending when its condition has happened there, or when one is suggested, and reaches at most one; another Chat, or a Branch from before it, can find another. Reaching one closes nothing: the Chat can be played on. The Narrator is never told the Endings, so they are found by how the story is played, where a Scene steers it.
 _Avoid_: Finale, outcome, route, win condition, game over
 
 **Epilogue**:
-The story's closing passage in one Chat, written by the Narrator when the user asks: how things settle after the Ending the Chat reached, or after an end the user chose themselves in a Story with none. It is an AI Message like any other, so the story can go on after it, and Regenerate writes it as an Epilogue again.
+The story's closing passage in one Chat, written by the Narrator when the user asks: how things settle after the Ending the Chat reached, or after an end the user chose themselves in a Story with none. It is an AI Message like any other, so the story can go on after it, and Regenerate writes it as an Epilogue again. It stands outside a Sudden event: it is not one of the replies the event has.
 _Avoid_: Afterword, outro, final message, summary
 
 **Lore**:

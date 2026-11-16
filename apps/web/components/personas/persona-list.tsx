@@ -116,7 +116,7 @@ function PersonaCard({ persona, autosave, justCreated, onSaved, onDelete, focusA
                                 disabled={pictureBusy !== null}
                                 question="Remove the picture?"
                                 confirmLabel="Remove"
-                                className="button-small"
+                                small
                                 onConfirm={() => savePicture('Removing…', () => personaApi.clearImage(persona.id))}
                                 focusAfter={() => pictureButton.current}
                             />

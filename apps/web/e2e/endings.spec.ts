@@ -68,12 +68,30 @@ test('a Chat that reaches an Ending shows it, writes its Epilogue on request, an
         await send(page, 'I light the lamp.');
         await expect(page.getByRole('article', { name: 'AI reply' }).last()).toContainText('She burns.');
 
-        // Reached: its name, what brought the story there, and the way to its Epilogue.
+        // Reached while playing: its name and the way to its Epilogue on one row, opened to say what brought the story there.
         await expect(banner).toContainText('Ending reached');
-        await expect(banner.getByRole('heading', { name: 'The light returns' })).toBeVisible();
+        const named = banner.getByRole('button', { name: /The light returns/ });
+        await expect(named).toHaveAttribute('aria-expanded', 'true');
         await expect(banner).toContainText('Ash lit the lamp.');
+        await expect(banner).toContainText('Writing it uses credit like one long reply.');
         await expect(banner).toHaveAttribute('data-epilogue', 'none');
         await noSidewaysScroll(page);
+        // A tap folds it to its row (docs/ui-audit-2026-11-16.md H1: it was a block of 160px), and on a later visit it is the row from the start.
+        await named.tap();
+        await expect(named).toHaveAttribute('aria-expanded', 'false');
+        await expect(banner).not.toContainText('Ash lit the lamp.');
+        expect((await banner.boundingBox())!.height).toBeLessThanOrEqual(52);
+        await page.reload();
+        await expect(named).toHaveAttribute('aria-expanded', 'false');
+        expect((await banner.boundingBox())!.height).toBeLessThanOrEqual(52);
+        await expect(banner.getByRole('button', { name: 'Write the epilogue' })).toBeVisible();
+        // On a short screen (the keyboard up) it gives its room to the thread, and is back when there is room.
+        await page.setViewportSize({ width: 390, height: 520 });
+        await expect(banner).toBeHidden();
+        await expect(page.getByRole('region', { name: 'Messages' })).toBeVisible();
+        expect((await page.getByRole('region', { name: 'Messages' }).boundingBox())!.height).toBeGreaterThan(150);
+        await page.setViewportSize({ width: 390, height: 844 });
+        await expect(banner).toBeVisible();
 
         await scriptTurn(request, 'For forty winters the beam swept the reef.\n\n@Mira: Still here, keeper.');
         await banner.getByRole('button', { name: 'Write the epilogue' }).tap();
@@ -213,10 +231,17 @@ test('in a Story with no Endings the AI suggests one when the story closes: "Not
 
         await page.goto(`/stories/${storyId}/chats/${waved}`);
         const banner = page.getByRole('region', { name: 'Ending', exact: true });
-        await expect(banner).toContainText('The story may have reached its end');
-        await expect(banner.getByRole('heading', { name: 'A quiet watch' })).toBeVisible();
-        await expect(banner).toContainText('The storm passed and the lamp is safe.');
+        // Suggested before this visit: one row that says so, with both ways on in it; a tap opens why.
+        await expect(banner).toContainText('Suggested ending');
+        const named = banner.getByRole('button', { name: /A quiet watch/ });
+        await expect(named).toHaveAttribute('aria-expanded', 'false');
         await expect(banner).toHaveAttribute('data-suggested', 'true');
+        // Its name is whole on the row, with both buttons on a row under it at this width: half of the 180px it took.
+        expect(await named.locator('span.truncate').last().evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+        expect((await banner.boundingBox())!.height).toBeLessThanOrEqual(96);
+        await named.tap();
+        await expect(banner).toContainText('The storm passed and the lamp is safe.');
+        await expect(banner).toContainText('The story may have reached its end. “Not yet” stops these suggestions here; the Chat menu turns them back on.');
         await noSidewaysScroll(page);
 
         // "Not yet": it goes, and stays gone through the next reply, whatever the Judge would say.
@@ -231,9 +256,29 @@ test('in a Story with no Endings the AI suggests one when the story closes: "Not
         await expect(banner).toHaveCount(0);
         expect((await (await request.get(`/api/stories/${storyId}/chats/${waved}`)).json()).ending).toBeNull();
 
+        // The Chat menu is the way back (docs/ui-audit-2026-11-16.md M1): its switch is off now, and on again the Judge may suggest once more.
+        await page.getByRole('button', { name: 'Chat menu' }).tap();
+        const suggest = page.getByRole('dialog', { name: 'Chat menu' }).getByRole('switch', { name: /Suggest an ending/ });
+        await expect(suggest).toHaveAttribute('aria-checked', 'false');
+        await suggest.tap();
+        await expect(suggest).toHaveAttribute('aria-checked', 'true');
+        await page.keyboard.press('Escape');
+        await scriptTurn(request, '@Mira: The night is done.', judgement({ reason: 'The watch is over.', suggest: 'The night is done' }));
+        await send(page, 'I bank the fire.');
+        await expect(page.getByRole('article', { name: 'AI reply' }).last()).toContainText('The night is done.');
+        // Suggested while playing, so it opens to say why; the next turn folds it to its row again.
+        const again = banner.getByRole('button', { name: /The night is done/ });
+        await expect(again).toHaveAttribute('aria-expanded', 'true');
+        await expect(banner).toContainText('The watch is over.');
+        await scriptTurn(request, '@Mira: Sleep, keeper.');
+        await send(page, 'I sit a while.');
+        await expect(page.getByRole('article', { name: 'AI reply' }).last()).toContainText('Sleep, keeper.');
+        await expect(again).toHaveAttribute('aria-expanded', 'false');
+        await expect(banner).not.toContainText('The watch is over.');
+
         // In the other Chat the suggestion is taken: its Epilogue is written for it by name.
         await page.goto(`/stories/${storyId}/chats/${closed}`);
-        await expect(banner.getByRole('heading', { name: 'A quiet watch' })).toBeVisible();
+        await expect(banner.getByRole('button', { name: /A quiet watch/ })).toBeVisible();
         await scriptTurn(request, 'The lamp burned on, and the reef kept its peace.');
         await banner.getByRole('button', { name: 'Write the epilogue' }).tap();
         await expect(page.getByRole('article', { name: 'Epilogue' })).toContainText('the reef kept its peace');
@@ -243,7 +288,7 @@ test('in a Story with no Endings the AI suggests one when the story closes: "Not
 
         // Its row says how it ended; a suggested Ending is not one of the Story's to be found.
         await page.goto(`/stories/${storyId}/chats`);
-        await expect(page.locator('[data-chat-ending]')).toHaveText('Ending: A quiet watch');
+        await expect(page.locator('[data-chat-ending]')).toHaveText(['Ending: A quiet watch', 'Ending: The night is done']);
         await expect(page.locator('[data-endings-found]')).toHaveCount(0);
     } finally {
         await request.delete(`/api/stories/${storyId}`);

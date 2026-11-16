@@ -53,7 +53,7 @@ test("a Character's profile holds their Diary: an entry on request, the next one
         // An empty Diary: what it is, and one button.
         let profile = await openProfile();
         const diary = () => page.getByRole('dialog', { name: 'Mira' }).getByRole('region', { name: 'Diary' });
-        await expect(diary()).toContainText('What Mira writes in private about the story so far, when you ask.');
+        await expect(diary()).toContainText('What Mira writes in private about the story so far, when you ask. Each entry uses credit like one reply.');
         await expect(diary().locator('[data-diary-entry]')).toHaveCount(0);
 
         await scriptEntry(request, 'A new keeper. Soft hands.\n\nWe will see how long he lasts.');

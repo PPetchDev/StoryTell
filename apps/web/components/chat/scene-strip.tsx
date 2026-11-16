@@ -2,7 +2,7 @@
 
 import { ComponentType, useState } from 'react';
 
-import { COLUMN } from '@/components/chat/chat-classes';
+import { COLUMN, SHORTEST_HIDDEN } from '@/components/chat/chat-classes';
 import {
     AfternoonIcon,
     CloseIcon,
@@ -77,14 +77,21 @@ export function SceneStrip({ current, timeOfDay, place = null, weather = null, o
     });
     return (
         // Half-way into the page's side padding, like the top bar.
-        <div className={`-mx-2 flex shrink-0 items-start border-b border-line bg-surface ${COLUMN}`}>
+        <div className={`-mx-2 flex shrink-0 items-start border-b border-line bg-surface ${COLUMN} ${SHORTEST_HIDDEN}`}>
             <button
                 type="button"
-                className="bare-button flex min-h-11 min-w-0 flex-1 flex-wrap items-center gap-x-3.5 gap-y-1 px-2 py-1.5 text-left text-sm text-muted cursor-pointer focus-ring-inset"
+                className="bare-button flex min-h-11 min-w-0 flex-1 flex-wrap items-center gap-x-2.5 gap-y-1 px-2 py-1.5 text-left text-sm text-muted cursor-pointer focus-ring-inset"
                 aria-expanded={open}
                 onClick={() => setOpen((was) => !was)}
             >
-                <span className={`shrink-0 font-semibold text-text ${open ? '' : 'max-w-[50%] truncate'}`}>
+                {/*
+                  * Closed, beside a Place: the name, the Time and the Place are one line of their own, and where they
+                  * don't all fit the name and the Place give way together, each by its own length. The Place used to get
+                  * only what the name left it, 86px of its 169 (docs/ui-audit-2026-11-16.md L9), though it is what changes
+                  * as the story moves. Otherwise this wrapper is not there for layout at all.
+                  */}
+                <span className={!open && place ? 'flex min-w-0 flex-[1_0_100%] items-center gap-x-2.5' : 'contents'} data-strip-line>
+                <span className={`font-semibold text-text ${open ? 'shrink-0' : place ? 'min-w-0 shrink truncate' : 'shrink-0 max-w-[50%] truncate'}`}>
                     <span className="sr-only">Scene: </span>
                     <PinIcon size={14} className={STRIP_ICON} />
                     {current ? current.name : 'Free play'}
@@ -99,12 +106,13 @@ export function SceneStrip({ current, timeOfDay, place = null, weather = null, o
                 )}
                 {place && (
                     // Where the story is: one line while closed, whole once opened.
-                    <span className={`min-w-0 text-text [overflow-wrap:anywhere] ${open ? '' : 'flex-1 truncate'}`}>
+                    <span className={`min-w-0 text-text [overflow-wrap:anywhere] ${open ? '' : 'shrink truncate'}`}>
                         <span className="sr-only">Place: </span>
                         <PlaceIcon size={14} className={STRIP_ICON} />
                         {place}
                     </span>
                 )}
+                </span>
                 {open && weather && (
                     <span className="min-w-0 text-text [overflow-wrap:anywhere]">
                         <span className="sr-only">Weather: </span>
