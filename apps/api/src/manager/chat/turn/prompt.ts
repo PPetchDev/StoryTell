@@ -144,6 +144,8 @@ export interface TurnPromptInput {
      * layer. None, or left out, and the prompt is as before.
      */
     diaries?: PromptDiary[];
+    /** Each Character's Thought before this reply (.scratch/character-minds/spec.md); none, or left out, and the prompt is as before. */
+    thoughts?: PromptThought[];
     /**
      * The most the Memory layer may take on the next turn, which the Story so far trigger reserves
      * (spec: "The budget is reserved"); left out, only the layer as it stands is counted.
@@ -265,6 +267,23 @@ export const PROMPT_LAYERS = {
     storySoFar: '# Story so far',
 } as const;
 
+/** A Character's Thought before this reply (.scratch/character-minds/spec.md): what they make of the moment and mean to do. */
+export interface PromptThought {
+    characterName: string;
+    text: string;
+}
+
+/**
+ * The Thoughts in the turn's trailing message, after "Where things stand": each Character thought
+ * on their own, from only what they know. The Narrator still decides what happens. Null with none.
+ */
+export function thoughtsBlock(thoughts: readonly PromptThought[] | undefined): string | null {
+    if (!thoughts || thoughts.length === 0) return null;
+    return `What the Characters are thinking right now, each knowing only what they know:
+${thoughts.map((thought) => `- ${thought.characterName}: ${thought.text}`).join('\n')}
+Let each speak and act from their own thought, in their own way, as far as the moment allows; you decide what actually happens. A thought is private: nobody else hears it, and nothing in it has happened.`;
+}
+
 /** A Character's inner-life line from their newest Diary entry (.scratch/diary/spec.md): feelings, never facts. */
 export interface PromptDiary {
     characterName: string;
@@ -318,12 +337,14 @@ You are the Narrator of an interactive story. You describe the Setting and actio
 - Choose who speaks: only Characters present who would naturally respond. Zero, one or several may speak, in any order, interleaved with narration.
 
 # Dialogue
-- A speech line holds only what the Character says aloud, the way people really talk: contractions, everyday words, sentences of mixed length. Never put stage directions, parentheses or *asterisk actions* inside it.
+- A speech line holds only what the Character says aloud. Never put stage directions, parentheses or *asterisk actions* inside it.
+- Write speech the way people really talk, not the way characters in a script do: mostly short, plain sentences, contractions and everyday words. People react before they explain, understate, change the subject and leave things unsaid. They rarely name their own feelings outright, and they don't make speeches.
+- Avoid the tics of written dialogue: lists of three, sentences that open the same way ("I can hear… I can hear…"), "not X, it's Y" turns ("No. It's worse."), strings of rhetorical questions, and a punchline in every line. Most lines are ordinary; let a clever one land on its own.
 - What a Character does (a look, a gesture, a blush) goes in a short narration line before or after the speech, and only when it adds something.
 - Keep each Character's voice distinct. Show it through their word choice and rhythm, as their Voice and Example lines do; never copy the card's descriptive words into the story as labels.
 - Don't repeat the same details turn after turn (ears, eyes, grins, how someone moves or sounds). Find a fresh detail or leave it out.
 - Dashes, trailing off and stammering only for a Character whose Voice calls for them. Italics for emphasis rarely.
-- Most turns, one or two Characters speak, and a speaker may say several sentences. The others react in narration or stay quiet; don't let everyone talk every turn.`;
+- Most turns, one or two Characters speak, and a speaker may say several sentences. The others react in narration or stay quiet: bystanders don't remark on every moment, and nobody chimes in just to be funny.`;
 }
 
 /**
@@ -572,7 +593,7 @@ export function povAndTense(story: PromptStory, identity: string): string {
 
 /** The trailing system message of every turn. */
 export function turnFinalInstruction(identity: string): string {
-    return `Write the next turn now. Do not write anything ${identity} says, thinks or does. Use @Name: lines for Character speech, spoken words only: no parentheses or *(stage directions)* inside them, even where earlier turns had them. Actions go in narration.`;
+    return `Write the next turn now. Do not write anything ${identity} says, thinks or does. Use @Name: lines for Character speech, spoken words only: no parentheses or *(stage directions)* inside them, even where earlier turns had them. Actions go in narration. Keep the speech plain and natural, the way people actually talk.`;
 }
 
 /**
@@ -593,6 +614,7 @@ export function stateReminder(
     lines.push(...details.where);
     if (present.length > 0) lines.push(`In the latest exchange: ${present.join(', ')}.`);
     if (details.wearing) lines.push(details.wearing);
+    if (details.goals) lines.push(details.goals);
     if (sittingOut.length > 0) lines.push(sittingOutSentence(sittingOut));
     lines.push(`Narrate in ${povAndTense(input.story, input.identity.name)}, and keep each Character as their card describes.`);
     lines.push(`Gender ${input.identity.name} only as their description or the user's own messages do, whatever earlier turns said.`);
@@ -693,6 +715,7 @@ export function buildTurnPrompt(input: TurnPromptInput): TurnPrompt {
             ...(epilogue
                 ? [epilogueFinalInstruction(identity)]
                 : [
+                      thoughtsBlock(input.thoughts),
                       suddenEventBlock(input.suddenEvent, identity),
                       rollBlock(input.roll, identity),
                       input.nudge ? nudgeLine(input.nudge) : null,

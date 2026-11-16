@@ -10,8 +10,13 @@ export enum DetailKind {
     /** Where the story is. */
     Place = 'place',
     Weather = 'weather',
-    /** What one Character is wearing; the only kind with a Character. */
+    /** What one Character is wearing. */
     Outfit = 'outfit',
+    /**
+     * What one Character is after now, in a short phrase from their side (.scratch/character-minds/spec.md);
+     * an empty value means they have none any more.
+     */
+    Goal = 'goal',
 }
 
 /**

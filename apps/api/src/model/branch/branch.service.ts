@@ -93,6 +93,7 @@ async function copyChat(manager: EntityManager, sourceChatId: number, through: n
         // Whether the user waved suggested Endings away (.scratch/endings/spec.md): the Branch keeps their choice.
         endingSuggestions: source.endingSuggestions,
         autoDiary: source.autoDiary,
+        characterThoughts: source.characterThoughts,
         ...(keepStorySoFar
             ? {
                   storySoFar: source.storySoFar,
@@ -294,6 +295,18 @@ const copyThaiReadings: CopyStep = async ({ manager, sourceChatId, through, mess
         [sourceChatId, olds, news, through],
     );
 };
+/** Character Thoughts (.scratch/character-minds/spec.md): copied with the Messages the Branch keeps, to their new ids. */
+const copyThoughts: CopyStep = async ({ manager, sourceChatId, through, messageIds }) => {
+    const [olds, news] = oldAndNewIds(messageIds);
+    await manager.query(
+        `INSERT INTO "message_thought" ("message_id", "character_id", "position", "text")
+         SELECT m."new_id", t."character_id", t."position", t."text"
+         FROM "message_thought" t JOIN "message" s ON s."id" = t."message_id"
+         JOIN unnest($2::int[], $3::int[]) AS m("old_id", "new_id") ON m."old_id" = t."message_id"
+         WHERE s."chat_id" = $1 AND s."position" <= $4 ORDER BY t."id"`,
+        [sourceChatId, olds, news, through],
+    );
+};
 /**
  * Beliefs and every BeliefChange (.scratch/memory-by-meaning/spec.md: "Branch copies Beliefs and
  * their changes with remapped ids"), as Memories are copied: every Belief id the source mentions
@@ -375,7 +388,7 @@ const remapMemoriesUsed: CopyStep = async ({ manager, chatId, memoryIds, beliefI
 };
 
 /** In order: Messages before anything that points at them, Memories before their changes and the Beliefs that contradict them. */
-const COPY_STEPS: CopyStep[] = [copyMessages, copyMessageParts, copyThaiReadings, copyMemories, copyBeliefs, remapMemoriesUsed, copyLedger, copySittingOut];
+const COPY_STEPS: CopyStep[] = [copyMessages, copyMessageParts, copyThaiReadings, copyThoughts, copyMemories, copyBeliefs, remapMemoriesUsed, copyLedger, copySittingOut];
 
 /** `count` fresh ids from `table`'s id sequence, ascending. */
 async function reserveIds(manager: EntityManager, table: string, count: number): Promise<number[]> {

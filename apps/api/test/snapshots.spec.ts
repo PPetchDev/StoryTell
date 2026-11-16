@@ -839,7 +839,8 @@ describe('Snapshots and the Gallery', () => {
 
             await snap(story.id, chat.id, { hint: 'zebra-hint-marker', scene: 'Mira holds a zebra-scene-marker lantern.' });
             // The Snapshot made one text call of its own; no judge or extraction ran for it.
-            expect(t.gateway.textCalls().map((call) => call.kind).slice(3)).toEqual(['snapshot_prompt']);
+            // A turn also asks each Character in the moment for a Thought (.scratch/character-minds/spec.md, tested in character-minds.spec.ts); this test is about the other calls.
+            expect(t.gateway.textCalls().map((call) => call.kind).filter((kind) => kind !== 'character_thought').slice(3)).toEqual(['snapshot_prompt']);
             expect((await t.http.get(`/api/stories/${story.id}/chats/${chat.id}/dashboard`).expect(200)).body).toEqual(before.dashboard);
             expect((await t.http.get(`/api/stories/${story.id}/chats/${chat.id}/memories`).expect(200)).body).toEqual(before.memories);
             expect(

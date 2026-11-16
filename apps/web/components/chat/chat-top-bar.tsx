@@ -405,6 +405,8 @@ interface ChatTopBarProps {
     onSetEndingSuggestions(on: boolean): void;
     /** Turns the Characters' own Diary entries on or off in this Chat. */
     onSetAutoDiary(on: boolean): void;
+    /** Turns the Characters' Thoughts before each reply on or off in this Chat. */
+    onSetCharacterThoughts(on: boolean): void;
     onReset(): void;
     /** Asks for the story's Epilogue (.scratch/endings/spec.md); the menu asks first. */
     onEndStory(): void;
@@ -443,6 +445,7 @@ export function ChatTopBar({
     onSetAutoRead,
     onSetEndingSuggestions,
     onSetAutoDiary,
+    onSetCharacterThoughts,
     onReset,
     onEndStory,
     canEndStory,
@@ -675,6 +678,22 @@ export function ChatTopBar({
                                 >
                                     <span className="flex min-w-0 flex-1 flex-col items-start">
                                         <MenuText label="Characters keep diaries" sub="They write now and then as you play" />
+                                    </span>
+                                    <span aria-hidden="true" className={SWITCH_TRACK}>
+                                        <span className={SWITCH_KNOB} />
+                                    </span>
+                                </button>
+                                {/* Each Character thinks before a reply (.scratch/character-minds/spec.md): on by default. */}
+                                <button
+                                    type="button"
+                                    role="switch"
+                                    aria-checked={chat.characterThoughts}
+                                    className={`${ITEM} flex-row items-center gap-3 text-text`}
+                                    disabled={busy}
+                                    onClick={() => onSetCharacterThoughts(!chat.characterThoughts)}
+                                >
+                                    <span className="flex min-w-0 flex-1 flex-col items-start">
+                                        <MenuText label="Characters think for themselves" sub="Each thinks before a reply, from what they know" />
                                     </span>
                                     <span aria-hidden="true" className={SWITCH_TRACK}>
                                         <span className={SWITCH_KNOB} />

@@ -19,6 +19,7 @@ const CALL_KINDS = Object.keys({
     write_for_me: true,
     thai_reading: true,
     diary_entry: true,
+    character_thought: true,
     snapshot_image: true,
     reference_image: true,
     expression_image: true,

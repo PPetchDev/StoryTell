@@ -21,6 +21,7 @@ const ProfileContext = createContext<{
     has(characterId: number): boolean;
     character(characterId: number): Character | undefined;
     setOutfits(outfits: Outfits): void;
+    setGoals(goals: Outfits): void;
     setChat(chat: DiaryChat | null): void;
 } | null>(null);
 
@@ -47,6 +48,18 @@ export function useProfileOutfits(outfits: ReadonlyArray<{ characterId: number; 
     useEffect(() => {
         setOutfits?.(Object.fromEntries((JSON.parse(key) as Array<{ characterId: number; outfit: string }>).map((entry) => [entry.characterId, entry.outfit])));
     }, [setOutfits, key]);
+}
+
+/**
+ * Tells the profiles what each Character is after now, from the Chat on screen
+ * (.scratch/character-minds/spec.md), so a profile shows it. Outside a Chat it does nothing.
+ */
+export function useProfileGoals(goals: ReadonlyArray<{ characterId: number; goal: string }> | undefined): void {
+    const setGoals = useContext(ProfileContext)?.setGoals;
+    const key = JSON.stringify(goals ?? []);
+    useEffect(() => {
+        setGoals?.(Object.fromEntries((JSON.parse(key) as Array<{ characterId: number; goal: string }>).map((entry) => [entry.characterId, entry.goal])));
+    }, [setGoals, key]);
 }
 
 /**
@@ -84,8 +97,9 @@ export function CharacterProfiles({ characters, children }: { characters: readon
     const has = useCallback((characterId: number) => characters.some((character) => character.id === characterId), [characters]);
     const find = useCallback((characterId: number) => characters.find((character) => character.id === characterId), [characters]);
     const [outfits, setOutfits] = useState<Outfits>({});
+    const [goals, setGoals] = useState<Outfits>({});
     const [chat, setChat] = useState<DiaryChat | null>(null);
-    const value = useMemo(() => ({ open: setOpenId, has, character: find, setOutfits, setChat }), [has, find]);
+    const value = useMemo(() => ({ open: setOpenId, has, character: find, setOutfits, setGoals, setChat }), [has, find]);
     const character = characters.find((candidate) => candidate.id === openId);
     const close = useCallback(() => setOpenId(null), []);
 
@@ -97,6 +111,7 @@ export function CharacterProfiles({ characters, children }: { characters: readon
                     character={character}
                     colour={characterColour(character.id, characters.map((member) => member.id))}
                     outfit={outfits[character.id] ?? null}
+                    goal={goals[character.id] ?? null}
                     chat={chat}
                     onClose={close}
                 />
@@ -116,12 +131,15 @@ function CharacterProfileSheet({
     character,
     colour,
     outfit,
+    goal,
     chat,
     onClose,
 }: {
     character: Character;
     colour: string;
     outfit: string | null;
+    /** What they are after now in this Chat (.scratch/character-minds/spec.md); null with none. */
+    goal: string | null;
     chat: DiaryChat | null;
     onClose(): void;
 }) {
@@ -162,6 +180,13 @@ function CharacterProfileSheet({
                     <section className="rounded-lg bg-surface-raised px-3.5 py-3">
                         <h3 className="mt-0 mb-1 text-sm font-semibold text-muted">Wearing now</h3>
                         <p className="m-0 leading-normal [overflow-wrap:anywhere]">{outfit}</p>
+                    </section>
+                )}
+                {/* What they are after now in this Chat (.scratch/character-minds/spec.md). */}
+                {goal && (
+                    <section className="rounded-lg bg-surface-raised px-3.5 py-3" data-goal>
+                        <h3 className="mt-0 mb-1 text-sm font-semibold text-muted">Wants now</h3>
+                        <p className="m-0 leading-normal [overflow-wrap:anywhere]">{goal}</p>
                     </section>
                 )}
                 {/* Their Diary in this Chat, above who they are: it is what changes as the story goes. */}

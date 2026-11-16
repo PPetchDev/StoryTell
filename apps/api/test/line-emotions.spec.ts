@@ -134,8 +134,9 @@ describe('The Judge tags each line a Character speaks', () => {
         expect(calls).toHaveLength(1);
         expect(calls[0].messages[1].content).toContain('[1] @Mira: Better.\n\n[2] @Kai: She means thank you.\n\n[3] @Mira: I do not.');
         expect(calls[0].messages[0].content).toContain('Expression rule:');
-        expect(calls[0].maxTokens).toBe(1020); // 700, 200 for the line tags and 120 for the Place, weather and outfits
-        expect(t.gateway.textCalls().map((call) => call.kind).sort()).toEqual(['judge', 'memory_extraction', 'turn']);
+        expect(calls[0].maxTokens).toBe(1080); // 700, 200 for the line tags and 180 for the Place, weather and outfits
+        // A turn also asks each Character in the moment for a Thought (.scratch/character-minds/spec.md, tested in character-minds.spec.ts); this test is about the other calls.
+        expect(t.gateway.textCalls().map((call) => call.kind).filter((kind) => kind !== 'character_thought').sort()).toEqual(['judge', 'memory_extraction', 'turn']);
     });
 
     it('drops tags for lines that are not there, and leaves an untagged line null', async () => {
@@ -178,7 +179,7 @@ describe('The Judge tags each line a Character speaks', () => {
         expect(call.messages[0].content).not.toContain('Expression');
         expect(call.messages[0].content).not.toContain('"expressions"');
         expect(call.messages[1].content).toContain('Mira watches the boots.\n\n@Mira: Better.\n\n@Kai: She means thank you.\n\n@Mira: I do not.');
-        expect(call.maxTokens).toBe(820); // 700 and the 120 the Place, weather and outfits answer takes
+        expect(call.maxTokens).toBe(880); // 700 and the 180 the Place, weather, outfits and goals answer takes
         expect(emotions(lastAi(played))).toEqual([null, null, null, null]);
         // Speech always answers the field, null while untagged; narration has none.
         expect(lastAi(played).parts!.slice(0, 2)).toEqual([

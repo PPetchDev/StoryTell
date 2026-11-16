@@ -7,7 +7,10 @@ import { judgeDetailsSection } from '../src/manager/chat/details/details.js';
 import { startTestApp, TestApp } from './harness/test-app.js';
 
 /** The rule line that closes the judge's Place, weather and outfits section (.scratch/info-box/spec.md): the same words every turn. */
-const DETAILS_RULE = judgeDetailsSection({ place: null, weather: null, outfits: [] }, []).split(String.fromCharCode(10)).at(-1)!;
+// The details section's two rules, its last lines: the details, then Goals (.scratch/character-minds/spec.md).
+const DETAILS_LINES = judgeDetailsSection({ place: null, weather: null, outfits: [], goals: [] }, []).split(String.fromCharCode(10));
+const DETAILS_RULE = DETAILS_LINES.at(-2)!;
+const GOALS_RULE = DETAILS_LINES.at(-1)!;
 
 /**
  * The Bond, Arc and Scene judge, the change ledger and the dashboard (ticket 27), through the
@@ -324,7 +327,7 @@ describe('The Bond, Arc and Scene judge, the ledger and the dashboard', () => {
             expect(lastAi(played).judge).toEqual({ status: 'done', error: null });
             const calls = t.gateway.textCalls('judge');
             expect(calls).toHaveLength(1);
-            expect(calls[0]).toMatchObject({ kind: 'judge', json: true, maxTokens: 820, servedFor: { storyId: story.id, chatId: chat.id } });
+            expect(calls[0]).toMatchObject({ kind: 'judge', json: true, maxTokens: 880, servedFor: { storyId: story.id, chatId: chat.id } });
             expect(calls[0].messages.map((message) => message.role)).toEqual(['system', 'user']);
             expect(calls[0].messages[0].content).toContain('At most one change per Bond per turn.');
             expect(calls[0].messages[1].content).toBe(`# Cast
@@ -361,11 +364,13 @@ Ash: I take them off.
 
 @Mira: Better.
 
-# Place, weather and outfits
+# Place, weather, outfits and goals
 Place: not yet known
 Weather: not yet known
 Wearing: Mira: not yet known; Kai: not yet known
-${DETAILS_RULE}`);
+Goals: Mira: none yet; Kai: none yet
+${DETAILS_RULE}
+${GOALS_RULE}`);
         });
 
         it('applies a judgement: the Bond change, Arc step and Scene advance are recorded with their events, before and after, and the causing Message', async () => {

@@ -26,6 +26,7 @@ function memoryColumns(record: TurnMemoryRecord | null): Pick<MessageEntity, 'me
 }
 import { ReplyVersionEntity } from './entities/reply-version.entity.js';
 import { ThaiReadingEntity } from './entities/thai-reading.entity.js';
+import { MessageThoughtEntity } from './entities/message-thought.entity.js';
 
 /** The worn identity as a User Message records it: the Persona (null for the Role) and the name. */
 export interface StampedIdentity {
@@ -56,6 +57,7 @@ export class ChatModelService {
         @InjectRepository(MessageEntity) private readonly messages: Repository<MessageEntity>,
         @InjectRepository(ChatSittingOutEntity) private readonly sittingOut: Repository<ChatSittingOutEntity>,
         @InjectRepository(ThaiReadingEntity) private readonly thaiReadings: Repository<ThaiReadingEntity>,
+        @InjectRepository(MessageThoughtEntity) private readonly thoughts: Repository<MessageThoughtEntity>,
     ) {}
 
     /** A Story's Chats, most recently played first. */
@@ -194,6 +196,23 @@ export class ChatModelService {
     }
 
     /** Whether the Characters write Diary entries by themselves in this Chat (.scratch/diary/spec.md). */
+    /** Whether each Character thinks before a reply in this Chat (.scratch/character-minds/spec.md). */
+    async setCharacterThoughts(chatId: number, characterThoughts: boolean): Promise<void> {
+        await this.chats.update({ id: chatId }, { characterThoughts });
+    }
+
+    /** The Thoughts kept with these Messages, in order. */
+    async findThoughts(messageIds: number[]): Promise<MessageThoughtEntity[]> {
+        if (messageIds.length === 0) return [];
+        return this.thoughts.find({ where: { messageId: In(messageIds) }, order: { messageId: 'ASC', position: 'ASC' } });
+    }
+
+    /** Replaces the Thoughts kept with a Message: a reply written again keeps only its own. */
+    async setThoughts(messageId: number, thoughts: Array<{ characterId: number; text: string }>): Promise<void> {
+        await this.thoughts.delete({ messageId });
+        if (thoughts.length > 0) await this.thoughts.insert(thoughts.map((thought, position) => ({ messageId, characterId: thought.characterId, position, text: thought.text })));
+    }
+
     async setAutoDiary(chatId: number, autoDiary: boolean): Promise<void> {
         await this.chats.update({ id: chatId }, { autoDiary });
     }

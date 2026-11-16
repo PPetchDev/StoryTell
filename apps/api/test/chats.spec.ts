@@ -477,7 +477,7 @@ A Character knows only the Memories it is tagged on and acts as if the rest neve
                 { role: 'user', content: 'I knock the rain off my hat.' },
                 {
                     role: 'system',
-                    content: expect.stringMatching(/^Where things stand: [^\n]+\nWrite the next turn now. Do not write anything Ash says, thinks or does. Use @Name: lines for Character speech, spoken words only: no parentheses or \*\(stage directions\)\* inside them, even where earlier turns had them. Actions go in narration.$/),
+                    content: expect.stringMatching(/^Where things stand: [^\n]+\nWrite the next turn now. Do not write anything Ash says, thinks or does. Use @Name: lines for Character speech, spoken words only: no parentheses or \*\(stage directions\)\* inside them, even where earlier turns had them. Actions go in narration. Keep the speech plain and natural, the way people actually talk.$/),
                 },
             ]);
             expect(call.stop).toEqual(['\nAsh:', '\n@Ash:', '\nYou:']);
@@ -891,7 +891,7 @@ A Character knows only the Memories it is tagged on and acts as if the rest neve
                 },
                 {
                     role: 'system',
-                    content: expect.stringMatching(/^Where things stand: [^\n]+\nWrite the next turn now. Do not write anything Ash says, thinks or does. Use @Name: lines for Character speech, spoken words only: no parentheses or \*\(stage directions\)\* inside them, even where earlier turns had them. Actions go in narration.$/),
+                    content: expect.stringMatching(/^Where things stand: [^\n]+\nWrite the next turn now. Do not write anything Ash says, thinks or does. Use @Name: lines for Character speech, spoken words only: no parentheses or \*\(stage directions\)\* inside them, even where earlier turns had them. Actions go in narration. Keep the speech plain and natural, the way people actually talk.$/),
                 },
             ]);
             // The rule against writing the worn identity still holds in the system message.
@@ -1211,7 +1211,7 @@ describe('Chats through the real gateway', () => {
             provider: { only: ['deepinfra'], allow_fallbacks: false },
             reasoning: { enabled: false },
             response_format: { type: 'json_object' },
-            max_tokens: 820, // 700 and the 120 the Place, weather and outfits answer takes (.scratch/info-box/spec.md)
+            max_tokens: 880, // 700 and the 180 the Place, weather, outfits and goals answer takes (.scratch/info-box/spec.md, .scratch/character-minds/spec.md)
         });
         expect(judgeRequest.body).not.toHaveProperty('stop');
         expect(memoryRequest.body).toMatchObject({

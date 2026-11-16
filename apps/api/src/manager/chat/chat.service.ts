@@ -73,6 +73,9 @@ import { beliefResponses, choiceBeliefs } from './memory/beliefs.js';
 import { promptStorySoFar, StorySoFarManagerService } from './story-so-far/story-so-far.service.js';
 import { SuggestedRepliesManagerService } from './suggestions/suggested-replies.service.js';
 import { DiaryManagerService } from './diary/diary.service.js';
+import { ThoughtsManagerService } from './thoughts/thoughts.service.js';
+import { thinkers, ThoughtPromptInput } from './thoughts/thoughts.js';
+import type { MessageThoughtEntity } from '../../model/chat/entities/message-thought.entity.js';
 import { renderUser } from './memory/render-user.js';
 import { autoDiaryWriters, diariesInPlay, DIARY_AFTER_THE_ENDING, diaryMoment, storySince } from './diary/diary.js';
 import type { DiaryEntryEntity, DiaryEntryResponse } from '../../model/ledger/entities/diary-entry.entity.js';
@@ -100,7 +103,7 @@ import { chosenLore, LoreInPlay, loreInPlayOf, promptLore, selectLoreAt } from '
 import { documentQuery } from '../document/document-search.js';
 import { DocumentSearchManagerService, DocumentsInPlay, hasDocumentPassages } from './document-search.service.js';
 import { TurnMemoryRecord } from '../../model/chat/chat.service.js';
-import { CastName, ParseOptions, parseReply, partsToText, releasedText, ReplyPart } from './turn/reply-parser.js';
+import { CastName, historyPartsText, ParseOptions, parseReply, partsToText, releasedText, ReplyPart } from './turn/reply-parser.js';
 import { TurnStoppedError, TurnStream } from './turn/turn-stream.js';
 import { Dice } from '../../service/dice/dice.js';
 import { Roll, ROLL_SIDES, ROLL_TARGETS } from './roll.js';
@@ -132,7 +135,11 @@ export interface ChatList {
 }
 
 /** A Message on the Chat screen: what it is, and its current Thai reading or null. */
-export type ChatMessageResponse = MessageResponse & { thaiReading: string | null };
+export type ChatMessageResponse = MessageResponse & {
+    thaiReading: string | null;
+    /** What each Character thought before this reply (.scratch/character-minds/spec.md), in order; empty for none. */
+    thoughts: Array<{ characterId: number; characterName: string; text: string }>;
+};
 
 /** A Chat as the Chat screen reads it: its Messages plus everything the notice line needs. */
 export interface ChatDetail extends ChatSummary {
@@ -155,6 +162,8 @@ export interface ChatDetail extends ChatSummary {
     weather: string | null;
     /** What each Character is wearing now, for those the story has shown, in cast order. */
     outfits: Array<{ characterId: number; outfit: string }>;
+    /** What each Character is after now (.scratch/character-minds/spec.md), for those who are after something, in cast order. */
+    goals: Array<{ characterId: number; goal: string }>;
     /** The worn identity's name, under which the next User Message shows. */
     identityName: string;
     /** The worn Persona; null while the Chat wears its Story's Role. */
@@ -195,6 +204,8 @@ export interface ChatDetail extends ChatSummary {
     endingSuggestions: boolean | null;
     /** Whether the Characters write Diary entries by themselves in this Chat (.scratch/diary/spec.md). */
     autoDiary: boolean;
+    /** Whether each Character thinks before a reply in this Chat (.scratch/character-minds/spec.md). */
+    characterThoughts: boolean;
     /** Entries are being written by themselves right now: the Chat screen re-reads until they are done. */
     diaryWriting: boolean;
     /** Each Character's newest Diary entry, in cast order: a new one is shown to the user. */
@@ -333,6 +344,8 @@ export interface ChatFields {
     endingSuggestions?: boolean;
     /** Whether the Characters write Diary entries by themselves (.scratch/diary/spec.md). */
     autoDiary?: boolean;
+    /** Whether each Character thinks before a reply (.scratch/character-minds/spec.md). */
+    characterThoughts?: boolean;
 }
 @Injectable()
 export class ChatManagerService {
@@ -368,6 +381,7 @@ export class ChatManagerService {
         private readonly writeForMeWriter: WriteForMeManagerService,
         private readonly thaiReadings: ThaiReadingManagerService,
         private readonly diaryWriter: DiaryManagerService,
+        private readonly thinker: ThoughtsManagerService,
         private readonly storySoFar: StorySoFarManagerService,
         private readonly documentSearch: DocumentSearchManagerService,
         private readonly gateway: ModelGateway,
@@ -668,6 +682,73 @@ export class ChatManagerService {
         return { ...(await this.getChat(story.id, chatId)), rolledBack };
     }
 
+    /**
+     * The Thoughts before a reply (.scratch/character-minds/spec.md): each Character the moment
+     * holds thinks, in parallel, from only what they know. A failed or slow one is dropped and
+     * logged; the reply never waits on it.
+     */
+    private async thinkFirst(
+        story: StoryEntity,
+        chat: ChatEntity,
+        context: {
+            identity: WornIdentity;
+            state: LedgerState;
+            memories: Awaited<ReturnType<MemoryModelService['findByChat']>>;
+            held: Awaited<ReturnType<BeliefModelService['findByChat']>>;
+            entries: DiaryEntryEntity[];
+            history: PromptHistoryMessage[];
+            userText: string | null;
+            nudge: string | null;
+            sittingOut: CastName[];
+        },
+    ): Promise<Array<{ characterId: number; name: string; text: string }>> {
+        const { identity, state } = context;
+        const who = thinkers({
+            cast: story.characters.map((character) => ({ id: character.id, name: character.name })),
+            present: inLatestExchange(story, chat, context.userText),
+            nudge: context.nudge,
+            sittingOut: context.sittingOut.map((character) => character.id),
+        });
+        if (who.length === 0) return [];
+        const details = currentDetails(state.detailChanges);
+        const scene = story.scenes.find((candidate) => candidate.id === chat.currentSceneId) ?? null;
+        const bonds = currentBonds(state.bondChanges);
+        const innerLives = promptDiaries(story, chat, context.entries);
+        const nameOf = (id: number | null): string | null => (id === null ? identity.name : (story.characters.find((character) => character.id === id)?.name ?? null));
+        const told = context.history.map((message) => (message.role === 'user' ? `${identity.name}: ${message.text}` : message.text));
+        const thoughts = await Promise.all(
+            who.map(async (member) => {
+                const character = story.characters.find((candidate) => candidate.id === member.id)!;
+                const input: ThoughtPromptInput = {
+                    character: { name: character.name, personality: character.personality, voice: character.voice, background: character.background },
+                    identityName: identity.name,
+                    identityDescription: identity.description,
+                    setting: story.setting,
+                    scene: scene ? { name: scene.name, situation: scene.situation } : null,
+                    timeOfDay: chat.timeOfDay,
+                    place: details.place,
+                    goal: details.goals.find((goal) => goal.characterId === member.id)?.goal ?? null,
+                    bonds: bonds.flatMap((bond) => {
+                        const towardName = nameOf(bond.toCharacterId);
+                        if (bond.fromCharacterId !== member.id || towardName === null) return [];
+                        return [{ towardName, label: bond.label, description: bond.description, levels: bond.levels() }];
+                    }),
+                    beliefs: context.held.filter((belief) => belief.active && belief.characterId === member.id).map((belief) => renderUser(belief.text, identity.name)),
+                    memories: context.memories
+                        .filter((memory) => !memory.archived && memory.knownByIds().includes(member.id))
+                        .map((memory) => renderUser(memory.text, identity.name)),
+                    innerLife: innerLives.find((line) => line.characterName === member.name)?.text ?? null,
+                    story: told,
+                    userText: context.userText,
+                };
+                const thought = await this.thinker.think(input, { storyId: story.id, chatId: chat.id });
+                if (thought.text === null) this.logger.warn(`Chat ${chat.id}: ${member.name}'s Thought dropped: ${thought.error}`);
+                return thought.text === null ? null : { characterId: member.id, name: member.name, text: thought.text };
+            }),
+        );
+        return thoughts.filter((thought): thought is { characterId: number; name: string; text: string } => thought !== null);
+    }
+
     /** Spec: "Start both background calls in parallel, with their status set to pending." */
     private startBackground(story: StoryEntity, chatId: number, messageId: number): void {
         const judged = this.judge.run(story, chatId, messageId);
@@ -811,6 +892,10 @@ export class ChatManagerService {
         if (fields.autoRead !== undefined) {
             chat.autoRead = fields.autoRead;
             await this.chatModel.setAutoRead(chat.id, chat.autoRead);
+        }
+        if (fields.characterThoughts !== undefined) {
+            chat.characterThoughts = fields.characterThoughts;
+            await this.chatModel.setCharacterThoughts(chat.id, chat.characterThoughts);
         }
         if (fields.autoDiary !== undefined) {
             chat.autoDiary = fields.autoDiary;
@@ -1309,7 +1394,8 @@ export class ChatManagerService {
                 text:
                     message.kind === MessageKind.User
                         ? (message.text ?? '')
-                        : partsToText(message.parts.map((part) => part.toResponse())),
+                        : // Spoken words only in speech lines, so the model is not taught to put stage directions there.
+                          historyPartsText(message.parts.map((part) => part.toResponse())),
             }));
         const identity: WornIdentity = wornIdentity(story, chat);
         const sittingOut = sittingOutOf(story, chat);
@@ -1340,6 +1426,9 @@ export class ChatManagerService {
         });
         if (query) this.logger.debug(memorySearchLogLine(story.id, chat.id, choice));
         const memoryRecord: TurnMemoryRecord = { used: memoriesUsedOf(choice), query };
+        // Each Character in the moment thinks first, from only what they know (.scratch/character-minds/spec.md). Never on an Epilogue.
+        const thoughts =
+            asEpilogue || !chat.characterThoughts ? [] : await this.thinkFirst(story, chat, { identity, state, memories, held, entries, history, userText, nudge, sittingOut });
         const prompt = buildTurnPrompt({
             story,
             identity,
@@ -1366,6 +1455,7 @@ export class ChatManagerService {
             suddenEvent: promptSuddenEvent(eventState(story.suddenEvents ?? [], state.suddenEventSteps), newestAiMessage(chat)?.id ?? null),
             roll: userText !== null ? rollOf(chat.messages[chat.messages.length - 1]) : null,
             epilogue: asEpilogue ? promptEpilogue(endingState(story.endings ?? [], state.endingsReached)) : null,
+            thoughts: thoughts.map((thought) => ({ characterName: thought.name, text: thought.text })),
         });
         if (prompt.trimmed > 0) {
             this.logger.log(`Chat ${chat.id}: left out the ${prompt.trimmed} oldest Messages to fit the prompt budget`);
@@ -1412,6 +1502,8 @@ export class ChatManagerService {
             // A Message after the one with versions settles it on its shown version.
             await this.chatModel.dropReplyVersions(chat.id);
         }
+        // Kept with the reply they were thought for; a reply written again keeps only its own.
+        await this.chatModel.setThoughts(aiMessageId, thoughts.map((thought) => ({ characterId: thought.characterId, text: thought.text })));
         // Last, and only once stored: the client's final parts are the stored Message.
         stream?.onParts(parts);
         await this.chatModel.touchPlayed(chat.id);
@@ -1575,7 +1667,7 @@ export class ChatManagerService {
     }
 
     private async detail(story: StoryEntity, chat: ChatEntity): Promise<ChatDetail> {
-        const [settings, creditOut, source, readings, appSavedReplies, appReplaceRules, bondChanges, beliefs, eventSteps, detailChanges, endingsReached, personas, diaryEntries] = await Promise.all([
+        const [settings, creditOut, source, readings, appSavedReplies, appReplaceRules, bondChanges, beliefs, eventSteps, detailChanges, endingsReached, personas, diaryEntries, thoughtRows] = await Promise.all([
             this.settingsModel.get(),
             this.creditOut(),
             // Read live, so a rename of the source shows.
@@ -1592,6 +1684,7 @@ export class ChatManagerService {
             // The Account's Personas: few, and only those this Chat shows are answered.
             this.personaModel.findAll(),
             this.ledger.diaryEntriesOf(chat.id),
+            this.chatModel.findThoughts(chat.messages.map((message) => message.id)),
         ]);
         // Oldest first, so each Character's newest entry is the one left.
         const newestEntry = new Map(diaryEntries.map((entry) => [entry.characterId, entry.id]));
@@ -1614,6 +1707,10 @@ export class ChatManagerService {
                 const outfit = details.outfits.find((entry) => entry.characterId === character.id)?.outfit;
                 return outfit ? [{ characterId: character.id, outfit }] : [];
             }),
+            goals: story.characters.flatMap((character) => {
+                const goal = details.goals.find((entry) => entry.characterId === character.id)?.goal;
+                return goal ? [{ characterId: character.id, goal }] : [];
+            }),
             identityName: identity.name,
             personaId: identity.personaId,
             roleName: story.role.name,
@@ -1623,6 +1720,8 @@ export class ChatManagerService {
             messages: withThaiReadings(
                 chat.messages.map((message) => message.toResponse()),
                 readings,
+                thoughtRows,
+                story.characters,
             ),
             awaitingReply: awaitingReply(chat),
             ...playableStatus(story),
@@ -1643,6 +1742,7 @@ export class ChatManagerService {
             autoRead: chat.autoRead,
             endingSuggestions: (story.endings ?? []).some(endingReady) ? null : chat.endingSuggestions,
             autoDiary: chat.autoDiary,
+            characterThoughts: chat.characterThoughts,
             diaryWriting: this.diaryRuns.has(chat.id),
             diaryLatest: story.characters.flatMap((character) => {
                 const entryId = newestEntry.get(character.id);
@@ -1680,7 +1780,7 @@ export class ChatManagerService {
 function promptHistory(messages: MessageEntity[]): PromptHistoryMessage[] {
     return messages.map((message) => ({
         role: message.kind === MessageKind.User ? 'user' : 'assistant',
-        text: message.kind === MessageKind.User ? (message.text ?? '') : partsToText(message.parts.map((part) => part.toResponse())),
+        text: message.kind === MessageKind.User ? (message.text ?? '') : historyPartsText(message.parts.map((part) => part.toResponse())),
     }));
 }
 
@@ -1832,11 +1932,20 @@ function newestAiMessage(chat: ChatEntity): MessageEntity | null {
  * Each Message with its current Thai reading: the one whose fingerprint matches its stored text
  * now. A changed text (an edit, another Reply version) simply finds none.
  */
-function withThaiReadings(messages: MessageResponse[], readings: ThaiReadingEntity[]): ChatMessageResponse[] {
+function withThaiReadings(
+    messages: MessageResponse[],
+    readings: ThaiReadingEntity[],
+    thoughts: MessageThoughtEntity[] = [],
+    characters: ReadonlyArray<{ id: number; name: string }> = [],
+): ChatMessageResponse[] {
     const byMessage = new Map<string, string>(readings.map((reading) => [`${reading.messageId}:${reading.sourceFingerprint}`, reading.text]));
     return messages.map((message) => ({
         ...message,
         thaiReading: byMessage.get(`${message.id}:${sourceFingerprint(thaiReadingSource(message))}`) ?? null,
+        thoughts: thoughts.flatMap((thought) => {
+            const characterName = characters.find((character) => character.id === thought.characterId)?.name;
+            return thought.messageId === message.id && characterName ? [{ characterId: thought.characterId, characterName, text: thought.text }] : [];
+        }),
     }));
 }
 

@@ -142,6 +142,15 @@ export interface AiMessage {
     createdAt: string;
     /** Its Thai reading for the text as it stands; null when none was made (.scratch/write-for-me/spec.md). */
     thaiReading: string | null;
+    /** What each Character thought before it (.scratch/character-minds/spec.md), shown only on a tap; empty or absent for none. */
+    thoughts?: MessageThought[];
+}
+
+/** One Character's Thought before a reply. */
+export interface MessageThought {
+    characterId: number;
+    characterName: string;
+    text: string;
 }
 
 export type Message = UserMessage | AiMessage;
@@ -161,6 +170,10 @@ export interface Chat extends ChatSummary {
     endingSuggestions: boolean | null;
     /** Whether the Characters write Diary entries by themselves as the story goes (.scratch/diary/spec.md). */
     autoDiary: boolean;
+    /** Whether each Character thinks on their own before a reply (.scratch/character-minds/spec.md). */
+    characterThoughts: boolean;
+    /** What each Character is after now, for those who are after something (.scratch/character-minds/spec.md). */
+    goals?: Array<{ characterId: number; goal: string }>;
     /** Entries are being written by themselves right now: the Chat screen re-reads until they are done. */
     diaryWriting: boolean;
     /** Each Character's newest Diary entry: a new one is shown as a toast. */
@@ -414,6 +427,9 @@ export const chatApi = {
     /** Whether the Judge may suggest an Ending in this Chat: "Not yet" turns it off, the Chat menu's switch sets it either way. */
     setEndingSuggestions: (storyId: number, chatId: number, endingSuggestions: boolean) =>
         apiSend<Chat>('PATCH', `/stories/${storyId}/chats/${chatId}`, { endingSuggestions }),
+    /** Whether each Character thinks before a reply in this Chat. */
+    setCharacterThoughts: (storyId: number, chatId: number, characterThoughts: boolean) =>
+        apiSend<Chat>('PATCH', `/stories/${storyId}/chats/${chatId}`, { characterThoughts }),
     /** Whether the Characters write Diary entries by themselves in this Chat. */
     setAutoDiary: (storyId: number, chatId: number, autoDiary: boolean) => apiSend<Chat>('PATCH', `/stories/${storyId}/chats/${chatId}`, { autoDiary }),
     /** Sets the Author's note, read from the next turn on; an empty text clears it. */

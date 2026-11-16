@@ -22,6 +22,7 @@ import { AiMessageParts, MessageBody, UserLine } from '@/components/chat/message
 import { ReadAloudAction, ReadAloudControls, readingNowOf, useReadAloud } from '@/components/chat/read-aloud';
 import { MessageSnapshots } from '@/components/chat/snapshots';
 import { ThaiReadingAction, ThaiReadingBlock, ThaiReadings } from '@/components/chat/thai-reading';
+import { MessageThoughts } from '@/components/chat/message-thoughts';
 import { BranchIcon, CameraIcon, ChevronLeftIcon, ChevronRightIcon, MoreIcon, PencilIcon, UndoIcon } from '@/components/icons';
 import { ConfirmButton } from '@/components/story-editor/fields';
 import { Cast, Portraits } from '@/lib/character-colour';
@@ -408,6 +409,7 @@ const TAPPABLE = '[[data-can-tap]_&:hover]:cursor-pointer [-webkit-tap-highlight
 function sameMessage(a: Message, b: Message): boolean {
     if (a === b) return true;
     if (a.id !== b.id || a.thaiReading !== b.thaiReading) return false;
+    if (a.kind === 'ai' && b.kind === 'ai' && (a.thoughts?.length ?? 0) !== (b.thoughts?.length ?? 0)) return false;
     if (a.kind === 'user' || b.kind === 'user') {
         return a.kind === 'user' && b.kind === 'user' && a.text === b.text && a.identityName === b.identityName;
     }
@@ -610,6 +612,8 @@ const MessageView = memo(function MessageView({
                             </p>
                         )}
                         <MessageBody message={message} cast={cast} portraits={portraits} readingNow={readingNow} />
+                        {/* What each Character thought before it, behind a tap (.scratch/character-minds/spec.md). */}
+                        {message.kind === 'ai' && <MessageThoughts thoughts={message.thoughts} />}
                     </>
                 )}
                 {/* Its Thai reading, or why one failed: under the story text, above the Snapshots. */}

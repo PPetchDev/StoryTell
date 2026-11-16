@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { ChatBackdrop } from '@/components/chat/backdrop';
-import { useOpenProfile, useProfileChat, useProfileOutfits } from '@/components/chat/character-profile';
+import { useOpenProfile, useProfileChat, useProfileGoals, useProfileOutfits } from '@/components/chat/character-profile';
 import { diaryEntrySeen, markDiaryEntrySeen } from '@/lib/diary-seen';
 import { CharacterRow } from '@/components/chat/character-row';
 import { ChatComposer } from '@/components/chat/chat-composer';
@@ -213,6 +213,8 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
 
     // A Character's profile shows what they are wearing now in this Chat (.scratch/info-box/spec.md).
     useProfileOutfits(chat.outfits);
+    // And what they are after now (.scratch/character-minds/spec.md).
+    useProfileGoals(chat.goals);
     // And their Diary, which is written at the Chat's newest AI Message (.scratch/diary/spec.md).
     useProfileChat(chat.storyId, chat.id, chat.messages.findLast((message) => message.kind === 'ai')?.id ?? null);
 
@@ -624,6 +626,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                 onSetAutoRead={(autoRead) => void runWrite(() => chatApi.setAutoRead(chat.storyId, chat.id, autoRead))}
                 onSetEndingSuggestions={(on) => void runWrite(() => chatApi.setEndingSuggestions(chat.storyId, chat.id, on))}
                 onSetAutoDiary={(on) => void runWrite(() => chatApi.setAutoDiary(chat.storyId, chat.id, on))}
+                onSetCharacterThoughts={(on) => void runWrite(() => chatApi.setCharacterThoughts(chat.storyId, chat.id, on))}
                 onSetSittingOut={(characterIds) =>
                     void runWrite(() => chatApi.setSittingOut(chat.storyId, chat.id, characterIds))
                 }

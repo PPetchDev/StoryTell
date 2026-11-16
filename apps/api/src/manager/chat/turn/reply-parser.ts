@@ -120,6 +120,32 @@ export function partsToText(parts: ReplyPart[]): string {
         .join('\n\n');
 }
 
+/**
+ * A speech line's spoken words only: *asterisk asides* and (parenthesised directions) taken out.
+ * For the history a prompt reads, never for what is kept or shown (.scratch/natural-speech/spec.md):
+ * replies that put stage directions inside speech taught the model to keep doing it, whatever the
+ * rules said, so earlier replies reach it as clean examples.
+ */
+export function spokenOnly(text: string): string {
+    return text
+        .replace(/\*[^*\n]+\*/g, ' ')
+        .replace(/\([^()\n]*\)/g, ' ')
+        .replace(/[ \t]+([,.!?;:…])/g, '$1')
+        .replace(/[ \t]{2,}/g, ' ')
+        .trim();
+}
+
+/** A reply as the history of a prompt reads it: `partsToText`, with each speech line's words only; a line left with none is dropped. */
+export function historyPartsText(parts: ReplyPart[]): string {
+    return partsToText(
+        parts.flatMap((part): ReplyPart[] => {
+            if (part.kind !== 'speech') return [part];
+            const text = spokenOnly(part.text);
+            return text === '' ? [] : [{ ...part, text }];
+        }),
+    );
+}
+
 /** What of a reply still being written may be shown (spec: "The guard while streaming"). */
 export interface ReleasedText {
     /** The longest start of the reply that can't turn into a line written as the worn identity. */

@@ -283,7 +283,7 @@ describe('Endings: authoring and play (HTTP)', () => {
         expect(judged()).toContain('1. The light returns — reached when: The lamp is lit again.\n2. Into the dark — reached when: Ash leaves the island for good.');
         expect(judged()).not.toContain('Unfinished');
         expect(judged().indexOf('# LATEST EXCHANGE')).toBeLessThan(judged().indexOf('# Endings'));
-        expect(judged().indexOf('# Endings')).toBeLessThan(judged().indexOf('# Place, weather and outfits'));
+        expect(judged().indexOf('# Endings')).toBeLessThan(judged().indexOf('# Place, weather, outfits and goals'));
         expect(first.ending).toBeNull();
 
         // A number that names no waiting Ending changes nothing.

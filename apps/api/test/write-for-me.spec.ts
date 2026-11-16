@@ -171,6 +171,8 @@ describe('Write for me', () => {
         it('is refused while a turn is being written, with no call', async () => {
             const storyId = await createStory();
             const chat = await createChat(storyId);
+            // The held call must be the turn's own: no Thoughts before it (.scratch/character-minds/spec.md).
+            await t.http.patch(`/api/stories/${storyId}/chats/${chat.id}`).send({ characterThoughts: false }).expect(200);
             let finish: (text: string) => void = () => {};
             const slow = new Promise<string>((resolve) => (finish = resolve));
             const original = t.gateway.completeText;

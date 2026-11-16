@@ -377,7 +377,8 @@ describe('Sitting out: the API', () => {
         };
         const awayBack = await callsOf(away.id);
         const plainBack = await callsOf(plain.id);
-        expect(awayBack.map((call) => call.kind)).toEqual(['judge', 'memory_extraction', 'turn']);
+        // A turn also asks each Character in the moment for a Thought (.scratch/character-minds/spec.md, tested in character-minds.spec.ts); this test is about the other calls.
+        expect(awayBack.map((call) => call.kind).filter((kind) => kind !== 'character_thought')).toEqual(['judge', 'memory_extraction', 'turn']);
         expect(awayBack.some((call) => call.messages.some((message) => /sitting out/i.test(message.content)))).toBe(false);
         expect(awayBack).toEqual(plainBack);
         expect((await getChat(storyId, away.id)).messages.at(-1)!.parts).toEqual((await getChat(storyId, plain.id)).messages.at(-1)!.parts);

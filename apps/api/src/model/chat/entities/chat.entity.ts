@@ -150,6 +150,13 @@ export class ChatEntity {
     @Column({ name: 'auto_diary', type: 'boolean', default: true })
     autoDiary: boolean;
 
+    /**
+     * Whether each Character thinks on their own before a reply (.scratch/character-minds/spec.md).
+     * On by default; the user turns it off or on, a Branch copies it, Reset keeps it.
+     */
+    @Column({ name: 'character_thoughts', type: 'boolean', default: true })
+    characterThoughts: boolean;
+
     // Loaded only through ChatModelService.findWithMessages(); never auto-loaded.
     @OneToMany('MessageEntity', 'chat')
     messages: Relation<MessageEntity[]>;

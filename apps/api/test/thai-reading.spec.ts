@@ -276,7 +276,8 @@ describe('Thai reading: the API', () => {
         const transcript = await t.http.get(`/api/stories/${storyId}/chats/${chat.id}/transcript`).expect(200);
 
         const sent = t.gateway.textCalls().flatMap((call) => call.messages.map((message) => message.content));
-        expect(t.gateway.textCalls().map((call) => call.kind).sort()).toEqual(['judge', 'memory_extraction', 'suggested_replies', 'turn', 'write_for_me']);
+        // A turn also asks each Character in the moment for a Thought (.scratch/character-minds/spec.md, tested in character-minds.spec.ts); this test is about the other calls.
+        expect(t.gateway.textCalls().map((call) => call.kind).filter((kind) => kind !== 'character_thought').sort()).toEqual(['judge', 'memory_extraction', 'suggested_replies', 'turn', 'write_for_me']);
         expect(sent.filter((content) => content.includes('ไทย'))).toEqual([]);
         expect(transcript.text).not.toContain('ไทย');
     });

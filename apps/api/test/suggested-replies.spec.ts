@@ -277,6 +277,8 @@ describe('Suggested replies', () => {
         it('is refused while a turn is being written, with no call', async () => {
             const story = await createStory();
             const chat = await createChat(story.id);
+            // The held call must be the turn's own: no Thoughts before it (.scratch/character-minds/spec.md).
+            await t.http.patch(`/api/stories/${story.id}/chats/${chat.id}`).send({ characterThoughts: false }).expect(200);
             const held = holdTextCalls();
             try {
                 // Supertest sends only once awaited: `.then` starts the turn now.

@@ -18,7 +18,7 @@ const CAST = [
     { id: 1, name: 'Mira' },
     { id: 2, name: 'Kai' },
 ];
-const NOTHING: ChatDetails = { place: null, weather: null, outfits: [] };
+const NOTHING: ChatDetails = { place: null, weather: null, outfits: [], goals: [] };
 const { Place, Weather, Outfit } = DetailKind;
 
 describe('Details: the current values (pure)', () => {
@@ -40,19 +40,50 @@ describe('Details: the current values (pure)', () => {
                 { characterId: 1, outfit: 'a wool nightdress' },
                 { characterId: 2, outfit: 'a patched jersey' },
             ],
+            goals: [],
         });
     });
 
+    it('keeps each Character\'s newest Goal, and an empty one clears theirs', () => {
+        const { Goal } = DetailKind;
+        expect(
+            currentDetails([
+                { kind: Goal, characterId: 1, value: 'keep the lamp lit' },
+                { kind: Goal, characterId: 2, value: 'win the race' },
+                { kind: Outfit, characterId: 1, value: 'a coat' },
+                { kind: Goal, characterId: 1, value: '' },
+                { kind: Goal, characterId: 2, value: 'climb the gallery' },
+            ]),
+        ).toEqual({ place: null, weather: null, outfits: [{ characterId: 1, outfit: 'a coat' }], goals: [{ characterId: 2, goal: 'climb the gallery' }] });
+    });
+
     it('names Outfits by Character in cast order, and leaves out one whose Character is gone', () => {
-        const details: ChatDetails = { place: 'the quay', weather: null, outfits: [{ characterId: 9, outfit: 'a cloak' }, { characterId: 2, outfit: 'a jersey' }, { characterId: 1, outfit: 'a coat' }] };
-        expect(promptDetails(details, CAST)).toEqual({ place: 'the quay', weather: null, outfits: [{ name: 'Mira', outfit: 'a coat' }, { name: 'Kai', outfit: 'a jersey' }] });
+        const details: ChatDetails = {
+            place: 'the quay',
+            weather: null,
+            outfits: [{ characterId: 9, outfit: 'a cloak' }, { characterId: 2, outfit: 'a jersey' }, { characterId: 1, outfit: 'a coat' }],
+            goals: [{ characterId: 2, goal: 'win the race' }],
+        };
+        expect(promptDetails(details, CAST)).toEqual({
+            place: 'the quay',
+            weather: null,
+            outfits: [{ name: 'Mira', outfit: 'a coat' }, { name: 'Kai', outfit: 'a jersey' }],
+            goals: [{ name: 'Kai', goal: 'win the race' }],
+        });
     });
 });
 
 describe('Details: what the Judge is asked and how its answer is applied (pure)', () => {
     it('shows what is known and what is not, then the rule and the JSON field, after the exchange; left out, the prompt is as it was', () => {
-        const section = judgeDetailsSection({ place: 'the lamp room', weather: null, outfits: [{ characterId: 1, outfit: 'an oilskin coat' }] }, CAST);
-        expect(section).toContain('# Place, weather and outfits\nPlace: the lamp room\nWeather: not yet known\nWearing: Mira: an oilskin coat; Kai: not yet known\nDetails rule: add "details": {"place": "...", "weather": "...", "outfits": [{"character": "Name", "outfit": "..."}]}');
+        const section = judgeDetailsSection(
+            { place: 'the lamp room', weather: null, outfits: [{ characterId: 1, outfit: 'an oilskin coat' }], goals: [{ characterId: 2, goal: 'climb the gallery' }] },
+            CAST,
+        );
+        expect(section).toContain(
+            '# Place, weather, outfits and goals\nPlace: the lamp room\nWeather: not yet known\nWearing: Mira: an oilskin coat; Kai: not yet known\nGoals: Mira: none yet; Kai: climb the gallery\nDetails rule: add "details": {"place": "...", "weather": "...", "outfits": [{"character": "Name", "outfit": "..."}]}',
+        );
+        expect(section).toContain('Goals rule: add "goals": [{"character": "Name", "goal": "..."}] inside "details" only for a Character the latest exchange gave a new aim, or saw reach or give up the one they had ("goal": "").');
+        expect(section).toContain("never for the user's own character");
         expect(section).toContain('giving only what the latest exchange changed or first made clear');
         expect(section).toContain('never guess');
 
@@ -71,16 +102,28 @@ describe('Details: what the Judge is asked and how its answer is applied (pure)'
             place: 'The quay.',
             weather: null,
             outfits: [{ character: 'Mira', outfit: 'a coat' }],
+            goals: [],
         });
         expect(readJudgedDetails({ weather: 3, place: '' })).toBeNull();
+        // A Goal of "" or null gives one up; one with no string is nothing.
+        expect(readJudgedDetails({ goals: [{ character: 'Mira', goal: ' Keep the lamp lit. ' }, { character: 'Kai', goal: '' }, { character: 'Lio', goal: null }, { character: 'Bo', goal: 3 }] })).toEqual({
+            place: null,
+            weather: null,
+            outfits: [],
+            goals: [
+                { character: 'Mira', goal: 'Keep the lamp lit.' },
+                { character: 'Kai', goal: '' },
+                { character: 'Lio', goal: '' },
+            ],
+        });
         expect(readJudgedDetails(null)).toBeNull();
         expect(readJudgedDetails('the quay')).toBeNull();
-        expect(parseJudgement('{"bond_changes":[],"arc_steps":[],"scene":null,"details":{"weather":"fog"}}').details).toEqual({ place: null, weather: 'fog', outfits: [] });
+        expect(parseJudgement('{"bond_changes":[],"arc_steps":[],"scene":null,"details":{"weather":"fog"}}').details).toEqual({ place: null, weather: 'fog', outfits: [], goals: [] });
         expect(parseJudgement('{"bond_changes":[],"arc_steps":[],"scene":null}').details).toBeNull();
     });
 
     it('takes what changed, tidied, and drops what is the same, unknown, sitting out or said twice', () => {
-        const current: ChatDetails = { place: 'the quay', weather: 'rain', outfits: [{ characterId: 1, outfit: 'an oilskin coat' }] };
+        const current: ChatDetails = { place: 'the quay', weather: 'rain', outfits: [{ characterId: 1, outfit: 'an oilskin coat' }], goals: [] };
         const applied = applyDetails(
             { current, cast: CAST, sittingOut: [2] },
             {
@@ -109,6 +152,34 @@ describe('Details: what the Judge is asked and how its answer is applied (pure)'
             changes: [],
             rejected: ['Outfit of Mira: unchanged'],
         });
+    });
+
+    it('takes a Goal that is new, changed or given up, one a Character, never for one sitting out', () => {
+        const current: ChatDetails = { place: null, weather: null, outfits: [], goals: [{ characterId: 1, goal: 'keep the lamp lit' }] };
+        const applied = applyDetails(
+            { current, cast: CAST, sittingOut: [] },
+            {
+                place: null,
+                weather: null,
+                outfits: [],
+                goals: [
+                    { character: 'Kai', goal: ' Win the race. ' },
+                    { character: 'Kai', goal: 'something else' },
+                    { character: 'Mira', goal: 'Keep the lamp lit' },
+                    { character: 'Nobody', goal: 'x' },
+                ],
+            },
+        );
+        expect(applied.changes).toEqual([{ kind: DetailKind.Goal, characterId: 2, value: 'Win the race' }]);
+        expect(applied.rejected).toEqual(['Goal of Kai: a second one in one turn', 'Goal of Mira: unchanged', 'Goal of Nobody: unknown name']);
+        // Given up, it clears; giving up one never had is nothing; sitting out, none is taken.
+        expect(applyDetails({ current, cast: CAST }, { place: null, weather: null, outfits: [], goals: [{ character: 'Mira', goal: '' }] }).changes).toEqual([
+            { kind: DetailKind.Goal, characterId: 1, value: '' },
+        ]);
+        expect(applyDetails({ current, cast: CAST }, { place: null, weather: null, outfits: [], goals: [{ character: 'Kai', goal: '' }] }).changes).toEqual([]);
+        expect(applyDetails({ current, cast: CAST, sittingOut: [2] }, { place: null, weather: null, outfits: [], goals: [{ character: 'Kai', goal: 'win' }] }).rejected).toEqual([
+            'Goal of Kai: sitting out',
+        ]);
     });
 
     it('cuts each to its length: 80 for a Place, 60 for the Weather, 160 for an Outfit', () => {
@@ -176,6 +247,7 @@ interface Chat {
     place: string | null;
     weather: string | null;
     outfits: Array<{ characterId: number; outfit: string }>;
+    goals: Array<{ characterId: number; goal: string }>;
     messages: Message[];
 }
 
@@ -255,8 +327,10 @@ describe('Details: the judge, the ledger and the Chat (HTTP)', () => {
         expect(chat).toMatchObject({ place: null, weather: null, outfits: [] });
 
         const played = await play(storyId, chat.id, 'One.');
-        expect(judged()).toMatch(/# Place, weather and outfits\nPlace: not yet known\nWeather: not yet known\nWearing: Mira: not yet known; Kai: not yet known\nDetails rule: /);
-        expect(judged().indexOf('# LATEST EXCHANGE')).toBeLessThan(judged().indexOf('# Place, weather and outfits'));
+        expect(judged()).toMatch(
+            /# Place, weather, outfits and goals\nPlace: not yet known\nWeather: not yet known\nWearing: Mira: not yet known; Kai: not yet known\nGoals: Mira: none yet; Kai: none yet\nDetails rule: /,
+        );
+        expect(judged().indexOf('# LATEST EXCHANGE')).toBeLessThan(judged().indexOf('# Place, weather, outfits and goals'));
         expect(trailing()).not.toContain('Place:');
         expect(trailing()).not.toContain('Wearing now');
         expect(played).toMatchObject({ place: null, weather: null, outfits: [] });
@@ -284,6 +358,22 @@ describe('Details: the judge, the ledger and the Chat (HTTP)', () => {
         const moved = await play(storyId, chat.id, 'Down to the quay.', judgement({ place: 'the quay', outfits: [{ character: 'Mira', outfit: 'a dry wool dress' }] }));
         expect(moved).toMatchObject({ place: 'the quay', weather: 'a rising storm' });
         expect(moved.outfits[0]).toEqual({ characterId: mira, outfit: 'a dry wool dress' });
+    });
+
+    it('a Goal the Judge sets shows on the Chat and drives the next turn; given up, it goes; Regenerate takes it back', async () => {
+        const { storyId, mira } = await createStory();
+        const chat = await createChat(storyId);
+        expect((await getChat(storyId, chat.id)).goals).toEqual([]);
+        const set = await play(storyId, chat.id, 'The lamp is out.', judgement({ goals: [{ character: 'Mira', goal: 'Get the lamp lit before the ship passes' }] }));
+        expect(set.goals).toEqual([{ characterId: mira, goal: 'Get the lamp lit before the ship passes' }]);
+        // The next turn tells the Narrator what she is after, as she is in the latest exchange.
+        const next = await play(storyId, chat.id, 'I hand her the oil.', judgement({ goals: [{ character: 'Mira', goal: '' }] }));
+        expect(trailing()).toContain('What they are after: Mira, Get the lamp lit before the ship passes. Let each pursue it on their own initiative when the moment allows, without waiting to be asked.');
+        expect(next.goals).toEqual([]);
+        // Regenerate takes back the reply that gave it up: she is after it again.
+        script('@Mira: Hold the light.', judgement());
+        await t.http.post(`/api/stories/${storyId}/chats/${chat.id}/messages/${next.messages.at(-1)!.id}/regenerate`).expect(200);
+        expect((await settled(storyId, chat.id)).goals).toEqual([{ characterId: mira, goal: 'Get the lamp lit before the ship passes' }]);
     });
 
     it('takes a change back with the reply that made it: Regenerate, an edit and Reset', async () => {

@@ -242,6 +242,14 @@ export class ChatOutfitDTO {
     outfit: string;
 }
 
+export class ChatGoalDTO {
+    @ApiProperty()
+    characterId: number;
+
+    @ApiProperty({ description: 'A short phrase, from the Character\'s side.' })
+    goal: string;
+}
+
 export class MessageDTO {
     @ApiProperty()
     id: number;
@@ -305,6 +313,20 @@ export class MessageDTO {
             'Its current Thai reading: the one made from its stored text as it is now; null when none was made for this text. Never part of the Chat (no prompt, no Transcript).',
     })
     thaiReading: string | null;
+
+    @ApiProperty({ type: () => MessageThoughtDTO, isArray: true, description: 'What each Character thought before this reply, in order; empty for none. Shown only when asked for.' })
+    thoughts: MessageThoughtDTO[];
+}
+
+export class MessageThoughtDTO {
+    @ApiProperty()
+    characterId: number;
+
+    @ApiProperty()
+    characterName: string;
+
+    @ApiProperty({ description: 'One to three sentences in the first person.' })
+    text: string;
 }
 
 export class CurrentSceneDTO {
@@ -391,6 +413,9 @@ export class ChatResponseBodyDTO extends ChatSummaryDTO implements Omit<ChatDeta
     @ApiProperty({ description: 'Whether the Characters write Diary entries by themselves as the story goes. On by default.' })
     autoDiary: boolean;
 
+    @ApiProperty({ description: 'Whether each Character thinks on their own before a reply. On by default.' })
+    characterThoughts: boolean;
+
     @ApiProperty({ description: 'Diary entries are being written by themselves right now; re-read the Chat until this is false.' })
     diaryWriting: boolean;
 
@@ -408,6 +433,9 @@ export class ChatResponseBodyDTO extends ChatSummaryDTO implements Omit<ChatDeta
 
     @ApiProperty({ type: [ChatOutfitDTO], description: 'What each Character is wearing now, for those the story has shown, in cast order.' })
     outfits: ChatOutfitDTO[];
+
+    @ApiProperty({ type: () => ChatGoalDTO, isArray: true, description: 'What each Character is after now, for those who are after something, in cast order.' })
+    goals: ChatGoalDTO[];
 
     @ApiProperty({ description: 'The worn identity, under which the next User Message shows.' })
     identityName: string;
