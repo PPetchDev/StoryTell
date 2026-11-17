@@ -32,3 +32,8 @@ About 2.5 s and $0.0006 a line. Run 3's last detector change (starting over) cam
 
 - API: the detector as pure logic on hand-picked lines, plain talk included; the repair's prompt and how its answer is taken or refused; through HTTP, a scripted reply with the habit is kept repaired, one without it makes no call, and a failed or worse repair keeps the line as written.
 - With the real model: the detector run over Chat 2's own history, and each flagged line repaired, read by eye for meaning kept and voice kept.
+
+## After a week on live (2026-11-17)
+
+- A repair turned "Not because I finally told you. Not because you figured it out." into "… You didn't figure it out, either.", which changes what she says. The prompt now asks to keep every "not", "no" and "never" on the same thing it was on. Tried three times on V4 Pro: one kept the meaning ("Not the telling, or you working it out"), two changed too little to take, so the line stayed as written.
+- "You always do this. You always—" was repaired into "Every damn time.", a word she never said. Two sentences where the second breaks off as it starts again are now left alone, like "I can't—I can't breathe".

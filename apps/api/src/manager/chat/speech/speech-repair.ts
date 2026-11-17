@@ -150,6 +150,7 @@ Written: "I loved you when you came back. I loved you when you poked me. I loved
 - Reshape only the sentences that open the same way: say each thing once, with no run of sentences opening with the same words and no list of three. Keep every other sentence word for word.
 - Keep who says and does what: "I" stays ${name}, and "you" stays whoever ${name} is talking to. Keep every fact, promise and question.
 - Add no names, nicknames or ways of addressing anyone that the line doesn't already use.
+- Keep every "not", "no" and "never" on the same thing it was on: a line saying what something was not still says exactly that.
 - Keep ${name}'s voice and the line's mood. About as long, or shorter.
 - Spoken words only: no stage directions, no *asterisks*, no "${name}:" label.
 Answer with only the line.`,

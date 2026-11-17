@@ -10,7 +10,9 @@
  * more comma- or semicolon-separated clauses in one sentence opening with the same word. One thing
  * said again for weight ("She's counting. Tavri, she's counting.", "No. No. No.") is how people talk,
  * not the habit: a run whose sentences are all the same words is left alone. So is starting over
- * ("I can't—I can't breathe"), where each sentence before the last breaks off at a dash.
+ * ("I can't—I can't breathe"), where each sentence before the last breaks off at a dash, and a
+ * second sentence that breaks off as it starts again ("You always do this. You always—"): a repair
+ * on live (2026-11-17) finished that one as "Every damn time.", a word she never said.
  */
 
 /** A text's words, lower case, without quotes or punctuation. */
@@ -51,7 +53,9 @@ export function repeatedOpenings(text: string): string[] {
         };
         const saidAgain = (end: number) =>
             sentences.slice(i, end).every((sentence) => openingWords(sentence).join(' ') === first.join(' ')) ||
-            sentences.slice(i, end - 1).every((sentence) => /[—–-]$/.test(sentence));
+            sentences.slice(i, end - 1).every((sentence) => /[—–-]$/.test(sentence)) ||
+            // Two, the second broken off as it starts again ("You always do this. You always—").
+            (end - i === 2 && /[—–-]$/.test(sentences[end - 1]));
         let j = i + 1;
         while (j < sentences.length && sameTwo(sentences[j])) j++;
         if (j - i >= 2) {

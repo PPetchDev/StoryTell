@@ -195,3 +195,26 @@ function couldBecomeUserLine(line: string, names: string[]): boolean {
         return after === rest.length;
     });
 }
+
+/** A text compared loosely: no asterisks or quotes, spaces collapsed, lower case. */
+const loosely = (text: string): string =>
+    text
+        .replace(/[*"“”]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLowerCase();
+
+/**
+ * The reply without the user's own message said back as its opening narration (seen on live
+ * 2026-11-17: a reply began with the user's whole message, word for word, then went on). Only an
+ * opening paragraph that is the user's message, read loosely, goes; a reply that merely starts
+ * the same way stays. With no user message (Continue, Epilogue), the parts as they are.
+ */
+export function withoutEchoedUserText(parts: ReplyPart[], userText: string | null): { parts: ReplyPart[]; echoed: boolean } {
+    const first = parts[0];
+    if (userText === null || first?.kind !== 'narration' || loosely(userText) === '') return { parts, echoed: false };
+    const paragraphs = first.text.split(/\n\s*\n/);
+    if (loosely(paragraphs[0]) !== loosely(userText)) return { parts, echoed: false };
+    const rest = paragraphs.slice(1).join('\n\n').trim();
+    return { parts: rest === '' ? parts.slice(1) : [{ kind: 'narration', text: rest }, ...parts.slice(1)], echoed: true };
+}

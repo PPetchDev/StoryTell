@@ -106,7 +106,7 @@ import { chosenLore, LoreInPlay, loreInPlayOf, promptLore, selectLoreAt } from '
 import { documentQuery } from '../document/document-search.js';
 import { DocumentSearchManagerService, DocumentsInPlay, hasDocumentPassages } from './document-search.service.js';
 import { TurnMemoryRecord } from '../../model/chat/chat.service.js';
-import { CastName, historyPartsText, ParseOptions, parseReply, partsToText, releasedText, ReplyPart } from './turn/reply-parser.js';
+import { CastName, historyPartsText, ParseOptions, parseReply, partsToText, releasedText, ReplyPart, withoutEchoedUserText } from './turn/reply-parser.js';
 import { TurnStoppedError, TurnStream } from './turn/turn-stream.js';
 import { Dice } from '../../service/dice/dice.js';
 import { Roll, ROLL_SIDES, ROLL_TARGETS } from './roll.js';
@@ -1530,7 +1530,10 @@ export class ChatManagerService {
         }
 
         // Line repair (.scratch/natural-speech/line-repair.md): a speech line with the repeated-sentence habit is said again, alone.
-        const parts: ReplyPart[] = await this.repairSpeech(story, chat.id, reply.parts);
+        // A reply that opened by saying the user's message back (seen on live) keeps only its own words.
+        const unechoed = withoutEchoedUserText(reply.parts, userText);
+        if (unechoed.echoed) this.logger.warn(`Chat ${chat.id}: the reply opened with the user's own message; dropped that`);
+        const parts: ReplyPart[] = await this.repairSpeech(story, chat.id, unechoed.parts);
         // A Stop that came while the reply was parsed or repaired still stores nothing.
         if (stream?.signal.aborted) throw new TurnStoppedError();
         let aiMessageId: number;

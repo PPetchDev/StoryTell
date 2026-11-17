@@ -27,6 +27,8 @@ import { startTestApp, TestApp } from './harness/test-app.js';
 describe('Line repair: the habit, found in code (pure)', () => {
     it.each([
         'I had a whole speech ready. I had stages. I had a sequence. I was going to make you beg.',
+        // Three, the last broken off: still the habit.
+        'I had stages. I had a sequence. I had—',
         "You're going to watch. You're going to wait. And you're going to find out exactly what I decided.",
         "No. No, you don't get to apologize. You don't get to be sorry and then hand me back my plan.",
         "You don't touch, you don't talk, you don't do the forehead thing.",
@@ -48,6 +50,8 @@ describe('Line repair: the habit, found in code (pure)', () => {
         'No. No. No.',
         // Starting over, as Tavri's Voice asks (Chat 2): a repair smoothed the stammer away.
         "I can't—I can't breathe—Tavri, tell Morra I'm dying—",
+        // Breaking off as it starts again (live, 2026-11-17): a repair finished it as "Every damn time."
+        'You always do this. You always—',
     ])('leaves plain talk alone: %s', (line) => {
         expect(repeatedOpenings(line)).toEqual([]);
     });
@@ -78,6 +82,7 @@ describe('Line repair: what is asked, and what is taken (pure)', () => {
         expect(user).toContain('Keep every other sentence word for word.');
         expect(user).toContain('"I" stays Nara, and "you" stays whoever Nara is talking to.');
         expect(user).toContain("Add no names, nicknames or ways of addressing anyone that the line doesn't already use.");
+        expect(user).toContain('Keep every "not", "no" and "never" on the same thing it was on');
         expect(user).toContain('no "Nara:" label');
         expect(user.endsWith('Answer with only the line.')).toBe(true);
     });

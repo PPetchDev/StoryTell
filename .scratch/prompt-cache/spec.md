@@ -93,3 +93,7 @@ The turn was sent as:
   - #582 follows what the user did, with breath and body, and lines cut off mid-way ("And now you're—").
   - The tender, non-sexual turns (#577, #579) still talk, which fits them.
 - **Spend:** the four explicit replays cost about $0.10 in all.
+
+## The reply that said the user's message back (2026-11-17)
+
+On live, one reply (Chat 2 #633) opened with the user's whole message as its first paragraph. That may have come from the user's words now sharing a message with the Narrator's notes. An opening narration paragraph that is the user's message, read loosely (asterisks, quotes, spacing and case aside), is now dropped before the reply is kept. A reply that only starts the same way is left alone.
