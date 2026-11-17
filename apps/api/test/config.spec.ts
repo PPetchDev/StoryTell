@@ -29,3 +29,24 @@ describe('Config: the speech folder', () => {
         );
     });
 });
+
+// .scratch/text-fallback/spec.md: the text chain, and TEXT_HOST from before it.
+describe('Config: the text hosts', () => {
+    it('is OpenRouter alone by default', () => {
+        expect(loadConfig(base).textHosts).toEqual(['openrouter']);
+    });
+
+    it('keeps TEXT_HOST=venice working as a chain of one', () => {
+        expect(loadConfig({ ...base, TEXT_HOST: 'venice' }).textHosts).toEqual(['venice']);
+    });
+
+    it('reads TEXT_HOSTS in order, ahead of TEXT_HOST', () => {
+        expect(loadConfig({ ...base, TEXT_HOSTS: 'openrouter, venice,free', TEXT_HOST: 'venice' }).textHosts).toEqual(['openrouter', 'venice', 'free']);
+    });
+
+    it('refuses an unknown host, a repeated one, or an empty list', () => {
+        expect(() => loadConfig({ ...base, TEXT_HOSTS: 'openrouter,groq' })).toThrow(/TEXT_HOSTS/);
+        expect(() => loadConfig({ ...base, TEXT_HOSTS: 'venice,venice' })).toThrow(/twice/);
+        expect(() => loadConfig({ ...base, TEXT_HOSTS: ' , ' })).toThrow(ConfigError);
+    });
+});

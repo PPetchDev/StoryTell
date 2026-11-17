@@ -20,6 +20,11 @@ export interface PoolUsage {
     lowCreditPercent: number;
     /** True when remaining credit is known and at or below the threshold. */
     lowCredit: boolean;
+    /**
+     * The text pool: the host of the text chain serving now (`openrouter`, `venice` or `free`,
+     * .scratch/text-fallback/spec.md); null for the image pool, and when it isn't known.
+     */
+    host: string | null;
 }
 
 /** A Member's Monthly cap and how much of it is spent (.scratch/accounts/spec.md). */
@@ -76,6 +81,8 @@ export class UsageManagerService {
                 capUsd,
                 lowCreditPercent,
                 lowCredit: remainingUsd !== null && remainingUsd <= (capUsd * lowCreditPercent) / 100,
+                // Which host serves text is not a balance, so a Member sees it too.
+                host: ownerCredit[name].host ?? null,
             };
         };
 

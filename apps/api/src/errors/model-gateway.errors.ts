@@ -12,6 +12,13 @@ export class ProviderOutageError extends ModelGatewayError {
 }
 
 /**
+ * Every host that embeds is out of credit, while the text chain still has a host that needs none
+ * (the free model, .scratch/text-fallback/spec.md). An outage rather than out of credit, so a turn's
+ * search fails softly and the turn still plays, with the newest Memories and no Documents.
+ */
+export class NoEmbeddingCreditError extends ProviderOutageError {}
+
+/**
  * An outage that is only the host being busy: a 429 rate limit or a 503 overload that outlasted
  * the retries. Nothing ran, so another model on the same host may still answer.
  */

@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
 import pg from 'pg';
 
-import { ModelRefusalError, OutOfCreditError, ProviderOutageError } from '../src/errors/model-gateway.errors.js';
+import { ModelRefusalError, NoEmbeddingCreditError, OutOfCreditError, ProviderOutageError } from '../src/errors/model-gateway.errors.js';
 import { DOCUMENTS_HEADING } from '../src/manager/document/document-search.js';
 import { startTestApp, TestApp } from './harness/test-app.js';
 
@@ -199,6 +199,8 @@ describe('Documents in turns', () => {
     it.each([
         ['an outage', new ProviderOutageError('DeepInfra is down.')],
         ['a refusal', new ModelRefusalError('Refused.')],
+        // .scratch/text-fallback/spec.md: every embedding host out of credit while the free model can still play.
+        ['no embedding host with credit', new NoEmbeddingCreditError('No host with an embedding model has credit.')],
     ])('plays the turn without Documents after %s at the embedding host, logs a warning and records failed', async (_, error) => {
         const storyId = await playableStory();
         await addDocument(storyId, 'Gull Point light', LIGHTHOUSE);

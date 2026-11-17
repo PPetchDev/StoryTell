@@ -73,10 +73,17 @@ export class PoolUsageDTO implements PoolUsage {
 
     @ApiProperty({ description: 'True when remaining credit is known and at or below the threshold.' })
     lowCredit: boolean;
+
+    @ApiProperty({
+        description: 'The text pool: the host of the text chain serving now (openrouter, venice or free). Null for the image pool, or when unknown.',
+        nullable: true,
+        type: String,
+    })
+    host: string | null;
 }
 
 export class UsagePoolsDTO {
-    @ApiProperty({ description: 'The OpenRouter text pool.', type: PoolUsageDTO })
+    @ApiProperty({ description: 'The text pool, on the host of the text chain serving now.', type: PoolUsageDTO })
     text: PoolUsageDTO;
 
     @ApiProperty({ description: 'The Venice image pool.', type: PoolUsageDTO })
