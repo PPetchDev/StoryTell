@@ -1,12 +1,15 @@
-import { repeatedOpenings, sentencesOf } from '../src/manager/chat/speech/repeated-openings.js';
 import { vi } from 'vitest';
 
+import { ProviderBusyError } from '../src/errors/model-gateway.errors.js';
+import { repeatedOpenings, sentencesOf } from '../src/manager/chat/speech/repeated-openings.js';
 import { SpeechRepairManagerService } from '../src/manager/chat/speech/speech-repair.service.js';
 import {
     acceptRepair,
     buildRepairPrompt,
+    firstRepairAnswer,
     judgeRepair,
     quotedTerms,
+    REPAIR_FALLBACK_AFTER_MS,
     REPAIR_LOG_TEXT_CAP,
     REPAIR_TIMEOUT_MS,
     RepairInput,
@@ -162,13 +165,93 @@ describe('Line repair: the call, and why a line was kept as written', () => {
         const failed = answering(async () => {
             throw new Error('upstream 500');
         });
-        expect(await failed.repair(INPUT, { chatId: 1 })).toEqual({ line: null, reason: 'error', answer: null, error: 'upstream 500' });
+        // Both models are asked: the play model, then the background one when it fails.
+        expect(await failed.repair(INPUT, { chatId: 1 })).toEqual({
+            line: null,
+            reason: 'error',
+            answer: null,
+            error: 'play model: upstream 500; background model: upstream 500',
+        });
 
         vi.useFakeTimers();
         const late = answering(() => new Promise(() => {}));
         const pending = late.repair(INPUT, { chatId: 1 });
         await vi.advanceTimersByTimeAsync(REPAIR_TIMEOUT_MS);
-        expect(await pending).toEqual({ line: null, reason: 'timeout', answer: null, error: `no answer within ${REPAIR_TIMEOUT_MS} ms` });
+        expect(await pending).toEqual({
+            line: null,
+            reason: 'timeout',
+            answer: null,
+            error: `play model: no answer within ${REPAIR_TIMEOUT_MS} ms; background model: no answer within ${REPAIR_TIMEOUT_MS - REPAIR_FALLBACK_AFTER_MS} ms`,
+        });
+    });
+});
+
+/** A call that answers `text` (or fails with it, when it is an Error) after `ms` of fake time. */
+function after(ms: number, text: string | Error): () => Promise<string> {
+    return () => new Promise((resolve, reject) => setTimeout(() => (text instanceof Error ? reject(text) : resolve(text)), ms));
+}
+const never = (): Promise<string> => new Promise(() => {});
+
+describe('Line repair: the background model, when the play model is slow or fails (pure, fake timers)', () => {
+    beforeEach(() => {
+        vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    async function settle(answer: Promise<unknown>): Promise<{ value: unknown; at: number }> {
+        const start = Date.now();
+        let value: unknown;
+        let done = false;
+        void answer.then((result) => {
+            value = result;
+            done = true;
+        });
+        while (!done) await vi.advanceTimersByTimeAsync(100);
+        return { value, at: Date.now() - start };
+    }
+
+    it("takes the play model's answer and never asks the background model", async () => {
+        const background = vi.fn(after(100, 'fallback'));
+        const { value, at } = await settle(firstRepairAnswer(after(2_000, 'played'), background));
+        expect(value).toEqual({ text: 'played', by: 'play', failures: [] });
+        expect(at).toBe(2_000);
+        await vi.advanceTimersByTimeAsync(REPAIR_TIMEOUT_MS);
+        expect(background).not.toHaveBeenCalled();
+    });
+
+    it('asks the background model at once when the play model fails, and at the first deadline when it is slow', async () => {
+        const failed = await settle(firstRepairAnswer(after(500, new ProviderBusyError('Too many requests')), after(1_000, 'fallback')));
+        expect(failed.value).toEqual({ text: 'fallback', by: 'background', failures: ['play model: Too many requests'] });
+        expect(failed.at).toBe(1_500);
+
+        const slow = await settle(firstRepairAnswer(never, after(1_000, 'fallback')));
+        expect(slow.value).toEqual({ text: 'fallback', by: 'background', failures: [`play model: no answer within ${REPAIR_FALLBACK_AFTER_MS} ms`] });
+        expect(slow.at).toBe(REPAIR_FALLBACK_AFTER_MS + 1_000);
+    });
+
+    it('still takes a late play answer that comes before the background one', async () => {
+        const background = vi.fn(after(3_000, 'fallback'));
+        const { value, at } = await settle(firstRepairAnswer(after(7_000, 'played late'), background));
+        expect(value).toEqual({ text: 'played late', by: 'play', failures: [] });
+        expect(at).toBe(7_000);
+        expect(background).toHaveBeenCalledTimes(1);
+    });
+
+    it('ends within the time limit, naming both models, when neither answers in time or both fail', async () => {
+        const late = await settle(firstRepairAnswer(never, never));
+        expect(late.at).toBe(REPAIR_TIMEOUT_MS);
+        expect(late.value).toEqual({
+            text: null,
+            by: null,
+            failures: [`play model: no answer within ${REPAIR_TIMEOUT_MS} ms`, `background model: no answer within ${REPAIR_TIMEOUT_MS - REPAIR_FALLBACK_AFTER_MS} ms`],
+        });
+
+        const failed = await settle(firstRepairAnswer(after(200, new Error('Out of text credit.')), after(300, new Error('The model refused to write this.'))));
+        expect(failed.at).toBe(500);
+        expect(failed.value).toEqual({ text: null, by: null, failures: ['play model: Out of text credit.', 'background model: The model refused to write this.'] });
     });
 });
 
@@ -202,7 +285,7 @@ describe('Line repair: the turn (HTTP)', () => {
         return { storyId, chatId: chat.id as number };
     }
 
-    async function play(storyId: number, chatId: number, reply: string, repairs: string[]) {
+    async function play(storyId: number, chatId: number, reply: string, repairs: Array<string | ProviderBusyError>) {
         t.gateway.scriptText('turn', { text: reply, model: 'glm-5.3' });
         for (const repair of repairs) t.gateway.scriptText('speech_repair', repair);
         t.gateway.scriptText('judge', NO_CHANGE);
@@ -241,5 +324,36 @@ describe('Line repair: the turn (HTTP)', () => {
         expect(worse.at(-1)!.text).toBe('I had a plan. I had stages. I had a sequence.');
         const failed = await play(storyId, chatId, '@Nara: You go. You stay. You decide.', []);
         expect(failed.at(-1)!.text).toBe('You go. You stay. You decide.');
+    });
+
+    it('asks the background model only when the play model fails, and guards its answer the same way', async () => {
+        const { storyId, chatId } = await createChat();
+
+        // The play model answers: no fallback call.
+        await play(storyId, chatId, '@Nara: You go. You stay. You decide.', ['Go or stay. Your call.']);
+        expect(t.gateway.textCalls('speech_repair')).toHaveLength(1);
+        expect(t.gateway.textCalls('speech_repair_fallback')).toHaveLength(0);
+
+        // The play model is busy: the background model's repair is kept, from the same prompt.
+        t.gateway.scriptText('speech_repair_fallback', 'I had a whole speech ready. Stages and everything.');
+        const fellBack = await play(storyId, chatId, '@Nara: I had a whole speech ready. I had stages. I had a sequence.', [
+            new ProviderBusyError('Too many requests'),
+        ]);
+        expect(fellBack.at(-1)!.text).toBe('I had a whole speech ready. Stages and everything.');
+        const played = t.gateway.textCalls('speech_repair').at(-1)!;
+        const fallback = t.gateway.textCalls('speech_repair_fallback').at(-1)!;
+        expect(fallback.messages).toEqual(played.messages);
+        expect(fallback.servedFor).toEqual({ storyId, chatId });
+
+        // The fallback's answer is no better: kept as written.
+        t.gateway.scriptText('speech_repair_fallback', 'I had a plan. I had stages. I had a sequence. I had more.');
+        const worse = await play(storyId, chatId, '@Nara: I had a plan. I had stages. I had a sequence.', [new ProviderBusyError('Too many requests')]);
+        expect(worse.at(-1)!.text).toBe('I had a plan. I had stages. I had a sequence.');
+
+        // Both fail: kept as written, and the turn goes through.
+        t.gateway.scriptText('speech_repair_fallback', new ProviderBusyError('Too many requests'));
+        const failed = await play(storyId, chatId, '@Nara: You go. You stay. You decide.', [new ProviderBusyError('Too many requests')]);
+        expect(failed.at(-1)!.text).toBe('You go. You stay. You decide.');
+        expect(t.gateway.textCalls('speech_repair_fallback')).toHaveLength(3);
     });
 });

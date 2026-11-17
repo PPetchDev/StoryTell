@@ -12,6 +12,89 @@ export const REPAIR_MAX_TOKENS = 300;
 /** A repair slower than this is dropped, and the line is kept as written. */
 export const REPAIR_TIMEOUT_MS = 10_000;
 
+/**
+ * A play-model repair with no answer by now is also asked of the background model, inside the
+ * same REPAIR_TIMEOUT_MS. On live (2026-11-17), a busy play model left one turn's three repairs
+ * all timing out at 10 s: the user waited, and nothing was repaired.
+ */
+export const REPAIR_FALLBACK_AFTER_MS = 6_000;
+
+export type RepairModel = 'play' | 'background';
+
+export interface RepairAnswer {
+    /** The first answer that came, or null when none came in time. */
+    text: string | null;
+    /** Which model gave it. */
+    by: RepairModel | null;
+    /** Each model that failed or was late, and why ("play model: no answer within 6000 ms"). */
+    failures: string[];
+}
+
+/**
+ * The play model's answer, or the background model's when the play model fails or has not
+ * answered after `fallbackAfterMs`, whichever answer comes first, and never later than `timeoutMs`
+ * after the start. A play call that is late is still listened to: if it answers before the
+ * background model, its answer is taken. The background model is asked at most once.
+ */
+export function firstRepairAnswer(
+    play: () => Promise<string>,
+    background: () => Promise<string>,
+    { fallbackAfterMs = REPAIR_FALLBACK_AFTER_MS, timeoutMs = REPAIR_TIMEOUT_MS } = {},
+): Promise<RepairAnswer> {
+    return new Promise((resolve) => {
+        const failures = new Map<RepairModel, string>();
+        /** Each model still being waited for, and when it was asked. */
+        const pending = new Map<RepairModel, number>();
+        let settled = false;
+        let fallbackStarted = false;
+        const list = (): string[] => [...failures].map(([model, why]) => `${model} model: ${why}`);
+        const finish = (text: string | null, by: RepairModel | null): void => {
+            if (settled) return;
+            settled = true;
+            if (by !== null) failures.delete(by);
+            clearTimeout(fallbackTimer);
+            clearTimeout(endTimer);
+            resolve({ text, by, failures: list() });
+        };
+        const ask = (model: RepairModel, call: () => Promise<string>): void => {
+            pending.set(model, Date.now());
+            let answer: Promise<string>;
+            try {
+                answer = call();
+            } catch (error) {
+                answer = Promise.reject(error);
+            }
+            answer.then(
+                (text) => {
+                    pending.delete(model);
+                    finish(text, model);
+                },
+                (error: unknown) => {
+                    pending.delete(model);
+                    failures.set(model, error instanceof Error ? error.message : String(error));
+                    if (model === 'play') startFallback();
+                    if (pending.size === 0) finish(null, null);
+                },
+            );
+        };
+        const startFallback = (): void => {
+            if (fallbackStarted || settled) return;
+            fallbackStarted = true;
+            ask('background', background);
+        };
+        const fallbackTimer = setTimeout(() => {
+            if (!pending.has('play')) return;
+            failures.set('play', `no answer within ${fallbackAfterMs} ms`);
+            startFallback();
+        }, fallbackAfterMs);
+        const endTimer = setTimeout(() => {
+            for (const [model, askedAt] of pending) failures.set(model, `no answer within ${Date.now() - askedAt} ms`);
+            finish(null, null);
+        }, timeoutMs);
+        ask('play', play);
+    });
+}
+
 /** "I", "me", "my" and the like; "you", "your" and the like: a repair that loses all of either has turned the line around. */
 const FIRST_PERSON = new Set(['i', "i'm", "i've", "i'd", "i'll", 'me', 'my', 'mine', 'myself']);
 const SECOND_PERSON = new Set(['you', "you're", "you've", "you'd", "you'll", 'your', 'yours', 'yourself']);

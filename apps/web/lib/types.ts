@@ -73,6 +73,7 @@ export type CallKind =
     | 'diary_entry'
     | 'character_thought'
     | 'speech_repair'
+    | 'speech_repair_fallback'
     | 'snapshot_image'
     | 'reference_image'
     | 'expression_image'
@@ -100,6 +101,7 @@ export const CALL_KIND_LABEL: Record<CallKind, string> = {
     diary_entry: 'Diary entries',
     character_thought: 'Character thoughts',
     speech_repair: 'Speech repairs',
+    speech_repair_fallback: 'Speech repairs (fallback)',
     snapshot_image: 'Snapshots',
     reference_image: 'Reference images',
     expression_image: 'Expression pictures',
