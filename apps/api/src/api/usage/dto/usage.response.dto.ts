@@ -21,6 +21,7 @@ const CALL_KINDS = Object.keys({
     diary_entry: true,
     character_thought: true,
     speech_repair: true,
+    speech_repair_fallback: true,
     snapshot_image: true,
     reference_image: true,
     expression_image: true,
