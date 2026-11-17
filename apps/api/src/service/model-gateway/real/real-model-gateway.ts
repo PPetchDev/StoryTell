@@ -1,6 +1,12 @@
 import { Logger } from '@nestjs/common';
 
-import { ModelGatewayError, ProviderBusyError, ProviderOutageError } from '../../../errors/model-gateway.errors.js';
+import {
+    ModelGatewayError,
+    NoEmbeddingCreditError,
+    OutOfCreditError,
+    ProviderBusyError,
+    ProviderOutageError,
+} from '../../../errors/model-gateway.errors.js';
 import {
     BACKGROUND_FALLBACK_MODEL,
     BACKGROUND_MODEL,
@@ -50,14 +56,12 @@ import {
     VENICE_HOST,
 } from './model-table.js';
 import { defaultSleep, SleepFn } from './http.js';
-import {
-    OpenRouterChatRequest,
-    OpenRouterChatResult,
-    OpenRouterClient,
-    SamplerRefusedError,
-    TextBill,
-} from './openrouter-client.js';
+import { OpenRouterChatRequest, OpenRouterChatResult, SamplerRefusedError, TextBill } from './openrouter-client.js';
+import { TextHost } from './text-hosts.js';
 import { VeniceClient } from './venice-client.js';
+
+/** How long a host that answered out of credit is passed over for the next one (.scratch/text-fallback/spec.md). */
+export const OUT_OF_CREDIT_SKIP_MS = 10 * 60_000;
 
 /** The Settings the gateway reads before each call. */
 export interface GatewayModelSettings {
@@ -84,13 +88,11 @@ export interface NewUsageRecord {
 }
 
 export interface RealModelGatewayDeps {
-    /** The text and embedding client: OpenRouter's, or Venice's when `textHost` says so. */
-    openRouter: OpenRouterClient;
     /**
-     * Set when text goes to another host than the model table names (.scratch/venice-text/spec.md):
-     * the host UsageRecords carry, and the pool the text credit is read from.
+     * The hosts text and embeddings go to, in the order they are tried (.scratch/text-fallback/spec.md).
+     * At least one; OpenRouter alone by default.
      */
-    textHost?: typeof VENICE_HOST;
+    textHosts: TextHost[];
     venice: VeniceClient;
     settings: { current(): Promise<GatewayModelSettings> };
     usage: { record(record: NewUsageRecord): Promise<void> };
@@ -98,6 +100,10 @@ export interface RealModelGatewayDeps {
     creditCacheMs?: number;
     /** How a stopped generation's bill lookup waits between tries. */
     sleep?: SleepFn;
+    /** How long a host that answered out of credit is passed over; OUT_OF_CREDIT_SKIP_MS by default. */
+    outOfCreditSkipMs?: number;
+    /** The clock the out-of-credit memory reads; tests move it. */
+    now?: () => number;
 }
 
 /** How many times a stopped generation's bill is asked for: about 30 s with the backoff. */
@@ -113,33 +119,31 @@ export class RealModelGateway extends ModelGateway {
     private readonly creditCacheMs: number;
     private readonly sleep: SleepFn;
     private creditCache: { readAt: number; credit: RemainingCredit } | undefined;
+    private readonly outOfCreditSkipMs: number;
+    private readonly now: () => number;
+    /** Each host that answered out of credit, and until when it is passed over. */
+    private readonly outUntil = new Map<TextHost['name'], number>();
 
     constructor(private readonly deps: RealModelGatewayDeps) {
         super();
+        if (deps.textHosts.length === 0) throw new RangeError('The gateway needs at least one text host.');
         this.creditCacheMs = deps.creditCacheMs ?? 30_000;
         this.sleep = deps.sleep ?? defaultSleep;
+        this.outOfCreditSkipMs = deps.outOfCreditSkipMs ?? OUT_OF_CREDIT_SKIP_MS;
+        this.now = deps.now ?? Date.now;
     }
 
     /**
-     * A background call whose model's host stays busy through every retry goes once more to
-     * BACKGROUND_FALLBACK_MODEL on the same host; the result and its UsageRecord name the model
-     * that answered. Play calls never switch model on their own.
+     * A text call, on the first host of the chain that answers it (`onHosts`). A background call
+     * whose model's host stays busy through every retry goes once more to BACKGROUND_FALLBACK_MODEL
+     * on the same host; the result and its UsageRecord name the model that answered. Play calls
+     * never switch model on their own.
      */
     async completeText(request: TextCompletionRequest): Promise<TextCompletionResult> {
-        let { modelName, chat } = await this.textCall(request);
-        let result: OpenRouterChatResult;
-        try {
-            result = await this.deps.openRouter.chat(chat);
-        } catch (error) {
-            if (!(error instanceof ProviderBusyError) || modelName !== BACKGROUND_MODEL) throw forUser(error, modelName);
-            this.logger.warn(
-                `${request.kind} on ${BACKGROUND_MODEL} stayed busy (${error.message}); sending it to ${BACKGROUND_FALLBACK_MODEL}.`,
-            );
-            modelName = BACKGROUND_FALLBACK_MODEL;
-            chat = { ...chat, model: TEXT_MODELS[modelName] };
-            result = await this.deps.openRouter.chat(chat);
-        }
-        await this.recordText(request, modelName, result);
+        const { modelName: asked, chat } = await this.textCall(request);
+        const { result: answer, host } = await this.onHosts(request.kind, this.deps.textHosts, (host) => this.chatOn(host, request, asked, chat));
+        const { modelName, result } = answer;
+        await this.recordText(request, modelName, result, host);
         return {
             text: result.text,
             model: modelName,
@@ -148,24 +152,101 @@ export class RealModelGateway extends ModelGateway {
         };
     }
 
+    /** One host's answer to a text call, with the busy background model's one fallback on that host. */
+    private async chatOn(
+        host: TextHost,
+        request: TextCompletionRequest,
+        modelName: TextModel,
+        chat: OpenRouterChatRequest,
+    ): Promise<{ modelName: TextModel; result: OpenRouterChatResult }> {
+        try {
+            return { modelName, result: await host.client.chat(chat) };
+        } catch (error) {
+            // A host with its own model (the free one) has no other model to send it to.
+            if (!(error instanceof ProviderBusyError) || modelName !== BACKGROUND_MODEL || host.ownModel) throw forUser(error, modelName);
+            this.logger.warn(
+                `${request.kind} on ${BACKGROUND_MODEL} stayed busy (${error.message}); sending it to ${BACKGROUND_FALLBACK_MODEL}.`,
+            );
+            const fallback = BACKGROUND_FALLBACK_MODEL;
+            return { modelName: fallback, result: await host.client.chat({ ...chat, model: TEXT_MODELS[fallback] }) };
+        }
+    }
+
     /**
-     * A turn streamed through OpenRouter. A finished stream is recorded as `completeText`
-     * records a call. A stopped one has no usage chunk, so its bill is read from OpenRouter's
-     * generation endpoint in the background, once OpenRouter knows it, and recorded then:
-     * the caller does not wait for it. A stream stopped before its first chunk carries no
-     * generation id to look up, so nothing is recorded for it.
+     * Runs a call on the chain of hosts (.scratch/text-fallback/spec.md). A host that answers out
+     * of credit is remembered for `outOfCreditSkipMs`, and the call goes once to the next host, with
+     * the same request, if `mayMoveOn` still allows it. A remembered host is passed over while a
+     * host follows it; the last host is always tried, so a chain of one behaves as before the chain.
+     */
+    private async onHosts<T>(
+        what: string,
+        hosts: TextHost[],
+        call: (host: TextHost) => Promise<T>,
+        mayMoveOn: () => boolean = () => true,
+    ): Promise<{ result: T; host: TextHost }> {
+        const tried = hosts.filter((host, at) => at === hosts.length - 1 || !this.isOutOfCredit(host));
+        for (let at = 0; ; at++) {
+            const host = tried[at];
+            try {
+                const result = await call(host);
+                this.outUntil.delete(host.name);
+                return { result, host };
+            } catch (error) {
+                if (!(error instanceof OutOfCreditError)) throw error;
+                this.rememberOutOfCredit(host);
+                const next = tried[at + 1];
+                if (!next || !mayMoveOn()) throw error;
+                this.logger.warn(
+                    `${what}: skipped ${host.name}, out of credit (${error.message}); sending it to ${next.name}, and passing ${host.name} over for ${Math.round(this.outOfCreditSkipMs / 60_000)} min.`,
+                );
+            }
+        }
+    }
+
+    private isOutOfCredit(host: TextHost): boolean {
+        return (this.outUntil.get(host.name) ?? 0) > this.now();
+    }
+
+    private rememberOutOfCredit(host: TextHost): void {
+        this.outUntil.set(host.name, this.now() + this.outOfCreditSkipMs);
+        // The text pool may now read from the next host.
+        this.creditCache = undefined;
+    }
+
+    /**
+     * A turn streamed, on the first host of the chain that answers it: a host that refuses for
+     * credit before any text has streamed passes it to the next; once text has streamed, never.
+     * A finished stream is recorded as `completeText` records a call. A stopped one has no usage
+     * chunk, so on OpenRouter its bill is read from the generation endpoint in the background,
+     * once OpenRouter knows it, and recorded then: the caller does not wait for it. A stream
+     * stopped before its first chunk carries no generation id to look up, so nothing is recorded
+     * for it; nor is one stopped on Venice, which has no such lookup, or on the free model.
      */
     async streamText(request: TextCompletionRequest, stream: TextStream): Promise<TextStreamResult> {
         const { modelName, chat } = await this.textCall(request);
-        const result = await this.deps.openRouter.chatStream(chat, stream).catch((error: unknown) => {
-            throw forUser(error, modelName);
-        });
+        let streamed = false;
+        const watched: TextStream = {
+            ...stream,
+            onText: (piece) => {
+                streamed = true;
+                stream.onText(piece);
+            },
+        };
+        const { result, host } = await this.onHosts(
+            request.kind,
+            this.deps.textHosts,
+            (host) =>
+                host.client.chatStream(chat, watched).catch((error: unknown) => {
+                    throw forUser(error, modelName);
+                }),
+            () => !streamed && !stream.signal.aborted,
+        );
         if (!result.stopped) {
-            await this.recordText(request, modelName, result);
-        } else if (result.generationId && !this.deps.textHost) {
+            await this.recordText(request, modelName, result, host);
+        } else if (result.generationId && host.looksUpStoppedBills) {
             const generationId = result.generationId;
-            void this.billOf(generationId)
-                .then((bill) => (bill ? this.recordText(request, modelName, bill) : undefined))
+            void this.billOf(host, generationId)
+                .then((bill) => (bill ? this.recordText(request, modelName, bill, host) : undefined))
                 .catch((error: unknown) =>
                     this.logger.warn(`Could not record the stopped generation ${generationId}: ${(error as Error).message}`),
                 );
@@ -199,13 +280,13 @@ export class RealModelGateway extends ModelGateway {
         };
     }
 
-    /** One text-pool UsageRecord for what a call billed. */
-    private recordText(request: TextCompletionRequest, modelName: TextModel, bill: TextBill): Promise<void> {
+    /** One text-pool UsageRecord for what a call billed, naming the host (and its own model, if it has one) that answered. */
+    private recordText(request: TextCompletionRequest, modelName: TextModel, bill: TextBill, host: TextHost): Promise<void> {
         return this.deps.usage.record({
             kind: request.kind,
             pool: 'text',
-            model: modelName,
-            host: this.deps.textHost ?? TEXT_MODELS[modelName].host,
+            model: host.ownModel ?? modelName,
+            host: host.recordedHost ?? TEXT_MODELS[modelName].host,
             promptTokens: bill.promptTokens,
             completionTokens: bill.completionTokens,
             images: null,
@@ -216,9 +297,9 @@ export class RealModelGateway extends ModelGateway {
     }
 
     /** A generation's bill, asked for until OpenRouter knows it (it 404s for a moment after a stream closes). */
-    private async billOf(generationId: string): Promise<TextBill | undefined> {
+    private async billOf(host: TextHost, generationId: string): Promise<TextBill | undefined> {
         for (let attempt = 0; attempt < GENERATION_LOOKUPS; attempt++) {
-            const bill = await this.deps.openRouter.generation(generationId);
+            const bill = await host.client.generation(generationId);
             if (bill) return bill;
             await this.sleep(1000 * 2 ** attempt);
         }
@@ -239,14 +320,26 @@ export class RealModelGateway extends ModelGateway {
         if (request.inputs.length === 0) throw new RangeError('embedTexts needs at least one input');
         const modelName = EMBEDDING_MODEL;
         const model = EMBEDDING_MODELS[modelName];
-        const result = await this.deps.openRouter.embed({ model, inputs: request.inputs });
+        const hosts = this.deps.textHosts.filter((host) => host.embeds);
+        // Only the free model in the chain: nothing can embed, which a turn's search survives.
+        if (hosts.length === 0) throw new NoEmbeddingCreditError('No host in TEXT_HOSTS has an embedding model.');
+        let answered: { result: Awaited<ReturnType<TextHost['client']['embed']>>; host: TextHost };
+        try {
+            answered = await this.onHosts(request.kind, hosts, (host) => host.client.embed({ model, inputs: request.inputs }));
+        } catch (error) {
+            if (error instanceof OutOfCreditError && this.deps.textHosts.some((host) => !host.embeds)) {
+                throw new NoEmbeddingCreditError(`No host with an embedding model has credit; text goes on on the free model. ${error.message}`);
+            }
+            throw error;
+        }
+        const { result, host } = answered;
         // Whole billionths of a dollar: a search is about $0.000005.
         const costUsd = result.costUsd ?? Math.round(result.promptTokens * model.priceUsdPerMillion * 1e3) / 1e9;
         await this.deps.usage.record({
             kind: request.kind,
             pool: 'text',
             model: modelName,
-            host: this.deps.textHost ?? model.host,
+            host: host.recordedHost ?? model.host,
             promptTokens: result.promptTokens,
             completionTokens: 0,
             images: null,
@@ -366,14 +459,28 @@ export class RealModelGateway extends ModelGateway {
         if (this.creditCache && now - this.creditCache.readAt < this.creditCacheMs) {
             return structuredClone(this.creditCache.credit);
         }
-        const [text, image] = await Promise.all([
-            // On Venice, text spends the same balance as images.
-            this.readCredit('text', () => (this.deps.textHost ? this.deps.venice.credit() : this.deps.openRouter.credit())),
-            this.readCredit('image', () => this.deps.venice.credit()),
-        ]);
+        const [text, image] = await Promise.all([this.textCredit(), this.readCredit('image', () => this.deps.venice.credit())]);
         const credit = { text, image };
         this.creditCache = { readAt: now, credit };
         return structuredClone(credit);
+    }
+
+    /**
+     * The text pool: the balance of the first host in the chain that can still serve a call, named
+     * by `host`. A host passed over for credit, or whose balance reads used up, gives way to the next;
+     * the last host's balance stands whatever it reads, so the pool reads out only when every host is
+     * out. The free model's balance is unknown, which never blocks a call.
+     */
+    private async textCredit(): Promise<CreditBalance> {
+        const hosts = this.deps.textHosts;
+        for (let at = 0; ; at++) {
+            const host = hosts[at];
+            const last = at === hosts.length - 1;
+            if (!last && this.isOutOfCredit(host)) continue;
+            const reading = await this.readCredit('text', () => host.credit());
+            if (!last && reading.remainingUsd !== null && reading.remainingUsd <= 0) continue;
+            return { ...reading, host: host.name };
+        }
     }
 
     /** A provider that can't be asked leaves its pool unknown rather than failing the view. */

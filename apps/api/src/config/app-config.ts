@@ -19,8 +19,11 @@ export abstract class AppConfig {
     /** `fake` is for tests and E2E runs only; it also mounts the fake's control routes. */
     abstract readonly modelGateway: ModelGatewayMode;
     abstract readonly providerKeys: ProviderKeys;
-    /** Where text and embedding calls go (.scratch/venice-text/spec.md): OpenRouter, or Venice while OpenRouter has no credit. */
-    abstract readonly textHost: TextHost;
+    /**
+     * Where text and embedding calls go, in the order they are tried (.scratch/text-fallback/spec.md):
+     * a call a host refuses for credit goes on to the next. One host, OpenRouter, by default.
+     */
+    abstract readonly textHosts: readonly TextHost[];
     /**
      * How long a send waits for the previous turn's background calls before telling the user
      * they are still saving (spec: "Send flow", step 2). Tests shorten it.
@@ -75,8 +78,31 @@ export interface ProviderKeys {
     readonly veniceAdmin: string | undefined;
 }
 
-/** `TEXT_HOST`: `openrouter` (the default) or `venice`. */
-export type TextHost = 'openrouter' | 'venice';
+/** A host text can go to: OpenRouter, Venice, or a free model on OpenRouter (text only, no embeddings). */
+export const TEXT_HOSTS = ['openrouter', 'venice', 'free'] as const;
+export type TextHost = (typeof TEXT_HOSTS)[number];
+
+/**
+ * `TEXT_HOSTS`, a comma-separated chain such as `openrouter,venice,free`. Unset, the one host
+ * `TEXT_HOST` names (`openrouter`, the default, or `venice`, as before the chain), so an
+ * environment from before keeps working.
+ */
+function readTextHosts(env: NodeJS.ProcessEnv): TextHost[] {
+    if (env.TEXT_HOSTS) {
+        const hosts = env.TEXT_HOSTS.split(',').map((host) => host.trim()).filter((host) => host !== '');
+        const unknown = hosts.filter((host) => !(TEXT_HOSTS as readonly string[]).includes(host));
+        if (hosts.length === 0 || unknown.length > 0) {
+            throw new ConfigError(`TEXT_HOSTS must list hosts from ${TEXT_HOSTS.join(', ')}, separated by commas; got "${env.TEXT_HOSTS}"`);
+        }
+        if (new Set(hosts).size !== hosts.length) throw new ConfigError(`TEXT_HOSTS names a host twice: "${env.TEXT_HOSTS}"`);
+        return hosts as TextHost[];
+    }
+    const textHost = env.TEXT_HOST || 'openrouter';
+    if (textHost !== 'openrouter' && textHost !== 'venice') {
+        throw new ConfigError(`TEXT_HOST must be "openrouter" or "venice", got "${textHost}"`);
+    }
+    return [textHost];
+}
 
 export class ConfigError extends Error {}
 
@@ -96,10 +122,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
         throw new ConfigError(`MODEL_GATEWAY must be "real" or "fake", got "${modelGateway}"`);
     }
 
-    const textHost = env.TEXT_HOST || 'openrouter';
-    if (textHost !== 'openrouter' && textHost !== 'venice') {
-        throw new ConfigError(`TEXT_HOST must be "openrouter" or "venice", got "${textHost}"`);
-    }
+    const textHosts = readTextHosts(env);
 
     const backgroundWaitMs = env.BACKGROUND_WAIT_MS ? Number(env.BACKGROUND_WAIT_MS) : DEFAULT_BACKGROUND_WAIT_MS;
     if (!Number.isInteger(backgroundWaitMs) || backgroundWaitMs < 0) {
@@ -155,7 +178,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
         imageDir,
         speechDir,
         modelGateway,
-        textHost,
+        textHosts,
         backgroundWaitMs,
         backgroundRetryMs,
         backupStatusFile: env.BACKUP_STATUS_FILE ? path.resolve(env.BACKUP_STATUS_FILE) : undefined,

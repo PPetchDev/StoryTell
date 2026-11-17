@@ -543,7 +543,7 @@ describe('OpenRouter contract', () => {
             const credit = await gateway.remainingCredit();
 
             expect(net.requests[0].url).toBe('https://openrouter.ai/api/v1/credits');
-            expect(credit.text).toEqual({ remainingUsd: 4.5, limitUsd: 10 });
+            expect(credit.text).toEqual({ remainingUsd: 4.5, limitUsd: 10, host: 'openrouter' });
         });
 
         it("falls back to the key's own limit when the credits endpoint is refused", async () => {
@@ -564,7 +564,7 @@ describe('OpenRouter contract', () => {
             const credit = await gateway.remainingCredit();
 
             expect(net.requests[2].url).toBe('https://openrouter.ai/api/v1/key');
-            expect(credit.text).toEqual({ remainingUsd: 18.25, limitUsd: 22 });
+            expect(credit.text).toEqual({ remainingUsd: 18.25, limitUsd: 22, host: 'openrouter' });
         });
 
         it('reports the text pool as unknown when OpenRouter cannot be read', async () => {
@@ -576,7 +576,7 @@ describe('OpenRouter contract', () => {
 
             const credit = await gateway.remainingCredit();
 
-            expect(credit.text).toEqual({ remainingUsd: null, limitUsd: null });
+            expect(credit.text).toEqual({ remainingUsd: null, limitUsd: null, host: 'openrouter' });
             expect(credit.image).toEqual({ remainingUsd: 1, limitUsd: null });
         });
     });

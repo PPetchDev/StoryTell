@@ -130,7 +130,12 @@ export interface PoolUsage {
     capUsd: number;
     lowCreditPercent: number;
     lowCredit: boolean;
+    /** The text pool: the host serving text now (`openrouter`, `venice` or `free`); null for the image pool. */
+    host?: string | null;
 }
+
+/** How the Usage page names the host serving text (.scratch/text-fallback/spec.md). */
+export const TEXT_HOST_LABEL: Record<string, string> = { openrouter: 'OpenRouter', venice: 'Venice', free: 'free model on OpenRouter' };
 
 export interface UsageResponse {
     month: string;

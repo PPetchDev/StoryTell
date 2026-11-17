@@ -11,11 +11,9 @@ import { FakeModelGateway } from './fake-model-gateway.js';
 import { SpendCap } from './spend-cap.js';
 import { ModelGateway } from './model-gateway.js';
 import { FetchLike } from './real/http.js';
-import { OpenRouterClient } from './real/openrouter-client.js';
 import { RealModelGateway } from './real/real-model-gateway.js';
-import { VENICE_HOST } from './real/model-table.js';
+import { buildTextHosts } from './real/text-hosts.js';
 import { VeniceClient } from './real/venice-client.js';
-import { VeniceTextClient } from './real/venice-text-client.js';
 
 /** The `fetch` the real gateway uses. A test app overrides it to replay recorded responses. */
 export const GATEWAY_FETCH = Symbol('GATEWAY_FETCH');
@@ -55,11 +53,11 @@ export class ModelGatewayModule {
 function gatewayFor(config: AppConfig, fetchImpl: FetchLike, settings: SettingsModelService, usage: UsageRecordModelService): ModelGateway {
     if (config.modelGateway === 'fake') return new FakeModelGateway();
     const keys = config.providerKeys;
+    const venice = new VeniceClient(keys.venice, keys.veniceAdmin, fetchImpl);
     return new RealModelGateway({
-        // .scratch/venice-text/spec.md: TEXT_HOST=venice sends text and embeddings to Venice instead.
-        openRouter: config.textHost === 'venice' ? new VeniceTextClient(keys.venice, fetchImpl) : new OpenRouterClient(keys.openRouter, fetchImpl),
-        textHost: config.textHost === 'venice' ? VENICE_HOST : undefined,
-        venice: new VeniceClient(keys.venice, keys.veniceAdmin, fetchImpl),
+        // .scratch/text-fallback/spec.md: TEXT_HOSTS, e.g. openrouter,venice,free; OpenRouter alone by default.
+        textHosts: buildTextHosts(config.textHosts, keys, fetchImpl, venice),
+        venice,
         settings: {
             current: async () => {
                 const current = await settings.get();

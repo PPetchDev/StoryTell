@@ -6,7 +6,7 @@ import { BackupBanner } from '@/components/backup-banner';
 import { useAccount } from '@/lib/account';
 import { useApiQuery } from '@/components/connection';
 import { ErrorState, Loading } from '@/components/query-state';
-import { CALL_KIND_LABEL, CreditPool, POOL_LABEL, PoolUsage, UsageResponse, usd } from '@/lib/types';
+import { CALL_KIND_LABEL, CreditPool, POOL_LABEL, PoolUsage, TEXT_HOST_LABEL, UsageResponse, usd } from '@/lib/types';
 
 /**
  * Label and value, the label muted: the label over its value on a phone, so the value has the
@@ -112,8 +112,8 @@ function KindTable({ pool, usage }: { pool: CreditPool; usage: PoolUsage }) {
 }
 
 function PoolCard({ pool, usage, member }: { pool: CreditPool; usage: PoolUsage; member: boolean }) {
-    // The Venice pool's label already names its provider.
-    const provider = pool === 'text' ? 'OpenRouter' : null;
+    // The Venice pool's label already names its provider; text names the host of its chain serving now.
+    const provider = pool === 'text' ? (TEXT_HOST_LABEL[usage.host ?? 'openrouter'] ?? usage.host) : null;
     return (
         <section className="card" aria-labelledby={`pool-${pool}`}>
             <h2 id={`pool-${pool}`}>
@@ -136,6 +136,7 @@ function PoolCard({ pool, usage, member }: { pool: CreditPool; usage: PoolUsage;
                                         // Why, in words (M15): the setting's name is in README, for whoever runs the server.
                                         <>. Venice tells its balance only to an admin key, and the server has none set up.</>
                                     )}
+                                    {pool === 'text' && usage.host === 'free' && <>. Text is on a free model while the paid hosts are out of credit.</>}
                                 </span>
                             ) : (
                                 <>

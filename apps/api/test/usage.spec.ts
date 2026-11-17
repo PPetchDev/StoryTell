@@ -50,6 +50,8 @@ describe('Usage', () => {
                 lowCreditPercent: 20,
                 // 20% of $22 is $4.40, so $4.50 is just above the line.
                 lowCredit: false,
+                // .scratch/text-fallback/spec.md: the host of the text chain serving now.
+                host: 'openrouter',
             });
             expect(body.pools.text.byKind).toEqual([
                 { kind: 'turn', spentUsd: 0.000987, calls: 1 },
@@ -63,6 +65,7 @@ describe('Usage', () => {
                 capUsd: 8,
                 lowCreditPercent: 20,
                 lowCredit: false,
+                host: null,
             });
         });
     });

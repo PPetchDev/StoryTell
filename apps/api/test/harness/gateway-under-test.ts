@@ -1,12 +1,12 @@
+import { TextHost as TextHostName } from '../../src/config/app-config.js';
 import { FetchLike, SleepFn } from '../../src/service/model-gateway/real/http.js';
-import { OpenRouterClient } from '../../src/service/model-gateway/real/openrouter-client.js';
 import {
     GatewayModelSettings,
     NewUsageRecord,
     RealModelGateway,
 } from '../../src/service/model-gateway/real/real-model-gateway.js';
+import { buildTextHosts } from '../../src/service/model-gateway/real/text-hosts.js';
 import { VeniceClient } from '../../src/service/model-gateway/real/venice-client.js';
-import { VeniceTextClient } from '../../src/service/model-gateway/real/venice-text-client.js';
 
 export const TEST_KEYS = {
     openRouter: 'sk-or-test-not-a-real-key',
@@ -19,6 +19,8 @@ export interface GatewayUnderTest {
     settings: GatewayModelSettings;
     records: NewUsageRecord[];
     sleeps: number[];
+    /** The clock the out-of-credit memory reads; move `now` to let time pass. */
+    clock: { now: number };
 }
 
 /**
@@ -28,7 +30,7 @@ export interface GatewayUnderTest {
  */
 export function gatewayUnderTest(
     fetchImpl: FetchLike,
-    options: { settings?: Partial<GatewayModelSettings>; veniceAdminKey?: string | undefined; textOnVenice?: boolean } = {},
+    options: { settings?: Partial<GatewayModelSettings>; veniceAdminKey?: string | undefined; textOnVenice?: boolean; textHosts?: TextHostName[] } = {},
 ): GatewayUnderTest {
     const settings: GatewayModelSettings = {
         playModel: 'glm-5.3',
@@ -42,16 +44,12 @@ export function gatewayUnderTest(
     const sleep: SleepFn = async (ms) => {
         sleeps.push(ms);
     };
+    const venice = new VeniceClient(TEST_KEYS.venice, 'veniceAdminKey' in options ? options.veniceAdminKey : TEST_KEYS.veniceAdmin, fetchImpl, sleep);
+    const clock = { now: 1_000_000 };
     const gateway = new RealModelGateway({
-        // .scratch/venice-text/spec.md: TEXT_HOST=venice.
-        openRouter: options.textOnVenice ? new VeniceTextClient(TEST_KEYS.venice, fetchImpl, sleep) : new OpenRouterClient(TEST_KEYS.openRouter, fetchImpl, sleep),
-        ...(options.textOnVenice ? { textHost: 'venice' as const } : {}),
-        venice: new VeniceClient(
-            TEST_KEYS.venice,
-            'veniceAdminKey' in options ? options.veniceAdminKey : TEST_KEYS.veniceAdmin,
-            fetchImpl,
-            sleep,
-        ),
+        // .scratch/text-fallback/spec.md: TEXT_HOSTS; `textOnVenice` is TEXT_HOST=venice from before the chain.
+        textHosts: buildTextHosts(options.textHosts ?? (options.textOnVenice ? ['venice'] : ['openrouter']), TEST_KEYS, fetchImpl, venice, sleep),
+        venice,
         settings: { current: async () => ({ ...settings }) },
         usage: {
             record: async (record) => {
@@ -60,6 +58,7 @@ export function gatewayUnderTest(
         },
         creditCacheMs: 0,
         sleep,
+        now: () => clock.now,
     });
-    return { gateway, settings, records, sleeps };
+    return { gateway, settings, records, sleeps, clock };
 }

@@ -391,6 +391,11 @@ export interface CreditBalance {
     remainingUsd: number | null;
     /** The pool's cap, when the provider reports one. */
     limitUsd: number | null;
+    /**
+     * The text pool only: the host of the text chain this balance is (`openrouter`, `venice` or
+     * `free`), the first that can still serve a call (.scratch/text-fallback/spec.md).
+     */
+    host?: string;
 }
 
 export type RemainingCredit = Record<CreditPool, CreditBalance>;

@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 
-import { OutOfCreditError } from '../../../errors/model-gateway.errors.js';
+import { NoEmbeddingCreditError, OutOfCreditError } from '../../../errors/model-gateway.errors.js';
 import { MemoryEntity } from '../../../model/memory/entities/memory.entity.js';
 import { MemoryModelService } from '../../../model/memory/memory.service.js';
 import { ModelGateway } from '../../../service/model-gateway/model-gateway.js';
@@ -101,7 +101,8 @@ export class MemoryEmbeddingManagerService implements OnApplicationBootstrap {
                 this.logger.warn(
                     `Chat ${chatId}: could not embed ${batch.length} Memories; they stay unembedded until they are embedded again: ${error instanceof Error ? error.message : String(error)}`,
                 );
-                if (error instanceof OutOfCreditError) return { embedded, outOfCredit: true };
+                // No embedding host with credit is out of credit for embeddings, even while the free model plays.
+                if (error instanceof OutOfCreditError || error instanceof NoEmbeddingCreditError) return { embedded, outOfCredit: true };
             }
         }
         return { embedded, outOfCredit: false };
