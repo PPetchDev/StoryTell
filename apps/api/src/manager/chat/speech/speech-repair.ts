@@ -82,32 +82,69 @@ Answer with only the line.`,
 
 const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+/** Which guard refused a repair's answer, named in the API log so a repair on live can be checked later. */
+export type RepairRefusal = 'empty' | "wrote another speaker's line" | 'too long' | 'no better' | 'lost all "I"' | 'lost all "you"' | 'added a quoted Voice term';
+
+/** Why a line was kept as written: a guard refused the answer, no answer came in time, or the call failed. */
+export type RepairFailure = RepairRefusal | 'timeout' | 'error';
+
+export type RepairVerdict ={ line: string; refused: null } | { line: null; refused: RepairRefusal };
+
 /**
- * The repaired line to keep, or null to keep the line as written: the answer without a fence, a
- * `Name:` label, wrapping quotes or asterisk asides, taken only when it is not empty, not more than
- * a quarter longer (and a few words), has fewer of the habit than the line it replaces, keeps some
- * of its "I" and of its "you", and brings in no term the Voice quotes that the line didn't use. On
- * Chat 2's real lines, unguarded repairs turned "I had a whole speech ready" into "You had a speech
- * ready", and put "traveller", which the card says she calls a stranger, into lines to her husband.
+ * The repaired line to keep, or the guard that refused it (the line is then kept as written): the
+ * answer without a fence, a `Name:` label, wrapping quotes or asterisk asides, taken only when it is
+ * not empty, not more than a quarter longer (and a few words), has fewer of the habit than the line
+ * it replaces, keeps some of its "I" and of its "you", and brings in no term the Voice quotes that
+ * the line didn't use. On Chat 2's real lines, unguarded repairs turned "I had a whole speech ready"
+ * into "You had a speech ready", and put "traveller", which the card says she calls a stranger, into
+ * lines to her husband.
  */
-export function acceptRepair(answer: string, input: Pick<RepairInput, 'speakerName' | 'line'> & { voice?: string }): string | null {
+export function judgeRepair(answer: string, input: Pick<RepairInput, 'speakerName' | 'line'> & { voice?: string }): RepairVerdict {
+    const refuse = (refused: RepairRefusal): RepairVerdict => ({ line: null, refused });
     let line = answer.trim();
     const fenced = line.match(/^```[^\n]*\n([\s\S]*?)\n?```$/);
     if (fenced) line = fenced[1].trim();
     line = line.replace(new RegExp(`^@?\\*{0,2}${escapeRegExp(input.speakerName)}\\*{0,2}\\s*:\\s*`, 'i'), '');
     line = line.replace(/\*[^*\n]+\*/g, ' ').replace(/[ \t]{2,}/g, ' ').trim();
     if (/^["“][\s\S]*["”]$/.test(line)) line = line.slice(1, -1).trim();
-    if (line === '' || line.includes('\n@')) return null;
-    if (line.length > input.line.length * 1.25 + 40) return null;
-    if (repeatedOpenings(line).length >= repeatedOpenings(input.line).length) return null;
+    if (line === '') return refuse('empty');
+    if (line.includes('\n@')) return refuse("wrote another speaker's line");
+    if (line.length > input.line.length * 1.25 + 40) return refuse('too long');
+    if (repeatedOpenings(line).length >= repeatedOpenings(input.line).length) return refuse('no better');
     // Turned around: every "I" or every "you" of the line gone ("I had a speech ready" said back as
     // "You had a speech ready"). Fewer is fine: folding "I had stages. I had a sequence." drops some.
     const was = personCounts(input.line);
     const now = personCounts(line);
-    if ((was.first >= 2 && now.first === 0) || (was.second >= 2 && now.second === 0)) return null;
+    if (was.first >= 2 && now.first === 0) return refuse('lost all "I"');
+    if (was.second >= 2 && now.second === 0) return refuse('lost all "you"');
     // A way of addressing someone the card quotes, brought in where the line had none ("traveller" to a husband).
     const original = input.line.toLowerCase();
     const lower = line.toLowerCase();
-    if (quotedTerms(input.voice ?? '').some((term) => lower.includes(term) && !original.includes(term))) return null;
-    return line;
+    if (quotedTerms(input.voice ?? '').some((term) => lower.includes(term) && !original.includes(term))) return refuse('added a quoted Voice term');
+    return { line, refused: null };
+}
+
+/** `judgeRepair`'s line alone: the repaired line to keep, or null to keep the line as written. */
+export function acceptRepair(answer: string, input: Pick<RepairInput, 'speakerName' | 'line'> & { voice?: string }): string | null {
+    return judgeRepair(answer, input).line;
+}
+
+/** Each text in a repair's log line is cut to this many characters. */
+export const REPAIR_LOG_TEXT_CAP = 600;
+
+/**
+ * One API log line per repair, so a repair on live can be checked later: who said it, the line as
+ * written, and either the line kept or the model's raw answer and why it was refused. The texts are
+ * JSON-encoded, so a newline in one can't split the line in journalctl.
+ */
+export function repairLogLine(
+    chatId: number,
+    entry: { speaker: string; part: number; written: string; repaired: string | null; answer: string | null; reason: RepairFailure | null; error?: string | null },
+): string {
+    const cap = (text: string | null | undefined): string | null =>
+        text === null || text === undefined || text.length <= REPAIR_LOG_TEXT_CAP ? (text ?? null) : `${text.slice(0, REPAIR_LOG_TEXT_CAP)}…(${text.length} chars)`;
+    const head = { speaker: entry.speaker, part: entry.part, written: cap(entry.written) };
+    if (entry.repaired !== null) return `Chat ${chatId}: Line repair kept ${JSON.stringify({ ...head, repaired: cap(entry.repaired) })}`;
+    const fields = { ...head, answer: cap(entry.answer), ...(entry.error ? { error: cap(entry.error) } : {}) };
+    return `Chat ${chatId}: Line repair refused (${entry.reason ?? 'unknown'}) ${JSON.stringify(fields)}`;
 }

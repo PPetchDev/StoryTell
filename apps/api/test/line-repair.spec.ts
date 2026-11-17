@@ -1,5 +1,19 @@
 import { repeatedOpenings, sentencesOf } from '../src/manager/chat/speech/repeated-openings.js';
-import { acceptRepair, buildRepairPrompt, quotedTerms, RepairInput, spokenPart } from '../src/manager/chat/speech/speech-repair.js';
+import { vi } from 'vitest';
+
+import { SpeechRepairManagerService } from '../src/manager/chat/speech/speech-repair.service.js';
+import {
+    acceptRepair,
+    buildRepairPrompt,
+    judgeRepair,
+    quotedTerms,
+    REPAIR_LOG_TEXT_CAP,
+    REPAIR_TIMEOUT_MS,
+    RepairInput,
+    repairLogLine,
+    spokenPart,
+} from '../src/manager/chat/speech/speech-repair.js';
+import { ModelGateway } from '../src/service/model-gateway/model-gateway.js';
 import { startTestApp, TestApp } from './harness/test-app.js';
 
 /**
@@ -87,6 +101,33 @@ describe('Line repair: what is asked, and what is taken (pure)', () => {
         expect(quotedTerms('Calls anyone younger "child" or "little one", and teases her daughter.')).toEqual(['child', 'little one']);
     });
 
+    it('names the guard that refused the answer', () => {
+        const line = "You can't say that. I had a whole speech ready. I had stages. I had a sequence. I was going to make you beg.";
+        const input = { speakerName: 'Nara', line, voice: 'Calls the user "traveller" until they earn a name.' };
+        expect(judgeRepair('I had a whole speech ready. Stages and everything.', INPUT)).toEqual({ line: 'I had a whole speech ready. Stages and everything.', refused: null });
+        expect(judgeRepair('  *sighs*  ', INPUT)).toEqual({ line: null, refused: 'empty' });
+        expect(judgeRepair('Fine.\n@Kai: Me too.', INPUT)).toEqual({ line: null, refused: "wrote another speaker's line" });
+        expect(judgeRepair(`${INPUT.line} ${'and more '.repeat(20)}`, INPUT)).toEqual({ line: null, refused: 'too long' });
+        expect(judgeRepair('I had a plan. I had stages. I had a sequence. I had more.', INPUT)).toEqual({ line: null, refused: 'no better' });
+        expect(judgeRepair('You had a speech ready. Stages. A sequence. You were supposed to beg.', input)).toEqual({ line: null, refused: 'lost all "I"' });
+        expect(judgeRepair("Can't say that. I had a whole speech ready. Stages, a sequence. I was going to make Ash beg.", input)).toEqual({ line: null, refused: 'lost all "you"' });
+        expect(judgeRepair("You can't say that, traveller. I had a whole speech ready. Stages, a sequence. I was going to make you beg.", input)).toEqual({
+            line: null,
+            refused: 'added a quoted Voice term',
+        });
+    });
+
+    it('logs each repair on one line: the line as written, and the line kept or the raw answer and why', () => {
+        const kept = repairLogLine(3, { speaker: 'Nara', part: 1, written: '*sighs* I had stages. I had a sequence.', repaired: '*sighs* Stages and all.', answer: 'Stages and all.', reason: null, error: null });
+        expect(kept).toBe('Chat 3: Line repair kept {"speaker":"Nara","part":1,"written":"*sighs* I had stages. I had a sequence.","repaired":"*sighs* Stages and all."}');
+        const refused = repairLogLine(3, { speaker: 'Nara', part: 0, written: 'I had stages. I had a sequence.', repaired: null, answer: 'Fine.\n@Kai: — —', reason: "wrote another speaker's line", error: null });
+        expect(refused).toBe(`Chat 3: Line repair refused (wrote another speaker's line) {"speaker":"Nara","part":0,"written":"I had stages. I had a sequence.","answer":"Fine.\\n@Kai: — —"}`);
+        const late = repairLogLine(3, { speaker: 'Nara', part: 0, written: 'x'.repeat(2000), repaired: null, answer: null, reason: 'timeout', error: 'no answer within 10000 ms' });
+        expect(late).not.toContain('\n');
+        expect(late).toContain('"answer":null,"error":"no answer within 10000 ms"');
+        expect(late).toContain(`"written":"${'x'.repeat(REPAIR_LOG_TEXT_CAP)}…(2000 chars)"`);
+    });
+
     it('sends only the spoken words, keeping an opening stage direction apart', () => {
         expect(spokenPart('*still not turning* I can hear you. I can hear you thinking.')).toEqual({
             aside: '*still not turning* ',
@@ -94,6 +135,40 @@ describe('Line repair: what is asked, and what is taken (pure)', () => {
         });
         expect(spokenPart('I had stages. I had a sequence.')).toEqual({ aside: '', spoken: 'I had stages. I had a sequence.' });
         expect(spokenPart('I had stages. *she sighs* I had a sequence.').spoken).toBeNull();
+    });
+});
+
+describe('Line repair: the call, and why a line was kept as written', () => {
+    const answering = (completeText: () => Promise<{ text: string }>) =>
+        new SpeechRepairManagerService({ completeText } as unknown as ModelGateway);
+
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    it('passes on the raw answer and the guard that refused it', async () => {
+        const service = answering(async () => ({ text: 'I had a plan. I had stages. I had a sequence. I had more.' }));
+        expect(await service.repair(INPUT, { chatId: 1 })).toEqual({ line: null, reason: 'no better', answer: 'I had a plan. I had stages. I had a sequence. I had more.', error: null });
+        const kept = answering(async () => ({ text: 'Nara: I had a whole speech ready. Stages and everything.' }));
+        expect(await kept.repair(INPUT, { chatId: 1 })).toEqual({
+            line: 'I had a whole speech ready. Stages and everything.',
+            reason: null,
+            answer: 'Nara: I had a whole speech ready. Stages and everything.',
+            error: null,
+        });
+    });
+
+    it('tells a failed call from a late one', async () => {
+        const failed = answering(async () => {
+            throw new Error('upstream 500');
+        });
+        expect(await failed.repair(INPUT, { chatId: 1 })).toEqual({ line: null, reason: 'error', answer: null, error: 'upstream 500' });
+
+        vi.useFakeTimers();
+        const late = answering(() => new Promise(() => {}));
+        const pending = late.repair(INPUT, { chatId: 1 });
+        await vi.advanceTimersByTimeAsync(REPAIR_TIMEOUT_MS);
+        expect(await pending).toEqual({ line: null, reason: 'timeout', answer: null, error: `no answer within ${REPAIR_TIMEOUT_MS} ms` });
     });
 });
 

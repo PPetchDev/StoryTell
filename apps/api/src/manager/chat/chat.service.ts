@@ -76,7 +76,7 @@ import { DiaryManagerService } from './diary/diary.service.js';
 import { ThoughtsManagerService } from './thoughts/thoughts.service.js';
 import { SpeechRepairManagerService } from './speech/speech-repair.service.js';
 import { repeatedOpenings } from './speech/repeated-openings.js';
-import { spokenPart } from './speech/speech-repair.js';
+import { repairLogLine, spokenPart } from './speech/speech-repair.js';
 import { thinkers, ThoughtPromptInput } from './thoughts/thoughts.js';
 import type { MessageThoughtEntity } from '../../model/chat/entities/message-thought.entity.js';
 import { renderUser } from './memory/render-user.js';
@@ -772,7 +772,18 @@ export class ChatManagerService {
                 const voice = story.characters.find((character) => character.id === part.characterId)?.voice ?? '';
                 const result = await this.speechRepair.repair({ speakerName: part.speakerName, voice, line: spoken, found }, { storyId: story.id, chatId });
                 if (result.line !== null) repaired[index] = { ...part, text: `${aside}${result.line}` };
-                else this.logger.log(`Chat ${chatId}: ${part.speakerName}'s line kept as written (${result.reason})`);
+                // Before and after, one line per repair, so a repair on live can be checked later.
+                this.logger.log(
+                    repairLogLine(chatId, {
+                        speaker: part.speakerName,
+                        part: index,
+                        written: part.text,
+                        repaired: result.line === null ? null : repaired[index].text,
+                        answer: result.answer,
+                        reason: result.reason,
+                        error: result.error,
+                    }),
+                );
             }),
         );
         const changed = repaired.filter((part, index) => part !== parts[index]).length;

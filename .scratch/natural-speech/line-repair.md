@@ -15,6 +15,7 @@ A reply is written as before; then, before it is kept, each speech line is check
 
 - What is not the habit, and is left alone: one thing said again for weight ("She's counting. Tavri, she's counting."), and starting over ("I can't—I can't breathe"), which Tavri's Voice asks for. A repair of the first read it as two people and changed who was in trouble; one of the second smoothed the stammer away.
 - An opening stage direction ("*still not turning* ") is kept apart: only the spoken words are sent, and the direction stays in front of the repaired line. A line with a direction further in is left as written.
+- Every repair leaves one API log line (2026-11-17), since only the repaired text is stored and nobody could tell what a repair changed (a stray "— —" on live could have come from the model or from the repair): `Chat <id>: Line repair kept {...}` with the speaker, the part's place in the reply, the line as written and the line kept; or `Line repair refused (<reason>) {...}` with the model's raw answer and the guard that refused it (empty, wrote another speaker's line, too long, no better, lost all "I", lost all "you", added a quoted Voice term), or timeout or error with the call's message. The texts are JSON-encoded so a newline can't split the line in journalctl, each cut at 600 characters. The Message isn't stored yet when the repair runs, so the line names the Chat only. The summary line ("repaired N of M…") stays.
 
 ## Measured (2026-11-16, DeepSeek V4 Pro, Chat 2's 101 real speech lines)
 
