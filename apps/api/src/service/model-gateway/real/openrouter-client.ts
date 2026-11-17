@@ -118,7 +118,11 @@ async function* serverSentData(body: ReadableStream<Uint8Array>): AsyncGenerator
  * (prototypes/one-ai-turn/server.mjs). Errors per https://openrouter.ai/docs/api-reference/errors.
  */
 export class OpenRouterClient {
-    private readonly logger = new Logger(OpenRouterClient.name);
+    protected readonly logger = new Logger(OpenRouterClient.name);
+    /** The host's name, in errors and logs. */
+    protected readonly label: string = 'OpenRouter';
+    /** The setting that holds the key, named when it is missing. */
+    protected readonly keyName: string = 'OPENROUTER_API_KEY';
 
     constructor(
         private readonly apiKey: string | undefined,
@@ -155,11 +159,31 @@ export class OpenRouterClient {
 
     /** True when the body asked OpenRouter to require its parameters. */
     private static requiresParameters(body: Record<string, unknown>): boolean {
-        return (body.provider as { require_parameters?: boolean }).require_parameters === true;
+        return (body.provider as { require_parameters?: boolean } | undefined)?.require_parameters === true;
+    }
+
+    /** The body a chat request becomes on this host. */
+    protected chatBody(request: OpenRouterChatRequest): Record<string, unknown> {
+        return OpenRouterClient.buildBody(request);
+    }
+
+    /** What a streamed request adds to its body, past `stream: true`. */
+    protected streamExtras(): Record<string, unknown> {
+        return {};
+    }
+
+    /** The body an embeddings request becomes on this host. */
+    protected embeddingBody(request: OpenRouterEmbeddingRequest): Record<string, unknown> {
+        return OpenRouterClient.buildEmbeddingBody(request);
+    }
+
+    /** What a call cost, from its answer (a whole one, or the stream's usage chunk); undefined when the host reported none. */
+    protected costOf(json: Record<string, any>): number | undefined {
+        return typeof json.usage?.cost === 'number' ? json.usage.cost : undefined;
     }
 
     async chat(request: OpenRouterChatRequest): Promise<OpenRouterChatResult> {
-        const body = OpenRouterClient.buildBody(request);
+        const body = this.chatBody(request);
         const response = await this.send('/chat/completions', {
             method: 'POST',
             headers: {
@@ -199,7 +223,7 @@ export class OpenRouterClient {
                 'Content-Type': 'application/json',
                 'X-Title': 'Storytell AI',
             },
-            body: JSON.stringify(OpenRouterClient.buildEmbeddingBody(request)),
+            body: JSON.stringify(this.embeddingBody(request)),
         });
         const json = await readJson(response);
         if (!response.ok || json?.error) throw this.toError(response.status, json);
@@ -227,8 +251,8 @@ export class OpenRouterClient {
         });
 
         const usage = json?.usage ?? {};
-        const costUsd = typeof usage.cost === 'number' ? usage.cost : undefined;
-        if (costUsd === undefined) this.logger.warn(`OpenRouter reported no cost for ${id}; recording the list price.`);
+        const costUsd = this.costOf(json ?? {});
+        if (costUsd === undefined) this.logger.warn(`${this.label} reported no cost for ${id}; recording the list price.`);
         return { vectors, promptTokens: typeof usage.prompt_tokens === 'number' ? usage.prompt_tokens : 0, costUsd };
     }
 
@@ -257,7 +281,7 @@ export class OpenRouterClient {
         });
         if (signal.aborted) return stopped('', undefined);
 
-        const body = { ...OpenRouterClient.buildBody(request), stream: true };
+        const body = { ...this.chatBody(request), stream: true, ...this.streamExtras() };
         let response: Response;
         try {
             response = await this.send(
@@ -288,6 +312,7 @@ export class OpenRouterClient {
         let generationId: string | undefined;
         let finishReason: string | undefined;
         let usage: Record<string, any> | undefined;
+        let usageChunk: Record<string, any> = {};
         try {
             for await (const data of serverSentData(response.body)) {
                 if (data === '[DONE]') break;
@@ -309,27 +334,31 @@ export class OpenRouterClient {
                     text += piece;
                     onText(piece);
                 }
-                if (chunk.usage) usage = chunk.usage;
+                if (chunk.usage) {
+                    usage = chunk.usage;
+                    usageChunk = chunk;
+                }
                 // Stop reading the moment the caller aborts, even mid-chunk.
                 if (signal.aborted) return stopped(text, generationId);
             }
         } catch (error) {
             if (signal.aborted) return stopped(text, generationId);
             if (error instanceof ModelGatewayError) throw error;
-            throw new ProviderOutageError(`The stream from OpenRouter broke off: ${(error as Error).message}`);
+            throw new ProviderOutageError(`The stream from ${this.label} broke off: ${(error as Error).message}`);
         }
         if (signal.aborted) return stopped(text, generationId);
         if (!usage) {
-            throw new ProviderOutageError(`The stream from OpenRouter ended before ${request.model.id} finished.`);
+            throw new ProviderOutageError(`The stream from ${this.label} ended before ${request.model.id} finished.`);
         }
-        if (typeof usage.cost !== 'number') {
-            this.logger.warn(`OpenRouter reported no cost for ${request.model.id}; recording $0.`);
+        const streamCost = this.costOf(usageChunk);
+        if (streamCost === undefined) {
+            this.logger.warn(`${this.label} reported no cost for ${request.model.id}; recording $0.`);
         }
         return {
             text,
             promptTokens: usage.prompt_tokens ?? 0,
             completionTokens: usage.completion_tokens ?? 0,
-            costUsd: typeof usage.cost === 'number' ? usage.cost : 0,
+            costUsd: streamCost ?? 0,
             finishReason,
             stopped: false,
             generationId,
@@ -387,7 +416,7 @@ export class OpenRouterClient {
 
     private headers(): Record<string, string> {
         if (!this.apiKey) {
-            throw new ProviderOutageError('OPENROUTER_API_KEY is not set.');
+            throw new ProviderOutageError(`${this.keyName} is not set.`);
         }
         return { Authorization: `Bearer ${this.apiKey}` };
     }
@@ -407,7 +436,7 @@ export class OpenRouterClient {
             }
             if (!isRetryable(response.status) || attempt >= MAX_RETRIES || signal?.aborted) return response;
             const delay = retryDelayMs(attempt, response.headers.get('retry-after'));
-            this.logger.warn(`OpenRouter answered ${response.status} on ${path}; retrying in ${delay} ms`);
+            this.logger.warn(`${this.label} answered ${response.status} on ${path}; retrying in ${delay} ms`);
             await this.sleep(delay);
             if (signal?.aborted) return response;
         }
@@ -424,25 +453,27 @@ export class OpenRouterClient {
             throw new UnparseableOutputError(`${model.id} returned no text.`);
         }
         const usage = json.usage ?? {};
-        if (typeof usage.cost !== 'number') {
-            this.logger.warn(`OpenRouter reported no cost for ${model.id}; recording $0.`);
+        const cost = this.costOf(json);
+        if (cost === undefined) {
+            this.logger.warn(`${this.label} reported no cost for ${model.id}; recording $0.`);
         }
         return {
             text,
             promptTokens: usage.prompt_tokens ?? 0,
             completionTokens: usage.completion_tokens ?? 0,
-            costUsd: typeof usage.cost === 'number' ? usage.cost : 0,
+            costUsd: cost ?? 0,
             finishReason,
             reasoningTokens: usage.completion_tokens_details?.reasoning_tokens ?? 0,
         };
     }
 
     private toError(status: number, json: Record<string, any> | undefined, requiredParameters = false): ModelGatewayError {
-        const error = json?.error ?? {};
+        // Venice answers `{ "error": "…" }`; OpenRouter `{ "error": { "message": "…" } }`.
+        const error = typeof json?.error === 'string' ? { message: json.error } : (json?.error ?? {});
         const message: string = typeof error.message === 'string' ? error.message : `HTTP ${status}`;
         const code: number = typeof error.code === 'number' ? error.code : status;
         const metadata = error.metadata ?? {};
-        const described = `OpenRouter: ${message}${describeProvider(metadata)}`;
+        const described = `${this.label}: ${message}${describeProvider(metadata)}`;
 
         // OpenRouter's routing refusal, "No endpoints found that can handle the requested
         // parameters" (a 404). Its exact status and wording are confirmed by the smoke run.
@@ -466,7 +497,7 @@ export class OpenRouterClient {
             code === 402 ||
             metadata.error_type === 'payment_required' ||
             /exceed(s)? your available credits/i.test(message) ||
-            /insufficient credits/i.test(message) ||
+            /insufficient (credits|balance|funds)/i.test(message) ||
             typeof metadata.limit_source === 'string'
         ) {
             return new OutOfCreditError('text', described);

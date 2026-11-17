@@ -19,6 +19,8 @@ export abstract class AppConfig {
     /** `fake` is for tests and E2E runs only; it also mounts the fake's control routes. */
     abstract readonly modelGateway: ModelGatewayMode;
     abstract readonly providerKeys: ProviderKeys;
+    /** Where text and embedding calls go (.scratch/venice-text/spec.md): OpenRouter, or Venice while OpenRouter has no credit. */
+    abstract readonly textHost: TextHost;
     /**
      * How long a send waits for the previous turn's background calls before telling the user
      * they are still saving (spec: "Send flow", step 2). Tests shorten it.
@@ -73,6 +75,9 @@ export interface ProviderKeys {
     readonly veniceAdmin: string | undefined;
 }
 
+/** `TEXT_HOST`: `openrouter` (the default) or `venice`. */
+export type TextHost = 'openrouter' | 'venice';
+
 export class ConfigError extends Error {}
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
@@ -89,6 +94,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     const modelGateway = env.MODEL_GATEWAY ?? 'real';
     if (modelGateway !== 'real' && modelGateway !== 'fake') {
         throw new ConfigError(`MODEL_GATEWAY must be "real" or "fake", got "${modelGateway}"`);
+    }
+
+    const textHost = env.TEXT_HOST || 'openrouter';
+    if (textHost !== 'openrouter' && textHost !== 'venice') {
+        throw new ConfigError(`TEXT_HOST must be "openrouter" or "venice", got "${textHost}"`);
     }
 
     const backgroundWaitMs = env.BACKGROUND_WAIT_MS ? Number(env.BACKGROUND_WAIT_MS) : DEFAULT_BACKGROUND_WAIT_MS;
@@ -145,6 +155,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
         imageDir,
         speechDir,
         modelGateway,
+        textHost,
         backgroundWaitMs,
         backgroundRetryMs,
         backupStatusFile: env.BACKUP_STATUS_FILE ? path.resolve(env.BACKUP_STATUS_FILE) : undefined,

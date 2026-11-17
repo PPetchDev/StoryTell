@@ -84,7 +84,13 @@ export interface NewUsageRecord {
 }
 
 export interface RealModelGatewayDeps {
+    /** The text and embedding client: OpenRouter's, or Venice's when `textHost` says so. */
     openRouter: OpenRouterClient;
+    /**
+     * Set when text goes to another host than the model table names (.scratch/venice-text/spec.md):
+     * the host UsageRecords carry, and the pool the text credit is read from.
+     */
+    textHost?: typeof VENICE_HOST;
     venice: VeniceClient;
     settings: { current(): Promise<GatewayModelSettings> };
     usage: { record(record: NewUsageRecord): Promise<void> };
@@ -156,7 +162,7 @@ export class RealModelGateway extends ModelGateway {
         });
         if (!result.stopped) {
             await this.recordText(request, modelName, result);
-        } else if (result.generationId) {
+        } else if (result.generationId && !this.deps.textHost) {
             const generationId = result.generationId;
             void this.billOf(generationId)
                 .then((bill) => (bill ? this.recordText(request, modelName, bill) : undefined))
@@ -199,7 +205,7 @@ export class RealModelGateway extends ModelGateway {
             kind: request.kind,
             pool: 'text',
             model: modelName,
-            host: TEXT_MODELS[modelName].host,
+            host: this.deps.textHost ?? TEXT_MODELS[modelName].host,
             promptTokens: bill.promptTokens,
             completionTokens: bill.completionTokens,
             images: null,
@@ -240,7 +246,7 @@ export class RealModelGateway extends ModelGateway {
             kind: request.kind,
             pool: 'text',
             model: modelName,
-            host: model.host,
+            host: this.deps.textHost ?? model.host,
             promptTokens: result.promptTokens,
             completionTokens: 0,
             images: null,
@@ -361,7 +367,8 @@ export class RealModelGateway extends ModelGateway {
             return structuredClone(this.creditCache.credit);
         }
         const [text, image] = await Promise.all([
-            this.readCredit('text', () => this.deps.openRouter.credit()),
+            // On Venice, text spends the same balance as images.
+            this.readCredit('text', () => (this.deps.textHost ? this.deps.venice.credit() : this.deps.openRouter.credit())),
             this.readCredit('image', () => this.deps.venice.credit()),
         ]);
         const credit = { text, image };

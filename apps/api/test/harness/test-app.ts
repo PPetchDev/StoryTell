@@ -103,6 +103,7 @@ export async function startTestApp(options: TestAppOptions = {}): Promise<TestAp
                 imageDir,
                 speechDir,
                 modelGateway: options.modelGateway ?? 'fake',
+                textHost: 'openrouter',
                 // Short, so a test of the "still saving" path does not sit through the real wait.
                 backgroundWaitMs: options.backgroundWaitMs ?? 1_500,
                 backgroundRetryMs: options.backgroundRetryMs ?? 0,

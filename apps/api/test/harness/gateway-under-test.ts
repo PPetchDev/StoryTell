@@ -6,6 +6,7 @@ import {
     RealModelGateway,
 } from '../../src/service/model-gateway/real/real-model-gateway.js';
 import { VeniceClient } from '../../src/service/model-gateway/real/venice-client.js';
+import { VeniceTextClient } from '../../src/service/model-gateway/real/venice-text-client.js';
 
 export const TEST_KEYS = {
     openRouter: 'sk-or-test-not-a-real-key',
@@ -27,7 +28,7 @@ export interface GatewayUnderTest {
  */
 export function gatewayUnderTest(
     fetchImpl: FetchLike,
-    options: { settings?: Partial<GatewayModelSettings>; veniceAdminKey?: string | undefined } = {},
+    options: { settings?: Partial<GatewayModelSettings>; veniceAdminKey?: string | undefined; textOnVenice?: boolean } = {},
 ): GatewayUnderTest {
     const settings: GatewayModelSettings = {
         playModel: 'glm-5.3',
@@ -42,7 +43,9 @@ export function gatewayUnderTest(
         sleeps.push(ms);
     };
     const gateway = new RealModelGateway({
-        openRouter: new OpenRouterClient(TEST_KEYS.openRouter, fetchImpl, sleep),
+        // .scratch/venice-text/spec.md: TEXT_HOST=venice.
+        openRouter: options.textOnVenice ? new VeniceTextClient(TEST_KEYS.venice, fetchImpl, sleep) : new OpenRouterClient(TEST_KEYS.openRouter, fetchImpl, sleep),
+        ...(options.textOnVenice ? { textHost: 'venice' as const } : {}),
         venice: new VeniceClient(
             TEST_KEYS.venice,
             'veniceAdminKey' in options ? options.veniceAdminKey : TEST_KEYS.veniceAdmin,
