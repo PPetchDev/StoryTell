@@ -1,4 +1,5 @@
 import { ProviderOutageError } from '../src/errors/model-gateway.errors.js';
+import { layersOf } from './harness/prompt-layers.js';
 import { ChatManagerService } from '../src/manager/chat/chat.service.js';
 import {
     parseStorySoFar,
@@ -68,12 +69,14 @@ const history = (count: number, words = 10) =>
     Array.from({ length: count }, (_, i) => ({ role: (i % 2 === 0 ? 'assistant' : 'user') as 'user' | 'assistant', text: `M${i} ${'word '.repeat(words)}` }));
 
 describe('Story so far: prompt (pure)', () => {
-    it('sends the Story so far after Memory and leaves the Messages it covers out of the history', () => {
+    it('sends the Story so far right before the history, with the standing layers, and leaves the Messages it covers out of it', () => {
         const prompt = buildTurnPrompt({ ...layers({ text: 'Ash arrived in the storm.', coveredMessages: 3 }), history: history(6), userText: 'Hello?' });
         const system = prompt.messages[0].content;
-        expect(system.indexOf(PROMPT_LAYERS.storySoFar)).toBeGreaterThan(system.indexOf(PROMPT_LAYERS.memory));
+        // Last in the first system message (.scratch/prompt-cache/spec.md); Memory comes after the history.
+        expect(system.indexOf(PROMPT_LAYERS.storySoFar)).toBeGreaterThan(system.indexOf(PROMPT_LAYERS.cast));
+        expect(system).not.toContain(PROMPT_LAYERS.memory);
         expect(system).toContain('Ash arrived in the storm.');
-        const sent = prompt.messages.slice(1, -2).map((message) => message.content);
+        const sent = prompt.messages.slice(1, -1).map((message) => message.content);
         expect(sent.map((text) => text.split(' ')[0])).toEqual(['M3', 'M4', 'M5']);
         expect(prompt.trimmed).toBe(0);
     });
@@ -81,7 +84,7 @@ describe('Story so far: prompt (pure)', () => {
     it('is exactly as before with no Story so far', () => {
         const prompt = buildTurnPrompt({ ...layers(null), history: history(4), userText: 'Hello?' });
         expect(prompt.messages[0].content).not.toContain(PROMPT_LAYERS.storySoFar);
-        expect(prompt.messages).toHaveLength(4 + 3);
+        expect(prompt.messages).toHaveLength(4 + 2);
     });
 
     it('gives Suggested replies the layer and the same uncovered history', () => {

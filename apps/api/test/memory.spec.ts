@@ -1,4 +1,5 @@
 import pg from 'pg';
+import { layersOf } from './harness/prompt-layers.js';
 
 import { ProviderOutageError } from '../src/errors/model-gateway.errors.js';
 import { MEMORY_BUDGET_TOKENS } from '../src/manager/chat/memory/memory-choice.js';
@@ -148,7 +149,7 @@ describe('Memory: extraction, the record, the prompt layer and rollback', () => 
     }
 
     function systemPrompt(request: TextCompletionRequest): string {
-        return request.messages[0].content;
+        return layersOf(request);
     }
 
     async function countRows(table: string, where: string, params: unknown[]): Promise<number> {
@@ -633,7 +634,7 @@ A Character knows only the Memories it is tagged on`);
             t.gateway.scriptText('suggested_replies', '{"action":"I wave.","speech":"Hello.","move":"I run."}');
             await t.http.post(`/api/stories/${story.id}/chats/${chat.id}/suggestions`).expect(200);
             const suggestions = t.gateway.textCalls('suggested_replies');
-            expect(suggestions[suggestions.length - 1].messages[0].content).toContain('Kai buried a tin box by the well.');
+            expect(layersOf(suggestions[suggestions.length - 1])).toContain('Kai buried a tin box by the well.');
         });
     });
 

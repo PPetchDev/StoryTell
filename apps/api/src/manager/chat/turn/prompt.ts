@@ -259,12 +259,13 @@ export const PROMPT_LAYERS = {
     identity: '# The user plays',
     style: '# Style',
     cast: '# Cast',
+    storySoFar: '# Story so far',
+    // After the history (.scratch/prompt-cache/spec.md):
     scene: '# Current Scene',
     feelings: '# Feelings',
     arcs: '# Arcs',
     memory: '# Memory',
     innerLife: '# Inner life',
-    storySoFar: '# Story so far',
 } as const;
 
 /** A Character's Thought before this reply (.scratch/character-minds/spec.md): what they make of the moment and mean to do. */
@@ -555,27 +556,62 @@ export function continueInstruction(identity: string): string {
 export type PromptLayersInput = Omit<TurnPromptInput, 'history' | 'userText' | 'tokenBudget' | 'nudge' | 'cue' | 'suddenEvent' | 'roll' | 'epilogue'>;
 
 /**
- * Layers 1–9 as the one system message, shared by the turn and by Suggested replies so they
- * read the Chat the same way. Reports how many Memories were left out to fit the cap.
+ * The layers in two parts (.scratch/prompt-cache/spec.md). `standing` changes only when the Story
+ * is edited or the Story so far is rewritten: it opens every prompt, so the host's prompt cache
+ * keeps it and the history after it. `moment` (Scene, Feelings, Arcs, Memory, Inner life)
+ * changes nearly every turn, so it goes after the history, where it no longer breaks the cache
+ * for everything behind it. Reports how many Memories were left out to fit the cap.
  */
-export function systemPrompt(input: PromptLayersInput): { text: string; memoriesLeftOut: number } {
+export function promptLayers(input: PromptLayersInput): { standing: string; moment: string; memoriesLeftOut: number } {
     const identity = input.identity.name;
     const castNames = input.story.characters.map((character) => character.name);
     const memory = memoryLayer(input.memories, input.beliefs ?? [], identity, input.present ?? [], input.memoryCapTokens ?? MEMORY_BUDGET_TOKENS);
-    const text = [
+    const standing = [
         rulesLayer(identity, castNames),
         `${PROMPT_LAYERS.setting}\n${input.story.setting}`,
         `${PROMPT_LAYERS.identity}\n${identity}: ${input.identity.description}`,
         styleLayer(input.story, identity),
         `${PROMPT_LAYERS.cast}\n${input.story.characters.map(castCard).join('\n\n')}`,
+        ...(input.storySoFar ? [storySoFarLayer(input.storySoFar)] : []),
+    ].join('\n\n');
+    const moment = [
         sceneLayer(input.scene, identity),
         feelingsLayer(input.bonds, identity),
         arcsLayer(input.arcs),
         memory.text,
         ...(input.diaries && input.diaries.length > 0 ? [innerLifeLayer(input.diaries)] : []),
-        ...(input.storySoFar ? [storySoFarLayer(input.storySoFar)] : []),
     ].join('\n\n');
-    return { text, memoriesLeftOut: memory.leftOut };
+    return { standing, moment, memoriesLeftOut: memory.leftOut };
+}
+
+/** All the layers as one text, standing then moment: for counting tokens, and for tests that read a layer. */
+export function systemPrompt(input: PromptLayersInput): { text: string; memoriesLeftOut: number } {
+    const layers = promptLayers(input);
+    return { text: `${layers.standing}\n\n${layers.moment}`, memoriesLeftOut: layers.memoriesLeftOut };
+}
+
+/**
+ * Between the user's own words and what only the Narrator reads, in the turn's closing message.
+ * Measured on DeepInfra (.scratch/prompt-cache/spec.md): a system message anywhere after the first
+ * stopped the prompt cache for the whole prompt, so all that changes each turn rides in the one
+ * closing user message instead.
+ */
+export const NARRATOR_NOTES = "(The Narrator's notes follow: where the story stands, then what to do. The user did not write them and does not see them.)";
+
+/** The turn's closing user message: the user's words (or the Continue/Epilogue instruction), then the moment layers and the trailing blocks. */
+export function closingMessage(userText: string, moment: string, trailing: string): string {
+    return `${userText}\n\n${NARRATOR_NOTES}\n\n${moment}\n\n${trailing}`;
+}
+
+/**
+ * The history as every prompt on the Chat sends it, so the turn, Suggested replies and Write for
+ * me share one cached prefix: the Narrator's past replies without stage directions.
+ */
+export function historyMessages(kept: PromptHistoryMessage[]): PromptMessage[] {
+    return kept.map((message) => ({
+        role: message.role,
+        content: message.role === 'assistant' ? withoutStageDirections(message.text) : message.text,
+    }));
 }
 
 /** The newest Messages that fit in `budget` tokens, oldest first; older ones are left out. */
@@ -598,7 +634,7 @@ export function povAndTense(story: PromptStory, identity: string): string {
 
 /** The trailing system message of every turn. */
 export function turnFinalInstruction(identity: string): string {
-    return `Write the next turn now. Do not write anything ${identity} says, thinks or does. Use @Name: lines for Character speech, spoken words only: no parentheses or *(stage directions)* inside them, even where earlier turns had them. Actions go in narration. Keep the speech plain and natural, the way people actually talk. Say each thing once: no run of sentences that open with the same words, as in "I had a plan. I had stages. I had a sequence.", and no lists of three.`;
+    return `Write the next turn now. Do not write anything ${identity} says, thinks or does. Use @Name: lines for Character speech, spoken words only: no parentheses or *(stage directions)* inside them, even where earlier turns had them. Actions go in narration. Keep the speech plain and natural, the way people actually talk. Say each thing once: no run of sentences that open with the same words, as in "I had a plan. I had stages. I had a sequence.", and no lists of three. When a moment turns sexual, stay in it and write it out explicitly: touch, skin, breath and sound, and how each Character's body answers what ${identity} does, at the pace of the scene; never summarise it, skip ahead or cut away. In such moments a Character says only a few words at a time, broken off by what they feel; the body carries the moment, not speeches about it.`;
 }
 
 /**
@@ -707,7 +743,7 @@ export function buildTurnPrompt(input: TurnPromptInput): TurnPrompt {
     // An Epilogue is a turn without a User Message, like a Continue, with its own instruction.
     const epilogue = input.userText === null ? (input.epilogue ?? null) : null;
     const userText = input.userText ?? (epilogue ? epilogueInstruction(identity, epilogue) : continueInstruction(identity));
-    const system = systemPrompt(input);
+    const layers = promptLayers(input);
     const lore = loreBlock(input.chosenLore ?? []);
     // One order (.scratch/sillytavern-gaps/integration.md): Lore, Documents, Author's note, Where things stand, Sudden event, Roll, Nudge, Cue, the final instruction.
     const finalInstruction = joinBlocks([
@@ -732,21 +768,15 @@ export function buildTurnPrompt(input: TurnPromptInput): TurnPrompt {
             .join('\n'),
     ]);
 
+    const closing = closingMessage(userText, layers.moment, finalInstruction);
     const budget = input.tokenBudget ?? TURN_PROMPT_TOKEN_BUDGET;
-    const fixed = estimateTokens(system.text) + estimateTokens(userText) + estimateTokens(finalInstruction);
+    const fixed = estimateTokens(`${layers.standing}\n\n${layers.moment}`) + estimateTokens(userText) + estimateTokens(finalInstruction) + estimateTokens(NARRATOR_NOTES);
     const uncovered = uncoveredHistory(input.history, input.storySoFar);
     const kept = recentHistory(uncovered, budget - fixed);
 
     return {
-        messages: [
-            { role: 'system', content: system.text },
-            ...kept.map((message) => ({
-                role: message.role,
-                content: message.role === 'assistant' ? withoutStageDirections(message.text) : message.text,
-            })),
-            { role: 'user', content: userText },
-            { role: 'system', content: finalInstruction },
-        ],
+        // Standing layers, the history, then one user message with all that changes each turn (.scratch/prompt-cache/spec.md).
+        messages: [{ role: 'system', content: layers.standing }, ...historyMessages(kept), { role: 'user', content: closing }],
         stop: stopStrings(identity),
         // An Epilogue has its own length, whatever the Story's reply length.
         maxTokens: epilogue
@@ -754,6 +784,6 @@ export function buildTurnPrompt(input: TurnPromptInput): TurnPrompt {
             : REPLY_LENGTH_WORDS[input.story.replyLength].maxTokens,
         // Covered Messages are in the Story so far, so only uncovered ones count as left out.
         trimmed: uncovered.length - kept.length,
-        memoriesLeftOut: system.memoriesLeftOut,
+        memoriesLeftOut: layers.memoriesLeftOut,
     };
 }

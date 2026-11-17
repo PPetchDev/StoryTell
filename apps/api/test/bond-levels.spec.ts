@@ -1,4 +1,5 @@
 import { applyJudgement, ApplyBond, ApplyInput } from '../src/manager/chat/judge/apply-judgement.js';
+import { layersOf } from './harness/prompt-layers.js';
 import { buildJudgePrompt, JudgedBondChange, Judgement, JudgePromptInput, parseJudgement } from '../src/manager/chat/judge/judge-prompt.js';
 import { buildTurnPrompt, TurnPromptInput } from '../src/manager/chat/turn/prompt.js';
 import { BondLevels, bondLevelsInWords, bondLevelWord } from '../src/model/ledger/bond-axes.js';
@@ -283,14 +284,14 @@ function turnInput(overrides: Partial<TurnPromptInput> = {}): TurnPromptInput {
 
 describe('The feelings layer: Bond levels in words', () => {
     it('adds the levels in words where a Bond has them, and nothing where it has none', () => {
-        const system = buildTurnPrompt(
+        const system = layersOf(buildTurnPrompt(
             turnInput({
                 bonds: [
                     { fromName: 'Mira', toName: null, label: 'Wary', description: 'She expects Ash to leave.', levels: LEVELS },
                     { fromName: 'Kai', toName: 'Mira', label: 'Fond', description: 'An old friend.', levels: null },
                 ],
             }),
-        ).messages[0].content;
+        ));
         expect(system).toContain(
             '# Feelings (hidden from the user; show them only through behaviour)\n' +
                 '- Mira → the user (Ash): "Wary" — She expects Ash to leave. (Trust: wary · Affection: fond · Desire: drawn · Tension: uneasy)\n' +
@@ -304,7 +305,7 @@ describe('The feelings layer: Bond levels in words', () => {
         expect(buildTurnPrompt(turnInput({ bonds: [{ ...bond, levels: null }] })).messages).toEqual(
             buildTurnPrompt(turnInput({ bonds: [bond] })).messages,
         );
-        expect(buildTurnPrompt(turnInput({ bonds: [bond] })).messages[0].content).toContain(
+        expect(layersOf(buildTurnPrompt(turnInput({ bonds: [bond] })))).toContain(
             '- Mira → the user (Ash): "Wary" — She expects Ash to leave.\nEach Character knows only its OWN feelings.',
         );
     });

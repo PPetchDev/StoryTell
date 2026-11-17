@@ -1,4 +1,5 @@
 import pg from 'pg';
+import { layersOf } from './harness/prompt-layers.js';
 
 import { ProviderOutageError } from '../src/errors/model-gateway.errors.js';
 import { FAKE_TEXT_MODEL } from '../src/service/model-gateway/fake-model-gateway.js';
@@ -211,7 +212,7 @@ describe('The Bond, Arc and Scene judge, the ledger and the dashboard', () => {
     }
 
     function systemPrompt(request: TextCompletionRequest): string {
-        return request.messages[0].content;
+        return layersOf(request);
     }
 
     function lastCall(kind: 'turn' | 'judge'): TextCompletionRequest {

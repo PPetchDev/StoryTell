@@ -1,3 +1,4 @@
+import { closingParts, trailingOf } from './harness/prompt-layers.js';
 import {
     applyEnding,
     EndingDefinition,
@@ -368,9 +369,9 @@ describe('Endings: authoring and play (HTTP)', () => {
         expect((closed.body as Chat).ending?.name).toBe('The light returns');
 
         const call = lastCall('turn');
-        const asked = call.messages.at(-2)!;
-        const last = call.messages.at(-1)!;
-        expect(asked.role).toBe('user');
+        const asked = { content: closingParts(call).userText };
+        const last = { content: trailingOf(call) };
+        expect(call.messages.at(-1)!.role).toBe('user');
         expect(asked.content).toContain('(The story ends here. Ash does nothing new.) Write the epilogue');
         expect(asked.content).toContain('The story has reached its ending: "The light returns".');
         expect(asked.content).toContain('What the author wants the epilogue to tell: Tell of the first ship to pass safely.');
@@ -386,15 +387,15 @@ describe('Endings: authoring and play (HTTP)', () => {
         script('The lamp burned on for forty winters.');
         await t.http.post(`${chatPath(storyId, chat.id)}/messages/${epilogue.id}/regenerate`).expect(200);
         const again = await settled(storyId, chat.id);
-        expect(lastCall('turn').messages.at(-2)!.content).toContain('The story has reached its ending: "The light returns".');
+        expect(closingParts(lastCall('turn')).userText).toContain('The story has reached its ending: "The light returns".');
         expect(again.messages.at(-1)).toMatchObject({ id: epilogue.id, epilogue: true });
 
         // A Branch carries the mark; and the story plays on after it as before.
         const { body: branch } = await t.http.post(`${chatPath(storyId, chat.id)}/messages/${epilogue.id}/branch`).expect(201);
         expect(branch.messages.at(-1)).toMatchObject({ epilogue: true });
         const on = await play(storyId, chat.id, 'I climb once more.');
-        expect(lastCall('turn').messages.at(-1)!.content).toContain('Write the next turn now');
-        expect(lastCall('turn').messages.at(-2)!.content).toBe('I climb once more.');
+        expect(trailingOf(lastCall('turn'))).toContain('Write the next turn now');
+        expect(closingParts(lastCall('turn')).userText).toBe('I climb once more.');
         expect(on.messages.at(-1)).toMatchObject({ epilogue: false });
         // The Epilogue is behind it now, so another can be asked for.
         script('And so it ended twice.');
@@ -410,7 +411,7 @@ describe('Endings: authoring and play (HTTP)', () => {
         const closed = await t.http.post(`${chatPath(storyId, chat.id)}/epilogue`).expect(200);
         expect((closed.body as Chat).messages.at(-1)).toMatchObject({ epilogue: true });
         expect((closed.body as Chat).ending).toBeNull();
-        const asked = lastCall('turn').messages.at(-2)!.content;
+        const asked = closingParts(lastCall('turn')).userText;
         expect(asked).toContain('Ash has chosen to end the story at this point.');
         expect(asked).not.toContain('has reached its ending');
         await settled(storyId, chat.id);
@@ -422,7 +423,7 @@ describe('Endings: authoring and play (HTTP)', () => {
         expect((await getChat(storyId, other.id)).messages.at(-1)!.kind).toBe('user');
         const refused = await t.http.post(`${chatPath(storyId, other.id)}/epilogue`).expect(409);
         expect(refused.body.error.code).toBe('409.004.013');
-        expect(t.gateway.textCalls('turn').filter((call) => call.messages.at(-2)?.content.includes('Write the epilogue'))).toHaveLength(1);
+        expect(t.gateway.textCalls('turn').filter((call) => closingParts(call).userText.includes('Write the epilogue'))).toHaveLength(1);
     });
 
     it('in a Story with no Endings of its own, the Judge may suggest one from the sixth reply on; waving it away stops the suggestions until a Reset', async () => {
@@ -455,8 +456,8 @@ describe('Endings: authoring and play (HTTP)', () => {
         expect(branch.ending).toMatchObject({ id: null, name: 'A Quiet Watch', suggested: true });
         script('The lamp burned on.', judgement({ reason: 'Again.', suggest: 'Again' }));
         await t.http.post(`${chatPath(storyId, branch.id)}/epilogue`).expect(200);
-        expect(lastCall('turn').messages.at(-2)!.content).toContain('The story has reached its ending: "A Quiet Watch".');
-        expect(lastCall('turn').messages.at(-2)!.content).not.toContain('What the author wants');
+        expect(closingParts(lastCall('turn')).userText).toContain('The story has reached its ending: "A Quiet Watch".');
+        expect(closingParts(lastCall('turn')).userText).not.toContain('What the author wants');
         await settled(storyId, branch.id);
         expect(judged()).not.toContain('# Ending');
 

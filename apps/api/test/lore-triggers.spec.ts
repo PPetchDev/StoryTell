@@ -1,3 +1,4 @@
+import { trailingOf } from './harness/prompt-layers.js';
 import { chosenLore, LoreMessage, loreReplayWindow, LoreRoll, loreRoll, PromptLoreEntry, selectLoreAt } from '../src/manager/chat/lore/lore-select.js';
 import { loreTriggerSummary } from '../src/manager/chat/lore/lore-summary.js';
 import { startTestApp, TestApp } from './harness/test-app.js';
@@ -494,7 +495,7 @@ describe('Lore triggers: the API', () => {
         t.gateway.scriptText('memory_extraction', NO_OPS);
         await t.http.post(`/api/stories/${storyId}/chats/${chatId}/messages`).send({ text }).expect(201);
         await settle(storyId, chatId);
-        return t.gateway.textCalls('turn').at(-1)!.messages.at(-1)!.content;
+        return trailingOf(t.gateway.textCalls('turn').at(-1)!);
     }
 
     async function newChat(storyId: number): Promise<number> {
@@ -648,7 +649,7 @@ describe('Lore triggers: the API', () => {
         t.gateway.scriptText('judge', NO_CHANGE);
         t.gateway.scriptText('memory_extraction', NO_OPS);
         await t.http.patch(`/api/stories/${storyId}/chats/${chatId}/messages/${userMessage.id}`).send({ text: 'To the market.' }).expect(200);
-        expect(t.gateway.textCalls('turn').at(-1)!.messages.at(-1)!.content).not.toContain('The well is deep.');
+        expect(trailingOf(t.gateway.textCalls('turn').at(-1)!)).not.toContain('The well is deep.');
         expect(await turn(storyId, chatId, 'I wait.', '@Nara: Wait more.')).not.toContain('The well is deep.');
 
         // Back at the well, then a Reset: only the Opening is left, and nothing stays.
@@ -675,7 +676,7 @@ describe('Lore triggers: the API', () => {
         t.gateway.scriptText('judge', NO_CHANGE);
         t.gateway.scriptText('memory_extraction', NO_OPS);
         await t.http.post(`/api/stories/${storyId}/chats/${chatId}/messages/${reply.id}/regenerate`).expect(200);
-        const regenerated = t.gateway.textCalls('turn').at(-1)!.messages.at(-1)!.content;
+        const regenerated = trailingOf(t.gateway.textCalls('turn').at(-1)!);
         expect(lorePart(regenerated)).toBe(lorePart(original));
 
         await settle(storyId, chatId);
@@ -705,7 +706,7 @@ describe('Lore triggers: the API', () => {
             t.gateway.scriptText('memory_extraction', NO_OPS);
             await t.http.post(`/api/stories/${storyId}/chats/${chatId}/messages/${reply.id}/regenerate`).expect(200);
             await settle(storyId, chatId);
-            return lorePart(t.gateway.textCalls('turn').at(-1)!.messages.at(-1)!.content);
+            return lorePart(trailingOf(t.gateway.textCalls('turn').at(-1)!));
         };
         expect(await regenerate('@Nara: Nothing.')).toBe(original);
 
@@ -740,7 +741,7 @@ describe('Lore triggers: the API', () => {
         t.gateway.scriptText('judge', NO_CHANGE);
         t.gateway.scriptText('memory_extraction', NO_OPS);
         await t.http.post(`/api/stories/${storyId}/chats/${chatId}/messages/${reply.id}/regenerate`).expect(200);
-        expect(lorePart(t.gateway.textCalls('turn').at(-1)!.messages.at(-1)!.content)).toBe(original);
+        expect(lorePart(trailingOf(t.gateway.textCalls('turn').at(-1)!))).toBe(original);
 
         // Lore in play rolls at the point after the newest Message, on that Message's text.
         const story = (await t.http.get(`/api/stories/${storyId}`).expect(200)).body as Story;

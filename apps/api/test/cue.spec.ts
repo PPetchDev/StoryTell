@@ -1,3 +1,4 @@
+import { closingParts, trailingOf } from './harness/prompt-layers.js';
 import { ProviderOutageError } from '../src/errors/model-gateway.errors.js';
 import { STORY_SO_FAR_TRIGGER_MARGIN, storySoFarCoverage } from '../src/manager/chat/story-so-far/story-so-far-prompt.js';
 import { buildSuggestionsPrompt } from '../src/manager/chat/suggestions/suggestions-prompt.js';
@@ -43,7 +44,6 @@ function input(overrides: Partial<TurnPromptInput> = {}): TurnPromptInput {
     };
 }
 
-const trailingOf = (prompt: { messages: Array<{ content: string }> }) => prompt.messages.at(-1)!.content;
 
 const CUE = 'Make Mira angrier, and end on a cliffhanger.';
 const CUE_LINE = `The user's cue for this reply only: ${CUE}`;
@@ -75,7 +75,7 @@ describe('Cue: the turn prompt (pure)', () => {
 
     it('rides on a Continue turn too, whose user message stays the continue instruction', () => {
         const prompt = buildTurnPrompt(input({ userText: null, cue: 'Skip to the next morning.' }));
-        expect(prompt.messages.at(-2)!.content).toContain('Continue the story from exactly where it stands');
+        expect(closingParts(prompt).userText).toContain('Continue the story from exactly where it stands');
         expect(trailingOf(prompt)).toContain("The user's cue for this reply only: Skip to the next morning.");
     });
 

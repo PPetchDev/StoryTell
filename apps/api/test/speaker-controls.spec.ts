@@ -1,4 +1,5 @@
 import { AddressInfo } from 'node:net';
+import { layersOf, trailingOf } from './harness/prompt-layers.js';
 import { ProviderOutageError } from '../src/errors/model-gateway.errors.js';
 import { STORY_SO_FAR_TRIGGER_MARGIN, storySoFarCoverage } from '../src/manager/chat/story-so-far/story-so-far-prompt.js';
 
@@ -50,7 +51,6 @@ function input(overrides: Partial<TurnPromptInput> = {}): TurnPromptInput {
     };
 }
 
-const trailingOf = (prompt: { messages: Array<{ content: string }> }) => prompt.messages.at(-1)!.content;
 
 describe('Sitting out: the turn prompt (pure)', () => {
     it('names them in "Where things stand" and leaves them out of "In the latest exchange"', () => {
@@ -92,8 +92,8 @@ describe('Sitting out: the turn prompt (pure)', () => {
         const withMira = buildTurnPrompt({ ...base, sittingOut: ['Mira'] });
         expect(without.memoriesLeftOut).toBe(1);
         // Mira's Memory is kept because she was in the exchange; sitting out must not change that.
-        expect(without.messages[0].content).toContain('Mira hid the logbook');
-        expect(withMira.messages[0]).toEqual(without.messages[0]);
+        expect(layersOf(without)).toContain('Mira hid the logbook');
+        expect(layersOf(withMira)).toEqual(layersOf(without));
         expect(withMira.memoriesLeftOut).toBe(1);
     });
 });

@@ -1,4 +1,5 @@
 import pg from 'pg';
+import { layersOf } from './harness/prompt-layers.js';
 
 import { TextCompletionRequest } from '../src/service/model-gateway/model-gateway.js';
 import { startTestApp, TestApp } from './harness/test-app.js';
@@ -142,7 +143,7 @@ describe('Bond levels from the Judge', () => {
     }
 
     const lastCall = (kind: TextCompletionRequest['kind']): TextCompletionRequest => t.gateway.textCalls(kind).at(-1)!;
-    const system = (kind: TextCompletionRequest['kind']): string => lastCall(kind).messages[0].content;
+    const system = (kind: TextCompletionRequest['kind']): string => layersOf(lastCall(kind));
 
     it('a first measure takes the levels as given, a later change is held to one step, and the dashboard and the Chat show them', async () => {
         const story = await createStory();

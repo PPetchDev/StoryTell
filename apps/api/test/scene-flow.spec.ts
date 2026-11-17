@@ -1,4 +1,5 @@
 import { LINGERING_REPLIES, PASSED_BY_REPLIES, repliesInScene, CountedMessage } from '../src/manager/chat/scene-replies.js';
+import { layersOf } from './harness/prompt-layers.js';
 import { applyJudgement, ApplyInput } from '../src/manager/chat/judge/apply-judgement.js';
 import { buildJudgePrompt, Judgement, JudgePromptInput, parseJudgement } from '../src/manager/chat/judge/judge-prompt.js';
 import { buildTurnPrompt, PromptScene, TurnPromptInput } from '../src/manager/chat/turn/prompt.js';
@@ -75,7 +76,7 @@ function turnInput(scene: TurnPromptInput['scene']): TurnPromptInput {
 
 /** The Narrator's Scene layer alone, from its heading to the next layer's. */
 function sceneLayerOf(input: TurnPromptInput): string {
-    const system = buildTurnPrompt(input).messages[0].content;
+    const system = layersOf(buildTurnPrompt(input));
     const start = system.indexOf('# Current Scene');
     const end = system.indexOf('\n\n# ', start + 1);
     return system.slice(start, end);

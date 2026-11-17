@@ -1,4 +1,5 @@
 import { ChatManagerService } from '../src/manager/chat/chat.service.js';
+import { layersOf } from './harness/prompt-layers.js';
 import { startTestApp, TestApp } from './harness/test-app.js';
 
 /**
@@ -104,7 +105,7 @@ describe('Starting Beliefs', () => {
         t.gateway.scriptText('memory_extraction', '{"operations":[]}');
         await t.http.post(`/api/stories/${storyId}/chats/${chat.id}/messages`).send({ text: 'Nara, may I sit?' }).expect(201);
         await t.app.get(ChatManagerService).backgroundIdle(chat.id);
-        expect(t.gateway.textCalls('turn')[0].messages[0].content).toContain('- Nara believes: Petch is a wandering herder.');
+        expect(layersOf(t.gateway.textCalls('turn')[0])).toContain('- Nara believes: Petch is a wandering herder.');
     });
 
     it('Reset brings back the Starting Beliefs as the Story has them now, whatever happened to the Chat\'s', async () => {

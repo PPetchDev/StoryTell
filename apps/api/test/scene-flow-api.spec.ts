@@ -1,4 +1,5 @@
 import { Logger } from '@nestjs/common';
+import { layersOf } from './harness/prompt-layers.js';
 import pg from 'pg';
 
 import { startTestApp, TestApp } from './harness/test-app.js';
@@ -105,7 +106,7 @@ describe('Scenes that keep moving', () => {
 
     /** The Narrator's Scene layer in a call's system message. */
     function sceneLayer(request: { messages: Array<{ content: string }> }): string {
-        const system = request.messages[0].content;
+        const system = layersOf(request as { messages: Array<{ role: string; content: string }> });
         const start = system.indexOf('# Current Scene');
         return system.slice(start, system.indexOf('\n\n# ', start + 1));
     }

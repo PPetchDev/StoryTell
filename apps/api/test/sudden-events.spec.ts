@@ -1,3 +1,4 @@
+import { trailingOf } from './harness/prompt-layers.js';
 import { buildJudgePrompt, parseJudgement } from '../src/manager/chat/judge/judge-prompt.js';
 import {
     applySuddenEvent,
@@ -220,7 +221,6 @@ describe('Sudden events: what the Narrator is told (pure)', () => {
         present: ['Mira'],
         ...overrides,
     });
-    const trailingOf = (prompt: { messages: Array<{ content: string }> }) => prompt.messages.at(-1)!.content;
 
     it('tells the event under way after "Where things stand", in the trailing message only, and leaves the outcome to the Gauge', () => {
         const event = promptSuddenEvent(eventState([INTERROGATION], [step(Start, 60, 3, 4)]), 4)!;

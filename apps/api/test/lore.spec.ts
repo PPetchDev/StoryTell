@@ -1,3 +1,4 @@
+import { trailingOf } from './harness/prompt-layers.js';
 import {
     chosenLore,
     LoreMessage,
@@ -133,8 +134,8 @@ describe('Lore: the turn and Suggested replies prompts (pure)', () => {
 
     it('opens the trailing system message with the chosen Lore, in the order handed in, before the reminder', () => {
         const prompt = buildTurnPrompt(input({ lore: [tent, salt], chosenLore: [salt, tent] }));
-        const last = prompt.messages.at(-1)!;
-        expect(last.role).toBe('system');
+        expect(prompt.messages.at(-1)!.role).toBe('user');
+        const last = { content: trailingOf(prompt) };
         expect(last.content.startsWith('# Lore (facts of this world that matter right now: common knowledge')).toBe(true);
         expect(last.content.indexOf('## Salt\nSalt is money here.')).toBeLessThan(last.content.indexOf('## Tents\nRound felt tents with a smoke hole.'));
         expect(last.content.indexOf('## Salt')).toBeGreaterThan(0);
@@ -144,7 +145,7 @@ describe('Lore: the turn and Suggested replies prompts (pure)', () => {
     it('carries only the chosen entries: the builders choose nothing themselves', () => {
         // The user's text mentions the yurt, but nothing was chosen: no block.
         const prompt = buildTurnPrompt(input({ lore: [tent, salt], userText: 'I enter the yurt.', chosenLore: [] }));
-        expect(prompt.messages.at(-1)!.content.startsWith('Where things stand:')).toBe(true);
+        expect(trailingOf(prompt).startsWith('Where things stand:')).toBe(true);
         expect(prompt.messages.map((message) => message.content).join('\n')).not.toContain('Round felt tents');
     });
 
@@ -169,7 +170,7 @@ describe('Lore: the turn and Suggested replies prompts (pure)', () => {
         const without = buildTurnPrompt(input());
         const withLore = buildTurnPrompt(input({ lore: [tent, salt], chosenLore: [tent] }));
         expect(withLore.messages[0]).toEqual(without.messages[0]);
-        expect(without.messages.at(-1)!.content.startsWith('Where things stand:')).toBe(true);
+        expect(trailingOf(without).startsWith('Where things stand:')).toBe(true);
     });
 
     it('gives Suggested replies the chosen Lore before their instruction', () => {
@@ -293,7 +294,7 @@ describe('Lore: the API', () => {
         await settle(storyId, chat.id);
 
         const [turn] = t.gateway.textCalls('turn');
-        const trailing = turn.messages.at(-1)!.content;
+        const trailing = trailingOf(turn);
         expect(trailing).toContain('Round felt tents with a smoke hole.');
         expect(trailing).toContain('Never point at the moon.');
         expect(trailing).not.toContain('Salt is money here.');

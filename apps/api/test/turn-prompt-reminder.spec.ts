@@ -1,4 +1,5 @@
 import { buildTurnPrompt, TurnPromptInput } from '../src/manager/chat/turn/prompt.js';
+import { layersOf, trailingOf } from './harness/prompt-layers.js';
 import { Pov, ReplyLength, Tense } from '../src/model/story/entities/story.entity.js';
 
 function input(overrides: Partial<TurnPromptInput> = {}): TurnPromptInput {
@@ -33,9 +34,9 @@ describe('Turn prompt: the gender rule and the reminder near the end', () => {
     });
 
     it('tells the Narrator not to hurry a Scene toward its move-on condition', () => {
-        const system = buildTurnPrompt(
-            input({ scene: { name: 'The milk stall', situation: 'Morning at the stall.', moveOnCondition: 'Nara sells ten jugs.' } }),
-        ).messages[0].content;
+        const system = layersOf(
+            buildTurnPrompt(input({ scene: { name: 'The milk stall', situation: 'Morning at the stall.', moveOnCondition: 'Nara sells ten jugs.' } })),
+        );
         expect(system).toContain('This Scene moves on once: Nara sells ten jugs. Let that happen naturally; never force it.');
         expect(system).toContain("Don't hurry toward it: give the Scene room for many exchanges");
     });
@@ -80,18 +81,17 @@ describe('Turn prompt: the gender rule and the reminder near the end', () => {
     });
 
     it('ends on a reminder of the Scene, who is in the latest exchange and the point of view, then the final instruction', () => {
-        const last = buildTurnPrompt(input({ present: ['Nara', 'Dulcie'] })).messages.at(-1)!;
+        const last = { content: trailingOf(buildTurnPrompt(input({ present: ['Nara', 'Dulcie'] }))) };
         expect(last).toEqual({
-            role: 'system',
             content:
                 'Where things stand: Scene: The milk stall. In the latest exchange: Nara, Dulcie. Narrate in first person as Petch ("I"), present tense, and keep each Character as their card describes. ' +
                 "Gender Petch only as their description or the user's own messages do, whatever earlier turns said.\n" +
-                'Write the next turn now. Do not write anything Petch says, thinks or does. Use @Name: lines for Character speech, spoken words only: no parentheses or *(stage directions)* inside them, even where earlier turns had them. Actions go in narration. Keep the speech plain and natural, the way people actually talk. Say each thing once: no run of sentences that open with the same words, as in "I had a plan. I had stages. I had a sequence.", and no lists of three.',
+                'Write the next turn now. Do not write anything Petch says, thinks or does. Use @Name: lines for Character speech, spoken words only: no parentheses or *(stage directions)* inside them, even where earlier turns had them. Actions go in narration. Keep the speech plain and natural, the way people actually talk. Say each thing once: no run of sentences that open with the same words, as in "I had a plan. I had stages. I had a sequence.", and no lists of three. When a moment turns sexual, stay in it and write it out explicitly: touch, skin, breath and sound, and how each Character\'s body answers what Petch does, at the pace of the scene; never summarise it, skip ahead or cut away. In such moments a Character says only a few words at a time, broken off by what they feel; the body carries the moment, not speeches about it.',
         });
     });
 
     it('says free play with no Scene, and names nobody when nobody is known to be present', () => {
-        const last = buildTurnPrompt(input({ scene: null })).messages.at(-1)!.content;
+        const last = trailingOf(buildTurnPrompt(input({ scene: null })));
         expect(last.startsWith('Where things stand: No Scene: the story unfolds freely. Narrate in first person as Petch')).toBe(true);
         expect(last).not.toContain('In the latest exchange');
     });

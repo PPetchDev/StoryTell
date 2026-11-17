@@ -1,3 +1,4 @@
+import { closingParts } from './harness/prompt-layers.js';
 import pg from 'pg';
 
 import { ProviderOutageError } from '../src/errors/model-gateway.errors.js';
@@ -95,7 +96,7 @@ describe('Write for me', () => {
         return t.http.post(`/api/stories/${storyId}/chats/${chatId}/write-for-me`).send({ draft });
     }
 
-    const closing = () => t.gateway.textCalls('write_for_me').at(-1)!.messages.at(-1)!;
+    const closing = () => ({ role: t.gateway.textCalls('write_for_me').at(-1)!.messages.at(-1)!.role, content: closingParts(t.gateway.textCalls('write_for_me').at(-1)!).trailing });
 
     describe('the answer', () => {
         it('is the written Message, cleaned of its label and any Character line, and nothing is stored or started', async () => {

@@ -34,12 +34,16 @@ async function scriptTurn(request: APIRequestContext, reply: string, judge = jud
     await request.post('/api/testing/fake-gateway/text', { data: { kind: 'memory_extraction', replies: [NO_OPS] } });
 }
 
-/** The last turn's stand-in for the user's message, as the API sent it to the model. */
+/**
+ * The last turn's stand-in for the user's message, as the API sent it to the model: the start of
+ * its closing message, before the Narrator's notes (.scratch/prompt-cache/spec.md).
+ */
 async function lastTurnAsked(request: APIRequestContext): Promise<string> {
     const { calls } = (await (await request.get('/api/testing/fake-gateway/calls')).json()) as {
         calls: Array<{ request: { kind?: string; messages?: Array<{ content: string }> } }>;
     };
-    return calls.filter((call) => call.request?.kind === 'turn').at(-1)!.request.messages!.at(-2)!.content;
+    const closing = calls.filter((call) => call.request?.kind === 'turn').at(-1)!.request.messages!.at(-1)!.content;
+    return closing.split("\n\n(The Narrator's notes follow")[0];
 }
 
 async function send(page: Page, text: string) {

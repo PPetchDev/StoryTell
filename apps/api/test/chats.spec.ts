@@ -1,7 +1,8 @@
+import { closingParts, layersOf, trailingOf } from './harness/prompt-layers.js';
 import pg from 'pg';
 
 import { ModelRefusalError, ProviderOutageError } from '../src/errors/model-gateway.errors.js';
-import { PROMPT_LAYERS, TURN_PROMPT_TOKEN_BUDGET } from '../src/manager/chat/turn/prompt.js';
+import { NARRATOR_NOTES, PROMPT_LAYERS, TURN_PROMPT_TOKEN_BUDGET } from '../src/manager/chat/turn/prompt.js';
 import { FAKE_TEXT_MODEL } from '../src/service/model-gateway/fake-model-gateway.js';
 import { FetchLike } from '../src/service/model-gateway/real/http.js';
 import { TEST_KEYS } from './harness/gateway-under-test.js';
@@ -437,23 +438,23 @@ Nobody moves to help.`;
             expect(call.servedFor).toEqual({ storyId: story.id, chatId: chat.id });
             expect(call.maxTokens).toBe(450);
 
-            const [system, ...rest] = call.messages;
-            expect(system.role).toBe('system');
-            const order = [
-                PROMPT_LAYERS.rules,
-                PROMPT_LAYERS.setting,
-                PROMPT_LAYERS.identity,
-                PROMPT_LAYERS.style,
-                PROMPT_LAYERS.cast,
-                PROMPT_LAYERS.scene,
-                PROMPT_LAYERS.feelings,
-                PROMPT_LAYERS.arcs,
-                PROMPT_LAYERS.memory,
-            ].map((heading) => system.content.indexOf(heading));
-            expect(order.every((index) => index >= 0)).toBe(true);
-            expect([...order].sort((a, b) => a - b)).toEqual(order);
-            // The Memory layer is last in the system message and empty on the first turn.
-            expect(system.content.endsWith(`${PROMPT_LAYERS.memory} (what has happened in this Chat so far)
+            // The standing layers first, then the history, then the layers that change each turn (.scratch/prompt-cache/spec.md).
+            const [standing, ...rest] = call.messages;
+            expect(standing.role).toBe('system');
+            const standingOrder = [PROMPT_LAYERS.rules, PROMPT_LAYERS.setting, PROMPT_LAYERS.identity, PROMPT_LAYERS.style, PROMPT_LAYERS.cast].map((heading) =>
+                standing.content.indexOf(heading),
+            );
+            expect(standingOrder.every((index) => index >= 0)).toBe(true);
+            expect([...standingOrder].sort((a, b) => a - b)).toEqual(standingOrder);
+            expect(standing.content).not.toContain(PROMPT_LAYERS.scene);
+            const closing = closingParts(call);
+            const moment = { content: closing.moment };
+            const momentOrder = [PROMPT_LAYERS.scene, PROMPT_LAYERS.feelings, PROMPT_LAYERS.arcs, PROMPT_LAYERS.memory].map((heading) => moment.content.indexOf(heading));
+            expect(momentOrder[0]).toBe(0);
+            expect([...momentOrder].sort((a, b) => a - b)).toEqual(momentOrder);
+            const system = { content: layersOf(call) };
+            // The Memory layer is last of the moment layers and empty on the first turn.
+            expect(moment.content.endsWith(`${PROMPT_LAYERS.memory} (what has happened in this Chat so far)
 Nothing has been established in this Chat yet.
 A Character knows only the Memories it is tagged on and acts as if the rest never happened; the Narrator knows them all. A Character acts on what they believe, even when it is wrong.`)).toBe(true);
 
@@ -471,15 +472,12 @@ A Character knows only the Memories it is tagged on and acts as if the rest neve
             expect(system.content).toContain('using exactly these names: Mira, Kai O\'Rourke');
             expect(system.content).toContain("NEVER write Ash's words, thoughts, feelings, decisions or actions");
 
-            // Then the recent Messages, the user's message and the final instruction.
-            expect(rest).toEqual([
-                { role: 'assistant', content: OPENING },
-                { role: 'user', content: 'I knock the rain off my hat.' },
-                {
-                    role: 'system',
-                    content: expect.stringMatching(/^Where things stand: [^\n]+\nWrite the next turn now. Do not write anything Ash says, thinks or does. Use @Name: lines for Character speech, spoken words only: no parentheses or \*\(stage directions\)\* inside them, even where earlier turns had them. Actions go in narration. Keep the speech plain and natural, the way people actually talk. Say each thing once: no run of sentences that open with the same words, as in "I had a plan. I had stages. I had a sequence.", and no lists of three.$/),
-                },
-            ]);
+            // Then the recent Messages, and one closing user message: the user's words, the moment layers, the final instruction.
+            expect(rest.map((message) => message.role)).toEqual(['assistant', 'user']);
+            expect(rest[0]).toEqual({ role: 'assistant', content: OPENING });
+            expect(closing.userText).toBe('I knock the rain off my hat.');
+            expect(rest[1].content.startsWith(`I knock the rain off my hat.\n\n${NARRATOR_NOTES}\n\n${PROMPT_LAYERS.scene}`)).toBe(true);
+            expect(closing.trailing).toEqual(expect.stringMatching(/^Where things stand: [^\n]+\nWrite the next turn now. Do not write anything Ash says, thinks or does. Use @Name: lines for Character speech, spoken words only: no parentheses or \*\(stage directions\)\* inside them, even where earlier turns had them. Actions go in narration. Keep the speech plain and natural, the way people actually talk. Say each thing once: no run of sentences that open with the same words, as in "I had a plan. I had stages. I had a sequence.", and no lists of three. When a moment turns sexual, stay in it and write it out explicitly: touch, skin, breath and sound, and how each Character's body answers what Ash does, at the pace of the scene; never summarise it, skip ahead or cut away\. In such moments a Character says only a few words at a time, broken off by what they feel; the body carries the moment, not speeches about it\.$/));
             expect(call.stop).toEqual(['\nAsh:', '\n@Ash:', '\nYou:']);
         });
 
@@ -491,13 +489,13 @@ A Character knows only the Memories it is tagged on and acts as if the rest neve
             await send(story.id, chat.id, 'Second.', 'Mira shrugs.');
 
             const call = lastTurnCall();
-            expect(call.messages[0].content).toContain('No Scene — the story unfolds freely.');
+            expect(layersOf(call)).toContain('No Scene — the story unfolds freely.');
             expect(call.messages.slice(1, -1)).toEqual([
                 { role: 'assistant', content: OPENING },
                 { role: 'user', content: 'First.' },
                 { role: 'assistant', content: 'Mira looks up.\n\n@Mira: What?' },
-                { role: 'user', content: 'Second.' },
             ]);
+            expect(closingParts(call).userText).toBe('Second.');
             expect(call.maxTokens).toBe(900);
         });
 
@@ -525,8 +523,10 @@ A Character knows only the Memories it is tagged on and acts as if the rest neve
                 'Turn 3. The ',
                 'Reply three.',
                 'Turn 4. The ',
-                'Where things',
             ]);
+            // The closing message still carries the state and the final instruction, whatever was trimmed.
+            expect(trailingOf(call).startsWith('Where things stand:')).toBe(true);
+            expect(trailingOf(call)).toContain('Write the next turn now.');
             // Every stored Message is still there; only the prompt window is trimmed.
             expect((await getChat(story.id, chat.id)).messages).toHaveLength(9);
         });
@@ -707,7 +707,7 @@ A Character knows only the Memories it is tagged on and acts as if the rest neve
             expect(calls).toHaveLength(1);
             const conversation = calls[0].messages.filter((message) => message.role !== 'system');
             expect(conversation.map((message) => message.role)).toEqual(['assistant', 'user']);
-            expect(conversation[1].content).toBe('I shake the rain off my coat.');
+            expect(closingParts(calls[0]).userText).toBe('I shake the rain off my coat.');
             expect(calls[0].messages.map((message) => message.content).join('\n')).not.toContain('Upstairs');
             // The discarded Messages and their parts are gone, not hidden.
             expect(await countRows(countSql('message', 'chat_id = $1'), [chat.id])).toBe(3);
@@ -879,19 +879,25 @@ A Character knows only the Memories it is tagged on and acts as if the rest neve
             const call = lastTurnCall();
             expect(call.kind).toBe('turn');
             expect(call.stop).toEqual(['\nAsh:', '\n@Ash:', '\nYou:']);
-            expect(call.messages.slice(1)).toEqual([
+            expect(call.messages.slice(1, -1)).toEqual([
                 { role: 'assistant', content: OPENING },
                 { role: 'user', content: 'I take my boots off.' },
                 { role: 'assistant', content: 'Mira grunts.' },
                 { role: 'assistant', content: '@Mira: The lamp, then.' },
+            ]);
+            expect(call.messages.at(-1)!.role).toBe('user');
+            expect(closingParts(call).userText).toBe(
+                '(Ash does nothing new this turn and waits.) Continue the story from exactly where it stands: let the Characters and the world move it forward. Do not write anything Ash says, thinks, feels, decides or does, and stop where Ash can respond.',
+            );
+            // No system message after the first: the instruction ends the closing user message.
+            expect(call.messages.filter((message) => message.role === 'system')).toHaveLength(1);
+            expect([
                 {
-                    role: 'user',
-                    content:
-                        '(Ash does nothing new this turn and waits.) Continue the story from exactly where it stands: let the Characters and the world move it forward. Do not write anything Ash says, thinks, feels, decides or does, and stop where Ash can respond.',
+                    content: trailingOf(call),
                 },
+            ]).toEqual([
                 {
-                    role: 'system',
-                    content: expect.stringMatching(/^Where things stand: [^\n]+\nWrite the next turn now. Do not write anything Ash says, thinks or does. Use @Name: lines for Character speech, spoken words only: no parentheses or \*\(stage directions\)\* inside them, even where earlier turns had them. Actions go in narration. Keep the speech plain and natural, the way people actually talk. Say each thing once: no run of sentences that open with the same words, as in "I had a plan. I had stages. I had a sequence.", and no lists of three.$/),
+                    content: expect.stringMatching(/^Where things stand: [^\n]+\nWrite the next turn now. Do not write anything Ash says, thinks or does. Use @Name: lines for Character speech, spoken words only: no parentheses or \*\(stage directions\)\* inside them, even where earlier turns had them. Actions go in narration. Keep the speech plain and natural, the way people actually talk. Say each thing once: no run of sentences that open with the same words, as in "I had a plan. I had stages. I had a sequence.", and no lists of three. When a moment turns sexual, stay in it and write it out explicitly: touch, skin, breath and sound, and how each Character's body answers what Ash does, at the pace of the scene; never summarise it, skip ahead or cut away\. In such moments a Character says only a few words at a time, broken off by what they feel; the body carries the moment, not speeches about it\.$/),
                 },
             ]);
             // The rule against writing the worn identity still holds in the system message.

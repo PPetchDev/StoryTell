@@ -1,3 +1,4 @@
+import { closingParts } from './harness/prompt-layers.js';
 import { DOCUMENTS_HEADING } from '../src/manager/document/document-search.js';
 import { LORE_HEADING } from '../src/manager/chat/lore/lore-select.js';
 import { buildTurnPrompt, estimateTokens, PromptHistoryMessage, TURN_PROMPT_TOKEN_BUDGET, TurnPromptInput } from '../src/manager/chat/turn/prompt.js';
@@ -40,7 +41,8 @@ function input(overrides: Partial<WriteForMePromptInput> = {}): WriteForMePrompt
     return { ...turnInput(), history: HISTORY, draft: '', ...overrides };
 }
 
-const closing = (prompt: ReturnType<typeof buildWriteForMePrompt>) => prompt.messages.at(-1)!;
+/** The closing message from its first block on, the moment layers before it left out (.scratch/prompt-cache/spec.md). */
+const closing = (prompt: ReturnType<typeof buildWriteForMePrompt>) => ({ role: prompt.messages.at(-1)!.role, content: closingParts(prompt).trailing });
 
 describe('Write for me: the prompt (pure)', () => {
     it("opens with the turn's system message unchanged and sends the history, then one closing user message", () => {

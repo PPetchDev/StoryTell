@@ -1,3 +1,4 @@
+import { layersOf } from './harness/prompt-layers.js';
 import {
     AutoDiaryInput,
     autoDiaryWriters,
@@ -252,16 +253,16 @@ describe('Diary: the Narrator reads the newest entries as feelings only (pure)',
 
     it('tells them after Memory as inner life, never as what happened, and leaves the prompt as it was without any', () => {
         expect(buildTurnPrompt(turnInput({ diaries: [] }))).toEqual(buildTurnPrompt(turnInput()));
-        const plain = buildTurnPrompt(turnInput()).messages[0].content;
+        const plain = layersOf(buildTurnPrompt(turnInput()));
         expect(plain).not.toContain('# Inner life');
-        const system = buildTurnPrompt(
+        const system = layersOf(buildTurnPrompt(
             turnInput({
                 diaries: [
                     { characterName: 'Mira', text: 'Mira is wary of Ash and means to watch them.', repliesAgo: 2 },
                     { characterName: 'Kai', text: 'Kai is fond of Ash.', repliesAgo: 0 },
                 ],
             }),
-        ).messages[0].content;
+        ));
         expect(system).toContain(
             '# Inner life (what Characters feel and mean to do, kept to themselves)\nLet these colour how each Character speaks and acts. They are feelings and intentions only: nothing here happened, nobody here said or did anything, and no one recalls, mentions or acts on anything as if it had. What happened is the story and the Memories above. Nobody else knows a Character\'s inner life, and they never speak of a diary.\n\n- Mira (as of 2 replies ago): Mira is wary of Ash and means to watch them.\n- Kai (as of just now): Kai is fond of Ash.',
         );
@@ -467,7 +468,7 @@ describe('Diary: asking, keeping and taking back (HTTP)', () => {
         // The next turn reads her entry as her inner life; the Judge and Memory extraction never do, so it becomes no fact.
         await play(storyId, chat.id, 'I light the lamp.');
         const turn = t.gateway.textCalls('turn').at(-1)!;
-        expect(turn.messages[0].content).toContain('- Mira (as of just now): Mira is wary of Ash and means to watch them closely.');
+        expect(layersOf(turn)).toContain('- Mira (as of just now): Mira is wary of Ash and means to watch them closely.');
         // Never the entry's own text, which may tell of events.
         expect(JSON.stringify(turn.messages)).not.toContain('like he owned it');
         for (const kind of ['judge', 'memory_extraction'] as const) {

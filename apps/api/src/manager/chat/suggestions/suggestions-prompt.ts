@@ -10,7 +10,8 @@ import {
     PromptHistoryMessage,
     PromptLayersInput,
     recentHistory,
-    systemPrompt,
+    historyMessages,
+    promptLayers,
     TURN_PROMPT_TOKEN_BUDGET,
     uncoveredHistory,
 } from '../turn/prompt.js';
@@ -72,7 +73,7 @@ Answer with only this JSON object and nothing else, one key per option:
  * closing message, so the blocks' tokens are reserved there.
  */
 export function buildSuggestionsPrompt(input: SuggestionsPromptInput): SuggestionsPrompt {
-    const system = systemPrompt(input);
+    const layers = promptLayers(input);
     const instruction = joinBlocks([
         loreBlock(input.chosenLore ?? []),
         documentsBlock(input.documentPassages ?? []),
@@ -81,14 +82,16 @@ export function buildSuggestionsPrompt(input: SuggestionsPromptInput): Suggestio
     ]);
     const kept = recentHistory(
         uncoveredHistory(input.history, input.storySoFar),
-        TURN_PROMPT_TOKEN_BUDGET - estimateTokens(system.text) - estimateTokens(instruction),
+        TURN_PROMPT_TOKEN_BUDGET - estimateTokens(`${layers.standing}\n\n${layers.moment}`) - estimateTokens(instruction),
     );
     return {
+        // As the turn sends it, so the two share the host's prompt cache (.scratch/prompt-cache/spec.md).
         messages: [
-            { role: 'system', content: system.text },
-            ...kept.map((message) => ({ role: message.role, content: message.text })),
-            // A user message, not a trailing system one: GLM-5.3 on DeepInfra answered that with an empty {"": ""}.
-            { role: 'user', content: instruction },
+            { role: 'system', content: layers.standing },
+            ...historyMessages(kept),
+            // A user message, not a trailing system one: GLM-5.3 on DeepInfra answered that with an empty {"": ""}, and a
+            // system message after the first stops the prompt cache. The moment layers ride in it, as in the turn.
+            { role: 'user', content: `${layers.moment}\n\n${instruction}` },
         ],
         maxTokens: SUGGESTIONS_MAX_TOKENS,
     };

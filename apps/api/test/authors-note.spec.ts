@@ -1,7 +1,8 @@
+import { layersOf, trailingOf } from './harness/prompt-layers.js';
 import { storySoFarCoverage } from '../src/manager/chat/story-so-far/story-so-far-prompt.js';
 import { buildSuggestionsPrompt } from '../src/manager/chat/suggestions/suggestions-prompt.js';
 import { buildWriteForMePrompt } from '../src/manager/chat/write-for-me/write-for-me-prompt.js';
-import { buildTurnPrompt, estimateTokens, PromptLayersInput, TURN_PROMPT_TOKEN_BUDGET, TurnPromptInput } from '../src/manager/chat/turn/prompt.js';
+import { buildTurnPrompt, estimateTokens, NARRATOR_NOTES, PromptLayersInput, TURN_PROMPT_TOKEN_BUDGET, TurnPromptInput } from '../src/manager/chat/turn/prompt.js';
 import { LedgerModelService } from '../src/model/ledger/ledger.service.js';
 import { TextCompletionRequest } from '../src/service/model-gateway/model-gateway.js';
 import { Pov, ReplyLength, Tense } from '../src/model/story/entities/story.entity.js';
@@ -55,8 +56,8 @@ describe("Author's note: the turn prompt (pure)", () => {
 
     it('sits after the Lore and before "Where things stand" and the final instruction, in the trailing message only', () => {
         const prompt = buildTurnPrompt(input({ lore, chosenLore: lore, authorsNote: `  ${NOTE}\n` }));
-        const trailing = prompt.messages.at(-1)!;
-        expect(trailing.role).toBe('system');
+        expect(prompt.messages.at(-1)!.role).toBe('user');
+        const trailing = { content: trailingOf(prompt) };
         const at = (text: string) => trailing.content.indexOf(text);
         expect(at('# Lore')).toBe(0);
         expect(at(HEADING)).toBeGreaterThan(at('The lamp burns whale oil.'));
@@ -88,7 +89,7 @@ describe("Author's note: the turn prompt (pure)", () => {
     it('counts toward the budget: a long note trims one more old Message where the budget is tight', () => {
         const turn = input({ history: history(6, 400) });
         const base = buildTurnPrompt({ ...turn, tokenBudget: 1_000_000 });
-        const fixed = estimateTokens(base.messages[0].content) + estimateTokens(turn.userText!) + estimateTokens(base.messages.at(-1)!.content);
+        const fixed = estimateTokens(layersOf(base)) + estimateTokens(turn.userText!) + estimateTokens(trailingOf(base)) + estimateTokens(NARRATOR_NOTES);
         // Room for three Messages and a little over: the note's ~300 tokens push one out.
         const tokenBudget = fixed + 3 * 400 + 50;
 
@@ -96,7 +97,7 @@ describe("Author's note: the turn prompt (pure)", () => {
         const withNote = buildTurnPrompt({ ...turn, tokenBudget, authorsNote: 'n'.repeat(1_000) });
         expect(without.trimmed).toBe(3);
         expect(withNote.trimmed).toBe(4);
-        expect(withNote.messages.slice(1, -2).map((message) => message.content.split(' ')[0])).toEqual(['M4', 'M5']);
+        expect(withNote.messages.slice(1, -1).map((message) => message.content.split(' ')[0])).toEqual(['M4', 'M5']);
     });
 
     it('is reserved by the Story so far trigger, so a Chat with a note gets its Story so far in time', () => {

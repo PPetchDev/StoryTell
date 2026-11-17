@@ -1,4 +1,5 @@
 import pg from 'pg';
+import { layersOf } from './harness/prompt-layers.js';
 
 import { TextCompletionRequest } from '../src/service/model-gateway/model-gateway.js';
 import { startTestApp, TestApp } from './harness/test-app.js';
@@ -172,7 +173,7 @@ describe('Cast and Scene changes reaching existing Chats', () => {
     function lastTurnPrompt(): string {
         const calls = t.gateway.textCalls('turn');
         const request: TextCompletionRequest = calls[calls.length - 1];
-        return request.messages[0].content;
+        return layersOf(request);
     }
 
     function character(board: Dashboard, name: string) {

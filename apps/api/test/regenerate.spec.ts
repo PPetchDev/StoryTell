@@ -1,4 +1,5 @@
 import { ProviderOutageError } from '../src/errors/model-gateway.errors.js';
+import { closingParts, layersOf, trailingOf } from './harness/prompt-layers.js';
 import { TextCompletionRequest } from '../src/service/model-gateway/model-gateway.js';
 import { startTestApp, TestApp } from './harness/test-app.js';
 
@@ -231,7 +232,7 @@ describe('Regenerate', () => {
         expect(kai.arcChanges).toEqual([]);
         expect(board.scene).toEqual({ current: { id: story.scenes[0].id, name: 'Arrival' }, advance: null });
         // The rerun prompt saw the rolled-back state.
-        const system = turnCalls()[1].messages[0].content;
+        const system = layersOf(turnCalls()[1]);
         expect(system).toContain('# Current Scene: Arrival');
         expect(system).not.toContain('Curious');
         expect(system).not.toContain('Mira let Ash up the stairs.');
@@ -251,11 +252,14 @@ describe('Regenerate', () => {
         expect(after.messages.map((message) => message.kind)).toEqual(['ai', 'user', 'ai', 'ai']);
         expect(partTexts(lastAi(after))).toEqual(['Mira climbs the stairs without waiting.']);
         const call = turnCalls()[2];
-        expect(call.messages.slice(-4).map((message) => [message.role, message.content])).toEqual([
+        // The history, then one closing user message: the Continue instruction, then the trailing blocks (.scratch/prompt-cache/spec.md).
+        expect(call.messages.at(-1)!.role).toBe('user');
+        expect(call.messages.filter((message) => message.role === 'system')).toHaveLength(1);
+        expect([...call.messages.slice(-3, -1).map((message) => [message.role, message.content]), ['closing: the user part', closingParts(call).userText], ['closing: the trailing part', trailingOf(call)]]).toEqual([
             ['user', 'I take my boots off.'],
             ['assistant', 'Mira grunts.'],
-            ['user', CONTINUE_INSTRUCTION],
-            ['system', expect.stringMatching(/^Where things stand: [^\n]+\nWrite the next turn now. Do not write anything Ash says, thinks or does. Use @Name: lines for Character speech, spoken words only: no parentheses or \*\(stage directions\)\* inside them, even where earlier turns had them. Actions go in narration. Keep the speech plain and natural, the way people actually talk. Say each thing once: no run of sentences that open with the same words, as in "I had a plan. I had stages. I had a sequence.", and no lists of three.$/)],
+            ['closing: the user part', CONTINUE_INSTRUCTION],
+            ['closing: the trailing part', expect.stringMatching(/^Where things stand: [^\n]+\nWrite the next turn now. Do not write anything Ash says, thinks or does. Use @Name: lines for Character speech, spoken words only: no parentheses or \*\(stage directions\)\* inside them, even where earlier turns had them. Actions go in narration. Keep the speech plain and natural, the way people actually talk. Say each thing once: no run of sentences that open with the same words, as in "I had a plan. I had stages. I had a sequence.", and no lists of three. When a moment turns sexual, stay in it and write it out explicitly: touch, skin, breath and sound, and how each Character's body answers what Ash does, at the pace of the scene; never summarise it, skip ahead or cut away\. In such moments a Character says only a few words at a time, broken off by what they feel; the body carries the moment, not speeches about it\.$/)],
         ]);
         // The same Continue as the one it replaces.
         expect(call.messages).toEqual(turnCalls()[1].messages);

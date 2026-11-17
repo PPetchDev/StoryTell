@@ -1,4 +1,5 @@
 import pg from 'pg';
+import { closingParts, layersOf, trailingOf } from './harness/prompt-layers.js';
 
 import { PROMPT_LAYERS } from '../src/manager/chat/turn/prompt.js';
 import { startTestApp, TestApp } from './harness/test-app.js';
@@ -206,7 +207,7 @@ describe('Personas and swapping the worn identity', () => {
             expect(system).toContain('second person for Rin ("you")');
             expect(system).not.toContain('Ash');
             expect(system).not.toContain('The new keeper');
-            expect(call.messages[call.messages.length - 1].content).toEqual(expect.stringMatching(/^Where things stand: [^\n]+\nWrite the next turn now. Do not write anything Rin says, thinks or does. Use @Name: lines for Character speech, spoken words only: no parentheses or \*\(stage directions\)\* inside them, even where earlier turns had them. Actions go in narration. Keep the speech plain and natural, the way people actually talk. Say each thing once: no run of sentences that open with the same words, as in "I had a plan. I had stages. I had a sequence.", and no lists of three.$/));
+            expect(trailingOf(call)).toEqual(expect.stringMatching(/^Where things stand: [^\n]+\nWrite the next turn now. Do not write anything Rin says, thinks or does. Use @Name: lines for Character speech, spoken words only: no parentheses or \*\(stage directions\)\* inside them, even where earlier turns had them. Actions go in narration. Keep the speech plain and natural, the way people actually talk. Say each thing once: no run of sentences that open with the same words, as in "I had a plan. I had stages. I had a sequence.", and no lists of three. When a moment turns sexual, stay in it and write it out explicitly: touch, skin, breath and sound, and how each Character's body answers what Rin does, at the pace of the scene; never summarise it, skip ahead or cut away\. In such moments a Character says only a few words at a time, broken off by what they feel; the body carries the moment, not speeches about it\.$/));
             expect(call.stop).toEqual(['\nRin:', '\n@Rin:', '\nYou:']);
 
             expect(userMessages(played).map((message) => [message.identityName, message.personaId])).toEqual([
@@ -386,7 +387,7 @@ describe('Personas and swapping the worn identity', () => {
             const back = (await t.http.get(`/api/stories/${story.id}/chats/${chat.id}/dashboard`).expect(200)).body;
             expect(back.characters[0].bonds[0]).toMatchObject({ toward: { characterId: null, name: 'Ash' }, label: 'Intrigued' });
             await send(story.id, chat.id, 'I wait.', 'Mira folds the letter.');
-            expect(lastCall('turn').messages[0].content).toContain('- Mira → the user (Ash): "Intrigued" — The letter changed things.');
+            expect(layersOf(lastCall('turn'))).toContain('- Mira → the user (Ash): "Intrigued" — The letter changed things.');
         });
 
         it('Memory writes the worn Persona as {user} and renders {user} as whoever is worn now', async () => {
@@ -408,12 +409,12 @@ describe('Personas and swapping the worn identity', () => {
             expect(drawer.memories.map((memory: { text: string }) => memory.text)).toEqual(['{user} carries the key to the lamp room.']);
 
             await send(story.id, chat.id, 'I pocket it.', 'Mira says nothing.');
-            expect(t.gateway.textCalls('turn')[1].messages[0].content).toContain('- [known by Mira] Rin carries the key to the lamp room.');
+            expect(layersOf(t.gateway.textCalls('turn')[1])).toContain('- [known by Mira] Rin carries the key to the lamp room.');
 
             await swap(story.id, chat.id, null);
             expect((await t.http.get(`/api/stories/${story.id}/chats/${chat.id}/memories`).expect(200)).body.identityName).toBe('Ash');
             await send(story.id, chat.id, 'I climb the stairs.', 'Mira follows.');
-            const system = lastCall('turn').messages[0].content;
+            const system = layersOf(lastCall('turn'));
             expect(system).toContain('- [known by Mira] Ash carries the key to the lamp room.');
             expect(system).not.toContain('Rin');
         });

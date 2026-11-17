@@ -1,4 +1,5 @@
 import { applyJudgement, ApplyInput } from '../src/manager/chat/judge/apply-judgement.js';
+import { layersOf } from './harness/prompt-layers.js';
 import { BondGate, bondGateInWords, gatesHold, GateBond } from '../src/manager/chat/judge/bond-gates.js';
 import { buildJudgePrompt, Judgement, JudgePromptInput } from '../src/manager/chat/judge/judge-prompt.js';
 import { buildTurnPrompt, TurnPromptInput } from '../src/manager/chat/turn/prompt.js';
@@ -186,7 +187,7 @@ describe('Prompts: Bond gates', () => {
         };
     }
 
-    const system = (input: TurnPromptInput) => buildTurnPrompt(input).messages[0].content;
+    const system = (input: TurnPromptInput) => layersOf(buildTurnPrompt(input));
 
     it('the Narrator\'s Scene line names the gates in words, beside the condition or alone', () => {
         const withBoth = system(turnInput({ name: 'Arrival', situation: 'Reach the lamp.', moveOnCondition: 'Nara opens the door.', gates: ['Nara toward Ash, Trust at least trusts'] }));

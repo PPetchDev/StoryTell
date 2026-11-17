@@ -1,4 +1,5 @@
 import pg from 'pg';
+import { layersOf } from './harness/prompt-layers.js';
 
 import { ProviderOutageError } from '../src/errors/model-gateway.errors.js';
 import { ChatManagerService } from '../src/manager/chat/chat.service.js';
@@ -502,7 +503,7 @@ describe('Branch', () => {
             await play(story.id, made.id, 'I say no.', 'Mira frowns.');
 
             const call = t.gateway.textCalls('turn').at(-1)!;
-            const system = call.messages[0].content;
+            const system = layersOf(call);
             expect(system).toContain('Curious');
             expect(system).not.toContain('Trusting');
             expect(system).toContain('# Current Scene: Arrival');

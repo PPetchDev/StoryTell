@@ -1,4 +1,5 @@
 import { memoryLine } from '../src/manager/chat/memory/memory-prompt.js';
+import { layersOf } from './harness/prompt-layers.js';
 import { buildSuggestionsPrompt } from '../src/manager/chat/suggestions/suggestions-prompt.js';
 import { buildTurnPrompt, estimateTokens, PromptMemory, systemPrompt, TurnPromptInput } from '../src/manager/chat/turn/prompt.js';
 import { Pov, ReplyLength, Tense } from '../src/model/story/entities/story.entity.js';
@@ -109,7 +110,7 @@ describe('Memory layer past its cap', () => {
         const turn = buildTurnPrompt(layers);
         const suggestions = buildSuggestionsPrompt({ ...layers, history: [] });
         expect(turn.memoriesLeftOut).toBe(2);
-        expect(keptLines(turn.messages[0].content)).toEqual(['Kai hid the map', 'Oren three']);
-        expect(suggestions.messages[0].content).toEqual(turn.messages[0].content);
+        expect(keptLines(layersOf(turn))).toEqual(['Kai hid the map', 'Oren three']);
+        expect(layersOf(suggestions)).toEqual(layersOf(turn));
     });
 });

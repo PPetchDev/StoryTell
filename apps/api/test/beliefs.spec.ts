@@ -1,4 +1,5 @@
 import pg from 'pg';
+import { layersOf } from './harness/prompt-layers.js';
 
 import { ChatManagerService } from '../src/manager/chat/chat.service.js';
 import { startTestApp, TestApp } from './harness/test-app.js';
@@ -83,7 +84,7 @@ describe('Beliefs', () => {
         return getChat(storyId, chatId);
     }
 
-    const lastTurnSystem = () => t.gateway.textCalls('turn').at(-1)!.messages[0].content;
+    const lastTurnSystem = () => layersOf(t.gateway.textCalls('turn').at(-1)!);
     const lastExtractionUser = () => t.gateway.textCalls('memory_extraction').at(-1)!.messages[1].content;
 
     /** A Chat where Kai knows the truth and Nara has been lied to. */

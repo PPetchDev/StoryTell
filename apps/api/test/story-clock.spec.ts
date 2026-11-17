@@ -1,3 +1,4 @@
+import { trailingOf } from './harness/prompt-layers.js';
 import pg from 'pg';
 
 import { parseJudgement } from '../src/manager/chat/judge/judge-prompt.js';
@@ -202,7 +203,7 @@ describe('Story clock: the judge, the ledger and the Chat', () => {
 
         await play(story.id, chat.id, 'Five.');
         expect(lastCall('judge').messages[1].content).toContain('# Time of day\nnight\n');
-        expect(lastCall('turn').messages.at(-1)!.content).toMatch(/^Where things stand: Scene: Arrival\. Time: night\. /);
+        expect(trailingOf(lastCall('turn'))).toMatch(/^Where things stand: Scene: Arrival\. Time: night\. /);
     });
 
     it('rolls back on an edit and on Regenerate, and Reset clears it', async () => {

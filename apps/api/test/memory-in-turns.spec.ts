@@ -1,4 +1,5 @@
 import { Logger } from '@nestjs/common';
+import { layersOf } from './harness/prompt-layers.js';
 import pg from 'pg';
 
 import { ProviderOutageError } from '../src/errors/model-gateway.errors.js';
@@ -82,7 +83,7 @@ describe('Memory in turns', () => {
     }
 
     const memoryLayerOf = (system: string) => system.slice(system.indexOf('# Memory'));
-    const lastTurnSystem = () => t.gateway.textCalls('turn').at(-1)!.messages[0].content;
+    const lastTurnSystem = () => layersOf(t.gateway.textCalls('turn').at(-1)!);
     const rendered = (text: string) => text.split('{user}').join('Ash');
 
     async function memoryId(chatId: number, text: string): Promise<number> {
@@ -139,7 +140,7 @@ describe('Memory in turns', () => {
         const turn = t.gateway.textCalls('turn').at(-1)!.messages;
         expect(turn.at(-1)!.content).toContain(`${DOCUMENTS_HEADING} (`);
         expect(turn.at(-1)!.content).toContain('## Albatross wreck');
-        expect(memoryLayerOf(turn[0].content)).toContain(rendered(COMPASS));
+        expect(memoryLayerOf(layersOf({ messages: turn }))).toContain(rendered(COMPASS));
     });
 
     it('writes the turn with the newest Memories when the search fails, and says so in the log', async () => {
@@ -205,7 +206,7 @@ describe('Memory in turns', () => {
         t.gateway.reset();
         t.gateway.scriptText('write_for_me', 'I ask about the compass.');
         await t.http.post(`/api/stories/${storyId}/chats/${branch.id}/write-for-me`).send({ draft: '' }).expect(200);
-        expect(memoryLayerOf(t.gateway.textCalls('write_for_me')[0].messages[0].content)).toContain(rendered(COMPASS));
+        expect(memoryLayerOf(layersOf(t.gateway.textCalls('write_for_me')[0]))).toContain(rendered(COMPASS));
     });
 
     it('marks nothing in play before any turn chose', async () => {
@@ -227,7 +228,7 @@ describe('Memory in turns', () => {
 
             await t.http.post(`/api/stories/${storyId}/chats/${chatId}/suggestions`).expect(200);
 
-            const layer = memoryLayerOf(t.gateway.textCalls('suggested_replies')[0].messages[0].content);
+            const layer = memoryLayerOf(layersOf(t.gateway.textCalls('suggested_replies')[0]));
             expect(layer).toContain(rendered(COMPASS));
             expect(layer).not.toContain(filler(0));
             expect(t.gateway.embeddingCalls()).toEqual([]);
@@ -241,7 +242,7 @@ describe('Memory in turns', () => {
 
             await t.http.post(`/api/stories/${storyId}/chats/${chatId}/write-for-me`).send({ draft: '' }).expect(200);
 
-            const layer = memoryLayerOf(t.gateway.textCalls('write_for_me')[0].messages[0].content);
+            const layer = memoryLayerOf(layersOf(t.gateway.textCalls('write_for_me')[0]));
             expect(layer).toContain(rendered(COMPASS));
             expect(layer).not.toContain(filler(0));
             expect(t.gateway.embeddingCalls()).toEqual([]);

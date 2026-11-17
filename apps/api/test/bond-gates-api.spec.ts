@@ -1,4 +1,5 @@
 import { startTestApp, TestApp } from './harness/test-app.js';
+import { layersOf } from './harness/prompt-layers.js';
 
 /**
  * Bond gates on Scenes (.scratch/bond-axes/issues/04-bond-gates.md), through the HTTP API with the
@@ -242,7 +243,7 @@ describe('Bond gates', () => {
             expect((await play(story.id, chatId, 'I knock.', judgement({ moveOn: true }))).currentScene?.name).toBe('Arrival');
             expect(t.gateway.textCalls('judge').at(-1)!.messages[1].content).toContain('# Current Scene\nArrival. Move-on condition: (gates only)\n');
             // The Narrator is steered toward the gate in words.
-            expect(t.gateway.textCalls('turn').at(-1)!.messages[0].content).toContain(
+            expect(layersOf(t.gateway.textCalls('turn').at(-1)!)).toContain(
                 'This Scene moves on once these feelings have grown: Nara toward Ash, Trust at least inclined to trust.',
             );
 
