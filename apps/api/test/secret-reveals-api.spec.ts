@@ -177,7 +177,8 @@ describe('Secret reveals: through the HTTP API', () => {
         expect(turn.messages[0].content).toContain(`- ${SONG}`);
         expect(lastClosing()).not.toContain('# Secrets');
         const shape = lastJudge().messages[0].content;
-        expect(shape).toContain('"secrets_revealed":[]}');
+        // Named in the system shape; Items (.scratch/story-items/spec.md) may add its field after it.
+        expect(shape).toContain('"secrets_revealed":[]');
         expect(lastJudge().messages[1].content).not.toContain('# Secrets that may come out');
 
         // The Judge raised Trust to "trusts": the next turn offers the first, and the Judge is asked about it.
