@@ -400,16 +400,30 @@ export class StoryManagerService {
                     const copied = await copyFile(expression.imagePath, (ext) => `expressions/story-${copyId}/character-${id}-${expression.emotion}-${token}.${ext}`);
                     if (!copied) continue;
                     const current = expression.drawnFrom !== null && expression.drawnFrom === character.referenceImagePath;
+                    // Its stage cut-out too (.scratch/stage-pictures/spec.md).
+                    const cutout = expression.cutoutPath
+                        ? await copyFile(expression.cutoutPath, () => `expressions/story-${copyId}/character-${id}-${expression.emotion}-${token}-cutout.png`)
+                        : null;
                     expressions.push({
                         characterId: id,
                         emotion: expression.emotion,
                         imagePath: copied,
                         crop: expression.crop ? { ...expression.crop } : null,
                         drawnFrom: current ? (images.get(id)?.path ?? expression.drawnFrom) : expression.drawnFrom,
+                        cutoutPath: cutout,
                     });
                 }
             }
             await this.storyModel.insertExpressions(expressions);
+            // The Reference image's stage cut-out, cut from the copy's Reference image.
+            for (const character of source.characters) {
+                const id = characterIds.get(character.id)!;
+                const reference = images.get(id);
+                if (!reference || !character.referenceCutout || character.referenceCutout.cutFrom !== character.referenceImagePath) continue;
+                const token = randomBytes(6).toString('hex');
+                const cutout = await copyFile(character.referenceCutout.imagePath, () => `reference-images/story-${copyId}/character-${id}-cutout-${token}.png`);
+                if (cutout) await this.storyModel.putReferenceCutout(id, cutout, reference.path);
+            }
 
             const cover = source.cover();
             const focus = cover?.focus ?? null;
@@ -616,6 +630,7 @@ export class StoryManagerService {
             throw error;
         }
         if (previous) await this.removeFile(previous);
+        await this.removeReferenceCutout(characterId);
         return this.saved(storyId);
     }
 
@@ -631,7 +646,14 @@ export class StoryManagerService {
             await this.replaceCover(story, { snapshotId: null, characterId: null, imagePath: null, focus: null });
         }
         if (previous) await this.removeFile(previous);
+        await this.removeReferenceCutout(characterId);
         return this.saved(storyId);
+    }
+
+    /** The stage cut-out of a Reference image that is gone (.scratch/stage-pictures/spec.md): its row and file. */
+    private async removeReferenceCutout(characterId: number): Promise<void> {
+        const cutout = await this.storyModel.removeReferenceCutout(characterId);
+        if (cutout) await this.removeFile(cutout);
     }
 
     /** Sets or clears the square of the Reference image shown beside the Character's lines in a Chat. */
@@ -646,11 +668,16 @@ export class StoryManagerService {
 
     private async removeReferenceImageFile(character: CharacterEntity): Promise<void> {
         if (character.referenceImagePath) await this.removeFile(character.referenceImagePath);
+        // Its stage cut-out (.scratch/stage-pictures/spec.md); the row goes with the Character.
+        if (character.referenceCutout) await this.removeFile(character.referenceCutout.imagePath);
     }
 
     /** Their rows go with the Character through ON DELETE CASCADE; the files go here. */
     private async removeExpressionFiles(character: CharacterEntity): Promise<void> {
-        for (const expression of character.expressions) await this.removeFile(expression.imagePath);
+        for (const expression of character.expressions) {
+            await this.removeFile(expression.imagePath);
+            if (expression.cutoutPath) await this.removeFile(expression.cutoutPath);
+        }
     }
 
     /** The record is already gone or updated, so a file that can't be deleted is logged, not an error. */

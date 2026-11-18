@@ -74,6 +74,21 @@ export class ExpressionApiController {
         return this.expressions.draw(storyId, characterId, emotion);
     }
 
+    @Post('cutout')
+    @ApiCreatedResponse({
+        type: StoryResponseBodyDTO,
+        description:
+            'Takes the background away from the Expression for the Visual novel stage (.scratch/stage-pictures/spec.md), and from the Reference image ' +
+            'when it has no cut-out yet; a drawn Expression is cut out by itself. Refused without the Expression (404) or with the Venice pool used up (402.001.004).',
+    })
+    cutOut(
+        @Id('storyId') storyId: number,
+        @Id('characterId') characterId: number,
+        @Emotion() emotion: ExpressionEmotion,
+    ): Promise<StoryResponseBodyDTO> {
+        return this.expressions.cutOut(storyId, characterId, emotion);
+    }
+
     @Put()
     @UseFilters(UploadTooLargeFilter)
     @UseInterceptors(FileInterceptor('image', { limits: { fileSize: MAX_UPLOAD_MB * 1024 * 1024, files: 1 } }))

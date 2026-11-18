@@ -298,8 +298,12 @@ The square of a Character's Reference image that the author picks to stand for t
 _Avoid_: Avatar, profile picture, icon
 
 **Expression**:
-A Character's picture for one emotion, drawn from their Reference image or uploaded by the author. When a line of theirs carries that emotion it shows in place of their Portrait; without one, the Portrait shows as usual.
+A Character's picture for one emotion, drawn from their Reference image or uploaded by the author. When a line of theirs carries that emotion it shows in place of their Portrait; without one, the Portrait shows as usual. Six of the thirteen emotions belong to intimate scenes between adults; a line with one of those and no picture for it shows the nearest everyday Expression.
 _Avoid_: Sprite, emote, mood picture
+
+**Cut-out**:
+An Expression or Reference image with its background taken away, so the Character stands on the Backdrop in the Visual novel view. A drawn Expression is cut out by itself; an uploaded one when the author asks.
+_Avoid_: Sprite, transparent picture, PNG
 
 **Speaking voice**:
 The synthetic voice a Character's lines are read aloud in, chosen by the author; unrelated to the Character's Voice, which is how they talk on the page. A Story also has a **Narration voice** for everything that is not a Character's line.

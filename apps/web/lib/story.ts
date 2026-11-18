@@ -95,6 +95,8 @@ export interface Character {
     referenceImagePath: string | null;
     /** The square of the Reference image shown beside their lines in a Chat; null while none is chosen. */
     portraitCrop: PortraitCrop | null;
+    /** The Reference image with its background taken away, for the Visual novel stage; null until cut out (.scratch/stage-pictures/spec.md). */
+    referenceCutoutPath?: string | null;
     /** The voice their lines are read aloud in; null reads them in the Narration voice. Apart from `voice`. */
     speakingVoice: string | null;
     /** Their pictures per emotion, in the fixed order of the emotions (.scratch/expressions/spec.md). */
@@ -362,7 +364,7 @@ export interface Story {
 }
 
 export type StoryFields = Partial<Pick<Story, 'title' | 'setting' | 'opening' | 'narrationVoice' | 'backdrop' | 'rollOffers'> & Style>;
-export type CharacterFields = Partial<Omit<Character, 'id' | 'referenceImagePath' | 'portraitCrop' | 'expressions'>>;
+export type CharacterFields = Partial<Omit<Character, 'id' | 'referenceImagePath' | 'referenceCutoutPath' | 'portraitCrop' | 'expressions'>>;
 export type SceneFields = Partial<Omit<Scene, 'id' | 'gates'>>;
 export type SuddenEventFields = Partial<Omit<SuddenEvent, 'id'>>;
 export type EndingFields = Partial<Omit<Ending, 'id'>>;
@@ -580,6 +582,9 @@ export const storyApi = {
     /** Draws the emotion's Expression from the Reference image, at the Settings Snapshot model's 1K price; replaces any there, keeping its square. */
     drawExpression: (storyId: number, characterId: number, emotion: ExpressionEmotion) =>
         apiSend<Story>('POST', `/stories/${storyId}/characters/${characterId}/expressions/${emotion}/draw`),
+    /** Takes the background away from the Expression (and the Reference image if not yet) for the Visual novel stage (.scratch/stage-pictures/spec.md). */
+    cutOutExpression: (storyId: number, characterId: number, emotion: ExpressionEmotion) =>
+        apiSend<Story>('POST', `/stories/${storyId}/characters/${characterId}/expressions/${emotion}/cutout`),
     /** Stores a picture from the phone as the emotion's Expression, replacing any there (.scratch/expressions/spec.md). */
     uploadExpression: (storyId: number, characterId: number, emotion: ExpressionEmotion, picture: Blob, filename: string) => {
         const form = new FormData();

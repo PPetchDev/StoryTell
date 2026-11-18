@@ -134,12 +134,19 @@ export const EXPRESSION_EXTRA_TOKENS = 200;
 export const EMOTION_MEANINGS: Record<Emotion, string> = {
     neutral: 'calm, plain talk, no strong feeling',
     joy: 'happy, amused, laughing, pleased, excited',
-    love: 'tender, affectionate, flirtatious, aroused, longing',
+    love: 'tender, affectionate, warm, fond',
     embarrassment: 'shy, embarrassed, ashamed, awkward',
     sadness: 'sad, hurt, grieving, disappointed',
     anger: 'angry, annoyed, disgusted, contemptuous',
     fear: 'afraid, nervous, anxious',
     surprise: 'surprised, shocked, confused, realising',
+    // An intimate scene between adults (.scratch/stage-pictures/spec.md), in the order such a scene goes.
+    teasing: 'only in an intimate or sexual moment: teasing, flirting, playfully seductive',
+    desire: 'only in an intimate or sexual moment: aroused, wanting, seductive',
+    flustered: 'only in an intimate or sexual moment: flustered and aroused, shy, breathless',
+    longing: 'only in an intimate or sexual moment: yearning, pleading, aching to be closer',
+    passion: 'only in an intimate or sexual moment: in its heat, overwhelmed, breathless with pleasure',
+    afterglow: 'only in an intimate or sexual moment: just after it, satisfied, blissful, relaxed',
 };
 
 const SYSTEM = `You track hidden feelings (Bonds) and lasting personality changes (Arcs) for Characters in an interactive story. You judge only what CHANGED in the latest exchange.

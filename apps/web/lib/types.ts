@@ -81,6 +81,7 @@ export type CallKind =
     | 'snapshot_image'
     | 'reference_image'
     | 'expression_image'
+    | 'image_cutout'
     | 'document_embedding'
     | 'document_search'
     | 'memory_embedding'
@@ -113,6 +114,7 @@ export const CALL_KIND_LABEL: Record<CallKind, string> = {
     snapshot_image: 'Snapshots',
     reference_image: 'Reference images',
     expression_image: 'Expression pictures',
+    image_cutout: 'Picture cut-outs',
     document_embedding: 'Document adding',
     document_search: 'Document search',
     memory_embedding: 'Memory embedding',

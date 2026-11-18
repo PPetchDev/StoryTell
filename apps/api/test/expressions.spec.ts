@@ -13,6 +13,7 @@ interface Expression {
     imagePath: string;
     crop: { x: number; y: number; size: number } | null;
     outdated: boolean;
+    cutoutPath?: string | null;
 }
 
 interface Character {
@@ -20,6 +21,7 @@ interface Character {
     name: string;
     referenceImagePath: string | null;
     portraitCrop: { x: number; y: number; size: number } | null;
+    referenceCutoutPath?: string | null;
     expressions: Expression[];
 }
 
@@ -116,7 +118,7 @@ describe('Expressions on a Character', () => {
             const { body } = await upload(story, 'joy', png('mira-happy')).expect(200);
 
             const mira = (body as Story).characters[0];
-            expect(mira.expressions).toEqual([{ emotion: 'joy', imagePath: expect.stringMatching(EXPRESSION_PATH), crop: null, outdated: false }]);
+            expect(mira.expressions).toEqual([{ emotion: 'joy', imagePath: expect.stringMatching(EXPRESSION_PATH), crop: null, outdated: false, cutoutPath: null }]);
             expect(mira.expressions[0].imagePath).toContain(`story-${story.id}/character-${mira.id}-joy-`);
             expect((body as Story).characters[1].expressions).toEqual([]);
             expect(await filesUnder(t.imageDir)).toEqual([mira.expressions[0].imagePath]);
@@ -301,9 +303,12 @@ describe('Expressions on a Character', () => {
 
             const { body } = await draw(story, 'joy').expect(201);
 
+            // The drawing, then (.scratch/stage-pictures/spec.md) its cut-out and the Reference image's.
             const calls = t.gateway.imageCalls();
-            expect(calls).toHaveLength(1);
-            expect(calls[0].kind).toBe('expression_image');
+            expect(calls.map((call) => call.kind)).toEqual(['expression_image', 'image_cutout', 'image_cutout']);
+            expect(calls[1].referenceImages).toEqual([{ bytes: png('mira-happy'), mimeType: 'image/png' }]);
+            expect(calls[2].referenceImages).toEqual([{ bytes: jpeg('mira-reference'), mimeType: 'image/jpeg' }]);
+            expect(calls[1].servedFor).toEqual({ storyId: story.id });
             expect(calls[0].referenceImages).toEqual([{ bytes: jpeg('mira-reference'), mimeType: 'image/jpeg' }]);
             expect(calls[0].prompt).toContain(EXPRESSION_LOOKS.joy);
             expect(calls[0].prompt).toContain('Mira');
@@ -312,9 +317,12 @@ describe('Expressions on a Character', () => {
             expect(t.gateway.calls.filter((call) => call.method !== 'generateImage' && call.method !== 'remainingCredit')).toEqual([]);
 
             const mira = (body as Story).characters[0];
-            expect(mira.expressions).toEqual([{ emotion: 'joy', imagePath: expect.stringMatching(EXPRESSION_PATH), crop: null, outdated: false }]);
+            expect(mira.expressions).toEqual([
+                { emotion: 'joy', imagePath: expect.stringMatching(EXPRESSION_PATH), crop: null, outdated: false, cutoutPath: expect.stringMatching(/-joy-[0-9a-f]+-cutout\.png$/) },
+            ]);
+            expect(mira.referenceCutoutPath).toMatch(/^reference-images\/story-\d+\/character-\d+-cutout-[0-9a-f]+\.png$/);
             expect(await readFile(path.join(t.imageDir, mira.expressions[0].imagePath))).toEqual(png('mira-happy'));
-            expect(await filesUnder(t.imageDir)).toEqual([mira.expressions[0].imagePath, referencePath].sort());
+            expect(await filesUnder(t.imageDir)).toEqual([mira.expressions[0].imagePath, mira.expressions[0].cutoutPath!, referencePath, mira.referenceCutoutPath!].sort());
         });
 
         it('drawing again replaces the file and keeps the square', async () => {
@@ -336,7 +344,11 @@ describe('Expressions on a Character', () => {
             const files = await filesUnder(t.imageDir);
             expect(files).toContain(second.imagePath);
             expect(files).not.toContain(first.imagePath);
-            expect(files).toHaveLength(2);
+            // The replaced drawing's cut-out goes with it; the new one has its own, and the Reference image keeps its one.
+            expect(files).toContain(second.cutoutPath);
+            expect(files).not.toContain(first.cutoutPath);
+            expect(files).toHaveLength(4);
+            expect(t.gateway.imageCalls().map((call) => call.kind)).toEqual(['expression_image', 'image_cutout', 'image_cutout', 'expression_image', 'image_cutout']);
         });
 
         it('a drawing over an upload keeps its square too, and the upload is replaced', async () => {
@@ -349,7 +361,8 @@ describe('Expressions on a Character', () => {
             const drawn = ((await draw(story, 'fear').expect(201)).body as Story).characters[0].expressions[0];
 
             expect(drawn.crop).toEqual({ x: 0, y: 0, size: 0.5 });
-            expect(await filesUnder(t.imageDir)).toHaveLength(2);
+            // The drawing and the Reference image, each with its cut-out.
+            expect(await filesUnder(t.imageDir)).toHaveLength(4);
         });
 
         it('needs a Reference image, and makes no call without one', async () => {

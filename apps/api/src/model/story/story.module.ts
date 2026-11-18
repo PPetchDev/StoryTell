@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { CharacterExpressionEntity } from './entities/character-expression.entity.js';
+import { ReferenceCutoutEntity } from './entities/reference-cutout.entity.js';
 import { CharacterSecretEntity } from './entities/character-secret.entity.js';
 import { CharacterEntity } from './entities/character.entity.js';
 import { LoreEntryEntity } from './entities/lore-entry.entity.js';
@@ -23,6 +24,7 @@ import { StoryModelService } from './story.service.js';
             RoleEntity,
             CharacterEntity,
             CharacterExpressionEntity,
+            ReferenceCutoutEntity,
             CharacterSecretEntity,
             StartingBondEntity,
             StartingBeliefEntity,

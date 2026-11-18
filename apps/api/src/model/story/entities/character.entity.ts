@@ -5,6 +5,7 @@ import {
     JoinColumn,
     ManyToOne,
     OneToMany,
+    OneToOne,
     PrimaryGeneratedColumn,
 } from 'typeorm';
 import type { Relation } from 'typeorm';
@@ -12,6 +13,7 @@ import type { Relation } from 'typeorm';
 import { EXPRESSION_EMOTIONS } from '../emotion.js';
 import type { CharacterExpressionEntity, ExpressionResponse } from './character-expression.entity.js';
 import type { CharacterSecretEntity, CharacterSecretResponse } from './character-secret.entity.js';
+import type { ReferenceCutoutEntity } from './reference-cutout.entity.js';
 import type { StoryEntity } from './story.entity.js';
 
 /** A square of the Reference image, in fractions of the image's width: left edge, top edge, side. */
@@ -37,6 +39,8 @@ export interface CharacterResponse {
     portraitCrop: PortraitCrop | null;
     /** The Kokoro voice their lines are read aloud in; null reads them in the Narration voice. Apart from `voice`, how they talk on the page. */
     speakingVoice: string | null;
+    /** The Reference image with its background taken away, for the Visual novel stage; null until cut out, or once the Reference image changed (.scratch/stage-pictures/spec.md). */
+    referenceCutoutPath: string | null;
     /** Their pictures per emotion, in the fixed order of the emotions (.scratch/expressions/spec.md). */
     expressions: ExpressionResponse[];
     /** Their Secrets one by one, in order, each with the Bond level it needs or none (.scratch/secret-reveals/spec.md). */
@@ -102,6 +106,10 @@ export class CharacterEntity {
     @OneToMany('CharacterExpressionEntity', 'character')
     expressions: Relation<CharacterExpressionEntity[]>;
 
+    // Loaded only through StoryModelService.findFull(); saved only by the Expression module, never by a Character save.
+    @OneToOne('ReferenceCutoutEntity', 'character')
+    referenceCutout: Relation<ReferenceCutoutEntity> | null;
+
     // Loaded only through StoryModelService.findFull(), in order; saved only through its own routes.
     @OneToMany('CharacterSecretEntity', 'character')
     secretList: Relation<CharacterSecretEntity[]>;
@@ -120,6 +128,7 @@ export class CharacterEntity {
             referenceImagePath: this.referenceImagePath,
             portraitCrop: this.portraitCrop ? { ...this.portraitCrop } : null,
             speakingVoice: this.speakingVoice,
+            referenceCutoutPath: this.referenceCutout && this.referenceCutout.cutFrom === this.referenceImagePath ? this.referenceCutout.imagePath : null,
             expressions: [...(this.expressions ?? [])]
                 .sort((a, b) => EXPRESSION_EMOTIONS.indexOf(a.emotion) - EXPRESSION_EMOTIONS.indexOf(b.emotion))
                 .map((expression) => expression.toResponse(this.referenceImagePath)),

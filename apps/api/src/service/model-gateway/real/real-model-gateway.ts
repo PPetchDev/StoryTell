@@ -18,6 +18,8 @@ import {
     EmbeddingResult,
     ImageGenerationRequest,
     ImageGenerationResult,
+    IMAGE_CUTOUT_MODEL,
+    IMAGE_CUTOUT_PRICE_USD,
     MAX_REFERENCE_IMAGES,
     ModelGateway,
     isPlayModel,
@@ -400,6 +402,7 @@ export class RealModelGateway extends ModelGateway {
     }
 
     async generateImage(request: ImageGenerationRequest): Promise<ImageGenerationResult> {
+        if (request.kind === 'image_cutout') return this.cutOut(request);
         const referenceCount = request.referenceImages?.length ?? 0;
         if (referenceCount > MAX_REFERENCE_IMAGES) {
             throw new RangeError(`At most ${MAX_REFERENCE_IMAGES} reference images, got ${referenceCount}`);
@@ -434,6 +437,28 @@ export class RealModelGateway extends ModelGateway {
         });
 
         return { image, model: modelName, costUsd };
+    }
+
+    /** The one reference image with its background taken away (`image_cutout`), on Venice, in the image pool. */
+    private async cutOut(request: ImageGenerationRequest): Promise<ImageGenerationResult> {
+        const source = request.referenceImages?.[0];
+        if (!source || request.referenceImages!.length !== 1) throw new RangeError('image_cutout takes exactly one reference image');
+        const image = await this.deps.venice.removeBackground(source);
+        const costUsd = IMAGE_CUTOUT_PRICE_USD;
+        await this.deps.usage.record({
+            kind: request.kind,
+            pool: 'image',
+            model: IMAGE_CUTOUT_MODEL,
+            host: VENICE_HOST,
+            promptTokens: null,
+            completionTokens: null,
+            images: 1,
+            costUsd,
+            storyId: request.servedFor?.storyId ?? null,
+            chatId: request.servedFor?.chatId ?? null,
+            messageId: request.servedFor?.messageId ?? null,
+        });
+        return { image, model: IMAGE_CUTOUT_MODEL, costUsd };
     }
 
     /**

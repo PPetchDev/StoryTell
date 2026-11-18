@@ -272,6 +272,8 @@ export class FakeModelGateway extends ModelGateway {
             );
         }
         const reply = this.imageReplies.get(request.kind)?.shift();
+        // A cut-out nobody scripted succeeds (.scratch/stage-pictures/spec.md): every drawn Expression asks for one.
+        if (reply === undefined && request.kind === 'image_cutout') return { image: FAKE_PNG, model: 'fake-background-remove', costUsd: 0 };
         if (reply === undefined) {
             throw new Error(`FakeModelGateway: no scripted reply for image call "${request.kind}"`);
         }

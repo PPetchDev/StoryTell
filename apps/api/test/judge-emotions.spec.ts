@@ -49,7 +49,8 @@ describe('The judge tags emotions only when the Story has an Expression', () => 
         for (const meaning of [
             '"neutral": calm, plain talk, no strong feeling',
             '"joy": happy, amused, laughing, pleased, excited',
-            '"love": tender, affectionate, flirtatious, aroused, longing',
+            '"love": tender, affectionate, warm, fond',
+            '"desire": only in an intimate or sexual moment: aroused, wanting, seductive',
             '"embarrassment": shy, embarrassed, ashamed, awkward',
             '"sadness": sad, hurt, grieving, disappointed',
             '"anger": angry, annoyed, disgusted, contemptuous',

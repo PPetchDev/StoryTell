@@ -6,6 +6,7 @@ import { copyDocuments } from '../document/document.service.js';
 import { ReplaceRuleEntity } from '../replace-rule/entities/replace-rule.entity.js';
 import { SavedReplyEntity } from '../saved-reply/entities/saved-reply.entity.js';
 import { ExpressionEmotion } from './emotion.js';
+import { ReferenceCutoutEntity } from './entities/reference-cutout.entity.js';
 import { CharacterExpressionEntity } from './entities/character-expression.entity.js';
 import { CharacterSecretEntity } from './entities/character-secret.entity.js';
 import { CharacterEntity, PortraitCrop } from './entities/character.entity.js';
@@ -29,7 +30,7 @@ import { AccountModelService } from '../account/account.service.js';
  */
 const FULL_RELATIONS = {
     role: true,
-    characters: { expressions: true, secretList: true },
+    characters: { expressions: true, secretList: true, referenceCutout: true },
     startingBonds: true,
     startingBeliefs: true,
     scenes: { gates: true },
@@ -51,6 +52,8 @@ export interface ExpressionColumns {
     imagePath: string;
     crop: PortraitCrop | null;
     drawnFrom: string | null;
+    /** Its cut-out (.scratch/stage-pictures/spec.md); left out or null for none. */
+    cutoutPath?: string | null;
 }
 
 /** A Story's Cover columns: at most one of the three pointers set, and where to look. */
@@ -361,16 +364,16 @@ export class StoryModelService {
             });
             if (previous) await manager.delete(CharacterExpressionEntity, { id: previous.id });
             const crop = columns.crop === 'keep' ? (previous?.crop ?? null) : columns.crop;
-            await manager.insert(CharacterExpressionEntity, { ...columns, crop });
+            await manager.insert(CharacterExpressionEntity, { ...columns, crop, cutoutPath: columns.cutoutPath ?? null });
             return previous
-                ? { characterId: previous.characterId, emotion: previous.emotion, imagePath: previous.imagePath, crop: previous.crop, drawnFrom: previous.drawnFrom }
+                ? { characterId: previous.characterId, emotion: previous.emotion, imagePath: previous.imagePath, crop: previous.crop, drawnFrom: previous.drawnFrom, cutoutPath: previous.cutoutPath }
                 : null;
         });
     }
 
     /** Copies Expressions onto other Characters (Duplicate Story), each with its file already written. */
     async insertExpressions(rows: ExpressionColumns[]): Promise<void> {
-        if (rows.length > 0) await this.expressions.insert(rows.map((row) => ({ ...row })));
+        if (rows.length > 0) await this.expressions.insert(rows.map((row) => ({ ...row, cutoutPath: row.cutoutPath ?? null })));
     }
 
     /** Sets or clears its own square; answers whether the Expression was there. */
@@ -379,12 +382,44 @@ export class StoryModelService {
         return (result.affected ?? 0) > 0;
     }
 
-    /** Deletes the row; answers its image path, or null when there was none. */
-    async removeExpression(characterId: number, emotion: ExpressionEmotion): Promise<string | null> {
+    /** Deletes the row; answers its file paths (the picture, and its cut-out if any), or null when there was none. */
+    async removeExpression(characterId: number, emotion: ExpressionEmotion): Promise<{ imagePath: string; cutoutPath: string | null } | null> {
         const expression = await this.expressions.findOneBy({ characterId, emotion });
         if (!expression) return null;
         await this.expressions.delete({ id: expression.id });
-        return expression.imagePath;
+        return { imagePath: expression.imagePath, cutoutPath: expression.cutoutPath };
+    }
+
+    /**
+     * Sets the cut-out of the Expression showing `imagePath` (.scratch/stage-pictures/spec.md). Answers
+     * the cut-out it replaced (or null), or false when that picture is no longer the Expression, so
+     * a cut-out that finishes after a redraw or a removal is not kept.
+     */
+    async setExpressionCutout(characterId: number, emotion: ExpressionEmotion, imagePath: string, cutoutPath: string): Promise<string | null | false> {
+        return this.dataSource.transaction(async (manager) => {
+            const expression = await manager.findOne(CharacterExpressionEntity, { where: { characterId, emotion, imagePath }, lock: { mode: 'pessimistic_write' } });
+            if (!expression) return false;
+            await manager.update(CharacterExpressionEntity, { id: expression.id }, { cutoutPath });
+            return expression.cutoutPath;
+        });
+    }
+
+    /** Sets the Reference image's cut-out, cut from `cutFrom`; answers the cut-out file it replaced, or null. */
+    async putReferenceCutout(characterId: number, imagePath: string, cutFrom: string): Promise<string | null> {
+        return this.dataSource.transaction(async (manager) => {
+            const previous = await manager.findOne(ReferenceCutoutEntity, { where: { characterId }, lock: { mode: 'pessimistic_write' } });
+            if (previous) await manager.delete(ReferenceCutoutEntity, { characterId });
+            await manager.insert(ReferenceCutoutEntity, { characterId, imagePath, cutFrom });
+            return previous?.imagePath ?? null;
+        });
+    }
+
+    /** Deletes the Reference image's cut-out row; answers its file, or null when there was none. */
+    async removeReferenceCutout(characterId: number): Promise<string | null> {
+        const cutout = await this.dataSource.getRepository(ReferenceCutoutEntity).findOneBy({ characterId });
+        if (!cutout) return null;
+        await this.dataSource.getRepository(ReferenceCutoutEntity).delete({ characterId });
+        return cutout.imagePath;
     }
 
     createStartingBond(fields: Partial<StartingBondEntity>): StartingBondEntity {

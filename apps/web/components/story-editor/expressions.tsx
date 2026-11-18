@@ -7,7 +7,7 @@ import { useConnection } from '@/components/connection';
 import { PortraitImage } from '@/components/portrait/portrait-image';
 import { ApiError, apiFetch, ApiUnreachableError } from '@/lib/api';
 import { preparedForUpload } from '@/lib/cover';
-import { EMOTION_LABEL, Expression, EXPRESSION_EMOTIONS, ExpressionEmotion } from '@/lib/expressions';
+import { EMOTION_LABEL, EVERYDAY_EMOTIONS, Expression, EXPRESSION_EMOTIONS, ExpressionEmotion, INTIMATE_EMOTIONS } from '@/lib/expressions';
 import { Character, PortraitCrop, referenceImageUrl, Story, storyApi } from '@/lib/story';
 import { SettingsResponse, usd } from '@/lib/types';
 import { ConfirmButton, FIELD_HINT } from './fields';
@@ -20,6 +20,9 @@ type Commit = (run: () => Promise<Story>, onError: (message: string) => void) =>
 
 /** The error codes a draw is routed on (docs/error-codes.md). */
 const OUT_OF_IMAGE_CREDIT = '402.001.004';
+
+/** What cutting one picture out costs, an estimate as the API records it (.scratch/stage-pictures/spec.md). */
+const CUTOUT_PRICE_USD = 0.01;
 
 let drawPrice: Promise<number | null> | undefined;
 
@@ -73,6 +76,50 @@ export function Expressions({ storyId, character, commit, flush, onDrawn }: Expr
     const price = useDrawPrice();
     /** The one emotion whose actions show; the rest are a tile each (docs/ui-audit-2026-11-13.md, H2). */
     const [open, setOpen] = useState<ExpressionEmotion | null>(null);
+    const { reportUnreachable } = useConnection();
+    /** Drawing every emotion in turn: which one it is on. */
+    const [drawingAll, setDrawingAll] = useState<string | null>(null);
+    const [drawAllError, setDrawAllError] = useState<string | null>(null);
+    const canDraw = character.referenceImagePath !== null;
+    // Each drawing is cut out for the stage too (.scratch/stage-pictures/spec.md): about a cent more.
+    const allPrice = price === null ? null : EXPRESSION_EMOTIONS.length * (price + CUTOUT_PRICE_USD);
+
+    /** Draws all thirteen, one after another, each replacing the one there; stops at the first failure. */
+    const drawAll = async () => {
+        setDrawAllError(null);
+        try {
+            await flush();
+            for (const [index, emotion] of EXPRESSION_EMOTIONS.entries()) {
+                setDrawingAll(`Drawing ${EMOTION_LABEL[emotion]}, ${index + 1} of ${EXPRESSION_EMOTIONS.length}…`);
+                onDrawn(await storyApi.drawExpression(storyId, character.id, emotion));
+            }
+            announce(`Drew all ${EXPRESSION_EMOTIONS.length} Expressions.`);
+        } catch (caught) {
+            if (caught instanceof ApiUnreachableError) reportUnreachable();
+            else if (caught instanceof ApiError && caught.code === OUT_OF_IMAGE_CREDIT) setDrawAllError('Out of image credit, so the rest were not drawn. Play is unaffected.');
+            else setDrawAllError(`Stopped: ${caught instanceof Error ? caught.message : 'Something went wrong.'}`);
+        }
+        setDrawingAll(null);
+    };
+
+    const tiles = (emotions: readonly ExpressionEmotion[]) =>
+        emotions.map((emotion) => (
+            <ExpressionRow
+                key={emotion}
+                storyId={storyId}
+                character={character}
+                heading={heading}
+                emotion={emotion}
+                expression={byEmotion.get(emotion)}
+                price={price}
+                commit={commit}
+                flush={flush}
+                onDrawn={onDrawn}
+                open={open === emotion}
+                locked={drawingAll !== null}
+                onToggle={() => setOpen((current) => (current === emotion ? null : emotion))}
+            />
+        ));
     return (
         <fieldset className={`${SUBSECTION} lg:col-span-2`}>
             <legend className={SUBSECTION_LEGEND}>Expressions</legend>
@@ -81,24 +128,37 @@ export function Expressions({ storyId, character, commit, flush, onDrawn }: Expr
                 others keep the Portrait. Tap a feeling to draw, upload or change it.
             </p>
             {character.referenceImagePath === null && <p className={`${FIELD_HINT} mb-2`}>Add a Reference image to draw Expressions.</p>}
-            {/* Dense, so an open feeling's actions take a whole row under it and the tiles after it close the gap. */}
-            <ul className="m-0 mt-2 grid list-none grid-flow-row-dense grid-cols-4 gap-2 p-0 sm:grid-cols-7">
-                {EXPRESSION_EMOTIONS.map((emotion) => (
-                    <ExpressionRow
-                        key={emotion}
-                        storyId={storyId}
-                        character={character}
-                        heading={heading}
-                        emotion={emotion}
-                        expression={byEmotion.get(emotion)}
-                        price={price}
-                        commit={commit}
-                        flush={flush}
-                        onDrawn={onDrawn}
-                        open={open === emotion}
-                        onToggle={() => setOpen((current) => (current === emotion ? null : emotion))}
+            {canDraw && (
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                    <ConfirmButton
+                        label={`Draw all ${EXPRESSION_EMOTIONS.length}`}
+                        ariaLabel={`Draw all ${EXPRESSION_EMOTIONS.length} Expressions of ${heading}`}
+                        disabled={drawingAll !== null}
+                        question={`Draw all ${EXPRESSION_EMOTIONS.length} Expressions of ${heading}?`}
+                        warning="Each one replaces the one there, and is cut out to stand on the Backdrop in the novel view."
+                        confirmLabel={allPrice === null ? 'Draw all' : `Draw all · ~${usd(allPrice)}`}
+                        onConfirm={() => void drawAll()}
                     />
-                ))}
+                    {drawingAll && (
+                        <span className="hint mt-0" role="status">
+                            {drawingAll}
+                        </span>
+                    )}
+                </div>
+            )}
+            {drawAllError && (
+                <p className="field-error m-0 mb-2" role="alert">
+                    {drawAllError}
+                </p>
+            )}
+            {/* Dense, so an open feeling's actions take a whole row under it and the tiles after it close the gap. */}
+            <ul className="m-0 mt-2 grid list-none grid-flow-row-dense grid-cols-4 gap-2 p-0 sm:grid-cols-7" aria-label="Everyday feelings">
+                {tiles(EVERYDAY_EMOTIONS)}
+            </ul>
+            <h3 className="m-0 mt-4 text-base font-semibold">Intimate scenes (18+)</h3>
+            <p className={`${FIELD_HINT} mt-0.5 mb-2`}>Shown only in an intimate moment between adults. Without one, the nearest feeling above shows.</p>
+            <ul className="m-0 grid list-none grid-flow-row-dense grid-cols-4 gap-2 p-0 sm:grid-cols-7" aria-label="Intimate feelings">
+                {tiles(INTIMATE_EMOTIONS)}
             </ul>
         </fieldset>
     );
@@ -112,12 +172,15 @@ interface ExpressionRowProps extends Omit<ExpressionsProps, 'character'> {
     price: number | null;
     /** Its actions show, in a row of their own under its tile. */
     open: boolean;
+    /** Draw all is running: no write of its own meanwhile. */
+    locked: boolean;
     onToggle(): void;
 }
 
-function ExpressionRow({ storyId, character, heading, emotion, expression, price, commit, flush, onDrawn, open, onToggle }: ExpressionRowProps) {
+function ExpressionRow({ storyId, character, heading, emotion, expression, price, commit, flush, onDrawn, open, locked, onToggle }: ExpressionRowProps) {
     const { reportUnreachable } = useConnection();
-    const [busy, setBusy] = useState<string | null>(null);
+    const [ownBusy, setBusy] = useState<string | null>(null);
+    const busy = ownBusy ?? (locked ? 'Waiting for Draw all…' : null);
     /** Shown in the row as it is. */
     const [error, setError] = useState<string | null>(null);
     /** Why the last square failed to save, shown in the cropper. */
@@ -238,6 +301,11 @@ function ExpressionRow({ storyId, character, heading, emotion, expression, price
                 {!busy && expression && !expression.outdated && (
                     <span className="hint mt-0">{expression.crop ? 'Its own face square.' : "The Portrait's face square."}</span>
                 )}
+                {!busy && expression && (
+                    <span className="hint mt-0">
+                        {expression.cutoutPath ? 'Cut out: stands on the Backdrop in the novel view.' : 'Not cut out: shows with its own background in the novel view.'}
+                    </span>
+                )}
             </div>
             {/* Full-size buttons, 8px apart (audit H25), each named for its row (M11). */}
             <div className="flex flex-wrap gap-2">
@@ -275,6 +343,21 @@ function ExpressionRow({ storyId, character, heading, emotion, expression, price
                         onClick={() => setCropping(true)}
                     >
                         Pick the face
+                    </button>
+                )}
+                {expression && !expression.cutoutPath && (
+                    <button
+                        type="button"
+                        className="button button-quiet"
+                        aria-label={`Cut out ${label}`}
+                        disabled={busy !== null}
+                        onClick={() =>
+                            void save('Cutting out…', () => storyApi.cutOutExpression(storyId, character.id, emotion), (message) =>
+                                setError(`Couldn't cut out the ${label} Expression: ${message}`),
+                            )
+                        }
+                    >
+                        {`Cut out · ~${usd(CUTOUT_PRICE_USD)}`}
                     </button>
                 )}
                 {expression?.crop && (

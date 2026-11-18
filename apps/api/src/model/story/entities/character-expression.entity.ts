@@ -13,6 +13,8 @@ export interface ExpressionResponse {
     crop: PortraitCrop | null;
     /** Drawn from a Reference image the Character no longer has (or from one when they have none now). */
     outdated: boolean;
+    /** The picture with its background taken away, a PNG for the Visual novel stage; null until cut out (.scratch/stage-pictures/spec.md). */
+    cutoutPath: string | null;
 }
 
 /**
@@ -46,6 +48,10 @@ export class CharacterExpressionEntity {
     @Column({ name: 'drawn_from', type: 'text', nullable: true })
     drawnFrom: string | null;
 
+    /** This picture with its background taken away (.scratch/stage-pictures/spec.md); null until cut out. */
+    @Column({ name: 'cutout_path', type: 'text', nullable: true })
+    cutoutPath: string | null;
+
     @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
     createdAt: Date;
 
@@ -56,6 +62,7 @@ export class CharacterExpressionEntity {
             imagePath: this.imagePath,
             crop: this.crop ? { x: this.crop.x, y: this.crop.y, size: this.crop.size } : null,
             outdated: this.drawnFrom !== null && this.drawnFrom !== referenceImagePath,
+            cutoutPath: this.cutoutPath ?? null,
         };
     }
 }

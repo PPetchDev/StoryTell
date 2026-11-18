@@ -7,7 +7,7 @@ import { CharacterNotFoundError, ExpressionNotFoundError, NoReferenceImageToDraw
 import { ExpressionEmotion } from '../../model/story/emotion.js';
 import { CharacterResponse, PortraitCrop } from '../../model/story/entities/character.entity.js';
 import { StoryModelService } from '../../model/story/story.service.js';
-import { ModelGateway } from '../../service/model-gateway/model-gateway.js';
+import { ImageData, ModelGateway } from '../../service/model-gateway/model-gateway.js';
 import { ImageStoreService } from '../../store/image/image-store.service.js';
 import { StoryDetail, StoryManagerService } from '../story/story.service.js';
 import { expressionPrompt } from './prompt.js';
@@ -52,7 +52,70 @@ export class ExpressionManagerService {
             servedFor: { storyId },
         });
         const extension = ImageStoreService.extensionFor(result.image.mimeType) ?? 'jpg';
-        return this.store(storyId, characterId, emotion, result.image.bytes, extension, { crop: 'keep', drawnFrom });
+        const imagePath = await this.storeFile(storyId, characterId, emotion, result.image.bytes, extension, { crop: 'keep', drawnFrom });
+        // Cut out for the stage (.scratch/stage-pictures/spec.md): the drawn picture, and the Reference
+        // image when it has no current cut-out yet. Best effort: the Expression stands either way.
+        await this.cutOutExpression(storyId, characterId, emotion, imagePath, result.image);
+        if (!character.referenceCutoutPath) await this.cutOutReference(storyId, characterId, drawnFrom, reference);
+        return this.saved(storyId);
+    }
+
+    /**
+     * Cuts out an Expression that is there (an upload, or one whose cut-out failed or is missing):
+     * one `image_cutout` call. Refused before the call without the Expression, or with the Venice
+     * pool known to be used up; a failed call is the error.
+     */
+    async cutOut(storyId: number, characterId: number, emotion: ExpressionEmotion): Promise<StoryDetail> {
+        const character = await this.findCharacter(storyId, characterId);
+        const expression = character.expressions.find((one) => one.emotion === emotion);
+        if (!expression) throw new ExpressionNotFoundError();
+        if (await this.imageCreditOut()) throw new OutOfCreditError('image');
+        const bytes = await this.imageStore.read(expression.imagePath);
+        await this.cutOutExpression(storyId, characterId, emotion, expression.imagePath, bytes, true);
+        if (character.referenceImagePath && !character.referenceCutoutPath) {
+            await this.cutOutReference(storyId, characterId, character.referenceImagePath, await this.imageStore.read(character.referenceImagePath));
+        }
+        return this.saved(storyId);
+    }
+
+    /** Cuts out the picture now at `imagePath` and keeps it as that Expression's cut-out. Swallows a failure unless `rethrow`. */
+    private async cutOutExpression(storyId: number, characterId: number, emotion: ExpressionEmotion, imagePath: string, image: ImageData | Buffer, rethrow = false): Promise<void> {
+        let cutoutPath: string | null = null;
+        try {
+            const cut = await this.cutOutImage(storyId, image);
+            cutoutPath = expressionImagePath(storyId, characterId, emotion, 'png').replace(/.png$/, '-cutout.png');
+            await this.imageStore.write(cutoutPath, cut);
+            const previous = await this.storyModel.setExpressionCutout(characterId, emotion, imagePath, cutoutPath);
+            // Redrawn or removed meanwhile: this cut-out belongs to no Expression.
+            if (previous === false) await this.removeFile(cutoutPath);
+            else if (previous) await this.removeFile(previous);
+        } catch (error) {
+            if (cutoutPath) await this.removeFile(cutoutPath);
+            this.logger.warn(`Story ${storyId}, Character ${characterId}: no cut-out for ${emotion} (${error instanceof Error ? error.message : error})`);
+            if (rethrow) throw error;
+        }
+    }
+
+    /** Cuts out the Reference image at `referencePath` and keeps it as the stage's neutral picture. Swallows a failure. */
+    private async cutOutReference(storyId: number, characterId: number, referencePath: string, image: ImageData | Buffer): Promise<void> {
+        let cutoutPath: string | null = null;
+        try {
+            const cut = await this.cutOutImage(storyId, image);
+            cutoutPath = `reference-images/story-${storyId}/character-${characterId}-cutout-${randomBytes(6).toString('hex')}.png`;
+            await this.imageStore.write(cutoutPath, cut);
+            const previous = await this.storyModel.putReferenceCutout(characterId, cutoutPath, referencePath);
+            if (previous && previous !== cutoutPath) await this.removeFile(previous);
+        } catch (error) {
+            if (cutoutPath) await this.removeFile(cutoutPath);
+            this.logger.warn(`Story ${storyId}, Character ${characterId}: no cut-out of the Reference image (${error instanceof Error ? error.message : error})`);
+        }
+    }
+
+    /** One `image_cutout` call; its PNG's bytes. */
+    private async cutOutImage(storyId: number, image: ImageData | Buffer): Promise<Buffer> {
+        const source: ImageData = Buffer.isBuffer(image) ? { bytes: image, mimeType: ImageStoreService.sniffMimeType(image) ?? 'image/jpeg' } : image;
+        const result = await this.gateway.generateImage({ kind: 'image_cutout', prompt: '', referenceImages: [source], servedFor: { storyId } });
+        return result.image.bytes;
     }
 
     /**
@@ -63,7 +126,8 @@ export class ExpressionManagerService {
         await this.findCharacter(storyId, characterId);
         const mimeType = ImageStoreService.sniffMimeType(bytes);
         if (!mimeType) throw new UnsupportedImageError();
-        return this.store(storyId, characterId, emotion, bytes, ImageStoreService.extensionFor(mimeType)!, { crop: null, drawnFrom: null });
+        await this.storeFile(storyId, characterId, emotion, bytes, ImageStoreService.extensionFor(mimeType)!, { crop: null, drawnFrom: null });
+        return this.saved(storyId);
     }
 
     async setCrop(storyId: number, characterId: number, emotion: ExpressionEmotion, crop: PortraitCrop | null): Promise<StoryDetail> {
@@ -76,24 +140,26 @@ export class ExpressionManagerService {
     /** Deletes the Expression and its file; its emotion shows the Portrait again. */
     async remove(storyId: number, characterId: number, emotion: ExpressionEmotion): Promise<StoryDetail> {
         await this.findCharacter(storyId, characterId);
-        const imagePath = await this.storyModel.removeExpression(characterId, emotion);
-        if (imagePath === null) throw new ExpressionNotFoundError();
-        await this.removeFile(imagePath);
+        const removed = await this.storyModel.removeExpression(characterId, emotion);
+        if (removed === null) throw new ExpressionNotFoundError();
+        await this.removeFile(removed.imagePath);
+        if (removed.cutoutPath) await this.removeFile(removed.cutoutPath);
         return this.saved(storyId);
     }
 
     /**
-     * Writes the file, then inserts or replaces the row, then deletes the replaced file. A failure
-     * before the row is saved deletes the new file and leaves the old Expression as it was.
+     * Writes the file, then inserts or replaces the row (with no cut-out), then deletes the replaced
+     * file and its cut-out. A failure before the row is saved deletes the new file and leaves the
+     * old Expression as it was. Answers the new file's path.
      */
-    protected async store(
+    protected async storeFile(
         storyId: number,
         characterId: number,
         emotion: ExpressionEmotion,
         bytes: Buffer,
         extension: string,
         fields: { crop: PortraitCrop | null | 'keep'; drawnFrom: string | null },
-    ): Promise<StoryDetail> {
+    ): Promise<string> {
         const imagePath = expressionImagePath(storyId, characterId, emotion, extension);
         await this.imageStore.write(imagePath, bytes);
         let previous;
@@ -104,7 +170,8 @@ export class ExpressionManagerService {
             throw error;
         }
         if (previous && previous.imagePath !== imagePath) await this.removeFile(previous.imagePath);
-        return this.saved(storyId);
+        if (previous?.cutoutPath) await this.removeFile(previous.cutoutPath);
+        return imagePath;
     }
 
     private async imageCreditOut(): Promise<boolean> {

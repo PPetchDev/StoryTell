@@ -119,6 +119,24 @@ export class VeniceClient {
         };
     }
 
+    /**
+     * `POST /image/background-remove`, per https://docs.venice.ai/api-reference/endpoint/image/background-remove
+     * (read 2026-11-18): the image as base64 in `image`; the answer is a PNG with transparency.
+     */
+    async removeBackground(image: ImageData): Promise<ImageData> {
+        const response = await this.send('/image/background-remove', {
+            method: 'POST',
+            headers: { ...this.inferenceHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image: image.bytes.toString('base64') }),
+        });
+        if (!response.ok) {
+            throw this.toError(response.status, await readJson(response));
+        }
+        const contentType = response.headers.get('content-type') ?? '';
+        if (!contentType.startsWith('image/')) throw new UnparseableOutputError('background-remove returned no image.');
+        return { bytes: Buffer.from(await response.arrayBuffer()), mimeType: contentType.split(';')[0] };
+    }
+
     async generate(request: VeniceImageRequest): Promise<ImageData> {
         const prompt = await this.fitPrompt(request.model, request.prompt);
         const body = VeniceClient.buildBody(request, prompt);

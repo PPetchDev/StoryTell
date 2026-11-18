@@ -77,8 +77,12 @@ export type TextCallKind =
     // A Character messaging the user first (.scratch/reach-outs/spec.md): a background-model call.
     | 'reach_out';
 
-/** `expression_image`: a Character's Expression, drawn from their Reference image (.scratch/expressions/spec.md). */
-export type ImageCallKind = 'snapshot_image' | 'reference_image' | 'expression_image';
+/**
+ * `expression_image`: a Character's Expression, drawn from their Reference image (.scratch/expressions/spec.md).
+ * `image_cutout`: one picture (the one reference image) given back with its background taken away, as a PNG
+ * with transparency, for the Visual novel stage (.scratch/stage-pictures/spec.md); its prompt is not used.
+ */
+export type ImageCallKind = 'snapshot_image' | 'reference_image' | 'expression_image' | 'image_cutout';
 
 /**
  * A Document's passages turned into vectors on Add; a Chat's Memories turned into vectors as they
@@ -284,6 +288,13 @@ export interface TextStreamResult extends TextCompletionResult {
      */
     stopped: boolean;
 }
+
+/**
+ * Venice background-remove (.scratch/stage-pictures/spec.md). Its price is not on Venice's pricing page
+ * (read 2026-11-18), so this is an estimate, recorded as the cost of each cut-out until a real one is seen.
+ */
+export const IMAGE_CUTOUT_MODEL = 'background-remove';
+export const IMAGE_CUTOUT_PRICE_USD = 0.01;
 
 export interface ImageData {
     bytes: Buffer;

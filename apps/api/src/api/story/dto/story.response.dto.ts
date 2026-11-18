@@ -202,6 +202,9 @@ export class ExpressionDTO implements ExpressionResponse {
 
     @ApiProperty({ description: 'Drawn from a Reference image the Character no longer has. Never true for an upload.' })
     outdated: boolean;
+
+    @ApiProperty({ type: String, nullable: true, description: 'The picture with its background taken away, a PNG for the Visual novel stage; null until cut out (.scratch/stage-pictures/spec.md).' })
+    cutoutPath: string | null;
 }
 
 export class CharacterDTO implements CharacterResponse {
@@ -240,6 +243,13 @@ export class CharacterDTO implements CharacterResponse {
             'null while there is none. Shown on the Character page and, cropped to the Portrait, in a Chat.',
     })
     referenceImagePath: string | null;
+
+    @ApiProperty({
+        type: String,
+        nullable: true,
+        description: 'The Reference image with its background taken away, for the Visual novel stage; null until cut out, or once the Reference image changed (.scratch/stage-pictures/spec.md).',
+    })
+    referenceCutoutPath: string | null;
 
     @ApiProperty({
         type: PortraitCropDTO,

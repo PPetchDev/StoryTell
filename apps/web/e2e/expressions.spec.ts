@@ -55,8 +55,11 @@ test('uploads a Happy picture, which fills its row and survives a reload, and Re
     // Character cards start folded; the Expressions are a tile each, whose actions show once tapped.
     const mira = await openCard(page, 'Character 1');
     const expressions = mira.getByRole('group', { name: 'Expressions' });
-    await expect(expressions.getByRole('button', { name: /^\w+ Expression, none yet$/ })).toHaveCount(7);
-    await expect(expressions.getByRole('group', { name: /Expression$/, includeHidden: true })).toHaveCount(7);
+    // Seven everyday feelings, and six for intimate scenes under their own heading (.scratch/stage-pictures/spec.md).
+    await expect(expressions.getByRole('button', { name: /^\w+ Expression, none yet$/ })).toHaveCount(13);
+    await expect(expressions.getByRole('group', { name: /Expression$/, includeHidden: true })).toHaveCount(13);
+    await expect(expressions.getByRole('list', { name: 'Everyday feelings' }).getByRole('button')).toHaveCount(7);
+    await expect(expressions.getByRole('list', { name: 'Intimate feelings' }).getByRole('button')).toHaveCount(6);
     const happyTile = expressionTile(mira, 'Happy');
     await expect(happyTile).toHaveAccessibleName('Happy Expression, none yet');
     await expect(happyTile.locator('img')).toHaveCount(0);

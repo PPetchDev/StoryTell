@@ -352,8 +352,36 @@ export function NovelView(props: NovelViewProps) {
 function SpeakerPicture({ step, cast }: { step: Extract<NovelStep, { kind: 'speech' }>; cast: Cast }) {
     const character = useCastCharacter(step.characterId);
     const openProfile = useCharacterProfile(step.characterId);
-    const whole = linePicture(character, step.emotion).whole;
+    const { whole, cutout } = linePicture(character, step.emotion);
     const colour = characterColour(step.characterId, cast);
+    if (whole && cutout) {
+        // A cut-out (.scratch/stage-pictures/spec.md): the figure alone, standing on the Backdrop from
+        // the knees up. The picture is drawn taller than the stage, its top at the stage's top, so
+        // the stage's bottom edge cuts it below the knees.
+        const figure = (
+            // eslint-disable-next-line @next/next/no-img-element -- served by the API from the image folder
+            <img
+                className="stage-figure block h-[128%] w-auto max-w-none select-none"
+                src={whole}
+                alt={step.speakerName}
+                data-stage-picture=""
+                data-stage-cutout=""
+                data-emotion={step.emotion ?? 'neutral'}
+                draggable={false}
+            />
+        );
+        return (
+            <div className="absolute inset-0 flex justify-center overflow-hidden">
+                {openProfile ? (
+                    <button type="button" className="bare-button block h-full cursor-pointer focus-ring" aria-label={`Profile of ${step.speakerName}`} onClick={openProfile}>
+                        {figure}
+                    </button>
+                ) : (
+                    figure
+                )}
+            </div>
+        );
+    }
     const picture = whole ? (
         // eslint-disable-next-line @next/next/no-img-element -- served by the API from the image folder
         <img className="block h-full max-w-full object-contain object-bottom motion-safe:animate-fade-in" src={whole} alt={step.speakerName} data-stage-picture="" draggable={false} />
