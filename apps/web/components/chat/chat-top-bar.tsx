@@ -394,6 +394,8 @@ interface ChatTopBarProps {
     onShowStrip(): void;
     /** Opens the Chapters, with Move on (.scratch/scene-chapters/spec.md); left out where the Story has no Scenes. */
     onOpenChapters?(): void;
+    /** Shows "Previously on…", the recap of where the story stands (.scratch/previously-on/spec.md). */
+    onOpenRecap?(): void;
     onSwapIdentity(personaId: number | null): void;
     onOpenMemory(): void;
     onRename(title: string): void;
@@ -446,6 +448,7 @@ export function ChatTopBar({
     stripHidden,
     onShowStrip,
     onOpenChapters,
+    onOpenRecap,
     onSwapIdentity,
     onOpenMemory,
     onRename,
@@ -641,6 +644,11 @@ export function ChatTopBar({
                                 {stripHidden && (
                                     <MenuButton onClick={choose(onShowStrip)}>
                                         <MenuText label="Show Scene strip" sub="The current Scene and its goal" />
+                                    </MenuButton>
+                                )}
+                                {onOpenRecap && (
+                                    <MenuButton onClick={choose(onOpenRecap)}>
+                                        <MenuText label="Previously on…" sub="Where the story stands" />
                                     </MenuButton>
                                 )}
                                 {onOpenChapters && (
