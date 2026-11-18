@@ -65,6 +65,8 @@ export type TextCallKind =
     | 'suggested_replies'
     | 'story_summary'
     | 'chapter_summary'
+    /** A Book chapter: one Chapter retold as novel prose (.scratch/chat-novel/spec.md). */
+    | 'book_chapter'
     | 'write_for_me'
     | 'thai_reading'
     | 'diary_entry'

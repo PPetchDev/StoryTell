@@ -1,11 +1,13 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useId, useState } from 'react';
 
 import { useConnection } from '@/components/connection';
 import { Loading } from '@/components/query-state';
 import { Sheet } from '@/components/sheet/sheet';
 import { ApiError, ApiUnreachableError } from '@/lib/api';
+import { bookHref } from '@/lib/book';
 import { Chapter, Chapters, chaptersApi, defaultMoveTarget } from '@/lib/chapters';
 import { Chat } from '@/lib/chat';
 import { Scene } from '@/lib/story';
@@ -120,6 +122,10 @@ export function ChaptersSheet({ chat, scenes, busy, onMoved, onClose }: Chapters
     return (
         <Sheet label="Chapters" title="Chapters" onClose={onClose}>
             <div className="grid grid-cols-[minmax(0,1fr)] gap-3 pb-1">
+                {/* The Chapters retold as a novel (.scratch/chat-novel/spec.md). */}
+                <Link href={bookHref(chat.storyId, chat.id)} className="button button-quiet justify-self-start">
+                    Read as a Book
+                </Link>
                 {error && (
                     <p role="alert" className="turn-error m-0">
                         {error}

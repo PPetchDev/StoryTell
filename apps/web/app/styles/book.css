@@ -1,0 +1,68 @@
+/*
+ * The Book view (.scratch/chat-novel/spec.md): the reading type, and printing the whole Book (Print or
+ * save as PDF). Owner: the Book session.
+ * What stays here is what utilities can't say (docs/adr/0004-tailwind-css.md, "What may stay plain CSS"):
+ * a print layout that hides the whole app around the Book with :has().
+ */
+@layer components {
+    .book-prose {
+        font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, 'Noto Serif Thai', 'Noto Serif', serif;
+        font-size: 1.125rem;
+        line-height: 1.7;
+        overflow-wrap: anywhere;
+        hyphens: auto;
+    }
+
+    .book-prose p {
+        margin: 0;
+        text-indent: 1.5em;
+    }
+
+    .book-prose p:first-child {
+        text-indent: 0;
+    }
+
+    .book-prose p + p {
+        margin-top: 0.35em;
+    }
+
+    .book-print {
+        display: none;
+    }
+
+    @media print {
+        /* Everything that neither holds the printed Book nor is inside it goes. */
+        body:has(.book-print) *:not(:has(.book-print)):not(.book-print):not(.book-print *) {
+            display: none !important;
+        }
+
+        body:has(.book-print),
+        body:has(.book-print) .page {
+            background: #fff !important;
+            color: #000 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            max-width: none !important;
+        }
+
+        .book-print {
+            display: block;
+            color: #000;
+        }
+
+        .book-print h1,
+        .book-print h2 {
+            text-align: center;
+            font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+        }
+
+        .book-print .book-print-chapter {
+            break-before: page;
+        }
+
+        .book-print .book-prose {
+            font-size: 12pt;
+            line-height: 1.5;
+        }
+    }
+}

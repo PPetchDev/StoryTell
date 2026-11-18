@@ -178,6 +178,10 @@ _Avoid_: VN mode, stage view
 A Chat as a plain text file the user downloads from the Chat menu: a title line, then every Message in order, the user's lines as "Name: …" under the identity worn when each was sent, and the AI's narration and speech as readable text.
 _Avoid_: Export, log, dump
 
+**Book**:
+A Chat retold as a novel, one **Book chapter** per ended Chapter: the Chapter's Messages rewritten as prose with a title, in the Story's tense, the user's Role or Persona written as a character by name, and only what the Chat showed. The play model writes a Book chapter when the user asks, and the user may edit it; when its Chapter's Messages change, it is out of date and keeps its text until rewritten. It is read in the Book view or downloaded as an EPUB, and no prompt reads it.
+_Avoid_: Novel (alone), export, story mode, Transcript (the Transcript is the Messages as they are)
+
 **Continue**:
 Asking the Narrator to write the next part of the Chat without a Message from the user; the result is an ordinary AI Message, and it never speaks or acts for the user.
 _Avoid_: Skip, auto-play, next

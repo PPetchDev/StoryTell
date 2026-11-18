@@ -173,6 +173,8 @@ const PLAY_MODEL_KINDS: ReadonlySet<TextCallKind> = new Set<TextCallKind>([
     'suggested_replies',
     'write_for_me',
     'diary_entry',
+    // A Chapter retold as novel prose (.scratch/chat-novel/spec.md): the story's own voice.
+    'book_chapter',
     // A speech line said again in the Character's own voice (.scratch/natural-speech/line-repair.md);
     // `speech_repair_fallback`, the same call when the play model is slow or fails, is a background call.
     'speech_repair',
@@ -187,7 +189,7 @@ export function isPlayModelKind(kind: TextCallKind): boolean {
  * drafting, the Story assistant and field rewrites stay on host defaults: their JSON and
  * structured answers were tuned there.
  */
-const SAMPLED_KINDS: ReadonlySet<TextCallKind> = new Set<TextCallKind>(['turn', 'suggested_replies', 'write_for_me', 'diary_entry']);
+const SAMPLED_KINDS: ReadonlySet<TextCallKind> = new Set<TextCallKind>(['turn', 'suggested_replies', 'write_for_me', 'diary_entry', 'book_chapter']);
 
 export function isSampledKind(kind: TextCallKind): boolean {
     return SAMPLED_KINDS.has(kind);

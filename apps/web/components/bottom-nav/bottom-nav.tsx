@@ -95,9 +95,12 @@ export function isChatScreen(pathname: string): boolean {
  */
 const CHAT_DASHBOARD = /^\/stories\/[^/]+\/chats\/[^/]+\/dashboard\/?$/;
 
-/** Whether the phone's bottom bar is left off `pathname`: the Chat screen and its Dashboard. */
+/** A Chat's Book (.scratch/chat-novel/spec.md) is read like its Chat: the whole screen, its way back at its top. */
+const CHAT_BOOK = /^\/stories\/[^/]+\/chats\/[^/]+\/book\/?$/;
+
+/** Whether the phone's bottom bar is left off `pathname`: the Chat screen, its Dashboard and its Book. */
 export function hidesBottomNav(pathname: string): boolean {
-    return CHAT_SCREEN.test(pathname) || CHAT_DASHBOARD.test(pathname);
+    return CHAT_SCREEN.test(pathname) || CHAT_DASHBOARD.test(pathname) || CHAT_BOOK.test(pathname);
 }
 
 /** A Story's own Gallery counts as the Gallery in the menu, not as Stories. */

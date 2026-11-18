@@ -1,3 +1,4 @@
+import { BookChapterEntity } from '../../model/book/entities/book-chapter.entity.js';
 import { PushSubscriptionEntity } from '../../model/push/entities/push-subscription.entity.js';
 import { AccountEntity } from '../../model/account/entities/account.entity.js';
 import { ChatSittingOutEntity } from '../../model/chat/entities/chat-sitting-out.entity.js';
@@ -92,4 +93,5 @@ export const entities = [
     ReplaceRuleEntity,
     AccountEntity,
     PushSubscriptionEntity,
+    BookChapterEntity,
 ];

@@ -11,6 +11,7 @@ import { CharacterPortrait } from '@/components/portrait/character-portrait';
 import { ConfirmDialog } from '@/components/sheet/confirm-dialog';
 import { Sheet } from '@/components/sheet/sheet';
 import { Cast, characterColour, Portraits } from '@/lib/character-colour';
+import { bookHref } from '@/lib/book';
 import { Chat, messageHref } from '@/lib/chat';
 import { PersonaList } from '@/lib/persona';
 
@@ -641,6 +642,12 @@ export function ChatTopBar({
                                     <MenuButton onClick={choose(onOpenChapters)}>
                                         <MenuText label="Chapters" sub="Each Scene so far, and Move on" />
                                     </MenuButton>
+                                )}
+                                {/* The Book (.scratch/chat-novel/spec.md) is made of the Chapters, so it shows where they do. */}
+                                {onOpenChapters && (
+                                    <Link href={bookHref(chat.storyId, chat.id)} className={LINK_ITEM} onClick={close}>
+                                        <MenuText label="Book" sub="Your Chat as a novel, a chapter per Scene" />
+                                    </Link>
                                 )}
                                 <MenuButton onClick={() => setMenu('note')} disabled={busy} title={note}>
                                     <MenuText label="Author's note" sub={note} />

@@ -126,6 +126,12 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | `404.004.091` | `ChapterNotFoundError` | No Chapter with that id in this Chat (`PUT …/chapters/:chapterId`, `POST …/chapters/:chapterId/write`): taken back with its Scene advance, or another Chat's. Nothing changes. |
 | `422.004.092` | `EmptyChapterError` | A Chapter summary saved with nothing but whitespace. Nothing changes. |
 | `409.004.093` | `ChapterNotFailedError` | Try again (`POST …/chapters/:chapterId/write`) on a Chapter whose summary did not fail: written, being written, waiting, or with no Messages. No call. |
+| `409.004.130` | `NothingToWriteError` | A Book write (`POST /api/stories/:storyId/chats/:chatId/book/write`) when every Book chapter that can be written is written and up to date (`.scratch/chat-novel/spec.md`). No call. At the Monthly cap it answers `402.010.009` first. |
+| `422.004.131` | `BookChapterNotWritableError` | A Book write naming a chapter whose Chapter has no Messages, or was taken back. No call. |
+| `404.004.132` | `BookChapterNotFoundError` | A Book chapter number with neither a Chapter nor a Book chapter in this Chat. |
+| `409.004.133` | `BookChapterBusyError` | Editing or removing a Book chapter while it waits to be written or is being written. Nothing changes. |
+| `409.004.134` | `EmptyBookError` | The Book's EPUB (`GET …/book/epub`) while no chapter is written. |
+| `422.004.135` | `EmptyBookChapterError` | A Book chapter saved (`PUT …/book/chapters/:number`) with a blank title or text. Nothing changes. |
 | `502.005.001` | `UnreadableDraftError` | The model's draft or rewrite could not be read (no JSON object, or no text). Nothing saved. Show with Retry. |
 | `502.005.002` | `InvalidDraftError` | The draft does not fit a Story (0 or 7 Characters, a Style value outside its set, a required field empty, a bad StartingBond). Nothing saved. Show with Retry. |
 | `422.005.003` | `EmptyIdeaError` | A draft was asked for with a blank idea. |
