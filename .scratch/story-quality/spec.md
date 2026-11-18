@@ -23,18 +23,20 @@ Built 2026-11-18, from live Chat 2 as played on 2026-11-17.
 - **Why canon facts recorded by the Judge, not a Memory-consolidation step.** The conflicting numbers are not only in Memories: they are in the Story so far and in the history the model reads word for word, which no consolidation of Memories can fix. What fixes them is one place that says which is true and is read after all of them. The Judge already reads every exchange with the Story so far and the recent story in view, already keeps per-reply records the ledger rolls back, and costs nothing extra to ask (one more field in a call it already makes). A consolidation step would be a new model call, would run only now and then, and would leave the history contradicting it.
 - **A fact is a detail record** (`detail_change`, kind `fact`), like a Goal: `value` is `"topic: fact"`, the newest record of a topic wins, an empty fact drops the topic. So Regenerate, Edit and choosing another Reply version take a fact back with the reply that set it, Reset clears them and a Branch copies them, with no code of their own. A **slip** is a detail record too (kind `slip`, `"topic: what was said"`), recorded against the reply that slipped; the turn reads only the slips of the newest AI Message before it, so a slip is read once, by the next turn, and goes with its reply. One migration adds both kinds to the check.
 - **Topics are matched loosely** (case, punctuation and a leading "the" aside), so the Judge can change a fact by naming its topic as listed.
-- **The Judge's section** goes in its user message, after the exchange (like the details section), so its system message never changes: the facts as they stand, then the rule, asking for `"facts": [{"topic", "fact"}]` and `"slips": [{"topic", "said"}]` at the top level of its JSON.
-  - Record a lasting, checkable fact the latest exchange states that is not listed yet, or that the story itself changes (time moves on, someone openly corrects it, the user's own words state it otherwise).
+- **The Judge's section** goes in its user message, after the exchange (like the details section): the facts as they stand, then the rule. The JSON reply shape in its system message names `"facts": [{"topic", "fact"}]` and `"slips": [{"topic", "said"}]` whenever the section is sent, which is every judgement, so the system message still never changes from one call to the next. Without the section, the prompt is byte for byte what it was.
+  - **The Judge extracts; the code decides** (changed after the real-model check, below). The Judge gives every lasting, checkable fact the latest exchange says in words, a listed one too when it is told differently, and slips where the reply tells a listed fact differently. It never works a fact out from others, and ties a length of time to the event it began with, never to now.
+  - **Only the user changes canon.** A listed fact told differently changes only when the user's own words in that exchange say the new telling (`saidByUser`): every word that tells which fact it is (numbers, units, names) is in the user's text, not just after a "not", and, where the user also says the listed telling, the new one is said last. Numerals, English number words and Thai digits count as one word ("27", "twenty-seven", "๒๗"). Otherwise the listed fact stands and the telling is recorded as a slip, so a reply's mistake never becomes canon. A slip the Judge gives in the user's own words is taken as the change. The Judge cannot drop a listed fact.
+  - **Known limits.** A Continue has no user words, so nothing listed changes on it. A number the user says for something else ("I wait twenty minutes") can still back a wrong change to "twenty" when the Judge gives one. Time-relative facts no longer move on as days pass, which is why the rule asks for facts tied to events.
   - Only what a later reply could get wrong: never feelings, plans, events, or what someone is doing or wearing now.
   - When a fact is not listed yet but the Story so far or the recent story stated it differently before, record what was said first and give a slip: a Chat already under way (live Chat 2) is seeded with the earliest telling, not the latest.
   - At most four new or changed facts a turn; at most 40 facts in a Chat (a new topic past that is dropped, a changed one is still taken). A topic is up to 60 characters, a fact up to 120.
-  - A slip needs a listed topic, or one the same answer first records (a fact seeded from an earlier telling, which the reply then told differently), a "said" that differs from the fact, and no change to a listed topic in the same answer.
+  - A slip needs a listed topic, or one the same answer first records (a fact seeded from an earlier telling, which the reply then told differently), a "said" that differs from the fact, and no change to a listed topic in the same answer. A topic names a listed one when it is the same, or is the listed topic followed by the telling ("Nara's mother Ilse" with "Ilse"); a longer topic is otherwise its own ("Nara's age at the wedding").
 - **Where the Narrator reads them: the closing user message, in its trailing blocks, after the Author's note and before "Where things stand"**, under `# Established facts`. Not the standing system message, although facts change rarely, for two reasons:
   - *Cost.* A change to the standing system message makes the next turn uncached: about 10k tokens at $1.30 per million instead of $0.10, about $0.012. In the closing message the list is never cached, but it is small: 40 facts at about 15 tokens is 600 tokens, about $0.0008 a turn at its largest, and a Chat's list starts empty. Facts are set most often early in a Chat and after each new thing learned, so even one change in fifteen turns costs more up top than every turn down here.
   - *Weight.* The facts must win over the Story so far, the Memory layer and the history, which all come before the closing message. Read after them, last but for the reminder and the instruction, they do. That is where the Rules sentence about sexual moments had to move for the same reason (prompt-cache spec).
   - The block keeps one place and one heading from turn to turn; its words change only when a fact does.
 - **The Story so far trigger reserves the block's room**, as it does for the Author's note.
-- **No UI in this change.** The user cannot see or correct a fact yet; a wrong fact can be undone only by Regenerate or Edit of the reply that set it. See Further Notes.
+- **No UI in this change.** The user cannot see a fact yet. A wrong fact can be changed by saying the right one in a message, or undone by Regenerate or Edit of the reply that set it. See Further Notes.
 
 ### Repeated phrases
 
@@ -68,5 +70,33 @@ Built 2026-11-18, from live Chat 2 as played on 2026-11-17.
   - Nothing listed, the Story so far said "nine summers", the reply "Six summers, give or take": it recorded "nine summers" and slipped on "six summers". The code then dropped that slip, because the topic was not listed before the turn; a slip on a topic first recorded in the same answer is now taken.
   - A dance with nothing factual in it: no facts, no slips.
 
+- **Real-model check after the merge (2026-11-18, live's Judge: DeepSeek V4 Flash on Venice, about $0.15 in all).** The Judge prompt was captured on dev from the merged master, and its latest exchange swapped for test replies.
+  - **First finding.** With the wording as merged, a slip came back in 0 of 4 runs. A plain fact came back, but once the Judge worked out an age and a family tie the story never said.
+  - **A firmer wording looked fixed, but only on its own example.** The firmer wording caught "twelve summers" against "nine summers" in 3 of 3 runs. On content its examples never mention, it gave facts in 0 of 5 runs and slips in about 1 of 5. Flash kept to the JSON shape in the system message, which did not name the fields.
+  - **Thinking was no way out.** Letting Flash think used up the whole answer budget, so the JSON was cut off.
+  - **The fix.** The shape names `facts` and `slips`, the Judge only extracts, and the code decides whether a telling is a change or a slip ("Only the user changes canon", above).
+  - **The result.** Through the real code, on content the rule never mentions, over 4 runs of 5 each:
+
+    | Case | Recorded as wanted |
+    |---|---|
+    | Facts stated by a Character (Morra's years at the herd's head, Tavri's tie) | 19/20 |
+    | A reply tells a listed number differently ("Six years" for "eleven years") | 13/20 slips |
+    | The user corrects a listed fact ("it was twelve, wasn't it?") | 14/20 |
+    | A reply names a listed person differently ("my mother Ilse" for "Morra") | 6/20 slips |
+    | Facts listed, a reply with nothing factual | 20/20 nothing |
+
+  - When a case failed, the Judge had given nothing. In none of the 60 slip and nothing-to-record runs did a listed fact change.
+  - **End to end on dev.** Chat 2's married stretch was used, with the user asking how many summers Nara kept the stall.
+    - With "Nara's years at the stall: eleven summers" listed (the history never says it), Nara said "Eleven summers" in 2 of 2 runs.
+    - With nothing listed, she said "nine summers", and the Judge recorded that as a new fact.
+  - **A review of the code before shipping** found:
+    - units were ignored ("three months" matched "three years");
+    - a user who quoted the wrong telling changed canon;
+    - a longer topic was mapped onto a listed one ("Nara's age at the wedding");
+    - digits, number words and Thai did not match;
+    - the Judge could drop a fact unchecked.
+
+    All are fixed, each with a test.
+
 - **Follow-up worth doing:** a Facts list in the Chat's info box, where the user can correct or delete a fact. Until then a wrong first fact in an old Chat (seeded from history) stays until the story changes it.
-- **Time-relative facts** ("married three days") need the Judge to move them on as days pass; the rule asks for it, but a fact anchored to an event ("married the night of the summer market") is steadier, and the rule prefers that wording where the story allows.
+- **Time-relative facts** ("married three days") would need to move on as days pass, and only the user changes canon now; so the rule asks for every length of time to be tied to the event it began with ("married the night of the summer market"), never to now.

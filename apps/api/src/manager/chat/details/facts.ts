@@ -122,14 +122,20 @@ export function readJudgedFacts(facts: unknown, slips: unknown): JudgedFacts | n
 /**
  * The Judge's section: the facts as they stand, then the rule and the JSON fields, so the system
  * message never changes. Read after the latest exchange, like the details section.
+ *
+ * Worded after the real-model check of 2026-11-18 (.scratch/story-quality/spec.md, "Real-model check
+ * after the merge"). On DeepSeek V4 Flash the Judge finds the facts an exchange states, but does not
+ * compare them with the list reliably: it missed slips, and took a reply's wrong number as the new
+ * fact. So it is asked only to give what the exchange states, listed topics included; `applyFacts`
+ * decides whether a different telling is a change or a slip.
  */
 export function judgeFactsSection(facts: readonly ChatFact[]): string {
     return [
         FACTS_HEADING,
         facts.length > 0 ? facts.map((entry) => `- ${entry.topic}: ${entry.fact}`).join('\n') : '(none yet)',
-        `Facts rule: add "facts": [{"topic": "...", "fact": "..."}] to your JSON for a lasting, checkable fact the latest exchange states that is not listed above yet: a number, an age, how long something has lasted or how long ago it was, a date, a name, or who is related or married to whom ("topic": "Nara's age", "fact": "twenty-six"; "topic": "Nara's years at the stall", "fact": "nine summers"). Only facts a later reply could get wrong: never feelings, plans, events, or what someone is doing or wearing now. Name each topic in a few words, by whose it is, without a colon. Where the story allows, tie a length of time to the event it began with ("married the night of the summer market") rather than to now.`,
-        `Change a listed fact, giving its topic exactly as listed, only when the story itself changes it: time moves on (after a night, "three days" becomes "four days"), someone openly corrects it, or the user's own words state it otherwise. "fact": "" drops a listed fact that is no longer true and has nothing in its place.`,
-        `Slips: when the latest reply states a listed fact differently and nothing in the story changed it, keep the fact and add "slips": [{"topic": "...", "said": "..."}] with the listed topic and what the reply said instead. When a fact is not listed yet but the story so far or the recent story stated it differently before the latest reply, record what was said first, and a slip for what the reply said. Leave "facts" and "slips" out when there is nothing; at most ${FACTS_PER_TURN} facts a turn.`,
+        `Facts rule: add "facts": [{"topic": "...", "fact": "..."}] to your JSON for every lasting, checkable fact the latest exchange says in words: a number, an age, how long something has lasted or how long ago it was, a date, a name, or who is related or married to whom ("topic": "Nara's years at the stall", "fact": "nine summers"). Give a fact that is listed above too when the exchange tells it differently, with its topic exactly as listed and what the exchange said. Write the fact in a few words as the story said it. Never work a fact out from others (no age or date counted from what was said) and never add what the story did not say. Only facts a later reply could get wrong: never feelings, plans, events, or what someone is doing or wearing now. Name each topic in a few words, by whose it is, without a colon. Tie a length of time to the event it began with ("married the night of the summer market"), never to now ("four days ago").`,
+        `Slips: where the latest reply tells a listed fact differently, also add "slips": [{"topic": "...", "said": "..."}] with the topic exactly as listed and what the reply said. When a fact is not listed yet but the story so far or the recent story stated it differently before the latest reply, give what was said first as the fact, and a slip for what the reply said.`,
+        `Leave "facts" and "slips" out when there is nothing; at most ${FACTS_PER_TURN} facts a turn.`,
     ].join('\n');
 }
 
@@ -140,59 +146,173 @@ function tidy(value: string, max: number): string {
 
 const same = (a: string, b: string): boolean => tidy(a, FACT_TEXT_MAX).toLowerCase() === tidy(b, FACT_TEXT_MAX).toLowerCase();
 
+/** Joining words that never tell which fact it is. Units ("years", "months") do: three years is not three months. */
+const FILLER = new Set(['a', 'an', 'the', 'and', 'of', 'in', 'on', 'at', 'to', 'by', 'as', 'is', 'it', 'for', 'her', 'his', 'their', 'our', 'your', 'its', 'with', 'from', 'was', 'were', 'has', 'had', 'that', 'this']);
+/** A "not" just before a word means the user is not saying it: "it was twelve, not eleven" says twelve. */
+const NEGATIONS = new Set(['not', 'no', 'never', 'nor', 'isnt', 'wasnt', 'arent', 'werent', 'dont', 'didnt', 'doesnt', 'aint']);
+const SMALL = new Map(
+    ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'].map((word, n) => [word, n]),
+);
+const TENS = new Map(['twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'].map((word, i) => [word, 20 + 10 * i]));
+const THAI = /[฀-๿]/;
+
+/**
+ * A text's words, lowercased, with English number words and Thai digits as numerals, so "27",
+ * "twenty-seven" and "๒๗" are one word. Thai runs stay whole (Thai has no spaces between words).
+ */
+function words(text: string): string[] {
+    const raw = text
+        .toLowerCase()
+        .replace(/[’']/g, '')
+        .replace(/[๐-๙]/g, (digit) => String(digit.charCodeAt(0) - 0x0e50))
+        .split(/[^\p{L}\p{M}\p{N}]+/u)
+        .filter((word) => word !== '');
+    const out: string[] = [];
+    for (let i = 0; i < raw.length; i++) {
+        const tens = TENS.get(raw[i]);
+        const unit = SMALL.get(raw[i + 1] ?? '');
+        if (tens !== undefined && unit !== undefined && unit > 0 && unit < 10) {
+            out.push(String(tens + unit));
+            i++;
+        } else if (tens !== undefined) out.push(String(tens));
+        else if (SMALL.has(raw[i])) out.push(String(SMALL.get(raw[i])));
+        else out.push(raw[i]);
+    }
+    return out;
+}
+
+/** The words of a telling that say which fact it is: all but the joining words. */
+function tellingWords(value: string): string[] {
+    return words(value).filter((word) => !FILLER.has(word));
+}
+
+/** Where the user last says a word, not just after a "not"; -1 for never. A Thai word may sit inside a longer Thai run. */
+function lastSaid(word: string, told: readonly string[]): number {
+    for (let i = told.length - 1; i >= 0; i--) {
+        if (!(THAI.test(word) ? told[i].includes(word) : told[i] === word)) continue;
+        if (NEGATIONS.has(told[i - 1] ?? '') || NEGATIONS.has(told[i - 2] ?? '')) continue;
+        return i;
+    }
+    return -1;
+}
+
+/**
+ * Whether the user's own words say this telling: every word of it that tells which fact it is (a
+ * number, a unit, a name) is in the user's text, and not just after a "not". With `listed`, the
+ * telling it would replace: where the user says that one too ("You said twelve? You are twenty-six"),
+ * only the one said last counts, by the words the two do not share.
+ */
+export function saidByUser(value: string, userText: string, listed?: string): boolean {
+    const told = words(userText);
+    const telling = tellingWords(value);
+    if (telling.length === 0 || telling.some((word) => lastSaid(word, told) < 0)) return false;
+    if (listed === undefined) return true;
+    const old = tellingWords(listed);
+    const ownNew = telling.filter((word) => !old.includes(word));
+    const ownOld = old.filter((word) => !telling.includes(word));
+    if (ownNew.length === 0) return false;
+    const oldAt = ownOld.map((word) => lastSaid(word, told));
+    if (ownOld.length === 0 || oldAt.some((at) => at < 0)) return true;
+    return Math.max(...ownNew.map((word) => lastSaid(word, told))) > Math.max(...oldAt);
+}
+
 /**
  * What one judgement changes. A fact equal to the listed one is not a change; a topic takes one
- * change a turn, at most `FACTS_PER_TURN` in all; a new topic past `FACTS_MAX` is dropped. A slip
- * needs a listed topic, or one first recorded in the same judgement (seeded from an earlier telling),
- * a "said" that differs from the fact, and no change to a listed topic in the same judgement. `rejected` says why what the Judge gave was not taken, for the log.
+ * change a turn, at most `FACTS_PER_TURN` in all; a new topic past `FACTS_MAX` is dropped.
+ *
+ * Only the user changes canon. A listed fact told differently changes only when `userText`, the
+ * user's own words in the exchange, say the new telling over the listed one (`saidByUser`).
+ * Otherwise the listed fact stands and the telling is kept as a slip, so a reply's mistake never
+ * becomes canon; a slip the Judge gives in the user's own words is taken as the change instead. The
+ * Judge never drops a listed fact. A topic names a listed one when it is the same, or is the listed
+ * topic followed by the telling itself ("Nara's mother Ilse" with "Ilse", for "Nara's mother").
+ *
+ * A slip needs a listed topic, or one first recorded in the same judgement (seeded from an earlier
+ * telling), a "said" that differs from the fact, and no change to a listed topic in the same
+ * judgement; the same slip twice is kept once. `rejected` says why what the Judge gave was not
+ * taken, for the log.
  */
-export function applyFacts(current: readonly ChatFact[], judged: JudgedFacts | null): { changes: NewDetail[]; rejected: string[] } {
+export function applyFacts(current: readonly ChatFact[], judged: JudgedFacts | null, userText = ''): { changes: NewDetail[]; rejected: string[] } {
     const changes: NewDetail[] = [];
     const rejected: string[] = [];
     if (!judged) return { changes, rejected };
     const listed = new Map(current.map((entry) => [topicKey(entry.topic), entry]));
+    /** The listed topic a given one names: the same, or the listed topic followed by the telling. */
+    const listedKey = (key: string, telling: string): string => {
+        if (listed.has(key)) return key;
+        const tail = topicKey(telling);
+        if (tail === '') return key;
+        for (const candidate of listed.keys()) if (key === `${candidate} ${tail}`) return candidate;
+        return key;
+    };
     let count = listed.size;
-    const changed = new Set<string>();
+    const changed = new Map<string, string>();
     const added = new Map<string, ChatFact>();
-    for (const entry of judged.facts) {
-        const topic = tidy(entry.topic.replace(/:/g, ' '), FACT_TOPIC_MAX);
-        const key = topicKey(topic);
+    const slips: FactSlip[] = [];
+    const facts: ChatFact[] = [...judged.facts];
+    // A slip in the user's own words is the change, not a slip.
+    for (const slip of judged.slips) {
+        const now = listed.get(listedKey(topicKey(slip.topic), slip.said));
+        if (now && slip.said.trim() !== '' && !same(now.fact, slip.said) && saidByUser(slip.said, userText, now.fact)) {
+            facts.push({ topic: now.topic, fact: slip.said });
+            rejected.push(`Slip on "${now.topic}": the user's own words, taken as the change`);
+        } else slips.push(slip);
+    }
+    for (const entry of facts) {
+        const given = tidy(entry.topic.replace(/:/g, ' '), FACT_TOPIC_MAX);
+        const key = listedKey(topicKey(given), entry.fact);
         if (key === '') continue;
         const now = listed.get(key);
+        const topic = now?.topic ?? given;
         const fact = entry.fact === '' ? '' : tidy(entry.fact, FACT_TEXT_MAX);
         if (changed.has(key)) {
-            rejected.push(`Fact "${topic}": a second change in one turn`);
+            // The same change given twice (as a fact and as a slip in the user's words) is one change.
+            if (!same(changed.get(key)!, fact)) rejected.push(`Fact "${given}": a second change in one turn`);
             continue;
         }
         if (fact === '' ? now === undefined : now !== undefined && same(now.fact, fact)) {
-            rejected.push(`Fact "${topic}": unchanged`);
+            rejected.push(`Fact "${given}": unchanged`);
+            continue;
+        }
+        if (now !== undefined && fact === '') {
+            rejected.push(`Fact "${given}": only the user changes a listed fact; kept "${now.fact}"`);
+            continue;
+        }
+        if (now !== undefined && !saidByUser(fact, userText, now.fact)) {
+            // Told differently, and not by the user: the listed fact stands.
+            slips.push({ topic: now.topic, said: fact });
+            rejected.push(`Fact "${given}": "${fact}" is not in the user's words; kept "${now.fact}", the telling as a slip`);
             continue;
         }
         if (changed.size >= FACTS_PER_TURN) {
-            rejected.push(`Fact "${topic}": more than ${FACTS_PER_TURN} in one turn`);
+            rejected.push(`Fact "${given}": more than ${FACTS_PER_TURN} in one turn`);
             continue;
         }
         if (now === undefined && count >= FACTS_MAX) {
-            rejected.push(`Fact "${topic}": the Chat already holds ${FACTS_MAX}`);
+            rejected.push(`Fact "${given}": the Chat already holds ${FACTS_MAX}`);
             continue;
         }
-        changed.add(key);
+        changed.set(key, fact);
         if (now === undefined) {
             count++;
             added.set(key, { topic, fact });
-        } else if (fact === '') count--;
+        }
         // A listed fact keeps its topic's wording.
-        changes.push({ kind: DetailKind.Fact, characterId: null, value: factValue(now?.topic ?? topic, fact) });
+        changes.push({ kind: DetailKind.Fact, characterId: null, value: factValue(topic, fact) });
     }
-    for (const slip of judged.slips) {
-        const key = topicKey(slip.topic);
+    const slipped = new Set<string>();
+    for (const slip of slips) {
+        const key = listedKey(topicKey(slip.topic), slip.said);
         // A fact first recorded this turn from an earlier telling can be slipped on by the same reply.
         const now = listed.get(key) ?? added.get(key);
         const said = tidy(slip.said, FACT_TEXT_MAX);
         if (!now) rejected.push(`Slip on "${slip.topic}": not a listed fact`);
         else if (changed.has(key) && !added.has(key)) rejected.push(`Slip on "${now.topic}": the fact changed this turn`);
         else if (said === '' || same(now.fact, said)) rejected.push(`Slip on "${now.topic}": said the same`);
-        else changes.push({ kind: DetailKind.Slip, characterId: null, value: factValue(now.topic, said) });
+        else if (!slipped.has(`${key}\n${said.toLowerCase()}`)) {
+            slipped.add(`${key}\n${said.toLowerCase()}`);
+            changes.push({ kind: DetailKind.Slip, characterId: null, value: factValue(now.topic, said) });
+        }
     }
     return { changes, rejected };
 }

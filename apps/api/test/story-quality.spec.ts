@@ -7,6 +7,7 @@ import {
     judgeFactsSection,
     promptFacts,
     readJudgedFacts,
+    saidByUser,
     topicKey,
 } from '../src/manager/chat/details/facts.js';
 import { buildJudgePrompt, parseJudgement } from '../src/manager/chat/judge/judge-prompt.js';
@@ -134,7 +135,7 @@ describe('Established facts: what stands, and what the Judge says (pure)', () =>
                 { topic: 'Tavri\'s age', said: 'nine' },
                 { topic: "nara's age", said: 'twenty-six' },
             ],
-        });
+        }, 'It was ten summers at the stall, not nine.');
         expect(applied.changes).toEqual([
             { kind: DetailKind.Fact, characterId: null, value: "Nara's years at the stall: ten summers" },
             { kind: DetailKind.Fact, characterId: null, value: 'Petch and Nara married: the night of the summer market' },
@@ -163,16 +164,79 @@ describe('Established facts: what stands, and what the Judge says (pure)', () =>
         });
     });
 
-    it('drops a fact, takes four a turn, and no new topic past the cap', () => {
+    // From the real-model check on DeepSeek V4 Flash (spec, "Real-model check after the merge").
+    const palace = [
+        { topic: "Mirelle's years at the palace", fact: 'eleven years' },
+        { topic: "Nara's mother", fact: 'Morra' },
+    ];
+
+    it("keeps a listed fact a reply tells differently, and records the telling as a slip (V4 Flash gave it as the change)", () => {
+        const applied = applyFacts(palace, { facts: [{ topic: "Mirelle's years at the palace", fact: 'Six years' }], slips: [] }, 'You must miss the palace.');
+        expect(applied.changes).toEqual([{ kind: DetailKind.Slip, characterId: null, value: "Mirelle's years at the palace: Six years" }]);
+        expect(applied.rejected).toEqual(['Fact "Mirelle\'s years at the palace": "Six years" is not in the user\'s words; kept "eleven years", the telling as a slip']);
+        // Given as a fact and as a slip too: one slip, the Judge's own.
+        const both = applyFacts(palace, { facts: [{ topic: "Mirelle's years at the palace", fact: 'six years' }], slips: [{ topic: "Mirelle's years at the palace", said: 'Six years' }] }, '');
+        expect(both.changes).toEqual([{ kind: DetailKind.Slip, characterId: null, value: "Mirelle's years at the palace: Six years" }]);
+    });
+
+    it("changes a listed fact when the user's own words say so, given as a fact or as a slip", () => {
+        const userText = "You told me eleven years, but it was twelve, wasn't it?";
+        const asFact = applyFacts(palace, { facts: [{ topic: "Mirelle's years at the palace", fact: 'twelve years' }], slips: [] }, userText);
+        expect(asFact.changes).toEqual([{ kind: DetailKind.Fact, characterId: null, value: "Mirelle's years at the palace: twelve years" }]);
+        const asSlip = applyFacts(palace, { facts: [], slips: [{ topic: "Mirelle's years at the palace", said: 'twelve' }] }, userText);
+        expect(asSlip.changes).toEqual([{ kind: DetailKind.Fact, characterId: null, value: "Mirelle's years at the palace: twelve" }]);
+        expect(asSlip.rejected).toEqual(['Slip on "Mirelle\'s years at the palace": the user\'s own words, taken as the change']);
+        const asBoth = applyFacts(palace, { facts: [{ topic: "Mirelle's years at the palace", fact: 'twelve years' }], slips: [{ topic: "Mirelle's years at the palace", said: 'twelve years' }] }, userText);
+        expect(asBoth.changes).toEqual([{ kind: DetailKind.Fact, characterId: null, value: "Mirelle's years at the palace: twelve years" }]);
+    });
+
+    it('reads a listed topic followed by the telling as that topic ("Nara\'s mother Ilse"), and no other longer topic', () => {
+        const applied = applyFacts(palace, { facts: [{ topic: "Nara's mother Ilse", fact: 'Ilse' }], slips: [] }, 'Your mother would laugh at us.');
+        expect(applied.changes).toEqual([{ kind: DetailKind.Slip, characterId: null, value: "Nara's mother: Ilse" }]);
+        // A new topic that only starts with a listed one is its own fact (review, 2026-11-18).
+        const ages = applyFacts(listed, { facts: [{ topic: "Nara's age at the wedding", fact: 'nineteen' }], slips: [] }, '');
+        expect(ages.changes).toEqual([{ kind: DetailKind.Fact, characterId: null, value: "Nara's age at the wedding: nineteen" }]);
+    });
+
+    it("tells the user's own words by the words that name the fact: numbers, units and names, not after a \"not\"", () => {
+        expect(saidByUser('twelve', "it was twelve, wasn't it?")).toBe(true);
+        expect(saidByUser('Ilse', 'my mother ilse sold rugs')).toBe(true);
+        expect(saidByUser('Jo', "Let's call him Jo")).toBe(true);
+        // Numerals, number words and Thai digits are one word; a Thai telling may sit inside a Thai run.
+        expect(saidByUser('9 summers', 'nine summers')).toBe(true);
+        expect(saidByUser('twenty-seven', 'You are 27 now')).toBe(true);
+        expect(saidByUser('27', 'อายุ ๒๗ แล้ว')).toBe(true);
+        expect(saidByUser('ยี่สิบเจ็ด', 'เธออายุยี่สิบเจ็ดแล้วนะ')).toBe(true);
+        // The unit tells which fact it is: three years is not three months.
+        expect(saidByUser('three months', 'Three years married, and you still blush.')).toBe(false);
+        expect(saidByUser('twelve years', "it was twelve, wasn't it?")).toBe(false);
+        expect(saidByUser('six years', 'You must miss the palace.')).toBe(false);
+        expect(saidByUser('the', 'the the')).toBe(false);
+        expect(saidByUser('twelve years', '')).toBe(false);
+        // Not after a "not"; and where the user says the listed telling too, the one said last.
+        expect(saidByUser('twelve', 'Not twelve. Twenty-six.')).toBe(false);
+        expect(saidByUser('twelve', 'You said twelve last time? You are twenty-six, silly.', 'twenty-six')).toBe(false);
+        expect(saidByUser('twelve', 'It was twelve, not eleven.', 'eleven')).toBe(true);
+        expect(saidByUser('twelve years', 'You told me eleven years, but it was twelve years.', 'eleven years')).toBe(true);
+    });
+
+    it("keeps canon when the user's words only quote the wrong telling (review, 2026-11-18)", () => {
+        const applied = applyFacts(listed, { facts: [{ topic: "Nara's age", fact: 'twelve' }], slips: [{ topic: "Nara's age", said: 'twelve' }] }, 'You said twelve last time? You are twenty-six, silly.');
+        expect(applied.changes).toEqual([{ kind: DetailKind.Slip, characterId: null, value: "Nara's age: twelve" }]);
+        const married = applyFacts([{ topic: 'Kai and Nara married', fact: 'three years' }], { facts: [{ topic: 'Kai and Nara married', fact: 'three months' }], slips: [] }, 'Three years married, and you still blush.');
+        expect(married.changes).toEqual([{ kind: DetailKind.Slip, characterId: null, value: 'Kai and Nara married: three months' }]);
+    });
+
+    it('never lets the Judge drop a listed fact; takes four a turn, and no new topic past the cap', () => {
         expect(applyFacts(listed, { facts: [{ topic: "Nara's age", fact: '' }, { topic: 'Unknown', fact: '' }], slips: [] })).toEqual({
-            changes: [{ kind: DetailKind.Fact, characterId: null, value: "Nara's age: " }],
-            rejected: ['Fact "Unknown": unchanged'],
+            changes: [],
+            rejected: ['Fact "Nara\'s age": only the user changes a listed fact; kept "twenty-six"', 'Fact "Unknown": unchanged'],
         });
         const five = Array.from({ length: 5 }, (_, i) => ({ topic: `Topic ${i}`, fact: 'x' }));
         expect(applyFacts([], { facts: five, slips: [] }).changes).toHaveLength(4);
         const full = Array.from({ length: FACTS_MAX }, (_, i) => ({ topic: `Topic ${i}`, fact: 'x' }));
-        const capped = applyFacts(full, { facts: [{ topic: 'One more', fact: 'y' }, { topic: 'Topic 3', fact: 'y' }], slips: [] });
-        expect(capped.changes).toEqual([{ kind: DetailKind.Fact, characterId: null, value: 'Topic 3: y' }]);
+        const capped = applyFacts(full, { facts: [{ topic: 'One more', fact: 'y' }, { topic: 'Topic 3', fact: 'seven' }], slips: [] }, 'Topic 3 is seven now.');
+        expect(capped.changes).toEqual([{ kind: DetailKind.Fact, characterId: null, value: 'Topic 3: seven' }]);
         expect(capped.rejected).toEqual([`Fact "One more": the Chat already holds ${FACTS_MAX}`]);
     });
 
@@ -180,11 +244,22 @@ describe('Established facts: what stands, and what the Judge says (pure)', () =>
         const section = judgeFactsSection(listed);
         expect(section.startsWith("# Established facts\n- Nara's age: twenty-six\n- Nara's years at the stall: nine summers\nFacts rule:")).toBe(true);
         expect(section).toContain('"slips": [{"topic": "...", "said": "..."}]');
+        // Worded after the real-model check (spec): give listed facts told differently too, and work none out.
+        expect(section).toContain('Give a fact that is listed above too when the exchange tells it differently');
+        expect(section).toContain('Never work a fact out from others');
+        expect(section).toContain('never to now ("four days ago")');
         expect(judgeFactsSection([])).toContain('# Established facts\n(none yet)\n');
         const input = { cast: [], identityName: 'Petch', bonds: [], arcs: [], scene: null, recent: [], userText: 'Hi', aiText: '@Nara: Nine summers.' };
         const without = buildJudgePrompt(input);
         const withFacts = buildJudgePrompt({ ...input, factsSection: section });
-        expect(withFacts.messages[0]).toEqual(without.messages[0]);
+        // With the section, the reply shape names the two fields, with and without the Expression rule (spec, "Real-model check").
+        const shape = ',\n "facts":[{"topic":"...","fact":"..."}],\n "slips":[{"topic":"...","said":"..."}]}\nEmpty arrays when nothing changed.';
+        expect(without.messages[0].content).not.toContain('"facts"');
+        expect(withFacts.messages[0].content).toBe(without.messages[0].content.replace(/\}\nEmpty arrays when nothing changed\.$/, shape));
+        const parts = [{ kind: 'speech' as const, characterId: 1, speakerName: 'Nara', text: 'Nine summers.' }];
+        const tagged = buildJudgePrompt({ ...input, factsSection: section, expressionParts: parts });
+        expect(tagged.messages[0].content).toContain('"expressions":[{"line":1,"emotion":"joy"}],\n "facts"');
+        expect(buildJudgePrompt({ ...input, expressionParts: parts }).messages[0].content).not.toContain('"facts"');
         expect(withFacts.messages[1].content).toBe(`${without.messages[1].content}\n\n${section}`);
         expect(withFacts.maxTokens).toBeGreaterThan(without.maxTokens);
     });

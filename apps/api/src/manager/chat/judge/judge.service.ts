@@ -250,7 +250,8 @@ export class JudgeManagerService {
             const stepped = eventsJudged ? applySuddenEvent(events, judgement.suddenEvent ?? null) : { step: null, rejected: [] };
             const detailed = applyDetails({ current: details, cast: detailsCast, sittingOut }, judgement.details ?? null);
             const ended = applyEnding(endings, judgement.ending ?? null);
-            const facted = applyFacts(facts, judgement.facts ?? null);
+            // Only the user's own words change a listed fact (.scratch/story-quality/spec.md).
+            const facted = applyFacts(facts, judgement.facts ?? null, userText ?? '');
             const noted = applyNow({ current: nowNotes, cast: detailsCast, sittingOut, identityName }, judgement.now ?? []);
             for (const reason of [...applied.rejected, ...stepped.rejected, ...detailed.rejected, ...noted.rejected, ...ended.rejected, ...facted.rejected]) {
                 this.logger.log(`Chat ${chat.id}, Message ${message.id}: judge item dropped: ${reason}`);

@@ -195,6 +195,19 @@ const SYSTEM_WITH_EXPRESSIONS = SYSTEM.replace('Reply with JSON only:', `${EXPRE
 );
 
 /**
+ * The reply shape with `facts` and `slips`, when the facts section is sent (every judgement on live,
+ * so the system message still never changes from one call to the next). Their rule is in the user
+ * message, but on DeepSeek V4 Flash a field only the user message asked for came back in no run of
+ * five, and in four of five once the shape named it (.scratch/story-quality/spec.md, "Real-model check").
+ */
+function withFactsShape(system: string): string {
+    return system.replace(/\}\nEmpty arrays when nothing changed\.$/, ',\n "facts":[{"topic":"...","fact":"..."}],\n "slips":[{"topic":"...","said":"..."}]}\nEmpty arrays when nothing changed.');
+}
+const SYSTEM_WITH_FACTS = withFactsShape(SYSTEM);
+const SYSTEM_WITH_EXPRESSIONS_AND_FACTS = withFactsShape(SYSTEM_WITH_EXPRESSIONS);
+if (SYSTEM_WITH_FACTS === SYSTEM || SYSTEM_WITH_EXPRESSIONS_AND_FACTS === SYSTEM_WITH_EXPRESSIONS) throw new Error('judge prompt: the reply shape no longer ends as expected');
+
+/**
  * A Passed-by Scene (.scratch/scene-flow/spec.md, "Passed by"): offered in the Current Scene section
  * only from `PASSED_BY_REPLIES` replies in the Scene, so the system message stays the same. Its
  * `went_to` becomes the Scene advance's event; the reason, which restates the condition and can get
@@ -292,7 +305,16 @@ ${exchangeUserLine(input.identityName, input.userText)}
 ${input.expressionParts ? numberedReplyText(input.expressionParts) : input.aiText}${input.endingSection ? `\n\n${input.endingSection}` : ''}${input.detailsSection ? `\n\n${input.detailsSection}` : ''}${input.factsSection ? `\n\n${input.factsSection}` : ''}${input.nowSection ? `\n\n${input.nowSection}` : ''}`;
     return {
         messages: [
-            { role: 'system', content: input.expressionParts ? SYSTEM_WITH_EXPRESSIONS : SYSTEM },
+            {
+                role: 'system',
+                content: input.factsSection
+                    ? input.expressionParts
+                        ? SYSTEM_WITH_EXPRESSIONS_AND_FACTS
+                        : SYSTEM_WITH_FACTS
+                    : input.expressionParts
+                      ? SYSTEM_WITH_EXPRESSIONS
+                      : SYSTEM,
+            },
             { role: 'user', content: user },
         ],
         maxTokens:
