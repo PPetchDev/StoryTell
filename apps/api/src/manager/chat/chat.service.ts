@@ -113,6 +113,7 @@ import { Roll, ROLL_SIDES, ROLL_TARGETS } from './roll.js';
 import { endingName, endingReady, endingState, EndingView, endingView, promptEpilogue } from './ending/ending.js';
 import { eventReady, eventState, promptSuddenEvent, SuddenEventView, suddenEventView } from './sudden-event/sudden-event.js';
 import { currentDetails, promptDetails } from './details/details.js';
+import { promptFacts } from './details/facts.js';
 
 /** A Chat as a Story's Chat list shows it (spec: "Lists and Home"). */
 export interface ChatListItem extends ChatSummary {
@@ -1482,6 +1483,8 @@ export class ChatManagerService {
             storySoFar: promptStorySoFar(chat),
             timeOfDay: chat.timeOfDay,
             details: detailsFor(story, state),
+            // The facts, and the slips of the newest reply before this one (.scratch/story-quality/spec.md).
+            facts: promptFacts(state.detailChanges, newestAiMessage(chat)?.id ?? null),
             lore: promptLore(story),
             // The one selection, once per turn, at the reply's point: the user's new Message is before it.
             chosenLore: chosenLore(selectLoreAt(promptLore(story), promptHistory(chat.messages))),
@@ -1629,6 +1632,7 @@ export class ChatManagerService {
             storySoFar: promptStorySoFar(chat),
             timeOfDay: chat.timeOfDay,
             details: detailsFor(story, state),
+            facts: promptFacts(state.detailChanges, newest?.id ?? null),
             lore: promptLore(story),
             hasDocuments: hasDocumentPassages(story),
             hasSuddenEvents: (story.suddenEvents ?? []).some(eventReady),

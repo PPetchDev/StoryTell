@@ -13,6 +13,8 @@ import { LINGERING_REPLIES } from '../scene-replies.js';
 import { PromptSuddenEvent, suddenEventBlock } from '../sudden-event/sudden-event.js';
 import { detailsReminder, PromptDetails } from '../details/details.js';
 import { EPILOGUE_MIN_TOKENS, epilogueFinalInstruction, epilogueInstruction, PromptEpilogue } from '../ending/ending.js';
+import { factsBlock, PromptFacts } from '../details/facts.js';
+import { repeatedPhrases, repeatedPhrasesLine } from '../speech/repeated-phrases.js';
 import { estimateTokens } from './prompt-tokens.js';
 
 /**
@@ -235,6 +237,11 @@ export interface TurnPromptInput {
      * stay as they are, so the system message, and with it the cached prefix, never changes.
      */
     sittingOut?: string[];
+    /**
+     * The Chat's Established facts and the last reply's slips (.scratch/story-quality/spec.md), read
+     * in the trailing blocks after the Author's note. None, null or left out sends no block.
+     */
+    facts?: PromptFacts | null;
 }
 
 export interface TurnPrompt {
@@ -766,22 +773,31 @@ export function buildTurnPrompt(input: TurnPromptInput): TurnPrompt {
     const userText = input.userText ?? (epilogue ? epilogueInstruction(identity, epilogue) : continueInstruction(identity));
     const layers = promptLayers(input);
     const lore = loreBlock(input.chosenLore ?? []);
-    // One order (.scratch/sillytavern-gaps/integration.md): Lore, Documents, Author's note, Where things stand, Sudden event, Roll, Nudge, Cue, the final instruction.
+    // Phrases the last few replies keep reusing (.scratch/story-quality/spec.md), named just before the final instruction.
+    const repeats = repeatedPhrasesLine(
+        repeatedPhrases(
+            input.history.filter((message) => message.role === 'assistant').map((message) => message.text),
+            [identity, ...input.story.characters.map((character) => character.name)],
+        ),
+    );
+    // One order (.scratch/sillytavern-gaps/integration.md): Lore, Documents, Author's note, Established facts, Where things stand, Sudden event, Roll, Nudge, Cue, Repeated phrases, the final instruction.
     const finalInstruction = joinBlocks([
         lore,
         documentsBlock(input.documentPassages ?? []),
         authorsNoteBlock(input.authorsNote, identity),
+        factsBlock(input.facts),
         // With none of the turn's own lines, exactly the reminder and the final instruction as before.
         [
             stateReminder(input),
             ...(epilogue
-                ? [epilogueFinalInstruction(identity)]
+                ? [repeats, epilogueFinalInstruction(identity)]
                 : [
                       thoughtsBlock(input.thoughts),
                       suddenEventBlock(input.suddenEvent, identity),
                       rollBlock(input.roll, identity),
                       input.nudge ? nudgeLine(input.nudge) : null,
                       cueBlock(input.cue, identity),
+                      repeats,
                       turnFinalInstruction(identity),
                   ]),
         ]

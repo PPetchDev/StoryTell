@@ -17,6 +17,10 @@ export enum DetailKind {
      * an empty value means they have none any more.
      */
     Goal = 'goal',
+    /** One of the Chat's established facts (.scratch/story-quality/spec.md), as `topic: fact`; an empty fact drops the topic. */
+    Fact = 'fact',
+    /** What a reply said against an established fact, as `topic: what was said`; read by the next turn only. */
+    Slip = 'slip',
 }
 
 /**
