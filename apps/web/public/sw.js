@@ -1,9 +1,10 @@
 // Storytell AI service worker. The app is online-only: this worker caches no data and
 // queues nothing. Its one job is to show the "can't connect" screen (offline.html) when a
-// page can't be loaded at all, for example when the home PC is off.
+// page can't be loaded at all, for example when the computer it runs on is off.
 
 // v2: the new app icon (icon-192 is cached for the offline page).
-const CACHE = 'storytell-shell-v2';
+// v3: offline.html no longer says the app runs on a home PC (live runs on a server).
+const CACHE = 'storytell-shell-v3';
 const OFFLINE_URL = '/offline.html';
 const OFFLINE_ASSETS = [OFFLINE_URL, '/icons/icon-192.png'];
 

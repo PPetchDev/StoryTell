@@ -1465,6 +1465,7 @@ export class ChatManagerService {
             present: presentForMemory(story, chat, userText !== null ? chat.messages.length - 1 : chat.messages.length, userText),
             identityName: identity.name,
             query,
+            chat,
         });
         if (query) this.logger.debug(memorySearchLogLine(story.id, chat.id, choice));
         const memoryRecord: TurnMemoryRecord = { used: memoriesUsedOf(choice), query };
@@ -1616,6 +1617,7 @@ export class ChatManagerService {
             present: presentForMemory(story, chat, chat.messages.length),
             identityName: identity.name,
             query,
+            chat,
         });
         return {
             story,
@@ -1878,15 +1880,25 @@ function promptMemoryLayer(
     beliefs: ChoiceBelief[],
 ): { memories: PromptMemory[]; beliefs: PromptBelief[]; memoryRoomTokens: number } {
     return {
-        memories: choice.memories.map(({ memory }) => ({ text: memory.text, knownBy: memory.knownBy, locked: memory.locked })),
+        memories: choice.memories.map(({ memory, reason }) => ({
+            text: memory.text,
+            knownBy: memory.knownBy,
+            locked: memory.locked,
+            // In the prompt's standing part, where they change rarely (.scratch/prompt-cache/spec.md).
+            standing: reason === 'locked' || reason === 'settled',
+        })),
         beliefs: choice.beliefs.map(({ belief }) => ({ characterName: belief.characterName, text: belief.text })),
         memoryRoomTokens: memoryRoomTokens(all, beliefs),
     };
 }
 
-/** What a turn's choice sent, by id, as its AI Message records it. */
+/** What a turn's choice sent, by id, as its AI Message records it, and what its search picked on its own. */
 function memoriesUsedOf(choice: MemoryChoice): MemoriesUsed {
-    return { memoryIds: choice.memories.map(({ memory }) => memory.id), beliefIds: choice.beliefs.map(({ belief }) => belief.id) };
+    return {
+        memoryIds: choice.memories.map(({ memory }) => memory.id),
+        beliefIds: choice.beliefs.map(({ belief }) => belief.id),
+        pickedIds: choice.picked,
+    };
 }
 
 /**

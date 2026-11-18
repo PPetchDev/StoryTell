@@ -66,7 +66,10 @@ describe('Usage', () => {
                 lowCreditPercent: 20,
                 lowCredit: false,
                 host: null,
+                cache: null,
             });
+            // .scratch/prompt-cache/spec.md: both recorded text calls reported their cache, which read nothing.
+            expect(body.pools.text.cache).toEqual({ promptTokens: expect.any(Number), cachedTokens: 0 });
         });
     });
 

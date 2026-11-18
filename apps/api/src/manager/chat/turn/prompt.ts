@@ -108,6 +108,11 @@ export interface PromptMemory {
     knownBy: string[];
     /** A locked Memory is the user's and is never left out to fit the cap. */
     locked: boolean;
+    /**
+     * Sent in the standing part, under "Lasting memory", where it changes rarely
+     * (.scratch/prompt-cache/spec.md): the locked and the Settled Memories. Left out, in the Memory layer.
+     */
+    standing?: boolean;
 }
 
 /** A Belief as the Memory layer tells it (.scratch/memory-by-meaning/spec.md, "Told to the Narrator"). */
@@ -259,6 +264,7 @@ export const PROMPT_LAYERS = {
     identity: '# The user plays',
     style: '# Style',
     cast: '# Cast',
+    lastingMemory: '# Lasting memory',
     storySoFar: '# Story so far',
     // After the history (.scratch/prompt-cache/spec.md):
     scene: '# Current Scene',
@@ -476,12 +482,17 @@ function arcsLayer(arcs: PromptArc[]): string {
     return `${PROMPT_LAYERS.arcs}\n${lines.join('\n')}`;
 }
 
+const KNOWN_BY_RULE = 'A Character knows only the Memories it is tagged on and acts as if the rest never happened; the Narrator knows them all.';
+
 /**
  * Spec: "Memory block": every non-archived Memory with its Known-by tags, under the
  * instruction that a Character knows only the Memories it is tagged on while the Narrator
  * knows all. `{user}` is rendered as the worn identity's name. Extraction keeps the list
  * under the cap by merging and archiving; should it fall behind, Memories are left out here
  * in `memoryLeaveOutOrder` so the prompt stays bounded, and the caller logs how many.
+ *
+ * The standing Memories (.scratch/prompt-cache/spec.md) come back apart, as the "Lasting
+ * memory" layer of the standing part, null with none; the Memory layer then holds the rest.
  */
 function memoryLayer(
     memories: PromptMemory[],
@@ -489,7 +500,7 @@ function memoryLayer(
     identity: string,
     present: string[],
     cap: number,
-): { text: string; leftOut: number } {
+): { text: string; lasting: string | null; leftOut: number } {
     const fits = (memoryList: PromptMemory[]) => estimateTokens(memoryList.map((memory) => memoryLine(memory)).join('\n')) <= cap;
     const leftOutIndexes = new Set<number>();
     const keptNow = () => memories.filter((_, index) => !leftOutIndexes.has(index));
@@ -499,18 +510,25 @@ function memoryLayer(
             if (fits(keptNow())) break;
         }
     }
-    const kept = keptNow();
     const leftOut = leftOutIndexes.size;
+    const line = (memory: PromptMemory) => memoryLine({ text: renderUser(memory.text, identity), knownBy: memory.knownBy });
+    const lastingMemories = keptNow().filter((memory) => memory.standing);
+    const kept = keptNow().filter((memory) => !memory.standing);
     // Each Belief of a Character present is a line of its own, after the Memories (.scratch/memory-by-meaning/spec.md).
     const believed = beliefs.map((belief) => beliefLine(belief.characterName, renderUser(belief.text, identity)));
-    const lines =
-        kept.length === 0 && believed.length === 0
-            ? ['Nothing has been established in this Chat yet.']
-            : [...kept.map((memory) => memoryLine({ text: renderUser(memory.text, identity), knownBy: memory.knownBy })), ...believed];
+    const nothing = lastingMemories.length > 0 ? 'Nothing more for this moment.' : 'Nothing has been established in this Chat yet.';
+    const lines = kept.length === 0 && believed.length === 0 ? [nothing] : [...kept.map(line), ...believed];
+    const what = lastingMemories.length > 0 ? 'more of what has happened in this Chat, for this moment' : 'what has happened in this Chat so far';
     return {
-        text: `${PROMPT_LAYERS.memory} (what has happened in this Chat so far)
+        text: `${PROMPT_LAYERS.memory} (${what})
 ${lines.join('\n')}
-A Character knows only the Memories it is tagged on and acts as if the rest never happened; the Narrator knows them all. A Character acts on what they believe, even when it is wrong.`,
+${KNOWN_BY_RULE} A Character acts on what they believe, even when it is wrong.`,
+        lasting:
+            lastingMemories.length > 0
+                ? `${PROMPT_LAYERS.lastingMemory} (what has happened in this Chat that keeps mattering)
+${lastingMemories.map(line).join('\n')}
+${KNOWN_BY_RULE}`
+                : null,
         leftOut,
     };
 }
@@ -557,7 +575,8 @@ export type PromptLayersInput = Omit<TurnPromptInput, 'history' | 'userText' | '
 
 /**
  * The layers in two parts (.scratch/prompt-cache/spec.md). `standing` changes only when the Story
- * is edited or the Story so far is rewritten: it opens every prompt, so the host's prompt cache
+ * is edited, the Story so far is rewritten, or a locked or Settled Memory changes (its "Lasting
+ * memory" layer): it opens every prompt, so the host's prompt cache
  * keeps it and the history after it. `moment` (Scene, Feelings, Arcs, Memory, Inner life)
  * changes nearly every turn, so it goes after the history, where it no longer breaks the cache
  * for everything behind it. Reports how many Memories were left out to fit the cap.
@@ -572,6 +591,8 @@ export function promptLayers(input: PromptLayersInput): { standing: string; mome
         `${PROMPT_LAYERS.identity}\n${identity}: ${input.identity.description}`,
         styleLayer(input.story, identity),
         `${PROMPT_LAYERS.cast}\n${input.story.characters.map(castCard).join('\n\n')}`,
+        // The locked and Settled Memories: they change about as rarely as the Story so far after them.
+        ...(memory.lasting ? [memory.lasting] : []),
         ...(input.storySoFar ? [storySoFarLayer(input.storySoFar)] : []),
     ].join('\n\n');
     const moment = [

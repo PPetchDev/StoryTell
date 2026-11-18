@@ -40,6 +40,13 @@ export class UsageRecordEntity {
     @Column({ name: 'completion_tokens', type: 'integer', nullable: true })
     completionTokens: number | null;
 
+    /**
+     * Of the prompt tokens, those the host read from its prompt cache (.scratch/prompt-cache/spec.md);
+     * null when it reported nothing about its cache, and on every call that isn't text.
+     */
+    @Column({ name: 'cached_tokens', type: 'integer', nullable: true })
+    cachedTokens: number | null;
+
     @Column({ type: 'integer', nullable: true })
     images: number | null;
 

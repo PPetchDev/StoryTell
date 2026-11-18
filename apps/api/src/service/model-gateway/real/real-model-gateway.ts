@@ -79,6 +79,8 @@ export interface NewUsageRecord {
     host: string;
     promptTokens: number | null;
     completionTokens: number | null;
+    /** Of the prompt tokens, those the host read from its cache; left out (null) when it reported none. */
+    cachedTokens?: number | null;
     images: number | null;
     /** Characters sent, for speech; left out (null) for every other kind. */
     characters?: number | null;
@@ -289,6 +291,7 @@ export class RealModelGateway extends ModelGateway {
             host: host.recordedHost ?? TEXT_MODELS[modelName].host,
             promptTokens: bill.promptTokens,
             completionTokens: bill.completionTokens,
+            cachedTokens: bill.cachedTokens ?? null,
             images: null,
             costUsd: bill.costUsd,
             storyId: request.servedFor?.storyId ?? null,

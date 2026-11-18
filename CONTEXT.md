@@ -175,7 +175,7 @@ One of three things the user might write next, offered on request in the voice o
 _Avoid_: Smart reply, quick reply, hint
 
 **Memory**:
-A fact established during one Chat — an event that happened, a detail of the world, something learned about the user, or an open promise or plan — that the Chat carries forward; it is known only to the Characters who witnessed or learned of it, never records feelings (a Bond) or a change of personality (an Arc), and the user can see, add, edit and delete it. A Chat starts with no Memories and keeps every one it makes; each turn, the ones the user locked and the ones closest in meaning to the moment reach the Narrator.
+A fact established during one Chat — an event that happened, a detail of the world, something learned about the user, or an open promise or plan — that the Chat carries forward; it is known only to the Characters who witnessed or learned of it, never records feelings (a Bond) or a change of personality (an Arc), and the user can see, add, edit and delete it. A Chat starts with no Memories and keeps every one it makes; each turn, the ones the user locked, the **Settled Memories**, and the ones closest in meaning to the moment reach the Narrator. Settled Memories are those that kept coming up in the turns before the Story so far was last written; they stay the same until it is written again.
 _Avoid_: Note, lorebook entry, context, summary
 
 **Belief**:

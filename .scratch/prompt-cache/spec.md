@@ -97,3 +97,66 @@ The turn was sent as:
 ## The reply that said the user's message back (2026-11-17)
 
 On live, one reply (Chat 2 #633) opened with the user's whole message as its first paragraph. That may have come from the user's words now sharing a message with the Narrator's notes. An opening narration paragraph that is the user's message, read loosely (asterisks, quotes, spacing and case aside), is now dropped before the reply is kept. A reply that only starts the same way is left alone.
+
+## Settled Memories (2026-11-18)
+
+### What was still uncached
+
+Live, warm turns read only 35-50% from cache. Everything after the history is uncached, and the closing message is about 6.5-7k tokens, most of it the Memory layer (up to its 4k cap). The Memory search picks that layer again by meaning every turn, so it can't simply move up: anything in the standing part that changes breaks the cache for the whole history behind it.
+
+On dev's Chat 2 (47 turns with a recorded choice), the search picks about 88 Memories a turn, and about 75-80% of them were picked the turn before. A Memory picked in at least 6 of 8 turns is picked again on 60-80% of the next 8 turns.
+
+### Decision
+
+- **The standing part gains a "Lasting memory" layer**, after Cast and before Story so far. It holds the locked Memories and the **Settled Memories**.
+- **Settled Memories** are the Memories the search picked in at least 6 of the newest 8 turns that were written before the Story so far was last written (its `story_so_far_updated_at`). Most often picked first, then the newest, up to 2,000 tokens (half the Memory budget). Never a locked one, which is in the layer anyway.
+- **Why tie them to the Story so far:** the Story so far is rewritten every several turns and that already breaks the cache. The turns before it don't change, so the Settled Memories stay the same until it is written again. Between rewrites they change only when one of them is edited or deleted, or when a turn inside the window is regenerated.
+- **They are sent whatever the search finds**, archived ones too, right after the locked ones in the choice, inside the same 4k budget. The search then fills the rest, by meaning and then the newest about the people present, as before. What it adds goes in the Memory layer of the closing message, as before.
+- **A Memory relevant to the latest exchange still reaches the turn.** The search still runs every turn, and what gives way to the Settled Memories is the tail of its own pick. In the replay, the top 61 Memories by meaning reached every turn, and 89% of each turn's own pick did.
+- **Each turn records what its search picked on its own** (`memoriesUsed.pickedIds`), beside what it sent (`memoryIds`, which the Memory drawer's "In play" shows). The next Settled Memories are read off `pickedIds`, so a Settled Memory never keeps itself settled. Turns recorded before this have no `pickedIds`; their `memoryIds` were exactly the search's pick and are read instead. A Branch copies `pickedIds` with its ids moved.
+- **The turn, Suggested replies and Write for me** use the same Settled Memories, so they still share one cached opening. Snapshots don't: they aren't cached.
+- **Considered and not done:**
+  - *Keep last turn's choice unless one is clearly more relevant:* the choice would still sit after the history, where nothing is cached, so it saves nothing.
+  - *Sending the Settled Memories on top of the 4k:* every Memory the search picked would still reach the turn, but the Story so far would have to reserve 2k more, and the history would lose about 2k tokens.
+
+### Measured without spending credit
+
+Dev's Chat 2 (Story 1), its 47 consecutive turns with a stored search query (positions 72-166), replayed through `buildTurnPrompt`:
+- the Memories rebuilt as they stood before each turn from `memory_change`;
+- each turn's search run again on its stored query vector;
+- the Story so far written again whenever `storySoFarCoverage` says so (about every 8-10 turns), its text changed each time.
+
+Scene, Feelings, Arcs, Lore and the rest are left out, the same before and after. So the shares below are higher than live's, but the tokens saved are what live would save. The replay script is in the session notes (`prompt-cache-replay/`), not in the repo.
+
+| Over 46 warm turns | Before | After |
+|---|---|---|
+| Prompt that opens the same as the turn before | 58% of characters | 70% |
+| Uncached tokens per turn (estimated) | ~4,960 | ~3,610 |
+| Standing part changed | only after a Story so far rewrite (4) | only after a Story so far rewrite (5: they fall a little differently) |
+| The search's own pick sent | 100% | 89% (top 61 by meaning always) |
+
+That is about 1,350 fewer uncached tokens a turn, about 27% fewer. On DeepSeek V4 Pro ($1.30 against $0.10 per million), about $0.0016 a turn.
+
+Other caps tried, on the same replay:
+
+| Cap | Shared | Uncached | Own pick sent |
+|---|---|---|---|
+| 1,500 | 67% | ~3,960 | 93% |
+| **2,000** | **70%** | **~3,610** | **89%** |
+| 2,500 | 73% | ~3,280 | 85% |
+| 3,000 | 74% | ~3,080 | 81% |
+
+Changing the threshold (5, 6 or 7 of 8, or 4 of 6) made almost no difference.
+
+### Seeing the cache
+
+- The gateway reads `usage.prompt_tokens_details.cached_tokens` from every text call, whole or streamed, on OpenRouter and Venice. It is 0 when the details come without a count, and null when the host sent no details.
+- It is kept on the usage record (`cached_tokens`, nullable).
+- The Usage API gives each pool a `cache`: this month's prompt tokens and cached tokens, over the calls that reported their cache. It is null while none did, and always for the image pool.
+- The Usage page shows it under the text pool, as "Read from cache: 62% of prompt tokens · 744K of 1.2M".
+- A stopped stream's bill, looked up afterwards, has no cache count.
+
+### Not verified
+
+- No real model call was made. The live cache share after this ships is for the Usage page to show.
+- Venice showed no cache at all on 2026-11-17. A steadier opening may not change that; the Usage page will tell.

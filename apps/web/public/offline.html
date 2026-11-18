@@ -1,7 +1,7 @@
 <!doctype html>
 <!--
-  The "can't connect" screen, served by sw.js when the app itself can't be loaded (the PC is
-  off, or no network). components/cant-connect.tsx is the same screen inside the running app.
+  The "can't connect" screen, served by sw.js when the app itself can't be loaded (the computer it
+  runs on is off, or no network). components/cant-connect.tsx is the same screen inside the running app.
   Keep the two in step. Self-contained: no scripts or styles from the Next.js build.
 -->
 <html lang="en">
@@ -105,11 +105,11 @@
     <body>
         <main class="page">
             <h1>Can't connect</h1>
-            <p>Storytell AI runs on your home PC. Check that:</p>
+            <p>Storytell AI can&#39;t reach the computer it runs on. Check that:</p>
             <ul class="checklist">
                 <li>this device is connected to the internet</li>
-                <li>the PC is on</li>
-                <li>Tailscale is connected on this device</li>
+                <li>that computer (a server, or your own PC) is on</li>
+                <li>if you reach it through a VPN, the VPN is connected on this device</li>
             </ul>
             <button type="button" class="button" onclick="location.reload()">Retry</button>
         </main>

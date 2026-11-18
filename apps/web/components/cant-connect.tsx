@@ -24,11 +24,11 @@ export function CantConnect({ onRecovered, waiting = 0 }: { onRecovered: () => P
     return (
         <main className="page">
             <h1>Can&apos;t connect</h1>
-            <p>Storytell AI runs on your home PC. Check that:</p>
+            <p>Storytell AI can&apos;t reach the computer it runs on. Check that:</p>
             <ul className="m-0 mb-6 rounded-md bg-surface py-4 pr-4 pl-9">
                 <li>this device is connected to the internet</li>
-                <li>the PC is on</li>
-                <li>Tailscale is connected on this device</li>
+                <li>that computer (a server, or your own PC) is on</li>
+                <li>if you reach it through a VPN, the VPN is connected on this device</li>
             </ul>
             {waiting > 0 && (
                 <p className="notice">

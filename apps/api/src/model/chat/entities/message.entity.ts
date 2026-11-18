@@ -33,6 +33,12 @@ export interface DocumentPassagesUsed {
 export interface MemoriesUsed {
     memoryIds: number[];
     beliefIds: number[];
+    /**
+     * The Memories the search picked, without the Settled ones it was sent with
+     * (.scratch/prompt-cache/spec.md): what the next Settled Memories are read off. Left out on
+     * turns recorded before it, whose `memoryIds` were exactly what the search picked.
+     */
+    pickedIds?: number[];
 }
 
 /** The model recorded on the Opening, which no model wrote. */
