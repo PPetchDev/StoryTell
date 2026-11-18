@@ -56,7 +56,7 @@ export interface ReplyCost {
  * The calls a turn makes before its AI Message is stored (.scratch/cost-view/spec.md: "Calls made
  * before the Message exists"): given the Message once it is.
  */
-export const TURN_CALL_KINDS: readonly CallKind[] = ['turn', 'context_search', 'character_thought', 'speech_repair', 'speech_repair_fallback'];
+export const TURN_CALL_KINDS: readonly CallKind[] = ['turn', 'context_search', 'character_thought', 'speech_repair', 'speech_repair_fallback', 'reach_out'];
 
 interface CacheRow {
     cacheCalls: string;

@@ -65,6 +65,7 @@ import { JudgeRolls1764370000000 } from './1764370000000-JudgeRolls.js';
 import { AiEvents1764380000000 } from './1764380000000-AiEvents.js';
 import { SceneChapters1764390000000 } from './1764390000000-SceneChapters.js';
 import { OpeningQuestions1764400000000 } from './1764400000000-OpeningQuestions.js';
+import { ReachOuts1764410000010 } from './1764410000010-ReachOuts.js';
 import { ChatRecap1764420000001 } from './1764420000001-ChatRecap.js';
 
 // Listed by hand, oldest first, so migrations load the same way from compiled JS, the
@@ -138,5 +139,6 @@ export const migrations = [
     AiEvents1764380000000,
     SceneChapters1764390000000,
     OpeningQuestions1764400000000,
+    ReachOuts1764410000010,
     ChatRecap1764420000001,
 ];

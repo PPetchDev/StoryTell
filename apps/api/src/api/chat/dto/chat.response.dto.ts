@@ -380,6 +380,9 @@ export class MessageDTO {
     @ApiPropertyOptional({ description: "AI Message only: whether it was written as the story's Epilogue." })
     epilogue?: boolean;
 
+    @ApiPropertyOptional({ description: 'AI Message only: whether a Character sent it on their own while the user was away (.scratch/reach-outs/spec.md).' })
+    reachOut?: boolean;
+
     @ApiProperty()
     createdAt: string;
 

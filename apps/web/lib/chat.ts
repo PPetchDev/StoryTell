@@ -185,6 +185,8 @@ export interface AiMessage {
     versions: ReplyVersions | null;
     /** Whether it was written as the story's Epilogue (CONTEXT.md, "Epilogue"). */
     epilogue: boolean;
+    /** Whether a Character sent it on their own while the user was away (.scratch/reach-outs/spec.md). */
+    reachOut?: boolean;
     createdAt: string;
     /** Its Thai reading for the text as it stands; null when none was made (.scratch/write-for-me/spec.md). */
     thaiReading: string | null;

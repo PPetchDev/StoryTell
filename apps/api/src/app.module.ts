@@ -11,6 +11,8 @@ import { DbModule } from './store/db/db.module.js';
 import { FakeGatewayControlController } from './testing/fake-gateway-control.controller.js';
 import { FakePushControlController } from './testing/fake-push-control.controller.js';
 import { FakeClockControlController } from './testing/fake-clock-control.controller.js';
+import { FakeReachOutControlController } from './testing/fake-reach-out-control.controller.js';
+import { ReachOutManagerModule } from './manager/reach-out/reach-out.module.js';
 import { PushAlertsManagerModule } from './manager/push/push.module.js';
 import { PushSenderModule } from './service/push/push-sender.module.js';
 
@@ -29,8 +31,10 @@ export class AppModule {
                 PushSenderModule,
                 PushAlertsManagerModule,
                 ApiModule,
+                // For the testing route's scheduler; the API module brings it in too.
+                ReachOutManagerModule,
             ],
-            controllers: config.modelGateway === 'fake' ? [FakeGatewayControlController, FakePushControlController, FakeClockControlController] : [],
+            controllers: config.modelGateway === 'fake' ? [FakeGatewayControlController, FakePushControlController, FakeClockControlController, FakeReachOutControlController] : [],
         };
     }
 }

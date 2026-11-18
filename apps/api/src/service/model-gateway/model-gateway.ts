@@ -71,7 +71,9 @@ export type TextCallKind =
     | 'diary_entry'
     | 'character_thought'
     | 'speech_repair'
-    | 'speech_repair_fallback';
+    | 'speech_repair_fallback'
+    // A Character messaging the user first (.scratch/reach-outs/spec.md): a background-model call.
+    | 'reach_out';
 
 /** `expression_image`: a Character's Expression, drawn from their Reference image (.scratch/expressions/spec.md). */
 export type ImageCallKind = 'snapshot_image' | 'reference_image' | 'expression_image';

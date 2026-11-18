@@ -348,10 +348,14 @@ test.describe('Read replies aloud', () => {
         const labels = await rows.evaluateAll((items) => items.map((item) => item.textContent ?? ''));
         const at = labels.findIndex((label) => label.startsWith('Read replies aloud'));
         expect(labels[at - 1]).toMatch(/^Who's in this Chat/);
-        expect(labels.slice(at + 1).map((label) => label.replace(/^(Suggest an ending|Characters keep diaries|Characters think for themselves|Watch the story|End the story|Reset Chat).*$/, '$1'))).toEqual([
+        expect(
+            labels.slice(at + 1).map((label) => label.replace(/^(Suggest an ending|Characters keep diaries|Characters think for themselves|Characters message first|Watch the story|End the story|Reset Chat).*$/, '$1')),
+        ).toEqual([
             'Suggest an ending',
             'Characters keep diaries',
             'Characters think for themselves',
+            // .scratch/reach-outs/spec.md
+            'Characters message first',
             'Watch the story',
             'End the story',
             'Reset Chat',

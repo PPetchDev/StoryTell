@@ -295,6 +295,8 @@ export class ChatModelService {
         documentPassages: DocumentPassagesUsed | null = null,
         memory: TurnMemoryRecord | null = null,
         epilogue = false,
+        /** .scratch/reach-outs/spec.md: a Character's message of their own while the user was away. */
+        reachOut = false,
     ): Promise<MessageEntity> {
         return this.dataSource.transaction(async (manager) => {
             const message = await manager.save(
@@ -304,6 +306,7 @@ export class ChatModelService {
                     kind: MessageKind.Ai,
                     model,
                     epilogue,
+                    reachOut,
                     documentPassages,
                     ...memoryColumns(memory),
                     judgeStatus: background,
@@ -458,6 +461,8 @@ export class ChatModelService {
                 memoryError: null,
             },
         );
+        // A Reach-out is never judged or extracted from (.scratch/reach-outs/spec.md), whichever version shows.
+        await manager.query('UPDATE "message" SET "judge_status" = NULL, "memory_status" = NULL WHERE "id" = $1 AND "reach_out"', [messageId]);
     }
 
     /** Deletes one Message for good; its parts go through ON DELETE CASCADE. */

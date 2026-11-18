@@ -13,6 +13,8 @@ import { Sheet } from '@/components/sheet/sheet';
 import { Cast, characterColour, Portraits } from '@/lib/character-colour';
 import { Chat, messageHref } from '@/lib/chat';
 import { PersonaList } from '@/lib/persona';
+import { ReachOutForm } from '@/components/chat/reach-out-form';
+import { reachOutApi, ReachOutHours, reachOutSummary } from '@/lib/reach-out';
 
 const RESET_QUESTION = 'Clear every Message and start this Chat over from the Opening?';
 // It says what it costs (docs/ui-audit-2026-11-16.md L7): an Epilogue is a reply from the play model, and a long one.
@@ -470,7 +472,21 @@ export function ChatTopBar({
     novelToggleRef,
     onOpenFind,
 }: ChatTopBarProps) {
-    const [menu, setMenu] = useState<'closed' | 'menu' | 'rename' | 'note' | 'who'>('closed');
+    const [menu, setMenu] = useState<'closed' | 'menu' | 'rename' | 'note' | 'who' | 'reach'>('closed');
+    // "Characters message first" (.scratch/reach-outs/spec.md): read each time the menu opens.
+    const [reachOutHours, setReachOutHours] = useState<ReachOutHours | undefined>(undefined);
+    const menuOpen = menu !== 'closed';
+    useEffect(() => {
+        if (!menuOpen) return;
+        let live = true;
+        reachOutApi.get(chat.storyId, chat.id).then(
+            (setting) => live && setReachOutHours(setting.afterHours),
+            () => undefined,
+        );
+        return () => {
+            live = false;
+        };
+    }, [menuOpen, chat.storyId, chat.id]);
     const sittingOutNames = chat.sittingOut.flatMap((id) => characters.find((character) => character.id === id)?.name ?? []);
     const [confirming, setConfirming] = useState(false);
     const [ending, setEnding] = useState(false);
@@ -552,7 +568,9 @@ export function ChatTopBar({
                               ? "Author's note"
                               : menu === 'who'
                                 ? "Who's in this Chat"
-                                : 'Chat menu'
+                                : menu === 'reach'
+                                  ? 'Characters message first'
+                                  : 'Chat menu'
                     }
                     onClose={close}
                 >
@@ -572,6 +590,14 @@ export function ChatTopBar({
                                 onSetAuthorsNote(text);
                             }}
                             onCancel={close}
+                        />
+                    ) : menu === 'reach' ? (
+                        <ReachOutForm
+                            storyId={chat.storyId}
+                            chatId={chat.id}
+                            hours={reachOutHours}
+                            onSaved={setReachOutHours}
+                            onDone={() => setMenu('menu')}
                         />
                     ) : menu === 'who' ? (
                         <WhosInForm
@@ -731,6 +757,10 @@ export function ChatTopBar({
                                         <span className={SWITCH_KNOB} />
                                     </span>
                                 </button>
+                                {/* A Character messages the user first after a while away (.scratch/reach-outs/spec.md): off by default. */}
+                                <MenuButton onClick={() => setMenu('reach')} title={reachOutSummary(reachOutHours)}>
+                                    <MenuText label="Characters message first" sub={reachOutSummary(reachOutHours)} />
+                                </MenuButton>
                             </section>
                             <div className="border-t border-line pt-1">
                                 {/* .scratch/watch-mode/spec.md: the story plays on by itself for a few replies. */}

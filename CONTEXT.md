@@ -182,6 +182,10 @@ _Avoid_: Export, log, dump
 Asking the Narrator to write the next part of the Chat without a Message from the user; the result is an ordinary AI Message, and it never speaks or acts for the user.
 _Avoid_: Skip, auto-play, next
 
+**Reach-out**:
+A short message one Character sends the user on their own, in a Chat whose "Characters message first" is on, once the user has been away from it for the time chosen: the Character who feels most warmly toward the user writes it, from where the story stands. It is an AI Message like any other, so the story carries on from it, and comes as an alert on the user's devices; at most one is sent per absence, never at night, and never after the Chat reached an Ending.
+_Avoid_: Ping, notification, nudge (a Nudge is the user asking a Character to speak)
+
 **Regenerate**:
 Writing the Chat's newest AI Message again, undoing everything the shown one changed; the replaced one is kept as a Reply version.
 _Avoid_: Reroll, swipe, retry, redo
