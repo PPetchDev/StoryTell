@@ -258,6 +258,18 @@ export class ChatNowNoteDTO {
     note: string;
 }
 
+/** One Established fact of the Chat (.scratch/facts-panel/spec.md). */
+export class ChatFactDTO {
+    @ApiProperty({ description: `What it is about, such as "Nara's age".` })
+    topic: string;
+
+    @ApiProperty({ description: 'The fact, in a few words.' })
+    fact: string;
+
+    @ApiProperty({ description: "The current telling is the user's own, set in the Facts panel." })
+    byUser: boolean;
+}
+
 export class MessageDTO {
     @ApiProperty()
     id: number;
@@ -447,6 +459,9 @@ export class ChatResponseBodyDTO extends ChatSummaryDTO implements Omit<ChatDeta
 
     @ApiProperty({ type: () => ChatNowNoteDTO, isArray: true, description: "Each Character's Now note, for those with one, in cast order." })
     nowNotes: ChatNowNoteDTO[];
+
+    @ApiProperty({ type: () => ChatFactDTO, isArray: true, description: 'The Established facts, in the order their topics were first set.' })
+    facts: ChatFactDTO[];
 
     @ApiProperty({ description: 'The worn identity, under which the next User Message shows.' })
     identityName: string;

@@ -183,7 +183,7 @@ Something one Character holds to be true within one Chat, which may be false: a 
 _Avoid_: False memory, misconception, rumour
 
 **Established fact**:
-One of a Chat's canon numbers, ages, lengths of time, dates, names and ties ("Nara's years at the stall: nine summers"), recorded by the Judge as the story states it and changed only when the story itself changes it. The Narrator reads them every turn, and they win over a Memory, the Story so far or an earlier Message that says otherwise. A Message that told one differently is a **slip**, which the next turn is told not to repeat.
+One of a Chat's canon numbers, ages, lengths of time, dates, names and ties ("Nara's years at the stall: nine summers"), recorded by the Judge as the story states it and changed only when the story itself changes it. The Narrator reads them every turn, and they win over a Memory, the Story so far or an earlier Message that says otherwise. A Message that told one differently is a **slip**, which the next turn is told not to repeat. The user sees them in the **Facts panel**, opened from the Scene strip, where they can edit, delete or add one; what the user sets there is theirs, and no rewind of a Message takes it away.
 _Avoid_: Canon, lore fact, stat
 
 **Memory graph**:

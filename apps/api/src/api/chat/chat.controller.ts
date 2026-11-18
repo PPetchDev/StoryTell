@@ -10,6 +10,7 @@ import {
     SendMessageRequestBodyDTO,
     SetAuthorsNoteRequestBodyDTO,
     SetNowNoteRequestBodyDTO,
+    SetFactRequestBodyDTO,
     SetSittingOutRequestBodyDTO,
     SwapIdentityRequestBodyDTO,
     TurnRequestBodyDTO,
@@ -105,6 +106,13 @@ export class ChatApiController {
         @Body() body: SetNowNoteRequestBodyDTO,
     ): Promise<ChatResponseBodyDTO> {
         return this.chatManager.setNowNote(storyId, chatId, characterId, body.text);
+    }
+
+    /** Sets the user's own Established fact for a topic (.scratch/facts-panel/spec.md); whitespace only deletes it. Never rolled back. */
+    @Put(':chatId/facts')
+    @ApiOkResponse({ type: ChatResponseBodyDTO })
+    setFact(@Id('storyId') storyId: number, @Id('chatId') chatId: number, @Body() body: SetFactRequestBodyDTO): Promise<ChatResponseBodyDTO> {
+        return this.chatManager.setFact(storyId, chatId, body.topic, body.fact);
     }
 
     /** Replaces who is sitting out, read from the next turn on. Never rolled back. */

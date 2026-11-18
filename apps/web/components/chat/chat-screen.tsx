@@ -12,6 +12,7 @@ import { ChatThread, OpenAt, PendingLine } from '@/components/chat/chat-thread';
 import { ChatTopBar } from '@/components/chat/chat-top-bar';
 import { ChatGlance } from '@/components/chat/chat-glance';
 import { CueSheet } from '@/components/chat/cue-sheet';
+import { FactsSheet } from '@/components/chat/facts-sheet';
 import { MemoryDrawer } from '@/components/chat/memory-drawer';
 import { NovelRequest, NovelView } from '@/components/chat/novel-view';
 import { PersonaPictures } from '@/components/chat/persona-pictures';
@@ -149,6 +150,8 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
      */
     const [cue, setCue] = useState<string | null>(null);
     const [cueSheet, setCueSheet] = useState(false);
+    // The Facts panel (.scratch/facts-panel/spec.md), opened from the Scene strip.
+    const [factsSheet, setFactsSheet] = useState(false);
     /**
      * The Roll armed for the next Message (CONTEXT.md, "Roll"): sent with the next send only, where
      * the app throws the dice. Gone on leaving, like the nudge and the Cue.
@@ -670,6 +673,8 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                     outfits={chat.outfits}
                     scenes={scenes}
                     characters={characters}
+                    factCount={chat.facts?.length ?? 0}
+                    onOpenFacts={() => setFactsSheet(true)}
                     onHide={() => {
                         setSceneStripHidden(true);
                         // The ⋯ menu is where it comes back from.
@@ -853,6 +858,21 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                 />
             )}
 
+            {factsSheet && (
+                <FactsSheet
+                    facts={chat.facts ?? []}
+                    onSave={async (topic, fact) => {
+                        try {
+                            setChat(await chatApi.setFact(chat.storyId, chat.id, topic, fact));
+                            return null;
+                        } catch (caught) {
+                            if (caught instanceof ApiUnreachableError) reportUnreachable();
+                            return caught instanceof ApiError ? caught.message : 'Something went wrong.';
+                        }
+                    }}
+                    onClose={() => setFactsSheet(false)}
+                />
+            )}
             {snapshotSheet && (
                 <SnapshotSheet
                     imageCreditOut={chat.imageCreditOut}

@@ -176,6 +176,8 @@ export interface Chat extends ChatSummary {
     goals?: Array<{ characterId: number; goal: string }>;
     /** What has lastingly changed about each Character in this Chat (.scratch/growing-cards/spec.md), for those with a Now note; `note` with `{user}`. */
     nowNotes?: Array<{ characterId: number; note: string }>;
+    /** The Chat's Established facts (.scratch/facts-panel/spec.md), in the order their topics were first set; `byUser` for the user's own telling. */
+    facts?: ChatFact[];
     /** Entries are being written by themselves right now: the Chat screen re-reads until they are done. */
     diaryWriting: boolean;
     /** Each Character's newest Diary entry: a new one is shown as a toast. */
@@ -374,6 +376,20 @@ function turn<T>(method: 'POST' | 'PATCH', path: string, body: object | undefine
     });
 }
 
+/** One Established fact of a Chat (CONTEXT.md, .scratch/facts-panel/spec.md). */
+export interface ChatFact {
+    /** What it is about, such as "Nara's age". */
+    topic: string;
+    fact: string;
+    /** The current telling is the user's own, set in the Facts panel. */
+    byUser: boolean;
+}
+
+/** The limits of a fact (mirror FACT_TOPIC_MAX, FACT_TEXT_MAX and FACTS_MAX in apps/api/src/manager/chat/details/facts.ts). */
+export const FACT_TOPIC_MAX = 60;
+export const FACT_TEXT_MAX = 120;
+export const FACTS_MAX = 40;
+
 /** The longest Cue the API takes (mirrors CUE_MAX in apps/api/src/manager/chat/turn/prompt.ts). */
 export const CUE_MAX = 300;
 
@@ -440,6 +456,9 @@ export const chatApi = {
     /** Sets the user's own Now note for one Character (.scratch/growing-cards/spec.md); an empty text clears it. */
     setNowNote: (storyId: number, chatId: number, characterId: number, text: string) =>
         apiSend<Chat>('PUT', `/stories/${storyId}/chats/${chatId}/characters/${characterId}/now`, { text }),
+    /** Sets the user's own Established fact for a topic (.scratch/facts-panel/spec.md); an empty fact deletes it. */
+    setFact: (storyId: number, chatId: number, topic: string, fact: string) =>
+        apiSend<Chat>('PUT', `/stories/${storyId}/chats/${chatId}/facts`, { topic, fact }),
     /** Replaces who is sitting out, read from the next turn on; an empty list brings everyone back. */
     setSittingOut: (storyId: number, chatId: number, characterIds: number[]) =>
         apiSend<Chat>('PUT', `/stories/${storyId}/chats/${chatId}/sitting-out`, { characterIds }),

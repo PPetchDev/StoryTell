@@ -216,3 +216,17 @@ export class NudgeSittingOutError extends AppError {
         super('409.004.021', `${name} is sitting out. Bring them back before nudging them.`);
     }
 }
+
+/** A fact set in the Facts panel (.scratch/facts-panel/spec.md) whose topic has no letters or digits. */
+export class FactWithoutTopicError extends AppError {
+    constructor() {
+        super('422.004.031', `Give the fact a topic, such as "Nara's age".`);
+    }
+}
+
+/** A new fact set in the Facts panel when the Chat already holds the most it keeps. */
+export class TooManyFactsError extends AppError {
+    constructor(max: number) {
+        super('422.004.032', `This Chat already holds ${max} facts. Delete one to add another.`);
+    }
+}

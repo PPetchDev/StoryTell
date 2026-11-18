@@ -317,6 +317,14 @@ export class LedgerModelService {
         await this.detailChanges.save(this.detailChanges.create({ chatId, kind: DetailKind.Now, characterId, value, messageId: null }));
     }
 
+    /**
+     * The user's own Established fact (.scratch/facts-panel/spec.md), `topic: fact`, or `topic: ` to
+     * delete it: a detail record tied to no Message, like the user's Now note, so no rewind takes it away.
+     */
+    async setUserFact(chatId: number, value: string): Promise<void> {
+        await this.detailChanges.save(this.detailChanges.create({ chatId, kind: DetailKind.Fact, characterId: null, value, messageId: null }));
+    }
+
     /** The Chat's Sudden event steps alone, oldest first: what its event state is read from. */
     suddenEventStepsOf(chatId: number): Promise<SuddenEventStepEntity[]> {
         return this.suddenEventSteps.find({ where: { chatId }, order: { id: 'ASC' } });
