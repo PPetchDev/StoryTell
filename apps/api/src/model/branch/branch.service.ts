@@ -126,11 +126,11 @@ const copyMessages: CopyStep = async ({ manager, sourceChatId, chatId, through, 
     await manager.query(
         `INSERT INTO "message" ("id", "chat_id", "position", "kind", "text", "identity_name", "persona_id", "model",
                 "judge_status", "judge_error", "memory_status", "memory_error", "version_ordinal", "document_passages",
-                "memories_used", "context_query", "context_query_model", "roll", "roll_target", "roll_stat", "roll_bonus", "roll_offer", "epilogue", "created_at")
+                "memories_used", "context_query", "context_query_model", "roll", "roll_target", "roll_stat", "roll_bonus", "roll_offer", "epilogue", "reach_out", "created_at")
          SELECT m."new_id", $1, s."position", s."kind", s."text", s."identity_name", s."persona_id", s."model",
                 s."judge_status", s."judge_error", s."memory_status", s."memory_error",
                 s."version_ordinal", s."document_passages", s."memories_used", s."context_query", s."context_query_model",
-                s."roll", s."roll_target", s."roll_stat", s."roll_bonus", s."roll_offer", s."epilogue", s."created_at"
+                s."roll", s."roll_target", s."roll_stat", s."roll_bonus", s."roll_offer", s."epilogue", s."reach_out", s."created_at"
          FROM "message" s JOIN unnest($3::int[], $4::int[]) AS m("old_id", "new_id") ON m."old_id" = s."id"
          WHERE s."chat_id" = $2 ORDER BY s."id"`,
         [chatId, sourceChatId, olds, news],

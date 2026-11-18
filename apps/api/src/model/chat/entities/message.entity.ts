@@ -110,6 +110,8 @@ export interface AiMessageResponse {
     versions: ReplyVersionsResponse | null;
     /** Whether it was written as the story's Epilogue (.scratch/endings/spec.md). */
     epilogue: boolean;
+    /** Whether a Character sent it on their own while the user was away (.scratch/reach-outs/spec.md). */
+    reachOut?: boolean;
     createdAt: string;
 }
 
@@ -187,6 +189,13 @@ export class MessageEntity {
      */
     @Column({ type: 'boolean', default: false })
     epilogue: boolean;
+
+    /**
+     * An AI Message a Character sent on their own while the user was away (.scratch/reach-outs/spec.md).
+     * It stays with the Message, so Regenerate writes every Reply version of it as a Reach-out.
+     */
+    @Column({ name: 'reach_out', type: 'boolean', default: false })
+    reachOut: boolean;
 
     // The judge's status on an AI Message a model wrote; NULL on User Messages and the Opening.
     @Column({
@@ -298,6 +307,7 @@ export class MessageEntity {
             memory: this.memoryStatus === null ? null : { status: this.memoryStatus, error: this.memoryError },
             versions: this.versionsResponse(),
             epilogue: this.epilogue ?? false,
+            reachOut: this.reachOut ?? false,
             createdAt: this.createdAt.toISOString(),
         };
     }

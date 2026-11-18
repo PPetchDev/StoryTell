@@ -39,6 +39,12 @@ function messageLabel(message: Message): string {
     return message.epilogue ? 'Epilogue' : 'AI reply';
 }
 
+/** "Mira messaged you while you were away", from the Reach-out's speaker. */
+function reachOutLabel(parts: MessagePart[]): string {
+    const speaker = parts.find((part) => part.kind === 'speech');
+    return `${speaker && speaker.kind === 'speech' ? speaker.speakerName : 'Someone'} messaged you while you were away`;
+}
+
 /** Focus back on a Message once what held it (its edit box, a menu item) is gone, unless the user is already elsewhere. */
 function refocus(element: () => HTMLElement | null) {
     requestAnimationFrame(() => {
@@ -623,6 +629,12 @@ const MessageView = memo(function MessageView({
                         {message.kind === 'ai' && message.epilogue && (
                             <p className="mt-0 mb-1 text-xs font-bold tracking-widest text-muted uppercase" data-epilogue-label>
                                 Epilogue
+                            </p>
+                        )}
+                        {/* A Character wrote first while the user was away (.scratch/reach-outs/spec.md). */}
+                        {message.kind === 'ai' && message.reachOut && (
+                            <p className="mt-0 mb-1 text-xs font-semibold text-muted" data-reach-out-label>
+                                {reachOutLabel(message.parts)}
                             </p>
                         )}
                         <MessageBody message={message} cast={cast} portraits={portraits} readingNow={readingNow} />

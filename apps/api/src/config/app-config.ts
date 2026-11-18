@@ -60,6 +60,11 @@ export abstract class AppConfig {
     abstract readonly supabaseEmailsConfirmed: boolean;
     /** Reply alerts' Web Push keys (.scratch/push-alerts/spec.md). Unset: alerts are off and hidden. */
     abstract readonly vapid: VapidConfig | undefined;
+    /**
+     * How often the Reach-out scheduler ticks (.scratch/reach-outs/spec.md); 0 or unset turns it off,
+     * as in tests, which tick it themselves. `REACH_OUT_TICK_MS`, five minutes by default.
+     */
+    readonly reachOutTickMs?: number;
 }
 
 /** The VAPID pair as `web-push generate-vapid-keys` prints it (base64url), and the contact the push service sees. */
@@ -80,6 +85,8 @@ const LOOPBACK_HOSTS = new Set(['127.0.0.1', '::1', 'localhost']);
 
 export const DEFAULT_BACKGROUND_WAIT_MS = 8_000;
 export const DEFAULT_BACKGROUND_RETRY_MS = 20_000;
+/** The Reach-out scheduler's tick (.scratch/reach-outs/spec.md): five minutes. */
+export const DEFAULT_REACH_OUT_TICK_MS = 300_000;
 
 export interface ProviderKeys {
     /** OpenRouter API key: text calls and the text credit balance. */
@@ -173,6 +180,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
         throw new ConfigError(`BACKGROUND_RETRY_MS must be a non-negative integer, got "${env.BACKGROUND_RETRY_MS}"`);
     }
 
+    const reachOutTickMs = env.REACH_OUT_TICK_MS ? Number(env.REACH_OUT_TICK_MS) : DEFAULT_REACH_OUT_TICK_MS;
+    if (!Number.isInteger(reachOutTickMs) || reachOutTickMs < 0) {
+        throw new ConfigError(`REACH_OUT_TICK_MS must be a non-negative integer, got "${env.REACH_OUT_TICK_MS}"`);
+    }
+
     const imageDir = path.resolve(env.IMAGE_DIR!);
     // Default: a folder named `speech` beside the image folder.
     const speechDir = env.SPEECH_DIR ? path.resolve(env.SPEECH_DIR) : path.join(path.dirname(imageDir), 'speech');
@@ -221,6 +233,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
         textHosts,
         backgroundWaitMs,
         backgroundRetryMs,
+        reachOutTickMs,
         backupStatusFile: env.BACKUP_STATUS_FILE ? path.resolve(env.BACKUP_STATUS_FILE) : undefined,
         providerKeys: {
             openRouter: env.OPENROUTER_API_KEY || undefined,

@@ -105,6 +105,14 @@ export class PushAlertsManagerService {
         this.alert(chatPayload(alert.storyId, alert.chatId, replyAlertBody(alert.speakerName, alert.chatTitle)));
     }
 
+    /**
+     * A Reach-out is stored (.scratch/reach-outs/spec.md): "<Name>: <their line>", already cut by the
+     * caller. Unlike a reply alert it carries a line of the story; the user turned it on per Chat.
+     */
+    reachOut(alert: { storyId: number; chatId: number; body: string }): void {
+        this.alert(chatPayload(alert.storyId, alert.chatId, cut(alert.body)));
+    }
+
     /** A Snapshot is stored. Returns at once. */
     snapshotReady(alert: SnapshotAlert): void {
         this.alert(chatPayload(alert.storyId, alert.chatId, snapshotAlertBody(alert.chatTitle)));

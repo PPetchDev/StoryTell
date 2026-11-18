@@ -24,7 +24,7 @@ import {
     FactWithoutTopicError,
     TooManyFactsError,
 } from '../../errors/chat.errors.js';
-import { OutOfCreditError } from '../../errors/model-gateway.errors.js';
+import { OutOfCreditError, UnparseableOutputError } from '../../errors/model-gateway.errors.js';
 import { SpendCap } from '../../service/model-gateway/spend-cap.js';
 import { PersonaNotFoundError } from '../../errors/persona.errors.js';
 import { CharacterNotFoundError, StoryNotFoundError } from '../../errors/story.errors.js';
@@ -127,6 +127,8 @@ import { currentDetails, promptDetails } from './details/details.js';
 import { FACTS_MAX, factsState, promptFacts, userFactChange } from './details/facts.js';
 import { castNowNotes, currentNowNotes, tidyNow } from './details/now-notes.js';
 import type { PromptNowNote } from './details/now-notes.js';
+import { ReachOutModelService } from '../../model/chat/reach-out.service.js';
+import { buildReachOutPrompt, inQuietHours, reachOutAlertBody, reachOutCheck, ReachOutMessage, readReachOut, reachOutSpeaker } from './reach-out/reach-out.js';
 
 /** A Chat as a Story's Chat list shows it (spec: "Lists and Home"). */
 export interface ChatListItem extends ChatSummary {
@@ -427,6 +429,7 @@ export class ChatManagerService {
         private readonly spendCap: SpendCap,
         private readonly dice: Dice,
         private readonly pushAlerts: PushAlertsManagerService,
+        private readonly reachOutModel: ReachOutModelService,
     ) {}
 
     async listChats(storyId: number): Promise<ChatList> {
@@ -595,7 +598,8 @@ export class ChatManagerService {
             await this.chatModel.rewriteAiMessage(message, reply.parts);
             // Its Snapshots show a moment the edit took away; they stay in the Gallery.
             await this.snapshotModel.clearMessageLinks([message.id]);
-            if (message.model !== AUTHOR_MODEL) await this.rerunBackground(story, chat.id, message.id);
+            // Neither the Opening nor a Reach-out (.scratch/reach-outs/spec.md) is judged or extracted from.
+            if (message.model !== AUTHOR_MODEL && !message.reachOut) await this.rerunBackground(story, chat.id, message.id);
             return { ...(await this.getChat(storyId, chatId)), rolledBack };
         }));
     }
@@ -648,9 +652,12 @@ export class ChatManagerService {
             const replaced = rewound.messages.find((candidate) => candidate.id === message.id) ?? message;
             rewound.messages = rewound.messages.filter((candidate) => candidate.id !== message.id);
             try {
-                await this.writeTurn(story, rewound, stream, replaced, nudge, cueOf(cue));
+                // A Reach-out is written again as one (.scratch/reach-outs/spec.md).
+                if (replaced.reachOut) await this.rewriteReachOut(story, rewound, replaced, stream);
+                else await this.writeTurn(story, rewound, stream, replaced, nudge, cueOf(cue));
             } catch (error) {
-                await this.rerunBackground(story, chat.id, message.id);
+                // A Reach-out changed nothing to roll back, and is never judged.
+                if (!replaced.reachOut) await this.rerunBackground(story, chat.id, message.id);
                 throw error;
             }
             return { ...(await this.getChat(story.id, chat.id)), rolledBack };
@@ -682,7 +689,7 @@ export class ChatManagerService {
             const rolledBack = await this.ledger.rollbackFrom(chat.id, message.position);
             await this.storySoFar.rewound(chat, message.position);
             await this.chatModel.chooseVersion(message, chosen);
-            this.startBackground(story, chat.id, message.id);
+            if (!message.reachOut) this.startBackground(story, chat.id, message.id);
             return { ...(await this.getChat(storyId, chatId)), rolledBack };
         });
     }
@@ -1201,6 +1208,153 @@ export class ChatManagerService {
             await this.writeTurn(story, chat, stream, undefined, null, null, true);
             return this.getChat(storyId, chatId);
         });
+    }
+
+    /**
+     * .scratch/reach-outs/spec.md: one Character messages the user first, when the Chat's
+     * "Characters message first" is on and every rule holds at `now`. The scheduler runs it as the
+     * Story's Account. Answers the stored Message's id, or null when the Chat is skipped (why, at
+     * debug). Every rule is read again inside the turn lock, and the absence is claimed before the
+     * call, so no absence ever gets two.
+     */
+    async reachOut(storyId: number, chatId: number, now: Date): Promise<number | null> {
+        const skip = (why: string): null => {
+            this.logger.debug(`Chat ${chatId}: no Reach-out: ${why}`);
+            return null;
+        };
+        const setting = await this.reachOutModel.find(chatId);
+        if (!setting) return skip('it is off');
+        if (inQuietHours(now)) return skip('quiet hours');
+        const { story, chat: loaded } = await this.load(storyId, chatId);
+        if (!reachOutCheck(reachOutMessages(loaded), loaded.lastPlayedAt, setting, now).due) return skip('not due');
+        if (this.inFlight.has(loaded.id)) return skip('a turn is running');
+        if (!playableStatus(story).playable) return skip('the Story is not playable');
+        if (await this.textCreditOut()) return skip('text credit is used up');
+        try {
+            await this.spendCap.assertUnderCap(now);
+        } catch {
+            return skip('the Monthly cap is reached');
+        }
+        const settled = await this.settleBackground(loaded);
+        if (settled.pending || settled.failed.length > 0) return skip('the newest reply has background calls not done');
+
+        return this.writingTurn(loaded.id, async () => {
+            const chat = await this.reload(loaded.id);
+            const check = reachOutCheck(reachOutMessages(chat), chat.lastPlayedAt, setting, now);
+            if (!check.due) return skip(check.why);
+            const state = await this.ledger.state(chat.id);
+            if (endingState(story.endings ?? [], state.endingsReached).reached) return skip('the Chat reached an Ending');
+            const writer = this.reachOutWriter(story, chat, state);
+            if (!writer) return skip('every Character is sitting out');
+            if (!(await this.reachOutModel.claim(chat.id, check.userMessageId, now))) return skip('this absence is claimed');
+            const { messageId, parts } = await this.writeReachOut(story, chat, state, writer, check.hoursAway);
+            const body = reachOutAlertBody(parts);
+            if (body) this.pushAlerts.reachOut({ storyId: story.id, chatId: chat.id, body });
+            this.logger.log(`Chat ${chat.id}: ${writer.name} reached out after ${check.hoursAway} hours away (Message ${messageId})`);
+            return messageId;
+        });
+    }
+
+    /** Who writes a Reach-out now (.scratch/reach-outs/spec.md, "Who speaks"); null when everyone sits out. */
+    private reachOutWriter(story: StoryEntity, chat: ChatEntity, state: LedgerState): { id: number; name: string } | null {
+        const towardUser = currentBonds(state.bondChanges).filter((bond) => bond.toCharacterId === null);
+        const lastSpoke = (characterId: number): number => {
+            for (let i = chat.messages.length - 1; i >= 0; i--) {
+                const message = chat.messages[i];
+                if (message.kind === MessageKind.Ai && message.parts.some((part) => part.characterId === characterId)) return message.position;
+            }
+            return -1;
+        };
+        const speaker = reachOutSpeaker(
+            story.characters.map((character) => {
+                const bond = towardUser.find((candidate) => candidate.fromCharacterId === character.id);
+                return { id: character.id, name: character.name, bondLevels: bond ? bond.levels() : undefined, lastSpokeAt: lastSpoke(character.id) };
+            }),
+            chat.sittingOutIds(),
+        );
+        return speaker ? { id: speaker.id, name: speaker.name } : null;
+    }
+
+    /**
+     * The Reach-out's one call, read and stored: a new AI Message at the end of the Chat, or, for
+     * Regenerate, the new Reply version of `replacing`. Never judged or extracted from. Throws the
+     * gateway's error, or `UnparseableOutputError` when no line of the writer's came back.
+     */
+    private async writeReachOut(
+        story: StoryEntity,
+        chat: ChatEntity,
+        state: LedgerState,
+        writer: { id: number; name: string },
+        hoursAway: number,
+        replacing?: MessageEntity,
+        stream?: TurnStream,
+    ): Promise<{ messageId: number; parts: ReplyPart[] }> {
+        const costsFrom = await this.usageModel.lastId();
+        const identity = wornIdentity(story, chat);
+        const character = story.characters.find((candidate) => candidate.id === writer.id)!;
+        const [entries, thoughts] = await Promise.all([this.ledger.diaryEntriesOf(chat.id), this.chatModel.findThoughts(chat.messages.map((message) => message.id))]);
+        const positionOf = new Map(chat.messages.map((message) => [message.id, message.position]));
+        const thought = thoughts
+            .filter((candidate) => candidate.characterId === writer.id)
+            .sort((a, b) => (positionOf.get(a.messageId) ?? 0) - (positionOf.get(b.messageId) ?? 0))
+            .at(-1);
+        const details = currentDetails(state.detailChanges);
+        const scene = story.scenes.find((candidate) => candidate.id === chat.currentSceneId) ?? null;
+        const bond = currentBonds(state.bondChanges).find((candidate) => candidate.fromCharacterId === writer.id && candidate.toCharacterId === null);
+        const nowNote = castNowNotes(currentNowNotes(state.detailChanges), story.characters).find((note) => note.characterId === writer.id)?.note ?? null;
+        const prompt = buildReachOutPrompt({
+            character: { name: character.name, personality: character.personality, voice: character.voice, background: character.background },
+            identityName: identity.name,
+            identityDescription: identity.description,
+            setting: story.setting,
+            scene: scene ? { name: scene.name, situation: scene.situation } : null,
+            timeOfDay: chat.timeOfDay,
+            place: details.place,
+            nowNote: nowNote ? renderUser(nowNote, identity.name) : null,
+            bond: bond ? { label: renderUser(bond.label, identity.name), description: renderUser(bond.description, identity.name), levels: bond.levels() } : null,
+            innerLife: promptDiaries(story, chat, entries).find((line) => line.characterName === character.name)?.text ?? null,
+            thought: thought?.text ?? null,
+            storySoFar: chat.storySoFar ? renderUser(chat.storySoFar, identity.name) : null,
+            story: promptHistory(chat.messages).map((message) => (message.role === 'user' ? `${identity.name}: ${message.text}` : message.text)),
+            hoursAway,
+        });
+        stream?.onStart();
+        const result = await this.gateway.completeText({
+            kind: 'reach_out',
+            messages: prompt.messages,
+            maxTokens: prompt.maxTokens,
+            servedFor: { storyId: story.id, chatId: chat.id },
+        });
+        const parts = readReachOut(result.text, writer, story.characters, identity.name, chat.sittingOutIds());
+        if (!parts) throw new UnparseableOutputError(`The Reach-out held no line of ${writer.name}'s.`);
+        if (stream?.signal.aborted) throw new TurnStoppedError();
+        let messageId: number;
+        if (replacing) {
+            await this.chatModel.replaceReply(replacing, result.model, parts, MAX_REPLY_VERSIONS);
+            messageId = replacing.id;
+        } else {
+            messageId = (await this.chatModel.addAiMessage(chat.id, chat.messages.length, result.model, parts, null, null, null, false, true)).id;
+            // A Message after the one with versions settles it on its shown version, as a turn's does.
+            await this.chatModel.dropReplyVersions(chat.id);
+        }
+        await this.usageModel.claimForReply(chat.id, costsFrom, messageId);
+        stream?.onParts(parts);
+        return { messageId, parts };
+    }
+
+    /**
+     * Regenerate of a Reach-out (.scratch/reach-outs/spec.md): the same Character writes one again,
+     * as the Message's new Reply version; another when they are gone or sitting out. No alert.
+     */
+    private async rewriteReachOut(story: StoryEntity, chat: ChatEntity, replacing: MessageEntity, stream?: TurnStream): Promise<void> {
+        const state = await this.ledger.state(chat.id);
+        const wrote = replacing.parts.find((part) => part.characterId !== null)?.characterId ?? null;
+        const same = story.characters.find((character) => character.id === wrote && !chat.sittingOutIds().includes(character.id));
+        const writer = same ? { id: same.id, name: same.name } : this.reachOutWriter(story, chat, state);
+        if (!writer) throw new UnparseableOutputError('Every Character is sitting out, so nobody can reach out.');
+        const before = chat.messages.at(-1);
+        const hoursAway = before ? Math.max(0, Math.floor((replacing.createdAt.getTime() - before.createdAt.getTime()) / 3_600_000)) : 0;
+        await this.writeReachOut(story, chat, state, writer, hoursAway, replacing, stream);
     }
 
     /**
@@ -2223,4 +2377,16 @@ function nudgeOf(story: StoryEntity, chat: ChatEntity, characterId: number | nul
     if (!character) throw new CharacterNotFoundError();
     if (chat.sittingOutIds().includes(character.id)) throw new NudgeSittingOutError(character.name);
     return character.name;
+}
+
+/** The Chat's Messages as the Reach-out rules read them (.scratch/reach-outs/spec.md). */
+function reachOutMessages(chat: ChatEntity): ReachOutMessage[] {
+    return chat.messages.map((message) => ({
+        id: message.id,
+        position: message.position,
+        kind: message.kind === MessageKind.User ? 'user' : 'ai',
+        reachOut: message.reachOut ?? false,
+        epilogue: message.epilogue ?? false,
+        createdAt: message.createdAt,
+    }));
 }
