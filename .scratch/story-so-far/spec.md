@@ -102,7 +102,7 @@ Each Chat gets a **Story so far**: a prose account, in order, of everything that
 - Searching the full history (vector retrieval), and choosing which Memories to send by relevance.
 - Version history of the Story so far, or an undo of an AI update.
 - Pausing automatic updates.
-- Summaries per Scene, or a hierarchy of summaries.
+- Summaries per Scene, or a hierarchy of summaries. (Per-Scene summaries came later as Chapters, for the user to read: [Move on, and Chapters](../scene-chapters/spec.md). The Story so far does not draw on them.)
 
 ## Further Notes
 

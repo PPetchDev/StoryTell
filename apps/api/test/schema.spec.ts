@@ -14,6 +14,7 @@ import { BeliefChangeEntity } from '../src/model/ledger/entities/belief-change.e
 import { BeliefEntity } from '../src/model/memory/entities/belief.entity.js';
 import { StartingBeliefEntity } from '../src/model/story/entities/starting-belief.entity.js';
 import { AccountEntity } from '../src/model/account/entities/account.entity.js';
+import { SceneAdvanceEntity } from '../src/model/ledger/entities/scene-advance.entity.js';
 
 import { startTestApp, TestApp } from './harness/test-app.js';
 
@@ -45,7 +46,7 @@ describe('Database schema', () => {
 
     // Older migrations name their constraints their own way, so the whole schema can't be diffed
     // against the entities. Newer tables are checked column by column instead.
-    it.each([DocumentEntity, DocumentPassageEntity, ThaiReadingEntity, MessageThoughtEntity, SavedReplyEntity, ReplaceRuleEntity, UsageRecordEntity, CharacterExpressionEntity, BeliefEntity, BeliefChangeEntity, StartingBeliefEntity, AccountEntity])('migrates every column %o declares, with its type and nullability', async (entity) => {
+    it.each([DocumentEntity, DocumentPassageEntity, ThaiReadingEntity, MessageThoughtEntity, SavedReplyEntity, ReplaceRuleEntity, UsageRecordEntity, CharacterExpressionEntity, BeliefEntity, BeliefChangeEntity, StartingBeliefEntity, AccountEntity, SceneAdvanceEntity])('migrates every column %o declares, with its type and nullability', async (entity) => {
         const metadata = t.app.get(DataSource).getMetadata(entity);
         const client = new pg.Client({ connectionString: t.databaseUrl });
         await client.connect();

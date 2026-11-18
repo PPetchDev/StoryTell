@@ -104,9 +104,9 @@ The user has no Move on button and never sees the reply counts.
 
 ## Out of Scope
 
-- A Move on or Skip button, or any way for the user to move a Scene by hand.
+- A Move on or Skip button, or any way for the user to move a Scene by hand. (Reversed 2026-11-18: [Move on, and Chapters](../scene-chapters/spec.md).)
 - Per-Story or per-Scene thresholds, or thresholds in Settings.
-- Jumping over several Scenes, choosing which Scene comes next, or branching Scenes.
+- Jumping over several Scenes, choosing which Scene comes next, or branching Scenes. (The user's Move on may now choose the next Scene: [Move on, and Chapters](../scene-chapters/spec.md). The Judge still moves only to the next in order.)
 - Showing reply counts, a progress bar or "lingering" anywhere in the UI.
 - Rewriting authors' conditions, or a Story editor hint about conditions that only the user can meet.
 

@@ -392,6 +392,8 @@ interface ChatTopBarProps {
     /** The Scene strip is hidden on this device, so the menu offers it back. */
     stripHidden: boolean;
     onShowStrip(): void;
+    /** Opens the Chapters, with Move on (.scratch/scene-chapters/spec.md); left out where the Story has no Scenes. */
+    onOpenChapters?(): void;
     onSwapIdentity(personaId: number | null): void;
     onOpenMemory(): void;
     onRename(title: string): void;
@@ -437,6 +439,7 @@ export function ChatTopBar({
     busy,
     stripHidden,
     onShowStrip,
+    onOpenChapters,
     onSwapIdentity,
     onOpenMemory,
     onRename,
@@ -624,6 +627,11 @@ export function ChatTopBar({
                                 {stripHidden && (
                                     <MenuButton onClick={choose(onShowStrip)}>
                                         <MenuText label="Show Scene strip" sub="The current Scene and its goal" />
+                                    </MenuButton>
+                                )}
+                                {onOpenChapters && (
+                                    <MenuButton onClick={choose(onOpenChapters)}>
+                                        <MenuText label="Chapters" sub="Each Scene so far, and Move on" />
                                     </MenuButton>
                                 )}
                                 <MenuButton onClick={() => setMenu('note')} disabled={busy} title={note}>

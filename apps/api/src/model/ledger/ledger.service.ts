@@ -61,7 +61,8 @@ export interface NewArcStep {
 }
 
 export interface NewSceneAdvance {
-    fromSceneId: number;
+    /** Null only for a user's Move on from free play (.scratch/scene-chapters/spec.md). */
+    fromSceneId: number | null;
     fromSceneName: string;
     toSceneId: number | null;
     toSceneName: string | null;
@@ -330,6 +331,51 @@ export class LedgerModelService {
     /** The Chat's latest SceneAdvance, or null while it has never moved on from a Scene. */
     lastSceneAdvance(chatId: number): Promise<SceneAdvanceEntity | null> {
         return this.sceneAdvances.findOne({ where: { chatId }, order: { id: 'DESC' } });
+    }
+
+    /**
+     * The user's Move on (.scratch/scene-chapters/spec.md): a Scene advance against the Chat's newest AI
+     * Message, as the Judge's are, so taking that Message back takes it back. It touches nothing else of
+     * the Message: its Judge stays as it was.
+     */
+    moveScene(chatId: number, messageId: number, advance: NewSceneAdvance): Promise<SceneAdvanceEntity> {
+        return this.dataSource.transaction(async (manager) => {
+            const saved = await manager.save(manager.create(SceneAdvanceEntity, { chatId, messageId, ...advance, movedBy: 'user' }));
+            await manager.update(ChatEntity, { id: chatId }, { currentSceneId: advance.toSceneId });
+            return saved;
+        });
+    }
+
+    /** The Chat's Scene advances, oldest first: each ends a Chapter (.scratch/scene-chapters/spec.md). */
+    sceneAdvancesOf(chatId: number): Promise<SceneAdvanceEntity[]> {
+        return this.sceneAdvances.find({ where: { chatId }, order: { id: 'ASC' } });
+    }
+
+    /**
+     * The AI's summary of a Chapter. It lands only while the Chapter has none and the user has not
+     * written their own: an advance rolled back meanwhile, or the user's save, makes it a no-op.
+     * Answers whether it landed.
+     */
+    async writeChapter(advanceId: number, text: string): Promise<boolean> {
+        const result = await this.sceneAdvances.update(
+            { id: advanceId, chapterBy: 'ai', chapterSummary: IsNull() },
+            { chapterSummary: text, chapterFailed: null, chapterUpdatedAt: new Date() },
+        );
+        return (result.affected ?? 0) > 0;
+    }
+
+    /** Records why the AI's summary failed, unless the Chapter got a summary meanwhile. */
+    async failChapter(advanceId: number, reason: string): Promise<void> {
+        await this.sceneAdvances.update({ id: advanceId, chapterSummary: IsNull() }, { chapterFailed: reason });
+    }
+
+    /** The user's own summary of a Chapter: the AI never writes over it. False when the Chat has no such Chapter. */
+    async saveUserChapter(chatId: number, advanceId: number, text: string): Promise<boolean> {
+        const result = await this.sceneAdvances.update(
+            { id: advanceId, chatId },
+            { chapterSummary: text, chapterBy: 'user', chapterFailed: null, chapterUpdatedAt: new Date() },
+        );
+        return (result.affected ?? 0) > 0;
     }
 
     /**

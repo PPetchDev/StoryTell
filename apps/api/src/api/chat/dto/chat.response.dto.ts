@@ -24,6 +24,7 @@ import { BeliefDTO } from '../../memory/dto/belief.response.dto.js';
 import { BondLevels } from '../../../model/ledger/bond-axes.js';
 import { BondChangeResponse } from '../../../model/ledger/entities/bond-change.entity.js';
 import { SceneAdvanceResponse } from '../../../model/ledger/entities/scene-advance.entity.js';
+import type { SceneMover } from '../../../model/ledger/entities/scene-advance.entity.js';
 import { RollbackCounts } from '../../../model/ledger/ledger.service.js';
 import { MissingFieldDTO } from '../../story/dto/story.response.dto.js';
 import { TraySavedReplyDTO } from '../../saved-reply/dto/saved-reply.response.dto.js';
@@ -668,6 +669,9 @@ export class SceneAdvanceDTO implements SceneAdvanceResponse {
 
     @ApiProperty({ description: 'The story event that met the move-on condition.' })
     event: string;
+
+    @ApiProperty({ enum: ['judge', 'user'], description: "The Judge, or the user's Move on (.scratch/scene-chapters/spec.md)." })
+    movedBy: SceneMover;
 
     @ApiProperty({ description: 'The causing AI Message.' })
     messageId: number;

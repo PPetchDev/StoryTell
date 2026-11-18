@@ -5,6 +5,7 @@ import { ComponentType, useState } from 'react';
 import { COLUMN, SHORTEST_HIDDEN } from '@/components/chat/chat-classes';
 import {
     AfternoonIcon,
+    ChaptersIcon,
     CloseIcon,
     DawnIcon,
     EveningIcon,
@@ -37,6 +38,8 @@ interface SceneStripProps {
     scenes: Scene[];
     /** The Story's Characters, to name a Scene's Bond gates; empty while the Story can't be read. */
     characters?: readonly { id: number; name: string }[];
+    /** Opens the Chapters, with Move on (.scratch/scene-chapters/spec.md); left out where the Story has no Scenes. */
+    onOpenChapters?(): void;
     onHide(): void;
 }
 
@@ -61,7 +64,7 @@ const STRIP_ICON = 'mr-1 inline-block shrink-0 align-[-0.2em]';
  * on to shows then. A tap opens it to read the goal whole and closes it again; its own ✕ hides it,
  * and ⋯ brings it back (audit M30: a tap used to hide it, with the goal cut off and no way to read it).
  */
-export function SceneStrip({ current, timeOfDay, place = null, weather = null, outfits = [], scenes, characters = [], onHide }: SceneStripProps) {
+export function SceneStrip({ current, timeOfDay, place = null, weather = null, outfits = [], scenes, characters = [], onOpenChapters, onHide }: SceneStripProps) {
     const [open, setOpen] = useState(false);
     const scene = current ? scenes.find((candidate) => candidate.id === current.id) : undefined;
     const goal = scene?.situation ?? '';
@@ -141,6 +144,18 @@ export function SceneStrip({ current, timeOfDay, place = null, weather = null, o
                         </span>
                     ))}
             </button>
+            {onOpenChapters && (
+                <button
+                    type="button"
+                    className="bare-button grid size-11 shrink-0 cursor-pointer place-items-center text-muted press focus-ring-inset"
+                    aria-label="Chapters"
+                    title="Chapters, and Move on"
+                    aria-haspopup="dialog"
+                    onClick={onOpenChapters}
+                >
+                    <ChaptersIcon size={20} />
+                </button>
+            )}
             <button
                 type="button"
                 className="bare-button grid size-11 shrink-0 cursor-pointer place-items-center text-muted press focus-ring-inset"

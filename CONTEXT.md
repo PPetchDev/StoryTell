@@ -13,8 +13,16 @@ The place, situation and premise a Story takes place in; every Story has one.
 _Avoid_: Scene, world, background
 
 **Scene**:
-An optional, author-defined stage of a Story that the plot moves through in order, each ending when its plain-language move-on condition is met and its Bond gates all hold; a Scene steers the story but never limits what the user or the Characters can do. Scenes only ever move on by themselves: the user cannot skip one.
-_Avoid_: Chapter, act, stage
+An optional, author-defined stage of a Story that the plot moves through in order, each ending when its plain-language move-on condition is met and its Bond gates all hold, or when the user Moves on; a Scene steers the story but never limits what the user or the Characters can do.
+_Avoid_: Chapter (a Chapter is what happened in one Chat while it was on a Scene), act, stage
+
+**Move on**:
+The user ending the Chat's current Scene themselves, to the next Scene in order or one they choose, or into free play. It is a Scene advance like the Judge's, made at the Chat's newest AI Message, so taking that Message back takes the move back.
+_Avoid_: Skip, next scene, advance (alone)
+
+**Chapter**:
+The part of one Chat played in one Scene, from where the Scene began to the Scene advance that ended it, with a short summary written in the background when it ends, for the user to read and edit. No prompt reads it. A Chapter goes when the advance that ended it is taken back.
+_Avoid_: Scene, episode, recap, Story so far
 
 **Lingering Scene**:
 A Scene that has lasted many replies without moving on. The Narrator then has the Characters open the way toward its move-on condition and gates, without acting for the user.

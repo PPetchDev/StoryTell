@@ -16,6 +16,7 @@ import { MemoryDrawer } from '@/components/chat/memory-drawer';
 import { NovelRequest, NovelView } from '@/components/chat/novel-view';
 import { PersonaPictures } from '@/components/chat/persona-pictures';
 import { SceneStrip } from '@/components/chat/scene-strip';
+import { ChaptersSheet } from '@/components/chat/chapters-sheet';
 import { SuddenEventBanner, suddenEventAnnouncement } from '@/components/chat/sudden-event-banner';
 import { EndingBanner, endingAnnouncement, epilogueWritten } from '@/components/chat/ending-banner';
 import { SnapshotSheet } from '@/components/chat/snapshot-sheet';
@@ -149,6 +150,8 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
      */
     const [cue, setCue] = useState<string | null>(null);
     const [cueSheet, setCueSheet] = useState(false);
+    /** The Chapters sheet, with Move on (.scratch/scene-chapters/spec.md). */
+    const [chaptersOpen, setChaptersOpen] = useState(false);
     /**
      * The Roll armed for the next Message (CONTEXT.md, "Roll"): sent with the next send only, where
      * the app throws the dice. Gone on leaving, like the nudge and the Cue.
@@ -629,6 +632,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                 busy={writing || busy || editing !== null}
                 stripHidden={stripHidden}
                 onShowStrip={() => setSceneStripHidden(false)}
+                onOpenChapters={scenes.length > 0 ? () => setChaptersOpen(true) : undefined}
                 onSwapIdentity={swapIdentity}
                 onOpenMemory={() => openMemory()}
                 onRename={(title) =>
@@ -670,6 +674,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                     outfits={chat.outfits}
                     scenes={scenes}
                     characters={characters}
+                    onOpenChapters={scenes.length > 0 ? () => setChaptersOpen(true) : undefined}
                     onHide={() => {
                         setSceneStripHidden(true);
                         // The ⋯ menu is where it comes back from.
@@ -835,6 +840,18 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                 )}
             />
 
+            {chaptersOpen && (
+                <ChaptersSheet
+                    chat={chat}
+                    scenes={scenes}
+                    busy={writing || busy || editing !== null}
+                    onMoved={(moved) => {
+                        setChat(moved);
+                        announce(moved.currentScene ? `Moved on to ${moved.currentScene.name}.` : 'Moved on into free play.');
+                    }}
+                    onClose={() => setChaptersOpen(false)}
+                />
+            )}
             {cueSheet && (
                 <CueSheet
                     cue={cue ?? ''}
