@@ -12,6 +12,7 @@ import { AppSavedRepliesCard } from '@/components/saved-replies/app-saved-replie
 import { AppReplaceRulesCard } from '@/components/replace-rules/app-replace-rules-card';
 import { SaveStatus } from '@/components/story-editor/save-status';
 import { PeopleCard } from '@/components/settings/people-card';
+import { AlertsSetting } from '@/components/settings/alerts-setting';
 import { SignOutSetting } from '@/components/sign-in-gate';
 import { useAccount } from '@/lib/account';
 import { TextSizeSetting } from '@/components/text-size-setting';
@@ -338,6 +339,8 @@ export default function SettingsPage() {
             <SettingsGroup id="settings-device" title="This device">
                 <ThemeSetting />
                 <TextSizeSetting />
+                {/* Last in the group: it shows only once the server says alerts are set up. */}
+                <AlertsSetting />
             </SettingsGroup>
             {(settings.status === 'loading' || backup === undefined) && settings.status !== 'error' && (
                 <Loading label="Loading Settings…" className="card" />

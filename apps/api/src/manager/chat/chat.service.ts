@@ -47,6 +47,7 @@ import { BeliefResponse } from '../../model/memory/entities/belief.entity.js';
 import { MemoryModelService } from '../../model/memory/memory.service.js';
 import { PersonaModelService } from '../../model/persona/persona.service.js';
 import { SnapshotModelService } from '../../model/snapshot/snapshot.service.js';
+import { firstSpeakerName, PushAlertsManagerService } from '../push/push-alerts.service.js';
 import { SettingsModelService } from '../../model/settings/settings.service.js';
 import { StoryEntity } from '../../model/story/entities/story.entity.js';
 import { StoryModelService } from '../../model/story/story.service.js';
@@ -399,6 +400,7 @@ export class ChatManagerService {
         private readonly gateway: ModelGateway,
         private readonly spendCap: SpendCap,
         private readonly dice: Dice,
+        private readonly pushAlerts: PushAlertsManagerService,
     ) {}
 
     async listChats(storyId: number): Promise<ChatList> {
@@ -1580,6 +1582,8 @@ export class ChatManagerService {
         // Last, and only once stored: the client's final parts are the stored Message.
         stream?.onParts(parts);
         await this.chatModel.touchPlayed(chat.id);
+        // .scratch/push-alerts/spec.md: the user's devices are told the reply is ready (a visible app shows nothing).
+        this.pushAlerts.replyReady({ storyId: story.id, chatId: chat.id, chatTitle: chat.title, speakerName: firstSpeakerName(parts) });
         // Started once the turn's answer has been read (see `writingTurn`).
         this.startAfterTurn.set(chat.id, () => this.startBackground(story, chat.id, aiMessageId));
     }

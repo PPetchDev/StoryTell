@@ -20,6 +20,7 @@ import { BeliefModelService } from '../../model/memory/belief.service.js';
 import { MemoryModelService } from '../../model/memory/memory.service.js';
 import { SnapshotEntity, SnapshotResponse } from '../../model/snapshot/entities/snapshot.entity.js';
 import { SnapshotModelService } from '../../model/snapshot/snapshot.service.js';
+import { PushAlertsManagerService } from '../push/push-alerts.service.js';
 import { CharacterEntity } from '../../model/story/entities/character.entity.js';
 import { StoryEntity } from '../../model/story/entities/story.entity.js';
 import { StoryModelService } from '../../model/story/story.service.js';
@@ -147,6 +148,7 @@ export class SnapshotManagerService {
         private readonly imageStore: ImageStoreService,
         private readonly gateway: ModelGateway,
         private readonly config: AppConfig,
+        private readonly pushAlerts: PushAlertsManagerService,
     ) {}
 
     /**
@@ -345,6 +347,7 @@ export class SnapshotManagerService {
                 characters: inFrame.map((character) => ({ characterId: character.id, name: character.name })),
             });
             if (!stored) await this.removeFile(imagePath); // the Story was deleted meanwhile
+            else this.pushAlerts.snapshotReady({ storyId, chatId: chat.id, chatTitle: chat.title });
         } catch (error) {
             await this.removeFile(imagePath);
             throw error;

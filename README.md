@@ -79,6 +79,8 @@ The API reads its environment only through `apps/api/src/config/app-config.ts`:
 | `SESSION_SECRET` | with `SUPABASE_URL` | Keys every session cookie, at least 32 random characters. Unset, sessions are keyed from `LOGIN_PASSWORD` as before. Changing it signs every device out. |
 | `OWNER_EMAIL` | no | The Owner Account's email, so the Owner can sign in with Google or email too. Without it the Owner signs in with `LOGIN_PASSWORD` only. |
 | `SUPABASE_EMAILS_CONFIRMED` | no | `true` once you checked "Confirm email" is on in Supabase (its default), so an email + password user gets a session only after confirming the address. Then such a sign-in may claim a listed email; otherwise only Google, which checked the address, may. Never set it with "Confirm email" off. |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | for reply alerts | The Web Push key pair, as `npx web-push generate-vapid-keys` (run in `apps/api`) prints it (`.scratch/push-alerts/spec.md`). Unset: Settings shows no Alerts card and nothing is sent. Only one of them, or a malformed key, refuses to start. A new pair invalidates every device's alerts until each turns them on again. |
+| `VAPID_SUBJECT` | no | The contact the push services see, `mailto:` or `https:`, e.g. the site's URL. Default `https://storytell.invalid`. |
 | `ENV_FILE` | no | Load the variables above from this file at startup |
 
 The frontend reads `API_ORIGIN` (where to proxy `/api`, needed at both `next build` and

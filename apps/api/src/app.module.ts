@@ -9,6 +9,9 @@ import { ModelGatewayModule } from './service/model-gateway/model-gateway.module
 import { PageFetchModule } from './service/page-fetch/page-fetch.module.js';
 import { DbModule } from './store/db/db.module.js';
 import { FakeGatewayControlController } from './testing/fake-gateway-control.controller.js';
+import { FakePushControlController } from './testing/fake-push-control.controller.js';
+import { PushAlertsManagerModule } from './manager/push/push.module.js';
+import { PushSenderModule } from './service/push/push-sender.module.js';
 
 @Module({})
 export class AppModule {
@@ -22,9 +25,11 @@ export class AppModule {
                 ModelGatewayModule.forRoot(),
                 DiceModule,
                 PageFetchModule,
+                PushSenderModule,
+                PushAlertsManagerModule,
                 ApiModule,
             ],
-            controllers: config.modelGateway === 'fake' ? [FakeGatewayControlController] : [],
+            controllers: config.modelGateway === 'fake' ? [FakeGatewayControlController, FakePushControlController] : [],
         };
     }
 }

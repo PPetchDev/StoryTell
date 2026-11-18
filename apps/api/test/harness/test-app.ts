@@ -11,7 +11,7 @@ import { inject } from 'vitest';
 
 import { AppModule } from '../../src/app.module.js';
 import { configureApp } from '../../src/app.setup.js';
-import { ProviderKeys } from '../../src/config/app-config.js';
+import { ProviderKeys, VapidConfig } from '../../src/config/app-config.js';
 import { FakeModelGateway } from '../../src/service/model-gateway/fake-model-gateway.js';
 import { GATEWAY_FETCH } from '../../src/service/model-gateway/model-gateway.module.js';
 import { ModelGateway } from '../../src/service/model-gateway/model-gateway.js';
@@ -67,6 +67,8 @@ export interface TestAppOptions {
      * temp folder, and parallel tests would see each other's audio.
      */
     speechDir?: string;
+    /** Reply alerts' VAPID pair (.scratch/push-alerts/spec.md). Default: unset, so alerts are off. */
+    vapid?: VapidConfig;
 }
 
 async function admin(sql: string): Promise<void> {
@@ -115,6 +117,7 @@ export async function startTestApp(options: TestAppOptions = {}): Promise<TestAp
                 ownerEmail: options.ownerEmail,
                 supabaseAnonKey: options.supabaseUrl ? 'anon-key-for-tests' : undefined,
                 supabaseEmailsConfirmed: options.supabaseEmailsConfirmed ?? false,
+                vapid: options.vapid,
                 providerKeys: {
                     openRouter: undefined,
                     venice: undefined,
