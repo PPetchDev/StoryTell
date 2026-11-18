@@ -105,8 +105,9 @@ test('a Chat becomes a Book: priced, written, read chapter by chapter, edited, r
         await expectFits(page, 320);
         await page.setViewportSize({ width: 390, height: 844 });
 
-        // Write all from the Contents, priced; the first streams in as it comes.
-        await script(request, 'book_chapter', [{ text: CHAPTER_ONE, pieceDelayMs: 40, pieceSize: 40 }, CHAPTER_TWO]);
+        // Write all from the Contents, priced; the first streams in as it comes. About 4.5 s of
+        // streaming, so the Book view's 1.5 s poll is sure to catch it while it writes.
+        await script(request, 'book_chapter', [{ text: CHAPTER_ONE, pieceDelayMs: 150, pieceSize: 40 }, CHAPTER_TWO]);
         await page.getByRole('button', { name: 'Contents', exact: true }).tap();
         const contents = page.getByRole('dialog', { name: 'Contents' });
         await expect(contents.getByRole('button', { name: /^Write all 2 · ~\$0\.\d+$/ })).toBeVisible();
