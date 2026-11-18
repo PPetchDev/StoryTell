@@ -5,10 +5,12 @@ import { ReadAloudManagerModule } from '../../manager/read-aloud/read-aloud.modu
 import { ChatTranscriptApiController } from './chat-transcript.controller.js';
 import { ChatApiController } from './chat.controller.js';
 import { DictationApiController } from './dictation.controller.js';
+import { LiveTurns } from './live-turns.js';
 import { ReadAloudApiController } from './read-aloud.controller.js';
 
 @Module({
     imports: [ChatManagerModule, ReadAloudManagerModule],
     controllers: [ChatApiController, ChatTranscriptApiController, DictationApiController, ReadAloudApiController],
+    providers: [LiveTurns],
 })
 export class ChatApiModule {}

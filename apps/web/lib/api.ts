@@ -20,7 +20,7 @@ interface ErrorBody {
     error: { code: string; message: string };
 }
 
-function isErrorBody(body: unknown): body is ErrorBody {
+export function isErrorBody(body: unknown): body is ErrorBody {
     return (
         typeof body === 'object' &&
         body !== null &&
@@ -68,13 +68,13 @@ export const SIGNED_OUT_EVENT = 'storytell:signed-out';
 const SIGN_IN_REQUIRED = '401.010.001';
 
 /** A typed API error, after telling the sign-in gate when it says the session is gone. */
-function apiError(status: number, code: string, message: string): ApiError {
+export function apiError(status: number, code: string, message: string): ApiError {
     if (code === SIGN_IN_REQUIRED && typeof window !== 'undefined') window.dispatchEvent(new Event(SIGNED_OUT_EVENT));
     return new ApiError(status, code, message);
 }
 
 /** An API answer read as JSON: the body, or its typed error. */
-async function readJsonAnswer<T>(response: Response): Promise<T> {
+export async function readJsonAnswer<T>(response: Response): Promise<T> {
     if (response.status === 204) return undefined as T;
     const body: unknown = await response.json().catch(() => undefined);
     if (response.ok && body !== undefined) return body as T;
@@ -100,62 +100,17 @@ export class StreamBrokenError extends Error {
     }
 }
 
-export interface StreamOptions {
-    /** Aborting it stops the request: the call then rejects with StreamStoppedError. */
-    signal: AbortSignal;
-    /** Each event before the answer, in order. */
-    onEvent(event: string, data: unknown): void;
-}
+/**
+ * A turn the API no longer knows (.scratch/resume-reply/spec.md): its request never arrived, or
+ * it ended too long ago, or the API restarted. What happened is in the Chat as stored.
+ */
+export class TurnLostError extends StreamBrokenError {}
 
 /**
- * A JSON write that asks for server-sent events (spec: streaming replies, "The wire format").
- * Each event goes to `onEvent` until `done`, whose data is the answer, or `error`, whose data
- * is a typed error. An answer that is not a stream (an error before the stream began, a write
- * that runs no turn, or a proxy that buffered it) is read as `apiSend` reads it.
+ * The events of a server-sent event stream, their data parsed as JSON. Comments are skipped,
+ * but every chunk that arrives, a comment too, is told to `onChunk`: the stream is alive.
  */
-export async function apiSendStream<T>(
-    method: 'POST' | 'PATCH',
-    path: string,
-    body: object | undefined,
-    { signal, onEvent }: StreamOptions,
-): Promise<T> {
-    const write = jsonWrite(method, body);
-    let response: Response;
-    try {
-        response = await fetch(`/api${path}`, {
-            ...write,
-            cache: 'no-store',
-            signal,
-            headers: { Accept: 'text/event-stream, application/json', ...write.headers },
-        });
-    } catch {
-        if (signal.aborted) throw new StreamStoppedError();
-        throw new ApiUnreachableError();
-    }
-    if (!(response.headers.get('content-type') ?? '').startsWith('text/event-stream') || !response.body) {
-        return readJsonAnswer<T>(response);
-    }
-
-    try {
-        for await (const { event, data } of serverSentEvents(response.body)) {
-            if (event === 'done') return data as T;
-            if (event === 'error') {
-                if (!isErrorBody(data)) throw new StreamBrokenError();
-                throw apiError(Number(data.error.code.slice(0, 3)), data.error.code, data.error.message);
-            }
-            onEvent(event, data);
-        }
-    } catch (caught) {
-        if (signal.aborted) throw new StreamStoppedError();
-        if (caught instanceof ApiError) throw caught;
-        throw new StreamBrokenError();
-    }
-    if (signal.aborted) throw new StreamStoppedError();
-    throw new StreamBrokenError();
-}
-
-/** The events of a server-sent event stream, their data parsed as JSON. Comments are skipped. */
-async function* serverSentEvents(body: ReadableStream<Uint8Array>): AsyncGenerator<{ event: string; data: unknown }> {
+export async function* serverSentEvents(body: ReadableStream<Uint8Array>, onChunk?: () => void): AsyncGenerator<{ event: string; data: unknown }> {
     const reader = body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
@@ -163,6 +118,7 @@ async function* serverSentEvents(body: ReadableStream<Uint8Array>): AsyncGenerat
         for (;;) {
             const { value, done } = await reader.read();
             if (done) return;
+            onChunk?.();
             buffer += decoder.decode(value, { stream: true }).replace(/\r\n?/g, '\n');
             let end: number;
             while ((end = buffer.indexOf('\n\n')) >= 0) {
@@ -204,7 +160,7 @@ export function apiSend<T>(method: 'POST' | 'PATCH' | 'PUT' | 'DELETE', path: st
 }
 
 /** A write's method, and its body as JSON when it has one. */
-function jsonWrite(method: string, body: object | undefined): RequestInit {
+export function jsonWrite(method: string, body: object | undefined): RequestInit {
     return {
         method,
         headers: body === undefined ? {} : { 'Content-Type': 'application/json' },

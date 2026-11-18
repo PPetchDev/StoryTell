@@ -5,7 +5,7 @@ import { ReplyPart } from './reply-parser.js';
  * once the whole reply is written, as before.
  */
 export interface TurnStream {
-    /** Aborted when the user stops the reply: the turn then fails as a failed call does. */
+    /** Aborted when the user stops the reply (never when the request closes): the turn then fails as a failed call does. */
     signal: AbortSignal;
     /** The turn passed its gate and the model call starts; errors before this are plain. */
     onStart(): void;
@@ -15,8 +15,8 @@ export interface TurnStream {
 
 /**
  * The user stopped a streamed turn. Not an AppError, and in no error catalogue: like the
- * gateway's NetworkError it is an internal signal. The request it would answer is gone, so it
- * never reaches a client; it only unwinds the turn down its failure path.
+ * gateway's NetworkError it is an internal signal: it unwinds the turn down its failure path,
+ * and the turn's stream ends with `stopped` (.scratch/resume-reply/spec.md, "Stop").
  */
 export class TurnStoppedError extends Error {
     constructor() {
