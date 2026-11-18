@@ -140,14 +140,16 @@ function PoolCard({ pool, usage, member }: { pool: CreditPool; usage: PoolUsage;
                                 </span>
                             ) : (
                                 <>
-                                    {usd(usage.remainingUsd)} of {usd(usage.capUsd)}
+                                    {usage.remainingUsd <= 0 ? <strong className="text-caution-text">Used up</strong> : <>{usd(usage.remainingUsd)} of {usd(usage.capUsd)}</>}
                                     <CreditBar pool={pool} usage={usage} />
                                 </>
                             )}
                         </dd>
                         <dt>Low-credit warning</dt>
                         <dd>
-                            {usage.lowCredit ? (
+                            {usage.remainingUsd !== null && usage.remainingUsd <= 0 ? (
+                                <strong className="text-caution-text">Used up: top up the credit to play on</strong>
+                            ) : usage.lowCredit ? (
                                 <strong className="text-caution-text">
                                     Low: at or below {usage.lowCreditPercent}% of {usd(usage.capUsd)}
                                 </strong>

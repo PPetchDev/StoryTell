@@ -32,8 +32,8 @@ describe('Settings', () => {
         expect(
             body.playModels.map((m: Record<string, unknown>) => [m.id, m.label, m.priceUsdPerMillion, m.longTurnUsd]),
         ).toEqual([
-            ['glm-5.3', 'GLM-5.3 (DeepInfra)', { input: 0.5625, output: 2.5, cachedInput: 0.125 }, 0.01],
-            ['deepseek-v4-pro', 'DeepSeek V4 Pro (DeepInfra)', { input: 1.3, output: 2.6, cachedInput: 0.1 }, 0.02],
+            ['glm-5.3', 'GLM-5.3', { input: 0.5625, output: 2.5, cachedInput: 0.125 }, 0.01],
+            ['deepseek-v4-pro', 'DeepSeek V4 Pro', { input: 1.3, output: 2.6, cachedInput: 0.1 }, 0.02],
         ]);
         expect(body.imageModels.map((m: { id: string }) => m.id)).toEqual([
             'seedream-v4-edit',

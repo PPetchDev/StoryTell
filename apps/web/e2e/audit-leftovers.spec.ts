@@ -61,7 +61,7 @@ test('M3: the low-credit banner arrives at the foot of a page, above the bottom 
     const before = await topOf(page, heading);
 
     const banner = page.getByRole('status').filter({ hasText: 'credit is low' });
-    await expect(banner.getByRole('paragraph')).toHaveText(['Images and audio (Venice) credit is low: $1.00 of $8.00 left.']);
+    await expect(banner.getByRole('paragraph').locator('strong')).toHaveText(['Images and audio (Venice) credit is low: $1.00 of $8.00 left.']);
     expect(await topOf(page, heading)).toBe(before);
 
     // It sits over the page, just above the nav, until Hide puts it away.
@@ -69,7 +69,7 @@ test('M3: the low-credit banner arrives at the foot of a page, above the bottom 
     const navBox = (await page.getByRole('navigation', { name: 'Main' }).boundingBox())!;
     expect(bannerBox.y + bannerBox.height).toBeLessThanOrEqual(navBox.y + 1);
     expect(bannerBox.y).toBeLessThan(844);
-    await banner.getByRole('button', { name: 'Hide' }).tap();
+    await banner.getByRole('button', { name: 'Hide the credit warning' }).tap();
     await expect(banner.getByRole('paragraph')).toHaveCount(0);
 });
 
@@ -86,7 +86,7 @@ test('M3: on the Chat screen the low-credit line lies over the thread, so the to
         const openingAt = await topOf(page, opening);
 
         const line = page.getByRole('status').filter({ hasText: 'Credit is low' });
-        await expect(line).toContainText('Images and audio (Venice) $1.00 of $8.00 left.');
+        await expect(line).toContainText('Images and audio (Venice) credit is low: $1.00 of $8.00 left.');
         expect(await topOf(page, menu)).toBe(menuAt);
         expect(await topOf(page, opening)).toBe(openingAt);
 

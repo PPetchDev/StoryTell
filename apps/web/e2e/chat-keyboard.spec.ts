@@ -174,3 +174,32 @@ test.describe('on a PC', () => {
         }
     });
 });
+
+test.describe('on a phone, after the keyboard closes', () => {
+    test.use({ viewport: { width: 360, height: 780 }, hasTouch: true, isMobile: true });
+
+    // Seen on the user's Android phone (2026-11-18): after the keyboard closed, the top bar was gone and half
+    // the screen lay empty under the composer. The keyboard is a window that shrinks, and Chrome scrolls the
+    // page to keep the box in sight; the Chat must come back whole either way.
+    test('the Chat fills the window again: top bar at the top, composer at the bottom, nothing scrolled', async ({ page, request }) => {
+        const { storyId, chatId } = await playableChat(request);
+        try {
+            await page.goto(`/stories/${storyId}/chats/${chatId}`);
+            const { form, box } = composer(page);
+            await box.tap();
+            // The keyboard opens: the window shrinks, and the page is scrolled to the box.
+            await page.setViewportSize({ width: 360, height: 400 });
+            await page.evaluate(() => window.scrollTo(0, 300));
+            // It closes again.
+            await page.setViewportSize({ width: 360, height: 780 });
+            await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+            const menu = (await page.getByRole('button', { name: 'Chat menu' }).boundingBox())!;
+            expect(menu.y).toBeGreaterThanOrEqual(0);
+            expect(menu.y).toBeLessThan(60);
+            const bottom = (await form.boundingBox())!;
+            expect(bottom.y + bottom.height).toBeGreaterThan(780 - 40);
+        } finally {
+            await request.delete(`/api/stories/${storyId}`);
+        }
+    });
+});

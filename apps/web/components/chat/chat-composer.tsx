@@ -62,7 +62,7 @@ function Notices({ chat, failedSnapshots, onRetryBackground, retrying }: Notices
             <Status>
                 {chat.textCreditOut && (
                     <p className="notice">
-                        Sending is blocked: text credit is used up. <Link href="/usage">See usage</Link>
+                        Text credit is used up. <Link href="/usage">See usage</Link>
                     </p>
                 )}
             </Status>

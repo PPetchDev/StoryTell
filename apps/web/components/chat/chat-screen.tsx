@@ -78,7 +78,11 @@ function replyAnnouncement(message: Message | undefined): string | null {
  */
 const SCREEN = [
     'flex min-h-0 flex-1 flex-col',
-    '[.page:has(>&)]:flex [.page:has(>&)]:h-dvh [.page:has(>&)]:flex-col',
+    // Pinned to the window's four edges, not `h-dvh` (2026-11-18, on the user's Android phone): after the
+    // keyboard closed, the page kept its keyboard-time height and stayed scrolled, so the top bar was
+    // gone and half the screen lay empty under the composer. A fixed page can't be scrolled, and its
+    // height is always the window's, which still shrinks above the keyboard (interactive-widget).
+    '[.page:has(>&)]:fixed [.page:has(>&)]:inset-0 [.page:has(>&)]:flex [.page:has(>&)]:flex-col',
     // The thin top bar sits at the very top, below only the phone's status bar.
     '[.page:has(>&)]:pt-[env(safe-area-inset-top)] [.page:has(>&)]:pb-0',
     // Desktop (spec: "Desktop layout"): the thread scrolls anywhere across the page beside the rail.

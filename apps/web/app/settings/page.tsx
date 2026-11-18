@@ -25,7 +25,7 @@ type ModelKey = 'playModel' | 'imageModel';
 /** "$0.56 in / $2.50 out per million tokens · a long turn about $0.01" */
 function priceLine(option: PlayModelOption): string {
     const { input, output } = option.priceUsdPerMillion;
-    return `$${input.toFixed(2)} in / $${output.toFixed(2)} out per million tokens · a long turn about $${option.longTurnUsd.toFixed(2)}`;
+    return `On DeepInfra: $${input.toFixed(2)} in / $${output.toFixed(2)} out per million tokens · a long turn about $${option.longTurnUsd.toFixed(2)}. Usage shows the host serving now.`;
 }
 
 /** The size kept when the Snapshot model changes: the same one if the new model has it, else its smallest. */

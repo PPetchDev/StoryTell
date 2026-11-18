@@ -564,9 +564,11 @@ export function ChatTopBar({
                             onSave={onSetSittingOut}
                         />
                     ) : (
-                        <div className="grid gap-3">
+                        // One column that may shrink below its content (docs/ui-audit-2026-11-17.md, H1): a row's
+                        // truncated sub-line widened the whole sheet past the screen.
+                        <div className="grid grid-cols-[minmax(0,1fr)] gap-3 [&>*]:min-w-0">
                             {/* Other places for this Chat, as three tiles, then where a Branch came from. */}
-                            <nav aria-label="Go to" className="grid gap-1">
+                            <nav aria-label="Go to" className="grid grid-cols-[minmax(0,1fr)] gap-1 [&>*]:min-w-0">
                                 <h2 className={GROUP_LABEL} aria-hidden="true">
                                     Go to
                                 </h2>
@@ -602,7 +604,7 @@ export function ChatTopBar({
                                 )}
                             </nav>
                             {/* Its name and its text, then how it plays; Read replies aloud stays the last row before Reset. */}
-                            <section aria-labelledby={thisChatId} className="grid gap-0.5">
+                            <section aria-labelledby={thisChatId} className="grid grid-cols-[minmax(0,1fr)] gap-0.5 [&>*]:min-w-0">
                                 <h2 id={thisChatId} className={GROUP_LABEL}>
                                     This Chat
                                 </h2>
@@ -693,7 +695,7 @@ export function ChatTopBar({
                                     onClick={() => onSetCharacterThoughts(!chat.characterThoughts)}
                                 >
                                     <span className="flex min-w-0 flex-1 flex-col items-start">
-                                        <MenuText label="Characters think for themselves" sub="Each thinks before a reply, from what they know" />
+                                        <MenuText label="Characters think for themselves" sub="Each thinks before they reply" />
                                     </span>
                                     <span aria-hidden="true" className={SWITCH_TRACK}>
                                         <span className={SWITCH_KNOB} />

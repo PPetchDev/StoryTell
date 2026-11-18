@@ -26,8 +26,11 @@ function readHidden(): string {
 }
 
 interface LowCredit {
-    /** One line per low pool, e.g. "$1.00 of $8.00 left." */
-    lines: { pool: CreditPool; text: string }[];
+    /**
+     * One per low pool: "Text credit is low: $1.00 of $8.00 left." or, at or below zero, "Text
+     * credit is used up." (docs/ui-audit-2026-11-17.md, H2: it read "$-0.01 of $5.85 left").
+     */
+    lines: { pool: CreditPool; text: string; usedUp: boolean }[];
     showing: boolean;
     hide(): void;
 }
@@ -72,7 +75,9 @@ function useLowCredit(): LowCredit {
 
     const lines = low.map((pool) => {
         const { remainingUsd, capUsd } = usage!.pools[pool];
-        return { pool, text: `${usd(remainingUsd ?? 0)} of ${usd(capUsd)} left.` };
+        const usedUp = remainingUsd !== null && remainingUsd <= 0;
+        const text = usedUp ? `${POOL_LABEL[pool]} credit is used up.` : `${POOL_LABEL[pool]} credit is low: ${usd(remainingUsd ?? 0)} of ${usd(capUsd)} left.`;
+        return { pool, text, usedUp };
     });
 
     return { lines, showing: low.length > 0 && hidden !== lowKey, hide };
@@ -87,33 +92,41 @@ const STICK = [
 /** At the foot of the window where the phone has no bar (a Chat's Dashboard). */
 const STICK_NO_BAR = 'sticky bottom-[calc(1rem+env(safe-area-inset-bottom))] z-sticky';
 
+/** One thin line: the warning, a Usage link where it isn't the Usage page, and a close button, each 44px tall. */
+function CreditLine({ text, onUsagePage, hide }: { text: string; onUsagePage: boolean; hide(): void }) {
+    return (
+        <p className="m-0 flex min-h-11 min-w-0 items-center gap-2 rounded-md border border-banner-line bg-banner-surface pl-3 text-sm shadow-lg shadow-shadow-soft">
+            <strong className="min-w-0 flex-1 truncate font-semibold">{text}</strong>
+            {!onUsagePage && (
+                <Link href="/usage" className="flex min-h-11 flex-none items-center px-1 text-text">
+                    Usage
+                </Link>
+            )}
+            <button type="button" className="grid size-11 flex-none place-items-center" aria-label="Hide the credit warning" onClick={hide}>
+                <CloseIcon size={18} />
+            </button>
+        </p>
+    );
+}
+
 /**
- * Shown on every page but the Chat screen while a credit pool is low. It arrives after the page,
- * so it never goes above it: it comes last in the page and sticks to the foot of the window, over
- * the content until the page is scrolled to its end, where it has room of its own (audit M3).
- * The Chat screen shows `LowCreditLine` instead.
+ * Shown on every page but the Chat screen and the Usage page (which says it in full) while a
+ * credit pool is low. It arrives after the page, so it never goes above it: it comes last in the
+ * page and sticks to the foot of the window. It is one 44px line (docs/ui-audit-2026-11-17.md,
+ * H2: the block it was covered about 150px of a 780px phone). The Chat screen shows
+ * `LowCreditLine` instead.
  */
 export function LowCreditBanner() {
     const pathname = usePathname();
     const { lines, showing, hide } = useLowCredit();
-    const onPage = showing && !isChatScreen(pathname);
+    const onPage = showing && !isChatScreen(pathname) && pathname !== '/usage';
 
     // The status region is always there, so what appears in it is read out once.
     return (
         <div role="status" className={hidesBottomNav(pathname) ? STICK_NO_BAR : STICK}>
             {onPage && (
-                <div className="banner mt-4 mb-0 flex flex-wrap items-start gap-x-3 shadow-lg shadow-shadow-soft">
-                    <div className="min-w-0 flex-1">
-                        {lines.map((line) => (
-                            <p key={line.pool}>
-                                <strong>{POOL_LABEL[line.pool]} credit is low:</strong> {line.text}
-                            </p>
-                        ))}
-                        <Link href="/usage">See usage</Link>
-                    </div>
-                    <button type="button" className="button button-quiet button-small" onClick={hide}>
-                        Hide
-                    </button>
+                <div className="mt-4">
+                    <CreditLine text={lines.map((line) => line.text).join(' ')} onUsagePage={false} hide={hide} />
                 </div>
             )}
         </div>
@@ -123,23 +136,13 @@ export function LowCreditBanner() {
 /**
  * The Chat screen's low-credit warning: one thin line that Hide puts away for the session. The
  * Chat lays it over the top of the thread with its toasts, so it pushes nothing down (audit M3).
- * It sits inside the Chat's status region, so it is read out when it appears.
+ * It sits inside the Chat's status region, so it is read out when it appears. Text credit that is
+ * used up is left to the composer, which already says sending is blocked: the two said it twice,
+ * one of them over the story (docs/ui-audit-2026-11-17.md, H2).
  */
 export function LowCreditLine() {
     const { lines, showing, hide } = useLowCredit();
-    if (!showing) return null;
-    return (
-        <p className="m-0 flex min-h-11 min-w-0 items-center gap-2 rounded-md border border-banner-line bg-banner-surface pl-3 text-sm shadow-lg shadow-shadow-soft">
-            <span className="min-w-0 flex-1 truncate">
-                <strong className="font-semibold">Credit is low:</strong>{' '}
-                {lines.map((line) => `${POOL_LABEL[line.pool]} ${line.text}`).join(' ')}
-            </span>
-            <Link href="/usage" className="flex-none text-text">
-                Usage
-            </Link>
-            <button type="button" className="grid size-11 flex-none place-items-center" aria-label="Hide the credit warning" onClick={hide}>
-                <CloseIcon size={18} />
-            </button>
-        </p>
-    );
+    const shown = lines.filter((line) => !(line.pool === 'text' && line.usedUp));
+    if (!showing || shown.length === 0) return null;
+    return <CreditLine text={shown.map((line) => line.text).join(' ')} onUsagePage={false} hide={hide} />;
 }

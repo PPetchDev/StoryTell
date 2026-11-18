@@ -546,7 +546,7 @@ test('the low-credit banner names the Venice pool "Images and audio (Venice)"', 
 
     await page.goto('/');
     const banner = page.getByRole('status').filter({ hasText: 'credit is low' });
-    await expect(banner.getByRole('paragraph')).toHaveText(['Images and audio (Venice) credit is low: $1.00 of $8.00 left.']);
+    await expect(banner.getByRole('paragraph').locator('strong')).toHaveText(['Images and audio (Venice) credit is low: $1.00 of $8.00 left.']);
 });
 
 test('Cancel while the browser still asks for the microphone records nothing', async ({ page, request }) => {

@@ -88,9 +88,11 @@ export function useCastCharacter(characterId: number | null): Character | undefi
 }
 
 /**
- * Lets a tap on a Character's Portrait open their profile over the Chat: their Reference image
- * in full, their Expressions under it, name, their Diary in the Chat, Appearance, Personality, Voice and Background. Secrets and Arc directions stay
- * hidden, since they would give the story away.
+ * Lets a tap on a Character's Portrait open their profile over the Chat: their name, their
+ * Reference image (no taller than 40% of the screen, so the name and what they want now are seen
+ * first; docs/ui-audit-2026-11-17.md, M3), what they wear and want now, their Diary in the Chat,
+ * their Expressions, then Appearance, Personality, Voice and Background. Secrets and Arc directions
+ * stay hidden, since they would give the story away.
  */
 export function CharacterProfiles({ characters, children }: { characters: readonly Character[]; children: ReactNode }) {
     const [openId, setOpenId] = useState<number | null>(null);
@@ -148,10 +150,11 @@ function CharacterProfileSheet({
     return (
         <Sheet label={name} onClose={onClose}>
             <div className="flex flex-col gap-3.5 pb-2" style={{ '--speaker-colour': colour } as CSSProperties}>
+                <h2 className="m-0 text-center text-xl text-(color:--speaker-colour) [overflow-wrap:anywhere]">{name}</h2>
                 {character.referenceImagePath ? (
                     // eslint-disable-next-line @next/next/no-img-element -- served by the API from the image folder
                     <img
-                        className="block h-auto max-h-[55dvh] max-w-full self-center rounded-xl bg-surface-raised object-contain"
+                        className="block h-auto max-h-[40dvh] max-w-full self-center rounded-xl bg-surface-raised object-contain"
                         src={referenceImageUrl(character.referenceImagePath)}
                         alt={`Reference image of ${name}`}
                         draggable={false}
@@ -161,20 +164,6 @@ function CharacterProfileSheet({
                         {name.charAt(0).toUpperCase()}
                     </span>
                 )}
-                {character.expressions.length > 0 && (
-                    <ul className="m-0 flex list-none flex-wrap justify-center gap-x-3.5 gap-y-2.5 p-0" aria-label="Expressions">
-                        {character.expressions.map((expression) => (
-                            <li key={expression.emotion} className="flex flex-col items-center gap-1 text-sm text-muted">
-                                <PortraitImage
-                                    portrait={{ src: referenceImageUrl(expression.imagePath), crop: expression.crop ?? character.portraitCrop }}
-                                    className="size-12"
-                                />
-                                <span>{EMOTION_LABEL[expression.emotion]}</span>
-                            </li>
-                        ))}
-                    </ul>
-                )}
-                <h2 className="m-0 text-center text-xl text-(color:--speaker-colour) [overflow-wrap:anywhere]">{name}</h2>
                 {/* What they are wearing now in this Chat (.scratch/info-box/spec.md), above what they usually look like. */}
                 {outfit && (
                     <section className="rounded-lg bg-surface-raised px-3.5 py-3">
@@ -191,6 +180,19 @@ function CharacterProfileSheet({
                 )}
                 {/* Their Diary in this Chat, above who they are: it is what changes as the story goes. */}
                 {chat && <DiarySection chat={chat} characterId={character.id} name={name} />}
+                {character.expressions.length > 0 && (
+                    <ul className="m-0 flex list-none flex-wrap justify-center gap-x-3.5 gap-y-2.5 p-0" aria-label="Expressions">
+                        {character.expressions.map((expression) => (
+                            <li key={expression.emotion} className="flex flex-col items-center gap-1 text-sm text-muted">
+                                <PortraitImage
+                                    portrait={{ src: referenceImageUrl(expression.imagePath), crop: expression.crop ?? character.portraitCrop }}
+                                    className="size-12"
+                                />
+                                <span>{EMOTION_LABEL[expression.emotion]}</span>
+                            </li>
+                        ))}
+                    </ul>
+                )}
                 {sections.map(([label, field]) => (
                     <section key={field} className="rounded-lg bg-surface-raised px-3.5 py-3">
                         <h3 className="mt-0 mb-1 text-sm font-semibold text-muted">{label}</h3>

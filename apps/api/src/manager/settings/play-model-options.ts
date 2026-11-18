@@ -11,7 +11,10 @@ import { REPLY_LENGTH_WORDS, TURN_PROMPT_TOKEN_BUDGET } from '../chat/turn/promp
 
 export interface PlayModelOption {
     id: PlayModel;
-    /** Its name and the host that serves it. Every play model is pinned to DeepInfra (spec: "More play models"). */
+    /**
+     * Its name. The host is left out: text goes through a chain of hosts (.scratch/text-fallback/spec.md),
+     * and Settings says the price is DeepInfra's (docs/ui-audit-2026-11-17.md, M6).
+     */
     label: string;
     priceUsdPerMillion: { input: number; output: number; cachedInput: number };
     /** Roughly what a long turn costs: the full turn prompt uncached plus a Long reply, to the cent. */
@@ -26,7 +29,7 @@ export function playModelOptions(): PlayModelOption[] {
         const facts = PLAY_MODEL_CATALOGUE[id];
         return {
             id,
-            label: `${facts.name} (DeepInfra)`,
+            label: facts.name,
             priceUsdPerMillion: { ...facts.priceUsdPerMillion },
             longTurnUsd: longTurnUsd(facts.priceUsdPerMillion),
             samplers: SAMPLER_PARAMS.filter((param) => facts.samplers.includes(param)).map((param) => ({

@@ -367,9 +367,15 @@ export function Dashboard({ initial, cast = [], portraits = {} }: { initial: Cha
                     <>
                         <p className={EVENT}>
                             Moved on from {dashboard.scene.advance.fromSceneName}
-                            {dashboard.scene.advance.toSceneName ? ` to ${dashboard.scene.advance.toSceneName}` : ' into free play'}:{' '}
-                            {dashboard.scene.advance.event}
+                            {dashboard.scene.advance.toSceneName ? ` to ${dashboard.scene.advance.toSceneName}` : ' into free play'}.
                         </p>
+                        {/* The Judge's own reasoning, long and in its own words ("the user…"), folded away (docs/ui-audit-2026-11-17.md, M5). */}
+                        {dashboard.scene.advance.event && (
+                            <details className="text-sm">
+                                <summary className="min-h-11 cursor-pointer py-2.5 text-muted">Why it moved on</summary>
+                                <p className={`${P} text-muted`}>{dashboard.scene.advance.event}</p>
+                            </details>
+                        )}
                         <p className={WHEN}>
                             {formatWhen(dashboard.scene.advance.createdAt)} ·{' '}
                             <Cause dashboard={dashboard} messageId={dashboard.scene.advance.messageId} />
