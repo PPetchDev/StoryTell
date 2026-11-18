@@ -267,3 +267,47 @@ export class NoEventProposalError extends AppError {
         super('409.004.041', 'That event is no longer on offer: the story has moved on.');
     }
 }
+
+// Turn a Chat into a novel (.scratch/chat-novel/spec.md). Numbered from 130.
+
+/** Write all (or a write naming chapters) when every Book chapter that can be written is written and up to date. No call. */
+export class NothingToWriteError extends AppError {
+    constructor() {
+        super('409.004.130', 'Every chapter of the Book is written and up to date.');
+    }
+}
+
+/** A write for a Book chapter whose Chapter has no Messages, or was taken back. No call. */
+export class BookChapterNotWritableError extends AppError {
+    constructor(number: number) {
+        super('422.004.131', `Chapter ${number} has nothing to write from: its Chapter is empty or was taken back.`);
+    }
+}
+
+/** No Chapter and no Book chapter with that number in this Chat. */
+export class BookChapterNotFoundError extends AppError {
+    constructor() {
+        super('404.004.132', 'Chapter not found in this Book.');
+    }
+}
+
+/** An edit or a removal of a Book chapter while it is waiting to be written or being written. Nothing changes. */
+export class BookChapterBusyError extends AppError {
+    constructor() {
+        super('409.004.133', 'This chapter is being written. Wait for it to finish.');
+    }
+}
+
+/** An EPUB asked for while no Book chapter is written. */
+export class EmptyBookError extends AppError {
+    constructor() {
+        super('409.004.134', 'Write a chapter of the Book first.');
+    }
+}
+
+/** A Book chapter saved with a blank title or text. Nothing changes. */
+export class EmptyBookChapterError extends AppError {
+    constructor() {
+        super('422.004.135', 'Give the chapter a title and some text.');
+    }
+}

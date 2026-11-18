@@ -127,6 +127,12 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | `422.004.092` | `EmptyChapterError` | A Chapter summary saved with nothing but whitespace. Nothing changes. |
 | `409.004.093` | `ChapterNotFailedError` | Try again (`POST …/chapters/:chapterId/write`) on a Chapter whose summary did not fail: written, being written, waiting, or with no Messages. No call. |
 | `409.004.120` | `NothingToRecapError` | A "Previously on…" Recap asked for (`POST /api/stories/:storyId/chats/:chatId/recap`) in a Chat with nothing after its Opening (`.scratch/previously-on/spec.md`). No call. A failed write answers the gateway's own error (`502.001.001` and the like), and a Member at their cap `402.010.009`; nothing is stored either way. |
+| `409.004.130` | `NothingToWriteError` | A Book write (`POST /api/stories/:storyId/chats/:chatId/book/write`) when every Book chapter that can be written is written and up to date (`.scratch/chat-novel/spec.md`). No call. At the Monthly cap it answers `402.010.009` first. |
+| `422.004.131` | `BookChapterNotWritableError` | A Book write naming a chapter whose Chapter has no Messages, or was taken back. No call. |
+| `404.004.132` | `BookChapterNotFoundError` | A Book chapter number with neither a Chapter nor a Book chapter in this Chat. |
+| `409.004.133` | `BookChapterBusyError` | Editing or removing a Book chapter while it waits to be written or is being written. Nothing changes. |
+| `409.004.134` | `EmptyBookError` | The Book's EPUB (`GET …/book/epub`) while no chapter is written. |
+| `422.004.135` | `EmptyBookChapterError` | A Book chapter saved (`PUT …/book/chapters/:number`) with a blank title or text. Nothing changes. |
 | `409.004.160` | `WatchRunningError` | Watch started (`POST /api/stories/:storyId/chats/:chatId/watch`) while one already runs in the Chat (`.scratch/watch-mode/spec.md`). Nothing changes; Stop it first. Other refusals of a start are a Continue's: `409.004.013`, `422.004.002`, `409.004.004`, out of credit, the Monthly cap. |
 | `409.004.161` | `WatchNeedsYouError` | Watch started while a Sudden event is under way: its Gauge moves by how the user plays, so the user must play it. Nothing changes. |
 | `502.005.001` | `UnreadableDraftError` | The model's draft or rewrite could not be read (no JSON object, or no text). Nothing saved. Show with Retry. |

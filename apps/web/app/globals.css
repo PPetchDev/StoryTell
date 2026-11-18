@@ -13,6 +13,7 @@
 @import 'tailwindcss' source('..');
 
 @import './styles/memory.css';
+@import './styles/book.css';
 
 /* `light:` styles an element for the light theme, which the head script marks on <html>. */
 @custom-variant light (&:where([data-theme='light'], [data-theme='light'] *));

@@ -67,6 +67,7 @@ import { SceneChapters1764390000000 } from './1764390000000-SceneChapters.js';
 import { OpeningQuestions1764400000000 } from './1764400000000-OpeningQuestions.js';
 import { ReachOuts1764410000010 } from './1764410000010-ReachOuts.js';
 import { ChatRecap1764420000001 } from './1764420000001-ChatRecap.js';
+import { BookChapters1764430000010 } from './1764430000010-BookChapters.js';
 
 // Listed by hand, oldest first, so migrations load the same way from compiled JS, the
 // TypeORM CLI and Vitest. Add every new migration here.
@@ -141,4 +142,5 @@ export const migrations = [
     OpeningQuestions1764400000000,
     ReachOuts1764410000010,
     ChatRecap1764420000001,
+    BookChapters1764430000010,
 ];

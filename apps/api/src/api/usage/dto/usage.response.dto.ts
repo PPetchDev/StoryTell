@@ -18,6 +18,7 @@ export const CALL_KINDS = Object.keys({
     story_summary: true,
     chapter_summary: true,
     previously_on: true,
+    book_chapter: true,
     write_for_me: true,
     thai_reading: true,
     diary_entry: true,
