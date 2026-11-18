@@ -5,8 +5,8 @@ import { startApi, stopApi } from './harness/api-server';
 async function expectCantConnectScreen(page: Page) {
     await expect(page.getByRole('heading', { name: "Can't connect" })).toBeVisible();
     await expect(page.getByText('this device is connected to the internet')).toBeVisible();
-    await expect(page.getByText('the PC is on')).toBeVisible();
-    await expect(page.getByText('Tailscale is connected on this device')).toBeVisible();
+    await expect(page.getByText('that computer (a server, or your own PC) is on')).toBeVisible();
+    await expect(page.getByText('if you reach it through a VPN, the VPN is connected on this device')).toBeVisible();
 }
 
 test.afterEach(async ({ context }) => {

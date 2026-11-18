@@ -132,6 +132,11 @@ export interface PoolUsage {
     lowCredit: boolean;
     /** The text pool: the host serving text now (`openrouter`, `venice` or `free`); null for the image pool. */
     host?: string | null;
+    /**
+     * This month's prompt cache (.scratch/prompt-cache/spec.md): the prompt tokens of the calls whose
+     * host reported it, and how many of those it read from its cache; null while none did.
+     */
+    cache?: { promptTokens: number; cachedTokens: number } | null;
 }
 
 /** How the Usage page names the host serving text (.scratch/text-fallback/spec.md). */

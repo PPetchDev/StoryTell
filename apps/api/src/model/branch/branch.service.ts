@@ -374,14 +374,17 @@ function remapSnapshot(snapshot: Snapshot | null, messageIds: IdMap, memoryIds: 
  * turn"), with its Memory and Belief ids moved to the Branch's own; an id the copy doesn't hold is dropped.
  */
 const remapMemoriesUsed: CopyStep = async ({ manager, chatId, memoryIds, beliefIds }) => {
-    const rows: Array<{ id: number; memories_used: { memoryIds: number[]; beliefIds: number[] } }> = await manager.query(
+    const rows: Array<{ id: number; memories_used: { memoryIds: number[]; beliefIds: number[]; pickedIds?: number[] } }> = await manager.query(
         'SELECT "id", "memories_used" FROM "message" WHERE "chat_id" = $1 AND "memories_used" IS NOT NULL',
         [chatId],
     );
+    const remap = (ids: number[]) => ids.flatMap((id) => (memoryIds.has(id) ? [memoryIds.get(id)!] : []));
     for (const row of rows) {
         const used = {
-            memoryIds: row.memories_used.memoryIds.flatMap((id) => (memoryIds.has(id) ? [memoryIds.get(id)!] : [])),
+            memoryIds: remap(row.memories_used.memoryIds),
             beliefIds: row.memories_used.beliefIds.flatMap((id) => (beliefIds.has(id) ? [beliefIds.get(id)!] : [])),
+            // What the Settled Memories are read off (.scratch/prompt-cache/spec.md), so the Branch settles the same ones.
+            ...(row.memories_used.pickedIds ? { pickedIds: remap(row.memories_used.pickedIds) } : {}),
         };
         await manager.query('UPDATE "message" SET "memories_used" = $2 WHERE "id" = $1', [row.id, JSON.stringify(used)]);
     }

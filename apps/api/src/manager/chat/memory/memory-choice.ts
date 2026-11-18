@@ -11,6 +11,7 @@ import { renderUser } from './render-user.js';
  *
  * The budget is filled in this order:
  *  1. every locked Memory, oldest first, even past the budget;
+ *  1b. the Settled Memories (.scratch/prompt-cache/spec.md), oldest first, while they fit;
  *  2. the active Beliefs of the Characters present, oldest first;
  *  3. Memories by closeness to the query, closest first, at or above the floor (archived ones too);
  *  4. the newest Memories about the people present or the worn identity, newest first;
@@ -26,7 +27,17 @@ export const MEMORY_MIN_SIMILARITY = 0.35;
 /** How many top scores each Memory search logs. */
 export const MEMORY_LOGGED_SCORES = 5;
 
-export type MemoryChoiceReason = 'locked' | 'believed' | 'meaning' | 'recent';
+export type MemoryChoiceReason = 'locked' | 'settled' | 'believed' | 'meaning' | 'recent';
+
+/**
+ * The Settled Memories (.scratch/prompt-cache/spec.md, "Settled Memories"): read off the newest
+ * this many turns before the Story so far was last written.
+ */
+export const SETTLED_WINDOW_TURNS = 8;
+/** Picked by at least this many of those turns. */
+export const SETTLED_MIN_PICKS = 6;
+/** The most the Settled Memories take of the Memory budget (half), so the search keeps room of its own. */
+export const SETTLED_BUDGET_TOKENS = 2_000;
 
 /** A Memory as the choice reads it: its text with `{user}`, who knows it by name, its flags and its vector. */
 export interface ChoiceMemory {
@@ -66,6 +77,11 @@ export interface MemoryChoiceInput {
     identityName: string;
     /** Null when the search failed or there was nothing to search. */
     query: ContextQueryVector | null;
+    /**
+     * The Settled Memories by id (`settledMemoryIds`): sent after the locked ones whatever the
+     * search finds, so the standing part of the prompt stays the same turn after turn. Left out, none.
+     */
+    settled?: readonly number[];
     budget?: number;
     floor?: number;
 }
@@ -91,6 +107,12 @@ export interface MemoryChoice {
     usedTokens: number;
     /** Every comparable Memory's score, highest first, marked when sent: for the debug log. */
     scored: Array<{ id: number; score: number; sent: boolean }>;
+    /**
+     * The Memories the choice picks without the Settled ones, by id in story order: what the
+     * search alone found, which the turn records so the next Settled Memories are read off it,
+     * never off themselves. The same as `memories` when there are no Settled Memories.
+     */
+    picked: number[];
 }
 
 /** What one Memory takes of the budget: its line in the Memory layer, and the line break after it. */
@@ -143,6 +165,12 @@ export function chooseMemories(input: MemoryChoiceInput): MemoryChoice {
     // 1. Locked: never left out.
     for (const memory of input.memories) if (sentAsLocked(memory)) take(memory, 'locked');
 
+    // 1b. Settled: the same turn after turn, archived ones too, so the prompt's standing part holds.
+    const settled = new Set(input.settled ?? []);
+    for (const memory of input.memories) {
+        if (settled.has(memory.id) && !chosen.has(memory.id) && fits(memoryCost(memory))) take(memory, 'settled');
+    }
+
     // 2. The Beliefs of the Characters present.
     for (const belief of input.beliefs) {
         if (!input.present.includes(belief.characterName) || !fits(beliefCost(belief))) continue;
@@ -170,12 +198,44 @@ export function chooseMemories(input: MemoryChoiceInput): MemoryChoice {
         if (fits(memoryCost(memory))) take(memory, 'recent');
     }
 
+    const memories = input.memories.flatMap((memory) => chosen.get(memory.id) ?? []);
     return {
-        memories: input.memories.flatMap((memory) => chosen.get(memory.id) ?? []),
+        memories,
         beliefs,
         usedTokens: used,
         scored: scored.map(({ memory, score }) => ({ id: memory.id, score, sent: chosen.has(memory.id) })),
+        picked: settled.size > 0 ? chooseMemories({ ...input, settled: [] }).picked : memories.map(({ memory }) => memory.id),
     };
+}
+
+/**
+ * The Settled Memories (.scratch/prompt-cache/spec.md, "Settled Memories"): those the search
+ * picked in at least `minPicks` of the newest `window` turns it recorded, most often picked
+ * first, then the newest, up to `budget` tokens; never a locked one, which is sent anyway.
+ * `records` holds each turn's picked ids, oldest first. The caller hands in only turns from
+ * before the Story so far was last written, so the set changes only when the prompt's standing
+ * part changes anyway, or when one of them is edited or deleted.
+ */
+export function settledMemoryIds(
+    records: ReadonlyArray<readonly number[]>,
+    memories: ChoiceMemory[],
+    { window = SETTLED_WINDOW_TURNS, minPicks = SETTLED_MIN_PICKS, budget = SETTLED_BUDGET_TOKENS } = {},
+): number[] {
+    const picks = new Map<number, number>();
+    for (const ids of records.slice(-window)) for (const id of new Set(ids)) picks.set(id, (picks.get(id) ?? 0) + 1);
+    const byId = new Map(memories.map((memory) => [memory.id, memory]));
+    const candidates = [...picks]
+        .filter(([id, count]) => count >= minPicks && byId.has(id) && !byId.get(id)!.locked)
+        .sort(([idA, countA], [idB, countB]) => countB - countA || idB - idA);
+    const settled: number[] = [];
+    let used = 0;
+    for (const [id] of candidates) {
+        const cost = memoryCost(byId.get(id)!);
+        if (used + cost > budget) continue;
+        used += cost;
+        settled.push(id);
+    }
+    return settled.sort((a, b) => a - b);
 }
 
 /**

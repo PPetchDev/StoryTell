@@ -67,6 +67,22 @@ export interface TextBill {
     promptTokens: number;
     completionTokens: number;
     costUsd: number;
+    /**
+     * Of `promptTokens`, those the host read from its prompt cache (.scratch/prompt-cache/spec.md);
+     * null or left out when it reported nothing about its cache.
+     */
+    cachedTokens?: number | null;
+}
+
+/**
+ * The prompt tokens a host read from its cache: OpenRouter's and Venice's
+ * `usage.prompt_tokens_details.cached_tokens`. 0 when the details came without it; null when the
+ * host sent no details at all, so a share is only ever read off calls that reported one.
+ */
+export function cachedTokensOf(usage: Record<string, any> | undefined): number | null {
+    const details = usage?.prompt_tokens_details;
+    if (!details || typeof details !== 'object') return null;
+    return typeof details.cached_tokens === 'number' ? details.cached_tokens : 0;
 }
 
 export interface OpenRouterChatResult extends TextBill {
@@ -358,6 +374,7 @@ export class OpenRouterClient {
             text,
             promptTokens: usage.prompt_tokens ?? 0,
             completionTokens: usage.completion_tokens ?? 0,
+            cachedTokens: cachedTokensOf(usage),
             costUsd: streamCost ?? 0,
             finishReason,
             stopped: false,
@@ -461,6 +478,7 @@ export class OpenRouterClient {
             text,
             promptTokens: usage.prompt_tokens ?? 0,
             completionTokens: usage.completion_tokens ?? 0,
+            cachedTokens: cachedTokensOf(usage),
             costUsd: cost ?? 0,
             finishReason,
             reasoningTokens: usage.completion_tokens_details?.reasoning_tokens ?? 0,

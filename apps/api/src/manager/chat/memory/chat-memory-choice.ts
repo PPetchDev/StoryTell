@@ -2,7 +2,17 @@ import { ChatEntity } from '../../../model/chat/entities/chat.entity.js';
 import { MemoriesUsed, MessageKind } from '../../../model/chat/entities/message.entity.js';
 import { MemoryEntity } from '../../../model/memory/entities/memory.entity.js';
 import { StoryEntity } from '../../../model/story/entities/story.entity.js';
-import { ChoiceBelief, ChoiceMemory, chooseMemories, ContextQueryVector, MEMORY_BUDGET_TOKENS, MemoryChoice, memoryCost, beliefCost } from './memory-choice.js';
+import {
+    ChoiceBelief,
+    ChoiceMemory,
+    chooseMemories,
+    ContextQueryVector,
+    MEMORY_BUDGET_TOKENS,
+    MemoryChoice,
+    memoryCost,
+    beliefCost,
+    settledMemoryIds,
+} from './memory-choice.js';
 import { presentCharacters } from './present.js';
 
 /**
@@ -57,7 +67,11 @@ export function presentForMemory(story: StoryEntity, chat: ChatEntity, upTo: num
     return presentCharacters(cast, text, parts).map((character) => character.name);
 }
 
-/** The Chat's Memory choice with the given query and people present. */
+/**
+ * The Chat's Memory choice with the given query and people present. With `chat`, its Settled
+ * Memories go first after the locked ones (.scratch/prompt-cache/spec.md): every prompt that
+ * shares the turn's cached opening (the turn, Suggested replies, Write for me) hands it in.
+ */
 export function chooseForChat(input: {
     story: StoryEntity;
     memories: MemoryEntity[];
@@ -65,15 +79,33 @@ export function chooseForChat(input: {
     present: string[];
     identityName: string;
     query: ContextQueryVector | null;
+    chat?: ChatEntity;
 }): MemoryChoice {
+    const memories = choiceMemories(input.story, input.memories);
     return chooseMemories({
-        memories: choiceMemories(input.story, input.memories),
+        memories,
         beliefs: input.beliefs,
         cast: input.story.characters.map((character) => character.name),
         present: input.present,
         identityName: input.identityName,
         query: input.query,
+        settled: input.chat ? settledMemoryIds(settledRecordsOf(input.chat), memories) : [],
     });
+}
+
+/**
+ * What the Settled Memories are read off (.scratch/prompt-cache/spec.md, "Settled Memories"):
+ * the Memories each turn's search picked, oldest first, of the turns written before the Story
+ * so far was last written. They stay the same until it is written again, so the Settled
+ * Memories change with it, when the prompt's standing part changes anyway. None while there is
+ * no Story so far.
+ */
+export function settledRecordsOf(chat: ChatEntity): number[][] {
+    const writtenAt = chat.storySoFar !== null ? chat.storySoFarUpdatedAt : null;
+    if (!writtenAt) return [];
+    return chat.messages
+        .filter((message) => message.kind === MessageKind.Ai && message.memoriesUsed && message.createdAt.getTime() <= writtenAt.getTime())
+        .map((message) => message.memoriesUsed!.pickedIds ?? message.memoriesUsed!.memoryIds);
 }
 
 /**
@@ -90,5 +122,6 @@ export function memoryRoomTokens(memories: ChoiceMemory[], beliefs: ChoiceBelief
 /** Spec: "Used last turn": the newest AI Message's record of what its turn sent; nothing before any turn chose. */
 export function memoriesInPlayOf(chat: ChatEntity): MemoriesUsed {
     const newest = [...chat.messages].reverse().find((message) => message.kind === MessageKind.Ai);
-    return newest?.memoriesUsed ?? { memoryIds: [], beliefIds: [] };
+    const used = newest?.memoriesUsed;
+    return used ? { memoryIds: used.memoryIds, beliefIds: used.beliefIds } : { memoryIds: [], beliefIds: [] };
 }

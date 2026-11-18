@@ -2,7 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 
 import { MonthlyCapUsage, PoolUsage, UsageSummary } from '../../../manager/usage/usage.service.js';
 
-import type { KindSpend } from '../../../model/usage-record/usage-record.service.js';
+import type { KindSpend, PromptCacheSpend } from '../../../model/usage-record/usage-record.service.js';
 import type { CallKind } from '../../../service/model-gateway/model-gateway.js';
 
 /** Every call kind, for the docs; a Record so a new kind fails the typecheck until it is listed. */
@@ -45,6 +45,14 @@ export class KindSpendDTO implements KindSpend {
     calls: number;
 }
 
+export class PromptCacheSpendDTO implements PromptCacheSpend {
+    @ApiProperty({ description: "This month's prompt tokens, over the calls whose host reported its prompt cache." })
+    promptTokens: number;
+
+    @ApiProperty({ description: 'Of those prompt tokens, how many the host read from its cache (billed at a lower price).' })
+    cachedTokens: number;
+}
+
 export class PoolUsageDTO implements PoolUsage {
     @ApiProperty({ description: "This month's spend for the pool, the sum of its usage records, in USD." })
     spentUsd: number;
@@ -80,6 +88,13 @@ export class PoolUsageDTO implements PoolUsage {
         type: String,
     })
     host: string | null;
+
+    @ApiProperty({
+        type: PromptCacheSpendDTO,
+        nullable: true,
+        description: "This month's prompt cache over the calls whose host reported it. Null while none did, and for the image pool.",
+    })
+    cache: PromptCacheSpendDTO | null;
 }
 
 export class UsagePoolsDTO {

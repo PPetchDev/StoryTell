@@ -4,7 +4,7 @@ import { AccountModelService } from '../../model/account/account.service.js';
 import { AccountRole } from '../../model/account/entities/account.entity.js';
 import { SettingsModelService } from '../../model/settings/settings.service.js';
 import { startOfMonthUtc } from '../../service/model-gateway/spend-cap.js';
-import { KindSpend, UsageRecordModelService } from '../../model/usage-record/usage-record.service.js';
+import { KindSpend, PromptCacheSpend, UsageRecordModelService } from '../../model/usage-record/usage-record.service.js';
 import { CreditPool, ModelGateway } from '../../service/model-gateway/model-gateway.js';
 
 export interface PoolUsage {
@@ -25,6 +25,12 @@ export interface PoolUsage {
      * .scratch/text-fallback/spec.md); null for the image pool, and when it isn't known.
      */
     host: string | null;
+    /**
+     * This month's prompt cache (.scratch/prompt-cache/spec.md): the prompt tokens of the calls
+     * whose host reported its cache, and how many of them it read from the cache. Null while no
+     * call reported it, and for the image pool.
+     */
+    cache: PromptCacheSpend | null;
 }
 
 /** A Member's Monthly cap and how much of it is spent (.scratch/accounts/spec.md). */
@@ -83,6 +89,7 @@ export class UsageManagerService {
                 lowCredit: remainingUsd !== null && remainingUsd <= (capUsd * lowCreditPercent) / 100,
                 // Which host serves text is not a balance, so a Member sees it too.
                 host: ownerCredit[name].host ?? null,
+                cache: spend[name].cache,
             };
         };
 

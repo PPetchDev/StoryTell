@@ -25,6 +25,14 @@ function monthName(month: string): string {
     });
 }
 
+/** Of a pool's prompt tokens, the share its host read from the cache, in whole percent; null while none were reported. */
+function cachedShare(cache: PoolUsage['cache']): number | null {
+    if (!cache || cache.promptTokens <= 0) return null;
+    return Math.round((100 * cache.cachedTokens) / cache.promptTokens);
+}
+
+const tokens = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 });
+
 function callCount(count: number): string {
     return `${count} ${count === 1 ? 'call' : 'calls'}`;
 }
@@ -114,6 +122,7 @@ function KindTable({ pool, usage }: { pool: CreditPool; usage: PoolUsage }) {
 function PoolCard({ pool, usage, member }: { pool: CreditPool; usage: PoolUsage; member: boolean }) {
     // The Venice pool's label already names its provider; text names the host of its chain serving now.
     const provider = pool === 'text' ? (TEXT_HOST_LABEL[usage.host ?? 'openrouter'] ?? usage.host) : null;
+    const cached = cachedShare(usage.cache);
     return (
         <section className="card" aria-labelledby={`pool-${pool}`}>
             <h2 id={`pool-${pool}`}>
@@ -125,6 +134,18 @@ function PoolCard({ pool, usage, member }: { pool: CreditPool; usage: PoolUsage;
                 <dd>
                     {usd(usage.spentUsd)} <span className="muted">· {callCount(usage.calls)}</span>
                 </dd>
+                {/* .scratch/prompt-cache/spec.md: cached prompt tokens bill at a fraction of the price. */}
+                {cached !== null && usage.cache && (
+                    <>
+                        <dt>Read from cache</dt>
+                        <dd>
+                            {cached}% of prompt tokens{' '}
+                            <span className="muted">
+                                · {tokens.format(usage.cache.cachedTokens)} of {tokens.format(usage.cache.promptTokens)}
+                            </span>
+                        </dd>
+                    </>
+                )}
                 {!member && (
                     <>
                         <dt>Remaining credit</dt>
