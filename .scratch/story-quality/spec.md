@@ -98,5 +98,5 @@ Built 2026-11-18, from live Chat 2 as played on 2026-11-17.
 
     All are fixed, each with a test.
 
-- **Follow-up worth doing:** a Facts list in the Chat's info box, where the user can correct or delete a fact. Until then a wrong first fact in an old Chat (seeded from history) stays until the story changes it.
+- **Follow-up worth doing:** a Facts list in the Chat's info box, where the user can correct or delete a fact. Until then a wrong first fact in an old Chat (seeded from history) stays until the story changes it. Built 2026-11-18: [Spec: Facts panel](../facts-panel/spec.md).
 - **Time-relative facts** ("married three days") would need to move on as days pass, and only the user changes canon now; so the rule asks for every length of time to be tied to the event it began with ("married the night of the summer market"), never to now.

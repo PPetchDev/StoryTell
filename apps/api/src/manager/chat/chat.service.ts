@@ -20,6 +20,8 @@ import {
     ReplyVersionNotFoundError,
     StoryNotPlayableError,
     TurnInProgressError,
+    FactWithoutTopicError,
+    TooManyFactsError,
 } from '../../errors/chat.errors.js';
 import { OutOfCreditError } from '../../errors/model-gateway.errors.js';
 import { SpendCap } from '../../service/model-gateway/spend-cap.js';
@@ -115,7 +117,7 @@ import { Roll, ROLL_SIDES, ROLL_TARGETS } from './roll.js';
 import { endingName, endingReady, endingState, EndingView, endingView, promptEpilogue } from './ending/ending.js';
 import { eventReady, eventState, promptSuddenEvent, SuddenEventView, suddenEventView } from './sudden-event/sudden-event.js';
 import { currentDetails, promptDetails } from './details/details.js';
-import { promptFacts } from './details/facts.js';
+import { FACTS_MAX, factsState, promptFacts, userFactChange } from './details/facts.js';
 import { castNowNotes, currentNowNotes, tidyNow } from './details/now-notes.js';
 import type { PromptNowNote } from './details/now-notes.js';
 
@@ -177,6 +179,11 @@ export interface ChatDetail extends ChatSummary {
      * for those with a Now note, in cast order; `note` with `{user}`.
      */
     nowNotes: Array<{ characterId: number; note: string }>;
+    /**
+     * The Chat's Established facts (.scratch/facts-panel/spec.md), in the order their topics were
+     * first set; `byUser` when the current telling is the user's own.
+     */
+    facts: Array<{ topic: string; fact: string; byUser: boolean }>;
     /** The worn identity's name, under which the next User Message shows. */
     identityName: string;
     /** The worn Persona; null while the Chat wears its Story's Role. */
@@ -1005,6 +1012,21 @@ export class ChatManagerService {
     }
 
     /**
+     * .scratch/facts-panel/spec.md: the user's own Established fact for a topic, added or changed,
+     * tidied as the Judge's are; whitespace only deletes it. Tied to no Message, so no rewind takes
+     * it away, and the Judge treats it as any listed fact: only the user's words change it. Like the
+     * Now note it takes no turn lock.
+     */
+    async setFact(storyId: number, chatId: number, topic: string, fact: string): Promise<ChatDetail> {
+        const { chat } = await this.load(storyId, chatId);
+        const change = userFactChange(factsState(await this.ledger.detailChangesOf(chat.id)).facts, topic, fact);
+        if (change === 'no-topic') throw new FactWithoutTopicError();
+        if (change === 'full') throw new TooManyFactsError(FACTS_MAX);
+        if (change !== 'unchanged') await this.ledger.setUserFact(chat.id, change.value);
+        return this.getChat(storyId, chatId);
+    }
+
+    /**
      * .scratch/speaker-controls/spec.md, "Sitting out": replaces the whole set of Characters kept
      * out of this Chat's turns. An id outside the Story's cast is refused. Like the Author's note
      * it takes no turn lock and waits for no background call: a turn already being written
@@ -1798,6 +1820,7 @@ export class ChatManagerService {
                 return goal ? [{ characterId: character.id, goal }] : [];
             }),
             nowNotes: castNowNotes(currentNowNotes(detailChanges), story.characters).map(({ characterId, note }) => ({ characterId, note })),
+            facts: factsState(detailChanges).facts,
             identityName: identity.name,
             personaId: identity.personaId,
             roleName: story.role.name,

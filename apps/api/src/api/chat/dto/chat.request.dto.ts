@@ -4,6 +4,7 @@ import { IsArray, IsBoolean, IsInt, IsOptional, IsString, MaxLength, Min, Valida
 import type { ChatFields } from '../../../manager/chat/chat.service.js';
 import { CUE_MAX } from '../../../manager/chat/turn/prompt.js';
 import { NOW_MAX } from '../../../manager/chat/details/now-notes.js';
+import { FACT_TEXT_MAX, FACT_TOPIC_MAX } from '../../../manager/chat/details/facts.js';
 import { WRITE_FOR_ME_DRAFT_MAX } from '../../../manager/chat/write-for-me/write-for-me-prompt.js';
 
 const TITLE_MAX = 200;
@@ -104,6 +105,21 @@ export class SetNowNoteRequestBodyDTO {
     @IsString()
     @MaxLength(NOW_MAX)
     text: string;
+}
+
+export class SetFactRequestBodyDTO {
+    @ApiProperty({
+        maxLength: FACT_TOPIC_MAX,
+        description: `What the fact is about, such as "Nara's age" (.scratch/facts-panel/spec.md). Matched loosely to a listed topic, which keeps its wording.`,
+    })
+    @IsString()
+    @MaxLength(FACT_TOPIC_MAX)
+    topic: string;
+
+    @ApiProperty({ maxLength: FACT_TEXT_MAX, description: 'The fact, in a few words ("twenty-six"). Whitespace only deletes the topic.' })
+    @IsString()
+    @MaxLength(FACT_TEXT_MAX)
+    fact: string;
 }
 
 /** .scratch/authors-note/spec.md: about 250 tokens, so the note never crowds the story out of the prompt. */

@@ -14,7 +14,7 @@ import { exchangeIdentityName } from '../identity.js';
 import { repliesInScene } from '../scene-replies.js';
 import { applySuddenEvent, eventState, judgeSuddenEventSection } from '../sudden-event/sudden-event.js';
 import { applyDetails, currentDetails, judgeDetailsSection } from '../details/details.js';
-import { applyFacts, currentFacts, judgeFactsSection } from '../details/facts.js';
+import { applyFacts, factsState, judgeFactsSection } from '../details/facts.js';
 import { applyNow, currentNowNotes, judgeNowSection } from '../details/now-notes.js';
 import { applyEnding, ENDING_SUGGEST_AFTER_REPLIES, endingState, judgeEndingSection } from '../ending/ending.js';
 import { AUTHOR_MODEL } from '../../../model/chat/entities/message.entity.js';
@@ -152,7 +152,9 @@ export class JudgeManagerService {
             const details = currentDetails(state.detailChanges.filter((change) => change.messageId !== message.id));
             const detailsCast = story.characters.map((character) => ({ id: character.id, name: character.name }));
             // The Chat's Established facts before this reply (.scratch/story-quality/spec.md), read the same way.
-            const facts = currentFacts(state.detailChanges.filter((change) => change.messageId !== message.id));
+            // With the topics the user deleted, which stay deleted (.scratch/facts-panel/spec.md).
+            const factsBefore = factsState(state.detailChanges.filter((change) => change.messageId !== message.id));
+            const facts = factsBefore.facts.map(({ topic, fact }) => ({ topic, fact }));
             // The Now notes before this reply (.scratch/growing-cards/spec.md), read the same way; the user's own have no Message.
             const nowNotes = currentNowNotes(state.detailChanges.filter((change) => change.messageId !== message.id));
             // The Chat's Ending before this reply (.scratch/endings/spec.md), read the same way: only one not yet reached is asked about.
@@ -251,7 +253,7 @@ export class JudgeManagerService {
             const detailed = applyDetails({ current: details, cast: detailsCast, sittingOut }, judgement.details ?? null);
             const ended = applyEnding(endings, judgement.ending ?? null);
             // Only the user's own words change a listed fact (.scratch/story-quality/spec.md).
-            const facted = applyFacts(facts, judgement.facts ?? null, userText ?? '');
+            const facted = applyFacts(facts, judgement.facts ?? null, userText ?? '', factsBefore.clearedByUser);
             const noted = applyNow({ current: nowNotes, cast: detailsCast, sittingOut, identityName }, judgement.now ?? []);
             for (const reason of [...applied.rejected, ...stepped.rejected, ...detailed.rejected, ...noted.rejected, ...ended.rejected, ...facted.rejected]) {
                 this.logger.log(`Chat ${chat.id}, Message ${message.id}: judge item dropped: ${reason}`);

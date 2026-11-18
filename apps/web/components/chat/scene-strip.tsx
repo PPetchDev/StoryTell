@@ -5,6 +5,7 @@ import { ComponentType, useState } from 'react';
 import { COLUMN, SHORTEST_HIDDEN } from '@/components/chat/chat-classes';
 import {
     AfternoonIcon,
+    ChevronRightIcon,
     CloseIcon,
     DawnIcon,
     EveningIcon,
@@ -37,6 +38,10 @@ interface SceneStripProps {
     scenes: Scene[];
     /** The Story's Characters, to name a Scene's Bond gates; empty while the Story can't be read. */
     characters?: readonly { id: number; name: string }[];
+    /** How many Established facts the Chat holds (.scratch/facts-panel/spec.md). */
+    factCount?: number;
+    /** Opens the Facts panel; without it, the strip has no Facts row. */
+    onOpenFacts?(): void;
     onHide(): void;
 }
 
@@ -60,8 +65,20 @@ const STRIP_ICON = 'mr-1 inline-block shrink-0 align-[-0.2em]';
  * The Chat re-reads until each turn's background calls settle, so a Scene or time the judge moved
  * on to shows then. A tap opens it to read the goal whole and closes it again; its own ✕ hides it,
  * and ⋯ brings it back (audit M30: a tap used to hide it, with the goal cut off and no way to read it).
+ * Opened, its last row opens the Chat's Established facts (.scratch/facts-panel/spec.md).
  */
-export function SceneStrip({ current, timeOfDay, place = null, weather = null, outfits = [], scenes, characters = [], onHide }: SceneStripProps) {
+export function SceneStrip({
+    current,
+    timeOfDay,
+    place = null,
+    weather = null,
+    outfits = [],
+    scenes,
+    characters = [],
+    factCount = 0,
+    onOpenFacts,
+    onHide,
+}: SceneStripProps) {
     const [open, setOpen] = useState(false);
     const scene = current ? scenes.find((candidate) => candidate.id === current.id) : undefined;
     const goal = scene?.situation ?? '';
@@ -77,7 +94,7 @@ export function SceneStrip({ current, timeOfDay, place = null, weather = null, o
     });
     return (
         // Half-way into the page's side padding, like the top bar.
-        <div className={`-mx-2 flex shrink-0 items-start border-b border-line bg-surface ${COLUMN} ${SHORTEST_HIDDEN}`}>
+        <div className={`-mx-2 flex shrink-0 flex-wrap items-start border-b border-line bg-surface ${COLUMN} ${SHORTEST_HIDDEN}`}>
             <button
                 type="button"
                 className="bare-button flex min-h-11 min-w-0 flex-1 flex-wrap items-center gap-x-2.5 gap-y-1 px-2 py-1.5 text-left text-sm text-muted cursor-pointer focus-ring-inset"
@@ -150,6 +167,21 @@ export function SceneStrip({ current, timeOfDay, place = null, weather = null, o
             >
                 <CloseIcon size={18} />
             </button>
+            {/* Opened, a row of its own under the rest: the Chat's Established facts, in a sheet (.scratch/facts-panel/spec.md). */}
+            {open && onOpenFacts && (
+                <button
+                    type="button"
+                    className="bare-button flex min-h-11 basis-full items-center justify-between gap-2 border-t border-line px-2 text-left text-sm text-muted cursor-pointer focus-ring-inset"
+                    aria-haspopup="dialog"
+                    onClick={onOpenFacts}
+                    data-open-facts
+                >
+                    <span>
+                        <span className="font-semibold text-text">Established facts</span> · {factCount === 0 ? 'none yet' : factCount}
+                    </span>
+                    <ChevronRightIcon size={16} className="shrink-0" />
+                </button>
+            )}
         </div>
     );
 }

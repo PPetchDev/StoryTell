@@ -34,8 +34,24 @@ export interface FactSlip {
 export interface FactRecord {
     kind: DetailKind;
     value: string;
-    /** Null for a record the user made, which has no Message (.scratch/growing-cards/spec.md); facts and slips always have one. */
+    /**
+     * Null for a record the user made, which has no Message (.scratch/growing-cards/spec.md): a fact
+     * the user set in the Facts panel (.scratch/facts-panel/spec.md). Left out, a Judge's. Slips always have one.
+     */
     messageId?: number | null;
+}
+
+/** A fact as the Facts panel shows it. */
+export interface ShownFact extends ChatFact {
+    /** The current telling is the user's own record. */
+    byUser: boolean;
+}
+
+export interface FactsState {
+    /** In the order their topics were first set. */
+    facts: ShownFact[];
+    /** The topics (as `topicKey`) the user deleted, which nothing has set since. */
+    clearedByUser: string[];
 }
 
 /** The facts and the slips a turn reads. */
@@ -65,18 +81,31 @@ export function topicKey(topic: string): string {
         .replace(/^the /, '');
 }
 
-/** The facts as they stand, in the order their topics were first set; a changed fact keeps its place. */
-export function currentFacts(records: readonly FactRecord[]): ChatFact[] {
-    const facts = new Map<string, ChatFact>();
+/**
+ * The facts as they stand, in the order their topics were first set (a changed fact keeps its
+ * place), with whose telling each is, and the topics the user deleted that nothing has set since.
+ */
+export function factsState(records: readonly FactRecord[]): FactsState {
+    const facts = new Map<string, ShownFact>();
+    const cleared = new Set<string>();
     for (const record of records) {
         if (record.kind !== DetailKind.Fact) continue;
         const { topic, text } = splitValue(record.value);
         const key = topicKey(topic);
-        if (text === '') facts.delete(key);
-        else if (facts.has(key)) facts.set(key, { topic: facts.get(key)!.topic, fact: text });
-        else facts.set(key, { topic, fact: text });
+        const byUser = record.messageId === null;
+        cleared.delete(key);
+        if (text === '') {
+            facts.delete(key);
+            if (byUser) cleared.add(key);
+        } else if (facts.has(key)) facts.set(key, { topic: facts.get(key)!.topic, fact: text, byUser });
+        else facts.set(key, { topic, fact: text, byUser });
     }
-    return [...facts.values()];
+    return { facts: [...facts.values()], clearedByUser: [...cleared] };
+}
+
+/** The facts as they stand, in the order their topics were first set; a changed fact keeps its place. */
+export function currentFacts(records: readonly FactRecord[]): ChatFact[] {
+    return factsState(records).facts.map(({ topic, fact }) => ({ topic, fact }));
 }
 
 /** The slips recorded against one Message; none for no Message. */
@@ -231,8 +260,17 @@ export function saidByUser(value: string, userText: string, listed?: string): bo
  * telling), a "said" that differs from the fact, and no change to a listed topic in the same
  * judgement; the same slip twice is kept once. `rejected` says why what the Judge gave was not
  * taken, for the log.
+ *
+ * A topic the user deleted in the Facts panel (`clearedByUser`, as `topicKey`s) stays deleted: a new
+ * fact on it is taken only in the user's own words (.scratch/facts-panel/spec.md).
  */
-export function applyFacts(current: readonly ChatFact[], judged: JudgedFacts | null, userText = ''): { changes: NewDetail[]; rejected: string[] } {
+export function applyFacts(
+    current: readonly ChatFact[],
+    judged: JudgedFacts | null,
+    userText = '',
+    clearedByUser: readonly string[] = [],
+): { changes: NewDetail[]; rejected: string[] } {
+    const cleared = new Set(clearedByUser);
     const changes: NewDetail[] = [];
     const rejected: string[] = [];
     if (!judged) return { changes, rejected };
@@ -276,6 +314,10 @@ export function applyFacts(current: readonly ChatFact[], judged: JudgedFacts | n
         }
         if (now !== undefined && fact === '') {
             rejected.push(`Fact "${given}": only the user changes a listed fact; kept "${now.fact}"`);
+            continue;
+        }
+        if (now === undefined && cleared.has(key) && !saidByUser(fact, userText)) {
+            rejected.push(`Fact "${given}": the user deleted it; "${fact}" is not in the user's words`);
             continue;
         }
         if (now !== undefined && !saidByUser(fact, userText, now.fact)) {
@@ -334,4 +376,32 @@ export function factsBlock(input: PromptFacts | null | undefined): string | null
         lines.push(`The last reply got these wrong; keep to the facts above and don't repeat it: ${slips.map((slip) => `${slip.topic} (it said "${slip.said}")`).join('; ')}.`);
     }
     return lines.join('\n');
+}
+
+/** What the user's own edit in the Facts panel comes to (.scratch/facts-panel/spec.md). */
+export type UserFactChange =
+    /** The record to write: `topic: fact`, or `topic: ` to delete it. */
+    | { value: string }
+    /** Already so: nothing to write. */
+    | 'unchanged'
+    /** A topic with no letters or digits. */
+    | 'no-topic'
+    /** A new topic, and the Chat already holds `FACTS_MAX`. */
+    | 'full';
+
+/**
+ * The user's own fact for a topic, against the facts as they stand: tidied as the Judge's are, the
+ * topic matched loosely, a listed topic keeping its wording; a fact of whitespace only deletes it.
+ * Only the exact same telling is unchanged, so the user can fix a capital letter.
+ */
+export function userFactChange(current: readonly ChatFact[], topic: string, fact: string): UserFactChange {
+    const given = tidy(topic.replace(/:/g, ' '), FACT_TOPIC_MAX);
+    const key = topicKey(given);
+    if (key === '') return 'no-topic';
+    const listed = current.find((entry) => topicKey(entry.topic) === key);
+    const text = tidy(fact, FACT_TEXT_MAX);
+    if (text === '') return listed ? { value: factValue(listed.topic, '') } : 'unchanged';
+    if (listed) return listed.fact === text ? 'unchanged' : { value: factValue(listed.topic, text) };
+    if (current.length >= FACTS_MAX) return 'full';
+    return { value: factValue(given, text) };
 }
