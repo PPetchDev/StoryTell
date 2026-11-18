@@ -5,7 +5,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { ChatBackdrop } from '@/components/chat/backdrop';
 import { BookmarksProvider, useChatBookmarks } from '@/components/chat/bookmarks';
-import { useOpenProfile, useProfileChat, useProfileGoals, useProfileNow, useProfileOutfits } from '@/components/chat/character-profile';
+import { SecretRevealsProvider } from '@/components/chat/secret-reveals';
+import { useOpenProfile, useProfileChat, useProfileGoals, useProfileNow, useProfileOutfits, useProfileSecrets } from '@/components/chat/character-profile';
 import { diaryEntrySeen, markDiaryEntrySeen } from '@/lib/diary-seen';
 import { CharacterRow } from '@/components/chat/character-row';
 import { ChatComposer } from '@/components/chat/chat-composer';
@@ -239,6 +240,8 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
     useProfileOutfits(chat.outfits);
     // And what they are after now (.scratch/character-minds/spec.md).
     useProfileGoals(chat.goals);
+    // The Secrets the Chat has revealed, which the profiles show (.scratch/secret-reveals/spec.md).
+    useProfileSecrets(chat.secretReveals);
     // And what has lastingly changed about them, which the user can edit there (.scratch/growing-cards/spec.md).
     useProfileNow(chat.nowNotes, chat.identityName, async (characterId, text) => {
         try {
@@ -804,6 +807,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
             )}
 
             <BookmarksProvider value={bookmarks}>
+            <SecretRevealsProvider reveals={chat.secretReveals} cast={cast}>
             <ShownTextProvider rules={chat.replaceRules}>
             <ReadAloudProvider player={player}>
             {novel ? (
@@ -858,6 +862,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
             )}
             </ReadAloudProvider>
             </ShownTextProvider>
+            </SecretRevealsProvider>
             </BookmarksProvider>
 
             <ChatComposer

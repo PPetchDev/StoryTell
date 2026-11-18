@@ -11,6 +11,7 @@ import { SuddenEventStepEntity } from './entities/sudden-event-step.entity.js';
 import { DetailChangeEntity } from './entities/detail-change.entity.js';
 import { DiaryEntryEntity } from './entities/diary-entry.entity.js';
 import { EndingReachedEntity } from './entities/ending-reached.entity.js';
+import { SecretRevealEntity } from './entities/secret-reveal.entity.js';
 import { TimeChangeEntity } from './entities/time-change.entity.js';
 import { LedgerModelService } from './ledger.service.js';
 
@@ -25,6 +26,7 @@ import { LedgerModelService } from './ledger.service.js';
             DetailChangeEntity,
             DiaryEntryEntity,
             EndingReachedEntity,
+            SecretRevealEntity,
             ChatArcDirectionEntity,
             MemoryChangeEntity,
             BeliefChangeEntity,

@@ -27,6 +27,8 @@ import { MemoryKnownByEntity } from '../../model/memory/entities/memory-known-by
 import { MemoryEntity } from '../../model/memory/entities/memory.entity.js';
 import { SettingsEntity } from '../../model/settings/entities/settings.entity.js';
 import { CharacterExpressionEntity } from '../../model/story/entities/character-expression.entity.js';
+import { CharacterSecretEntity } from '../../model/story/entities/character-secret.entity.js';
+import { SecretRevealEntity } from '../../model/ledger/entities/secret-reveal.entity.js';
 import { CharacterEntity } from '../../model/story/entities/character.entity.js';
 import { LoreEntryEntity } from '../../model/story/entities/lore-entry.entity.js';
 import { DocumentPassageEntity } from '../../model/document/entities/document-passage.entity.js';
@@ -50,6 +52,8 @@ export const entities = [
     RoleEntity,
     CharacterEntity,
     CharacterExpressionEntity,
+    CharacterSecretEntity,
+    SecretRevealEntity,
     StartingBondEntity,
     StartingBeliefEntity,
     SceneBondGateEntity,

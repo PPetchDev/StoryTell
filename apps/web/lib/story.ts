@@ -99,7 +99,26 @@ export interface Character {
     speakingVoice: string | null;
     /** Their pictures per emotion, in the fixed order of the emotions (.scratch/expressions/spec.md). */
     expressions: Expression[];
+    /** Their Secrets one by one, in order, each with the Bond level it needs or none (.scratch/secret-reveals/spec.md). */
+    secretList?: CharacterSecret[];
 }
+
+/**
+ * One Secret of a Character (.scratch/secret-reveals/spec.md): the feeling toward the Role it needs,
+ * and how far it must have grown, picked by its word; both null for none.
+ */
+export interface CharacterSecret {
+    id: number;
+    text: string;
+    axis: BondAxis | null;
+    atLeast: number | null;
+}
+
+/** A change to one Secret; `axis: null` clears its level. */
+export type CharacterSecretFields = Partial<Pick<CharacterSecret, 'text' | 'axis' | 'atLeast'>>;
+
+/** The most Secrets one Character can hold (the API's limit). */
+export const MAX_SECRETS = 8;
 
 /** Its starting levels on the Bond axes ride along flat; the editor shows only their words. */
 export interface StartingBond extends BondLevels {
@@ -498,6 +517,12 @@ export const storyApi = {
     updateScene: (storyId: number, sceneId: number, fields: SceneFields) =>
         apiSend<Story>('PATCH', `/stories/${storyId}/scenes/${sceneId}`, fields),
     /** Replaces a Scene's Bond gates with the whole list. */
+    /** A Character's Secrets one by one (.scratch/secret-reveals/spec.md). */
+    addSecret: (storyId: number, characterId: number) => apiSend<Story>('POST', `/stories/${storyId}/characters/${characterId}/secrets`),
+    updateSecret: (storyId: number, characterId: number, secretId: number, fields: CharacterSecretFields) =>
+        apiSend<Story>('PATCH', `/stories/${storyId}/characters/${characterId}/secrets/${secretId}`, fields),
+    removeSecret: (storyId: number, characterId: number, secretId: number) =>
+        apiSend<Story>('DELETE', `/stories/${storyId}/characters/${characterId}/secrets/${secretId}`),
     setSceneGates: (storyId: number, sceneId: number, gates: SceneBondGate[]) =>
         apiSend<Story>('PUT', `/stories/${storyId}/scenes/${sceneId}/gates`, gates),
     removeScene: (storyId: number, sceneId: number) =>

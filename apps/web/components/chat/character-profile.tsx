@@ -40,7 +40,26 @@ const ProfileContext = createContext<{
     setGoals(goals: Outfits): void;
     setNow(now: NowNotes | null): void;
     setChat(chat: DiaryChat | null): void;
+    setSecrets(secrets: Secrets): void;
 } | null>(null);
+
+/** The Secrets the Chat on screen has revealed, in the order they came out, by Character id (.scratch/secret-reveals/spec.md). */
+type Secrets = Readonly<Record<number, readonly string[]>>;
+
+/**
+ * Tells the profiles which Secrets the Chat on screen has revealed, so a profile shows them under
+ * "Secrets shared with you". Outside a Chat it does nothing, and no profile shows any.
+ */
+export function useProfileSecrets(reveals: ReadonlyArray<{ characterId: number; text: string }> | undefined): void {
+    const setSecrets = useContext(ProfileContext)?.setSecrets;
+    const key = JSON.stringify((reveals ?? []).map(({ characterId, text }) => ({ characterId, text })));
+    useEffect(() => {
+        const secrets: Record<number, string[]> = {};
+        for (const { characterId, text } of JSON.parse(key) as Array<{ characterId: number; text: string }>) (secrets[characterId] ??= []).push(text);
+        setSecrets?.(secrets);
+    }, [setSecrets, key]);
+    useEffect(() => () => setSecrets?.({}), [setSecrets]);
+}
 
 /**
  * Tells the profiles which Chat is on screen and its newest AI Message, so a profile shows the
@@ -135,8 +154,8 @@ export function useCastCharacter(characterId: number | null): Character | undefi
  * Lets a tap on a Character's Portrait open their profile over the Chat: their name, their
  * Reference image (no taller than 40% of the screen, so the name and what they want now are seen
  * first; docs/ui-audit-2026-11-17.md, M3), what they wear and want now, their Diary in the Chat,
- * their Expressions, then Appearance, Personality, Voice and Background. Secrets and Arc directions
- * stay hidden, since they would give the story away.
+ * their Expressions, the Secrets they have told in this Chat, then Appearance, Personality, Voice and
+ * Background. Their other Secrets and Arc directions stay hidden, since they would give the story away.
  */
 export function CharacterProfiles({ characters, children }: { characters: readonly Character[]; children: ReactNode }) {
     const [openId, setOpenId] = useState<number | null>(null);
@@ -146,7 +165,8 @@ export function CharacterProfiles({ characters, children }: { characters: readon
     const [goals, setGoals] = useState<Outfits>({});
     const [now, setNow] = useState<NowNotes | null>(null);
     const [chat, setChat] = useState<DiaryChat | null>(null);
-    const value = useMemo(() => ({ open: setOpenId, has, character: find, setOutfits, setGoals, setNow, setChat }), [has, find]);
+    const [secrets, setSecrets] = useState<Secrets>({});
+    const value = useMemo(() => ({ open: setOpenId, has, character: find, setOutfits, setGoals, setNow, setChat, setSecrets }), [has, find]);
     const character = characters.find((candidate) => candidate.id === openId);
     const close = useCallback(() => setOpenId(null), []);
 
@@ -161,6 +181,7 @@ export function CharacterProfiles({ characters, children }: { characters: readon
                     goal={goals[character.id] ?? null}
                     now={now}
                     chat={chat}
+                    secrets={secrets[character.id] ?? []}
                     onClose={close}
                 />
             )}
@@ -182,6 +203,7 @@ function CharacterProfileSheet({
     goal,
     now,
     chat,
+    secrets,
     onClose,
 }: {
     character: Character;
@@ -192,6 +214,8 @@ function CharacterProfileSheet({
     /** The Chat's Now notes (.scratch/growing-cards/spec.md); null outside a Chat. */
     now: NowNotes | null;
     chat: DiaryChat | null;
+    /** The Secrets they have told in this Chat, in the order they came out (.scratch/secret-reveals/spec.md). */
+    secrets: readonly string[];
     onClose(): void;
 }) {
     const name = character.name.trim() || 'Unnamed';
@@ -243,6 +267,19 @@ function CharacterProfileSheet({
                             </li>
                         ))}
                     </ul>
+                )}
+                {/* What they have told the user in this Chat (.scratch/secret-reveals/spec.md): never a Secret not yet told. */}
+                {secrets.length > 0 && (
+                    <section className="rounded-lg bg-surface-raised px-3.5 py-3" data-revealed-secrets>
+                        <h3 className="mt-0 mb-1 text-sm font-semibold text-muted">Secrets shared with you</h3>
+                        <ul className="m-0 grid list-none gap-1.5 p-0">
+                            {secrets.map((secret, index) => (
+                                <li key={index} className="leading-normal [overflow-wrap:anywhere]">
+                                    {secret}
+                                </li>
+                            ))}
+                        </ul>
+                    </section>
                 )}
                 {sections.map(([label, field]) => (
                     <section key={field} className="rounded-lg bg-surface-raised px-3.5 py-3">

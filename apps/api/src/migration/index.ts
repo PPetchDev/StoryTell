@@ -58,6 +58,7 @@ import { EstablishedFacts1764300000000 } from './1764300000000-EstablishedFacts.
 import { CharacterThoughts1764280000000 } from './1764280000000-CharacterThoughts.js';
 import { UsageCachedTokens1764295000000 } from './1764295000000-UsageCachedTokens.js';
 import { GrowingCards1764310000000 } from './1764310000000-GrowingCards.js';
+import { SecretReveals1764450000010 } from './1764450000010-SecretReveals.js';
 import { UsageMessage1764330000000 } from './1764330000000-UsageMessage.js';
 import { MessageBookmarks1764340000000 } from './1764340000000-MessageBookmarks.js';
 import { PushSubscriptions1764350000000 } from './1764350000000-PushSubscriptions.js';
@@ -137,4 +138,5 @@ export const migrations = [
     AiEvents1764380000000,
     SceneChapters1764390000000,
     OpeningQuestions1764400000000,
+    SecretReveals1764450000010,
 ];

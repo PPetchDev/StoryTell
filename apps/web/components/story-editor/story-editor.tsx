@@ -31,6 +31,7 @@ import {
     REPLY_LENGTH_LABELS,
     RewriteRequest,
     SceneBondGate,
+    CharacterSecretFields,
     StartingBelief,
     OpeningQuestion,
     Story,
@@ -458,6 +459,26 @@ export function StoryEditor({ initial }: { initial: Story }) {
             queue(`ending.${endingId}.${field}`, () => storyApi.updateEnding(storyId, endingId, fields), applyStatus);
         }
     };
+    /**
+     * One Secret's text or level (.scratch/secret-reveals/spec.md): shown at once, saved like any other
+     * field; a level's feeling and least level go together.
+     */
+    const setSecret = (characterId: number, secretId: number, fields: CharacterSecretFields) => {
+        setStory((current) => ({
+            ...current,
+            characters: current.characters.map((c) =>
+                c.id === characterId ? { ...c, secretList: (c.secretList ?? []).map((s) => (s.id === secretId ? { ...s, ...fields } : s)) } : c,
+            ),
+        }));
+        if ('text' in fields) {
+            queue(`secret.${secretId}.text`, () => storyApi.updateSecret(storyId, characterId, secretId, { text: fields.text }), applyStatus);
+            return;
+        }
+        // The whole level each time, the feeling with its least level: a newer write under the key replaces an older one.
+        const before = story.characters.find((c) => c.id === characterId)?.secretList?.find((s) => s.id === secretId);
+        const level = { axis: fields.axis !== undefined ? fields.axis : (before?.axis ?? null), atLeast: fields.atLeast !== undefined ? fields.atLeast : (before?.atLeast ?? null) };
+        queue(`secret.${secretId}.level`, () => storyApi.updateSecret(storyId, characterId, secretId, level.axis === null ? { axis: null } : level), applyStatus);
+    };
     const setSceneGates = (sceneId: number, gates: SceneBondGate[]) => {
         setStory((current) => ({
             ...current,
@@ -864,6 +885,8 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                         flush={flush}
                                         commit={(run, onError) => commit(run, applyWhole, onError)}
                                         onExpressionDrawn={applyExpressions}
+                                        roleName={story.role.name.trim() || 'the Role'}
+                                        onSecret={(secretId, fields) => setSecret(character.id, secretId, fields)}
                                         index={index}
                                         count={story.characters.length}
                                         colour={characterColour(character.id, castIds)}

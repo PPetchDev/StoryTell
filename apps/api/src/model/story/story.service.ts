@@ -7,6 +7,7 @@ import { ReplaceRuleEntity } from '../replace-rule/entities/replace-rule.entity.
 import { SavedReplyEntity } from '../saved-reply/entities/saved-reply.entity.js';
 import { ExpressionEmotion } from './emotion.js';
 import { CharacterExpressionEntity } from './entities/character-expression.entity.js';
+import { CharacterSecretEntity } from './entities/character-secret.entity.js';
 import { CharacterEntity, PortraitCrop } from './entities/character.entity.js';
 import { LoreEntryEntity } from './entities/lore-entry.entity.js';
 import { RoleEntity } from './entities/role.entity.js';
@@ -28,7 +29,7 @@ import { AccountModelService } from '../account/account.service.js';
  */
 const FULL_RELATIONS = {
     role: true,
-    characters: { expressions: true },
+    characters: { expressions: true, secretList: true },
     startingBonds: true,
     startingBeliefs: true,
     scenes: { gates: true },
@@ -67,6 +68,7 @@ function byPosition<T extends { position: number; id: number }>(items: T[]): T[]
 /** Puts a loaded Story's lists in their authored order. */
 function sorted(story: StoryEntity): StoryEntity {
     story.characters = byPosition(story.characters);
+    for (const character of story.characters) character.secretList = byPosition(character.secretList ?? []);
     story.scenes = byPosition(story.scenes);
     for (const scene of story.scenes) scene.gates = [...(scene.gates ?? [])].sort((a, b) => a.id - b.id);
     story.suddenEvents = byPosition(story.suddenEvents ?? []);
@@ -192,6 +194,11 @@ export class StoryModelService {
                     }),
                 );
                 characterIds.set(character.id, copy.id);
+                // Their Secrets one by one, with their levels, in order (.scratch/secret-reveals/spec.md).
+                for (const secret of character.secretList ?? []) {
+                    const { position, text, axis, atLeast } = secret;
+                    await manager.save(manager.create(CharacterSecretEntity, { characterId: copy.id, position, text, axis, atLeast }));
+                }
             }
             for (const bond of source.startingBonds) {
                 await manager.save(
@@ -412,6 +419,22 @@ export class StoryModelService {
 
     async removeScene(scene: SceneEntity): Promise<void> {
         await this.scenes.delete({ id: scene.id });
+    }
+
+    /** A new Secret at the end of the Character's list (.scratch/secret-reveals/spec.md). */
+    async addSecret(characterId: number, position: number): Promise<CharacterSecretEntity> {
+        const secrets = this.dataSource.getRepository(CharacterSecretEntity);
+        return secrets.save(secrets.create({ characterId, position, text: '', axis: null, atLeast: null }));
+    }
+
+    async saveSecret(secret: CharacterSecretEntity): Promise<void> {
+        const { id, text, axis, atLeast } = secret;
+        await this.dataSource.getRepository(CharacterSecretEntity).update({ id }, { text, axis, atLeast });
+    }
+
+    /** Removes the Secret; its reveals in Chats go with it (ON DELETE CASCADE). */
+    async removeSecret(secretId: number): Promise<void> {
+        await this.dataSource.getRepository(CharacterSecretEntity).delete({ id: secretId });
     }
 
     /** Replaces a Scene's Bond gates with these, in one transaction, keeping their order. */

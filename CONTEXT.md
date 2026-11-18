@@ -32,6 +32,13 @@ _Avoid_: Stuck Scene, stalled Scene
 A Scene that has lasted a long time while the story clearly went somewhere its move-on condition can no longer happen soon. The Judge moves it on to the next Scene even though its condition and gates were never met.
 _Avoid_: Skipped Scene, forced advance
 
+**Secret**:
+One thing only a Character knows, from their card: the Secrets text, or one Secret of their list, which can need a **Bond level** (one feeling toward the user, at least a given level, as a Bond gate reads) before the Character is willing to tell it. The Narrator plays every Secret; the user sees one only once it is revealed. A Secret without a level is played like the Secrets text and never revealed on purpose.
+
+**Secret reveal**:
+A reply telling the user one of a Character's levelled Secrets, once its level is reached, as the Judge saw it: a record against that AI Message, shown as a "Secret revealed" card under it, after which the Secret shows in the Character's profile. Taking the Message back takes the reveal back. A Character is offered one Secret at a time, and a reply tells at most one.
+_Avoid_: unlock, spoiler
+
 **Bond gate**:
 A condition on a Scene that one Bond has reached at least a given level on one Bond axis ("Nara toward the user: Trust at least *close*"). A Scene moves on only when all its gates hold, as well as its move-on condition when it has one.
 _Avoid_: Bond requirement, unlock, threshold
@@ -283,7 +290,7 @@ The synthetic voice a Character's lines are read aloud in, chosen by the author;
 _Avoid_: TTS voice, audio voice
 
 **Character profile**:
-What a tap on a Character's Portrait in a Chat opens: their whole Reference image, name, what they are wearing, their Now note, their Diary, Appearance, Personality, Voice and Background, but never their Secrets or Arc directions, which would give the story away.
+What a tap on a Character's Portrait in a Chat opens: their whole Reference image, name, what they are wearing, their Now note, their Diary, Appearance, Personality, Voice and Background, but never their Secrets or Arc directions, which would give the story away: only the Secrets the Chat has revealed, under "Secrets shared with you".
 _Avoid_: Bio, character card
 
 ## Accounts

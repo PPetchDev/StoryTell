@@ -125,6 +125,7 @@ import { eventReady, GAUGE_RULES, promptSuddenEvent, SuddenEventView, suddenEven
 import { chatEventState, EventProposalView, eventProposalView, shownProposal } from './sudden-event/ai-events.js';
 import { currentDetails, promptDetails } from './details/details.js';
 import { FACTS_MAX, factsState, promptFacts, userFactChange } from './details/facts.js';
+import { secretsState, StorySecret, storySecrets } from './secrets/secrets.js';
 import { castNowNotes, currentNowNotes, tidyNow } from './details/now-notes.js';
 import type { PromptNowNote } from './details/now-notes.js';
 
@@ -261,6 +262,11 @@ export interface ChatDetail extends ChatSummary {
     memoriesInPlay: MemoriesUsed;
     /** Every Belief of the Chat, given-up ones included, oldest first (.scratch/memory-by-meaning/spec.md: "GET comes with the Chat"). */
     beliefs: BeliefResponse[];
+    /**
+     * The Secrets this Chat has revealed (.scratch/secret-reveals/spec.md), in the order they came out,
+     * each with the AI Message that told it. Never a Secret not yet revealed.
+     */
+    secretReveals: Array<{ secretId: number; characterId: number; messageId: number; text: string }>;
 }
 
 /** A current Bond as the Chat screen reads it: its direction, label and levels. */
@@ -1643,6 +1649,8 @@ export class ChatManagerService {
             details: detailsFor(story, state),
             // The facts, and the slips of the newest reply before this one (.scratch/story-quality/spec.md).
             facts: promptFacts(state.detailChanges, newestAiMessage(chat)?.id ?? null),
+            // What each Character may now tell, and what they have told (.scratch/secret-reveals/spec.md).
+            secrets: promptSecrets(story, chat, state),
             lore: promptLore(story),
             // The one selection, once per turn, at the reply's point: the user's new Message is before it.
             chosenLore: chosenLore(selectLoreAt(promptLore(story), promptHistory(chat.messages))),
@@ -1794,6 +1802,7 @@ export class ChatManagerService {
             timeOfDay: chat.timeOfDay,
             details: detailsFor(story, state),
             facts: promptFacts(state.detailChanges, newest?.id ?? null),
+            secrets: promptSecrets(story, chat, state),
             lore: promptLore(story),
             hasDocuments: hasDocumentPassages(story),
             // A Story that may make up events (.scratch/ai-events/spec.md) keeps the same room for the block.
@@ -1881,7 +1890,7 @@ export class ChatManagerService {
     }
 
     private async detail(story: StoryEntity, chat: ChatEntity): Promise<ChatDetail> {
-        const [settings, creditOut, source, readings, appSavedReplies, appReplaceRules, bondChanges, beliefs, eventSteps, detailChanges, endingsReached, personas, diaryEntries, thoughtRows, chatEvents] = await Promise.all([
+        const [settings, creditOut, source, readings, appSavedReplies, appReplaceRules, bondChanges, beliefs, eventSteps, detailChanges, endingsReached, personas, diaryEntries, thoughtRows, chatEvents, secretReveals] = await Promise.all([
             this.settingsModel.get(),
             this.creditOut(),
             // Read live, so a rename of the source shows.
@@ -1900,6 +1909,7 @@ export class ChatManagerService {
             this.ledger.diaryEntriesOf(chat.id),
             this.chatModel.findThoughts(chat.messages.map((message) => message.id)),
             this.ledger.chatSuddenEventsOf(chat.id),
+            this.ledger.secretRevealsOf(chat.id),
         ]);
         const events = chatEventState(story.suddenEvents ?? [], chatEvents, eventSteps);
         // Oldest first, so each Character's newest entry is the one left.
@@ -1981,6 +1991,13 @@ export class ChatManagerService {
             })),
             memoriesInPlay: memoriesInPlayOf(chat),
             beliefs: beliefResponses(beliefs, chat),
+            // Only those revealed: an unrevealed Secret never reaches the Chat (.scratch/secret-reveals/spec.md).
+            secretReveals: secretsState({ secrets: storySecrets(story.characters), bonds: [], reveals: secretReveals }).revealed.map((secret) => ({
+                secretId: secret.id,
+                characterId: secret.characterId,
+                messageId: secret.messageId,
+                text: secret.text,
+            })),
         };
     }
 
@@ -2085,6 +2102,19 @@ function memoriesUsedOf(choice: MemoryChoice): MemoriesUsed {
  * The Characters sitting out of the Chat (.scratch/speaker-controls/spec.md), in cast order. A
  * Chat loaded without its set (only `findWithMessages` reads it) has nobody sitting out.
  */
+/**
+ * The Secrets as a turn reads them (.scratch/secret-reveals/spec.md): per Character not sitting out,
+ * the one they may now tell, by their Bond toward the user as it stands; and those already told.
+ */
+function promptSecrets(story: StoryEntity, chat: ChatEntity, state: LedgerState): { offered: StorySecret[]; revealed: StorySecret[] } {
+    return secretsState({
+        secrets: storySecrets(story.characters),
+        bonds: currentBonds(state.bondChanges).map((bond) => ({ fromCharacterId: bond.fromCharacterId, toCharacterId: bond.toCharacterId, levels: bond.levels() })),
+        reveals: state.secretReveals,
+        sittingOut: sittingOutOf(story, chat).map((character) => character.id),
+    });
+}
+
 function sittingOutOf(story: StoryEntity, chat: ChatEntity): CastName[] {
     const ids = new Set(chat.sittingOutIds());
     return story.characters.filter((character) => ids.has(character.id)).map((character) => ({ id: character.id, name: character.name }));

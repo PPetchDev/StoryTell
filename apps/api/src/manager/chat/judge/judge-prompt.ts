@@ -12,6 +12,7 @@ import { FACTS_EXTRA_TOKENS, JudgedFacts, readJudgedFacts } from '../details/fac
 import { JudgedNow, NOW_EXTRA_TOKENS, readJudgedNow } from '../details/now-notes.js';
 import { ReplyPart } from '../turn/reply-parser.js';
 import { JudgedRollOffer, readJudgedRollOffer, ROLL_OFFER_EXTRA_TOKENS } from '../roll-offer/roll-offer.js';
+import { readJudgedSecrets, SECRETS_EXTRA_TOKENS } from '../secrets/secrets.js';
 
 /**
  * The Bond, Arc, Scene and Time of day judge's prompt and output (spec: "Background judge"), from the turn
@@ -489,23 +490,58 @@ function withRollOfferShape(system: string): string {
 const ROLL_OFFER_SYSTEMS = new Map([SYSTEM_WITH_FACTS, SYSTEM_WITH_EXPRESSIONS_AND_FACTS].map((system) => [system, withRollOfferShape(system)]));
 if ([...ROLL_OFFER_SYSTEMS].some(([before, after]) => before === after)) throw new Error('judge prompt: the reply shape no longer ends as expected');
 
-export function buildJudgePrompt(input: JudgePromptInput & RollOfferJudgeInput): { messages: PromptMessage[]; maxTokens: number } {
+export function buildJudgePrompt(input: JudgePromptInput & RollOfferJudgeInput & SecretsJudgeInput): { messages: PromptMessage[]; maxTokens: number } {
     const prompt = buildJudgePromptCore(input);
     const section = input.rollOfferSection?.trim();
+    const secrets = input.secretsShape ? input.secretsSection?.trim() : undefined;
+    const sections = [section, secrets].filter((text): text is string => !!text);
     return {
         messages: prompt.messages.map((message) => {
-            if (message.role === 'system') return { ...message, content: ROLL_OFFER_SYSTEMS.get(message.content) ?? message.content };
-            return section && message.role === 'user' ? { ...message, content: `${message.content}\n\n${section}` } : message;
+            if (message.role === 'system') {
+                const content = ROLL_OFFER_SYSTEMS.get(message.content) ?? message.content;
+                return { ...message, content: input.secretsShape ? withSecretsShape(content) : content };
+            }
+            return sections.length > 0 && message.role === 'user' ? { ...message, content: [message.content, ...sections].join('\n\n') } : message;
         }),
-        maxTokens: prompt.maxTokens + (section ? ROLL_OFFER_EXTRA_TOKENS : 0),
+        maxTokens: prompt.maxTokens + (section ? ROLL_OFFER_EXTRA_TOKENS : 0) + (secrets ? SECRETS_EXTRA_TOKENS : 0),
     };
 }
 
-/** The judgement with the Roll offer it gave, if any; read loosely, so anything else is none. */
-export function parseJudgement(text: string): Judgement & { rollOffer?: JudgedRollOffer | null } {
+/** The judgement with the Roll offer and the Secret reveals it gave, if any; read loosely, so anything else is none. */
+export function parseJudgement(text: string): Judgement & { rollOffer?: JudgedRollOffer | null; secretsRevealed?: number[] } {
     const judgement = parseJudgementCore(text);
     // The core has already read the JSON, so this match parses.
     const json = JSON.parse(text.match(/\{[\s\S]*\}/)![0]) as Record<string, unknown>;
     const rollOffer = readJudgedRollOffer(json.roll_offer);
-    return rollOffer ? { ...judgement, rollOffer } : judgement;
+    // Only when it gave some (.scratch/secret-reveals/spec.md), so a judgement without them reads as before.
+    const secretsRevealed = readJudgedSecrets(json.secrets_revealed);
+    return { ...judgement, ...(rollOffer ? { rollOffer } : {}), ...(secretsRevealed.length > 0 ? { secretsRevealed } : {}) };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Secret reveals (.scratch/secret-reveals/spec.md). Added like the Roll offer: the prompt is built
+// as before, then the field goes on the reply shape and the section at the end of the user message.
+// ---------------------------------------------------------------------------------------------
+
+/** What a judgement asking about Secret reveals adds to the prompt's input. */
+export interface SecretsJudgeInput {
+    /**
+     * The Story has a Secret with a level: the reply shape names `secrets_revealed` on every call in
+     * its Chats, whether or not one is on offer, so the system message stays the same from call to
+     * call. False or left out: the prompt is exactly as before.
+     */
+    secretsShape?: boolean;
+    /** The "# Secrets that may come out" section (`judgeSecretsSection`), sent only with the shape and only when a Secret is on offer. It goes last. */
+    secretsSection?: string | null;
+}
+
+/**
+ * The reply shape with `"secrets_revealed":[]`. As with the facts and the Roll offer, DeepSeek V4 Flash
+ * leaves out a field only the user message asks for (.scratch/story-quality/spec.md, "Real-model
+ * check"). Empty in the shape, not an example, so the default is no reveal.
+ */
+export function withSecretsShape(system: string): string {
+    const shaped = system.replace(/\}\nEmpty arrays when nothing changed\.$/, ',\n "secrets_revealed":[]}\nEmpty arrays when nothing changed.');
+    if (shaped === system) throw new Error('judge prompt: the reply shape no longer ends as expected');
+    return shaped;
 }

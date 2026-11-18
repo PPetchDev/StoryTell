@@ -26,6 +26,7 @@ import { partsToText } from '../turn/reply-parser.js';
 import { applyJudgement, emotionsOfParts } from './apply-judgement.js';
 import { buildJudgePrompt, JUDGE_CONTEXT_MESSAGES, parseJudgement } from './judge-prompt.js';
 import { applyRollOffer, judgeRollOfferSection, rollOfferAllowed } from '../roll-offer/roll-offer.js';
+import { applySecretReveals, hasLevelledSecret, judgeSecretsSection, secretsState, storySecrets } from '../secrets/secrets.js';
 
 /** What a send found when it looked at the previous AI Message's judge. */
 export interface SettledBackground {
@@ -195,6 +196,14 @@ export class JudgeManagerService {
             // Lines are tagged only where a tag can show (.scratch/expressions/spec.md): otherwise the prompt is as before.
             const tagLines = story.characters.some((character) => (character.expressions ?? []).length > 0);
             const offering = rollOffering(story, chat, index);
+            // The Secrets on offer when the reply was written (.scratch/secret-reveals/spec.md): this Message's own reveals left out.
+            const secretsShape = hasLevelledSecret(story.characters);
+            const secrets = secretsState({
+                secrets: storySecrets(story.characters),
+                bonds: bonds.map((bond) => ({ fromCharacterId: bond.fromCharacterId, toCharacterId: bond.toCharacterId, levels: bond.levels() })),
+                reveals: state.secretReveals.filter((reveal) => reveal.messageId !== message.id),
+                sittingOut,
+            });
             const prompt = withAiEvents(buildJudgePrompt({
                 cast: story.characters.map((character) => ({
                     name: character.name,
@@ -238,6 +247,7 @@ export class JudgeManagerService {
                 factsSection: judgeFactsSection(facts),
                 nowSection: judgeNowSection(nowNotes, detailsCast),
                 rollOfferSection: offering.section,
+                ...(secretsShape ? { secretsShape, secretsSection: judgeSecretsSection(secrets.offered) } : {}),
             }), aiEvents);
 
             const result = await this.gateway.completeText({
@@ -278,6 +288,8 @@ export class JudgeManagerService {
             // Only the user's own words change a listed fact (.scratch/story-quality/spec.md).
             const facted = applyFacts(facts, judgement.facts ?? null, userText ?? '', factsBefore.clearedByUser);
             const offered = applyRollOffer(offering, judgement.rollOffer ?? null);
+            const revealed = applySecretReveals(secrets.offered, judgement.secretsRevealed ?? []);
+            for (const reason of revealed.rejected) this.logger.log(`Chat ${chat.id}, Message ${message.id}: judge item dropped: ${reason}`);
             for (const reason of offered.rejected) this.logger.log(`Chat ${chat.id}, Message ${message.id}: judge item dropped: ${reason}`);
             const proposed = takeNewEvent(
                 { offered: aiEvents.offered, startedAnother: stepped.step?.kind === SuddenEventStepKind.Start, exchange: `${userText ?? ''}\n${partsToText(replyParts)}` },
@@ -296,7 +308,7 @@ export class JudgeManagerService {
             // Written with the rest of the judgement, in its one transaction, never after it. Without
             // Expressions the parts are not touched, so the record is exactly as before.
             const emotions = tagLines ? emotionsOfParts(message.parts, judgement.expressions) : undefined;
-            await this.ledger.record(chat.id, message.id, { ...applied, suddenEvent: stepped.step, details: [...detailed.changes, ...facted.changes, ...noted.changes], ending: ended.reached, ...(emotions ? { emotions } : {}), ...(proposed.event ? { newEvent: proposed.event } : {}), rollOffer: offered.offer });
+            await this.ledger.record(chat.id, message.id, { ...applied, suddenEvent: stepped.step, details: [...detailed.changes, ...facted.changes, ...noted.changes], ending: ended.reached, ...(emotions ? { emotions } : {}), ...(proposed.event ? { newEvent: proposed.event } : {}), rollOffer: offered.offer, ...(revealed.reveals.length > 0 ? { secretReveals: revealed.reveals } : {}) });
             return { ok: true };
         } catch (error) {
             const reason = error instanceof AppError ? error.message : `Unexpected error: ${String(error)}`;
