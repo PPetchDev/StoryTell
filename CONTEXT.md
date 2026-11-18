@@ -214,6 +214,10 @@ _Avoid_: False memory, misconception, rumour
 One of a Chat's canon numbers, ages, lengths of time, dates, names and ties ("Nara's years at the stall: nine summers"), recorded by the Judge as the story states it and changed only when the story itself changes it. The Narrator reads them every turn, and they win over a Memory, the Story so far or an earlier Message that says otherwise. A Message that told one differently is a **slip**, which the next turn is told not to repeat. The user sees them in the **Facts panel**, opened from the Scene strip, where they can edit, delete or add one; what the user sets there is theirs, and no rewind of a Message takes it away.
 _Avoid_: Canon, lore fact, stat
 
+**Item**:
+A thing that matters in one Chat's story (a key, a letter, a ring, a gift, a weapon), with who has it now — the user, a Character, or someone or somewhere else — and how it came to them ("given by Nara", "found in the well"). The Judge records an Item as the story shows it come to someone, change hands or end; an Item **ends** when it is used up, lost or destroyed, and stays listed as gone. A thing used up or destroyed never comes back; a lost one comes back when someone finds it. The Narrator reads who has what every turn, so no reply has the user holding what they gave away. The user sees them in the **Items** sheet, opened from the Scene strip, where they can change who has one, mark one gone, add one or delete one; like an Established fact, what the user sets there no rewind takes away. It is the thing itself, where an Outfit is what a Character is wearing.
+_Avoid_: Inventory, possession, loot, object
+
 **Memory graph**:
 A picture of a Chat's Memories, shown in place of their list when the user chooses it: the identity the user wears and the Characters as people, and each Memory as a dot linked to the people it is about. Who a Memory is about is read from its text (`{user}` or a name), or failing that is the Characters who know it; it is not stored, and it is a different thing from who knows the Memory. On request it also draws the Bonds between the people.
 _Avoid_: Mind map, knowledge graph, relationship map

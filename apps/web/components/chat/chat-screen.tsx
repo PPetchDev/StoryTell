@@ -15,6 +15,7 @@ import { ChatGlance } from '@/components/chat/chat-glance';
 import { CueSheet } from '@/components/chat/cue-sheet';
 import { FindSheet, FindTab } from '@/components/chat/find-sheet';
 import { FactsSheet } from '@/components/chat/facts-sheet';
+import { ItemsSheet } from '@/components/chat/items-sheet';
 import { MemoryDrawer } from '@/components/chat/memory-drawer';
 import { NovelRequest, NovelView } from '@/components/chat/novel-view';
 import { PersonaPictures } from '@/components/chat/persona-pictures';
@@ -168,6 +169,8 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
     const [cueSheet, setCueSheet] = useState(false);
     // The Facts panel (.scratch/facts-panel/spec.md), opened from the Scene strip.
     const [factsSheet, setFactsSheet] = useState(false);
+    // The Items sheet (.scratch/story-items/spec.md), opened from the Scene strip too.
+    const [itemsSheet, setItemsSheet] = useState(false);
     /** The Chapters sheet, with Move on (.scratch/scene-chapters/spec.md). */
     const [chaptersOpen, setChaptersOpen] = useState(false);
     /** Counts the asks for "Previously on…" from the Chat menu (.scratch/previously-on/spec.md). */
@@ -737,6 +740,8 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                     characters={characters}
                     factCount={chat.facts?.length ?? 0}
                     onOpenFacts={() => setFactsSheet(true)}
+                    itemCount={(chat.items ?? []).filter((item) => item.end === null).length}
+                    onOpenItems={() => setItemsSheet(true)}
                     onOpenChapters={scenes.length > 0 ? () => setChaptersOpen(true) : undefined}
                     onHide={() => {
                         setSceneStripHidden(true);
@@ -1020,6 +1025,22 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                         }
                     }}
                     onClose={() => setFactsSheet(false)}
+                />
+            )}
+            {itemsSheet && (
+                <ItemsSheet
+                    items={chat.items ?? []}
+                    characters={characters.map((character) => character.name)}
+                    onSave={async (change) => {
+                        try {
+                            setChat(await chatApi.setItem(chat.storyId, chat.id, change));
+                            return null;
+                        } catch (caught) {
+                            if (caught instanceof ApiUnreachableError) reportUnreachable();
+                            return caught instanceof ApiError ? caught.message : 'Something went wrong.';
+                        }
+                    }}
+                    onClose={() => setItemsSheet(false)}
                 />
             )}
             {snapshotSheet && (

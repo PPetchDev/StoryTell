@@ -12,6 +12,7 @@ import {
     SetAuthorsNoteRequestBodyDTO,
     SetNowNoteRequestBodyDTO,
     SetFactRequestBodyDTO,
+    SetItemRequestBodyDTO,
     SetSittingOutRequestBodyDTO,
     SwapIdentityRequestBodyDTO,
     TurnRequestBodyDTO,
@@ -121,6 +122,13 @@ export class ChatApiController {
     @ApiOkResponse({ type: ChatResponseBodyDTO })
     setFact(@Id('storyId') storyId: number, @Id('chatId') chatId: number, @Body() body: SetFactRequestBodyDTO): Promise<ChatResponseBodyDTO> {
         return this.chatManager.setFact(storyId, chatId, body.topic, body.fact);
+    }
+
+    /** Sets or deletes the user's own Item (.scratch/story-items/spec.md). Never rolled back. */
+    @Put(':chatId/items')
+    @ApiOkResponse({ type: ChatResponseBodyDTO })
+    setItem(@Id('storyId') storyId: number, @Id('chatId') chatId: number, @Body() body: SetItemRequestBodyDTO): Promise<ChatResponseBodyDTO> {
+        return this.chatManager.setItem(storyId, chatId, body);
     }
 
     /**

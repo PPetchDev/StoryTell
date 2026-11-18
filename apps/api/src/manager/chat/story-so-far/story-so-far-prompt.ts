@@ -17,6 +17,7 @@ import { documentsReserveTokens } from '../../document/document-search.js';
 import { loreReserveTokens } from '../lore/lore-select.js';
 import { beliefCost, memoryCost } from '../memory/memory-choice.js';
 import { factsBlock } from '../details/facts.js';
+import { itemsBlock } from '../details/items.js';
 import { REPEATS_RESERVE_TOKENS } from '../speech/repeated-phrases.js';
 
 /**
@@ -75,6 +76,8 @@ export function storySoFarCoverage(layers: PromptLayersInput, history: PromptHis
         estimateTokens(authorsNoteBlock(layers.authorsNote, layers.identity.name) ?? '') +
         // The Established facts as they stand, and a line of repeated phrases (.scratch/story-quality/spec.md).
         estimateTokens(factsBlock(layers.facts) ?? '') +
+        // And the Items as they stand (.scratch/story-items/spec.md).
+        estimateTokens(itemsBlock(layers.items, layers.identity.name) ?? '') +
         REPEATS_RESERVE_TOKENS +
         estimateTokens(`${reminder}
 ${turnFinalInstruction(layers.identity.name)}`);

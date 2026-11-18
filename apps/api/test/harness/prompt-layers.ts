@@ -2,11 +2,12 @@ import { DOCUMENTS_HEADING } from '../../src/manager/document/document-search.js
 import { LORE_HEADING } from '../../src/manager/chat/lore/lore-select.js';
 import { NARRATOR_NOTES, PROMPT_LAYERS } from '../../src/manager/chat/turn/prompt.js';
 import { FACTS_HEADING } from '../../src/manager/chat/details/facts.js';
+import { ITEMS_HEADING } from '../../src/manager/chat/details/items.js';
 
 type Prompt = { messages: ReadonlyArray<{ role: string; content: string }> };
 
-/** The blocks after the moment layers open with one of these: Lore, Documents, Author's note, Established facts, then the turn's reminder or the one-off instruction. */
-const TRAILING_STARTS = [`${LORE_HEADING} (`, DOCUMENTS_HEADING, "# Author's note", `${FACTS_HEADING} (`, 'Where things stand:', 'Step outside the story'];
+/** The blocks after the moment layers open with one of these: Lore, Documents, Author's note, Established facts, Items, then the turn's reminder or the one-off instruction. */
+const TRAILING_STARTS = [`${LORE_HEADING} (`, DOCUMENTS_HEADING, "# Author's note", `${FACTS_HEADING} (`, `${ITEMS_HEADING} (`, 'Where things stand:', 'Step outside the story'];
 
 /**
  * A prompt's closing user message in its three parts (.scratch/prompt-cache/spec.md): the user's

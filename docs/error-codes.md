@@ -133,6 +133,9 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | `409.004.133` | `BookChapterBusyError` | Editing or removing a Book chapter while it waits to be written or is being written. Nothing changes. |
 | `409.004.134` | `EmptyBookError` | The Book's EPUB (`GET …/book/epub`) while no chapter is written. |
 | `422.004.135` | `EmptyBookChapterError` | A Book chapter saved (`PUT …/book/chapters/:number`) with a blank title or text. Nothing changes. |
+| `422.004.140` | `ItemWithoutNameError` | An Item set (`PUT /api/stories/:storyId/chats/:chatId/items`) with a name of no letters or digits (`.scratch/story-items/spec.md`). Nothing is written. |
+| `422.004.141` | `ItemWithoutHolderError` | An Item set as held (no `end`) with no holder. Nothing is written. |
+| `422.004.142` | `TooManyItemsError` | A new held Item, or a gone one set held again, when the Chat already holds 30. A change to a held one, or marking one gone, is always taken. Nothing is written. |
 | `409.004.160` | `WatchRunningError` | Watch started (`POST /api/stories/:storyId/chats/:chatId/watch`) while one already runs in the Chat (`.scratch/watch-mode/spec.md`). Nothing changes; Stop it first. Other refusals of a start are a Continue's: `409.004.013`, `422.004.002`, `409.004.004`, out of credit, the Monthly cap. |
 | `409.004.161` | `WatchNeedsYouError` | Watch started while a Sudden event is under way: its Gauge moves by how the user plays, so the user must play it. Nothing changes. |
 | `502.005.001` | `UnreadableDraftError` | The model's draft or rewrite could not be read (no JSON object, or no text). Nothing saved. Show with Retry. |

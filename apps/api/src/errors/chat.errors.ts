@@ -231,6 +231,29 @@ export class TooManyFactsError extends AppError {
     }
 }
 
+// Items (.scratch/story-items/spec.md). Numbered from 140, the range kept for them.
+
+/** An Item set in the Items sheet whose name has no letters or digits. */
+export class ItemWithoutNameError extends AppError {
+    constructor() {
+        super('422.004.140', 'Give the item a name, such as "the brass key".');
+    }
+}
+
+/** An Item set as held with no one holding it. */
+export class ItemWithoutHolderError extends AppError {
+    constructor() {
+        super('422.004.141', 'Say who has the item, or mark it gone.');
+    }
+}
+
+/** A new held Item when the Chat already holds the most it keeps. */
+export class TooManyItemsError extends AppError {
+    constructor(max: number) {
+        super('422.004.142', `This Chat already holds ${max} items. Delete one or mark it gone to add another.`);
+    }
+}
+
 // Move on, and Chapters (.scratch/scene-chapters/spec.md). Numbered from 090, clear of the codes other features add after 030.
 
 /** A Move on to the Scene the Chat is already on, to free play from free play, to a Scene not in the Story, or in a Story with no Scenes. Nothing changes. */
