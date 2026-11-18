@@ -45,7 +45,10 @@ export function StorySheet({ story, onClose }: { story: StorySummary; onClose():
         }
     };
     const startChat = () =>
-        run('starting', async () => `/stories/${story.id}/chats/${(await chatApi.create(story.id)).id}`, "Couldn't start a Chat.");
+        // A Story that asks Opening questions asks them first (.scratch/opening-questions/spec.md).
+        story.asksOpeningQuestions
+            ? router.push(`/stories/${story.id}/new-chat`)
+            : run('starting', async () => `/stories/${story.id}/chats/${(await chatApi.create(story.id)).id}`, "Couldn't start a Chat.");
     const duplicate = () =>
         run('duplicating', async () => `/stories/${(await storyApi.duplicate(story.id)).id}`, "Couldn't duplicate the Story.");
 

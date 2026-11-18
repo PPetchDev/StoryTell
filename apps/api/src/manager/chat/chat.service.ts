@@ -68,6 +68,7 @@ import { exchangeUserText } from './exchange.js';
 import { repliesInScene } from './scene-replies.js';
 import { MissingField, playableStatus } from '../story/playable.js';
 import { WornIdentity, wornIdentity } from './identity.js';
+import { fillPlaceholders, resolveOpeningAnswers } from '../story/opening-questions.js';
 import { currentBonds, JudgeManagerService, latestJudged, SettledBackground } from './judge/judge.service.js';
 import { latestExtracted, MemoryExtractionManagerService } from './memory/extraction.service.js';
 import { charactersInExchange } from './memory/present.js';
@@ -190,8 +191,10 @@ export interface ChatDetail extends ChatSummary {
     identityName: string;
     /** The worn Persona; null while the Chat wears its Story's Role. */
     personaId: number | null;
-    /** The Story's Role's name, which the swap offers beside the Personas. */
+    /** The Story's Role's name, which the swap offers beside the Personas; its placeholders filled with this Chat's answers. */
     roleName: string;
+    /** What this Chat answered to its Story's Opening questions, by key (.scratch/opening-questions/spec.md); null when it was asked none. */
+    openingAnswers: Record<string, string> | null;
     /** Each with its current Thai reading (.scratch/write-for-me/spec.md), or null. */
     messages: ChatMessageResponse[];
     /** True when the last Message is a User Message, so its turn failed and Retry applies. */
@@ -449,9 +452,11 @@ export class ChatManagerService {
 
     /**
      * Spec: "Starting a Chat". The Opening becomes Message 1; the first Scene, or free play;
-     * StartingBonds seed the first BondChanges and Arc directions are copied in.
+     * StartingBonds seed the first BondChanges and Arc directions are copied in. The answers to the
+     * Story's Opening questions are kept on the Chat, a default for each one missing or blank, and
+     * fill the Opening's placeholders (.scratch/opening-questions/spec.md).
      */
-    async createChat(storyId: number): Promise<ChatDetail> {
+    async createChat(storyId: number, answers?: Record<string, unknown> | null): Promise<ChatDetail> {
         const story = await this.loadStory(storyId);
         this.requirePlayable(story);
 
@@ -461,9 +466,10 @@ export class ChatManagerService {
                 storyId,
                 title: defaultTitle(existing.map((other) => other.title)),
                 currentSceneId: story.scenes[0]?.id ?? null,
+                openingAnswers: (story.openingQuestions ?? []).length > 0 ? resolveOpeningAnswers(story.openingQuestions, answers) : null,
             }),
         );
-        await this.copyOpening(story, chat.id);
+        await this.copyOpening(story, chat.id, chat.openingAnswers);
         await this.seedLedger(story, chat.id);
         return this.getChat(storyId, chat.id);
     }
@@ -515,7 +521,8 @@ export class ChatManagerService {
             await this.chatModel.setCurrentScene(chat.id, story.scenes[0]?.id ?? null);
             await this.storySoFar.clear(chat.id);
             await this.chatModel.clearMessages(chat.id);
-            await this.copyOpening(story, chat.id);
+            // The Chat's own answers stay (.scratch/opening-questions/spec.md).
+            await this.copyOpening(story, chat.id, chat.openingAnswers);
             await this.seedLedger(story, chat.id);
             await this.readAloud.sweep();
             return this.getChat(storyId, chatId);
@@ -940,10 +947,14 @@ export class ChatManagerService {
         }
     }
 
-    /** The Opening becomes Message 1 with model "author", split by the same parser as replies. */
-    private async copyOpening(story: StoryEntity, chatId: number): Promise<void> {
+    /**
+     * The Opening becomes Message 1 with model "author", split by the same parser as replies, its
+     * placeholders filled with the Chat's answers (.scratch/opening-questions/spec.md).
+     */
+    private async copyOpening(story: StoryEntity, chatId: number, answers: Record<string, string> | null): Promise<void> {
+        const fill = (text: string) => fillPlaceholders(text, story.openingQuestions, answers);
         // The author wrote the Opening, so the guard that cuts lines written as the Role is off.
-        const opening = parseReply(story.opening, story.characters, story.role.name, { guard: false });
+        const opening = parseReply(fill(story.opening), story.characters, fill(story.role.name), { guard: false });
         await this.chatModel.addAiMessage(chatId, 0, AUTHOR_MODEL, opening.parts, null);
     }
 
@@ -1855,7 +1866,8 @@ export class ChatManagerService {
             facts: factsState(detailChanges).facts,
             identityName: identity.name,
             personaId: identity.personaId,
-            roleName: story.role.name,
+            roleName: fillPlaceholders(story.role.name, story.openingQuestions, chat.openingAnswers),
+            openingAnswers: chat.openingAnswers ? { ...chat.openingAnswers } : null,
             personaImages: personas.flatMap((persona) =>
                 persona.imagePath && inChat.has(persona.id) ? [{ personaId: persona.id, imagePath: persona.imagePath }] : [],
             ),

@@ -157,6 +157,14 @@ export class ChatEntity {
     @Column({ name: 'character_thoughts', type: 'boolean', default: true })
     characterThoughts: boolean;
 
+    /**
+     * The answers to its Story's Opening questions (.scratch/opening-questions/spec.md), one per
+     * question when the Chat was made; null when the Story asked none. Reset keeps them, a Branch
+     * copies them.
+     */
+    @Column({ name: 'opening_answers', type: 'jsonb', nullable: true })
+    openingAnswers: Record<string, string> | null;
+
     // Loaded only through ChatModelService.findWithMessages(); never auto-loaded.
     @OneToMany('MessageEntity', 'chat')
     messages: Relation<MessageEntity[]>;

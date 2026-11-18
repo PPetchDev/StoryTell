@@ -103,6 +103,16 @@ export function renderStory(story: StoryResponse, options: { loreTriggers?: bool
         `Style: ${story.style.pov} person, ${story.style.tense} tense, ${story.style.replyLength} replies, ${story.style.pacing} pacing, ${story.style.balance} between dialogue and action, ${story.style.difficulty} difficulty. ${line('Image style', story.style.imageStyle)}`,
         `Role (the part the author plays):\n  ${line('Name', story.role.name)}\n  ${line('Description', story.role.description)}`,
     ];
+    // Only when there are some, so every other Story's prompt stays as it was (.scratch/opening-questions/spec.md).
+    const questions = story.openingQuestions ?? [];
+    if (questions.length > 0) {
+        parts.push(
+            [
+                'Opening questions (asked when a Chat starts; each answer replaces its {placeholder} in the Opening and the Role, so keep those placeholders as written):',
+                ...questions.map((question) => `  {${question.key}}: "${question.question}" (default: ${question.defaultAnswer})`),
+            ].join('\n'),
+        );
+    }
     if (story.characters.length === 0) {
         parts.push('Characters: none yet.');
     }

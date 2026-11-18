@@ -94,6 +94,8 @@ async function copyChat(manager: EntityManager, sourceChatId: number, through: n
         endingSuggestions: source.endingSuggestions,
         autoDiary: source.autoDiary,
         characterThoughts: source.characterThoughts,
+        // What the user answered when the Chat began (.scratch/opening-questions/spec.md).
+        openingAnswers: source.openingAnswers,
         ...(keepStorySoFar
             ? {
                   storySoFar: source.storySoFar,

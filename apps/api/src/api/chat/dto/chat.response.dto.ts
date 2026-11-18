@@ -476,8 +476,16 @@ export class ChatResponseBodyDTO extends ChatSummaryDTO implements Omit<ChatDeta
     })
     personaImages: ChatPersonaImageDTO[];
 
-    @ApiProperty({ description: "The Story's Role's name, which the swap offers beside the Personas." })
+    @ApiProperty({ description: "The Story's Role's name, which the swap offers beside the Personas, its placeholders filled with this Chat's answers." })
     roleName: string;
+
+    @ApiProperty({
+        type: 'object',
+        additionalProperties: { type: 'string' },
+        nullable: true,
+        description: "What this Chat answered to its Story's Opening questions, by placeholder key; null when it was asked none.",
+    })
+    openingAnswers: Record<string, string> | null;
 
     @ApiProperty({ type: [MessageDTO], description: 'In order; the Opening is first.' })
     messages: MessageDTO[];

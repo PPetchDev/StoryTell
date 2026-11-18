@@ -2,6 +2,8 @@ import { InvalidGreetingError } from '../../errors/character-card.errors.js';
 import { LORE_GROUP_MAX, LORE_TIMED_MAX, LoreSecondaryMode, LoreTriggers } from '../../model/story/entities/lore-entry.entity.js';
 import { Backdrop, Balance, Difficulty, Pacing, Pov, ReplyLength, Tense } from '../../model/story/entities/story.entity.js';
 import { cleanPatterns, compileLorePattern } from '../chat/lore/lore-pattern.js';
+import type { OpeningQuestion } from '../../model/story/entities/story.entity.js';
+import { cleanOpeningQuestions } from '../story/opening-questions.js';
 import { CharacterFields, cleanKeywords, LoreEntryFields, StoryFields } from '../story/story.service.js';
 import { CardBookEntry, CardData } from './card-reader.js';
 
@@ -36,6 +38,8 @@ export interface CardStoryPlan {
     role: { name: string; description: string };
     character: Required<Omit<CharacterFields, 'speakingVoice'>> & { speakingVoice: string | null };
     lore: CardLoreEntry[];
+    /** A Storytell card's Opening questions (.scratch/opening-questions/spec.md); none from any other card. */
+    openingQuestions: OpeningQuestion[];
     /** Plain lines for the "Won't come along" list. */
     leftOut: string[];
 }
@@ -54,6 +58,10 @@ export interface StorytellBlock {
         speakingVoice?: unknown;
     };
     role: { name: string; description: string };
+    /** As the card writer puts them, only when the Story had some: unchecked here. */
+    openingQuestions?: unknown;
+    /** The Opening as written, placeholders kept; only beside `openingQuestions`. */
+    opening?: string;
     style: {
         pov?: Pov;
         tense?: Tense;
@@ -100,6 +108,8 @@ export function storytellBlock(card: CardData): StorytellBlock | null {
             speakingVoice: character.speakingVoice,
         },
         role: { name: str(role.name), description: str(role.description) },
+        openingQuestions: block.openingQuestions,
+        ...(typeof block.opening === 'string' && { opening: block.opening }),
         style: {
             pov: oneOf(Pov, style.pov),
             tense: oneOf(Tense, style.tense),
@@ -208,10 +218,13 @@ export function mapCard(card: CardData, choices: CardChoices, knownVoice: (voice
         else looksOut.push(`The Chat backdrop "${String(wanted)}" (not one Storytell has).`);
     }
 
+    const openingQuestions = cardOpeningQuestions(block, leftOut);
+    // The first greeting is the Opening with the default answers in; the block keeps it as written.
+    const asWritten = choices.greeting === 0 && openingQuestions.length > 0 && block?.opening !== undefined;
     const story: CardStoryPlan['story'] = {
         title: field('The title', titleOf(card)),
         setting: field('The Setting', card.scenario),
-        opening: field('The Opening', greetings[choices.greeting]),
+        opening: field('The Opening', asWritten ? block!.opening! : greetings[choices.greeting]),
         narrationVoice,
         backdrop,
     };
@@ -295,7 +308,25 @@ export function mapCard(card: CardData, choices: CardChoices, knownVoice: (voice
     leftOut.push(...looksOut);
     for (const label of cuts) leftOut.push(`${label} was cut to ${TEXT_MAX.toLocaleString('en-US')} characters.`);
 
-    return { story, role, character, lore, leftOut };
+    return { story, role, character, lore, openingQuestions, leftOut };
+}
+
+/**
+ * The Opening questions a Storytell card carries, checked by the editor's rules; a list that
+ * breaks one is left out whole, and listed.
+ */
+function cardOpeningQuestions(block: StorytellBlock | null, leftOut: string[]): OpeningQuestion[] {
+    const raw = block?.openingQuestions;
+    if (raw === undefined || raw === null) return [];
+    const questions = Array.isArray(raw)
+        ? raw.map((item) => (isObject(item) ? { key: str(item.key), question: str(item.question), defaultAnswer: str(item.defaultAnswer) } : null))
+        : [null];
+    const cleaned = questions.includes(null) ? 'they are not in a form Storytell reads.' : cleanOpeningQuestions(questions as OpeningQuestion[]);
+    if (typeof cleaned === 'string') {
+        leftOut.push(`The Opening questions (${cleaned})`);
+        return [];
+    }
+    return cleaned;
 }
 
 /** A single-line example that starts with the Character's own label loses it; other blocks keep their labels. */

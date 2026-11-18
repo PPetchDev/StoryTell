@@ -31,7 +31,7 @@ test('Duplicate on a Story card makes "<title> (copy)" with the cast and Scenes,
         storyIds.push(copyId);
         expect(copyId).not.toBe(sourceId);
         await expect(page.getByLabel('Title')).toHaveValue('The Lighthouse (copy)');
-        await expect(page.getByLabel('Opening')).toHaveValue(OPENING);
+        await expect(page.getByRole('region', { name: 'Story' }).getByLabel('Opening')).toHaveValue(OPENING);
         const copy = await (await request.get(`/api/stories/${copyId}`)).json();
         expect(copy.characters.map((character: { name: string }) => character.name)).toEqual(['Mira']);
         expect(copy.scenes.map((scene: { name: string }) => scene.name)).toEqual(['Arrival']);

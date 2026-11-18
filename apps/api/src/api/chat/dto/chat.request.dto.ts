@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsBoolean, IsInt, IsOptional, IsString, MaxLength, Min, ValidateIf } from 'class-validator';
+import { IsArray, IsBoolean, IsInt, IsObject, IsOptional, IsString, MaxLength, Min, ValidateIf } from 'class-validator';
 
 import type { ChatFields } from '../../../manager/chat/chat.service.js';
 import { CUE_MAX } from '../../../manager/chat/turn/prompt.js';
@@ -10,6 +10,21 @@ import { WRITE_FOR_ME_DRAFT_MAX } from '../../../manager/chat/write-for-me/write
 const TITLE_MAX = 200;
 // Long enough for any turn the user writes, short enough to refuse a runaway client.
 const TEXT_MAX = 20_000;
+
+/** Starting a Chat (.scratch/opening-questions/spec.md). With no body, every Opening question takes its default. */
+export class CreateChatRequestBodyDTO {
+    @ApiPropertyOptional({
+        type: 'object',
+        additionalProperties: { type: 'string' },
+        description:
+            "The answers to the Story's Opening questions, by placeholder key. A missing or blank answer takes the question's default; " +
+            'a key the Story does not ask is ignored. Each is made one line and cut to 200 characters.',
+        example: { name: 'Petch', trade: 'herder' },
+    })
+    @IsOptional()
+    @IsObject()
+    answers?: Record<string, unknown>;
+}
 
 /** The Chat's own settings; each is changed only when sent. */
 export class UpdateChatRequestBodyDTO implements ChatFields {

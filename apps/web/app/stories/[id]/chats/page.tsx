@@ -29,6 +29,11 @@ export default function ChatsPage({ params }: { params: Promise<{ id: string }> 
     const heading = useRef<HTMLHeadingElement>(null);
 
     const startChat = async () => {
+        // A Story that asks Opening questions asks them first (.scratch/opening-questions/spec.md).
+        if (story.status === 'ready' && (story.data.openingQuestions ?? []).length > 0) {
+            router.push(`/stories/${storyId}/new-chat`);
+            return;
+        }
         setStarting(true);
         setError(null);
         try {

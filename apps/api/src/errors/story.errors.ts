@@ -222,3 +222,10 @@ export class InvalidBondGateError extends AppError {
         super('422.003.024', `That Bond gate can't be set: ${reason}`);
     }
 }
+
+/** An Opening questions list that breaks a rule (.scratch/opening-questions/spec.md); the message says which. */
+export class InvalidOpeningQuestionsError extends AppError {
+    constructor(reason: string) {
+        super('422.003.040', `Those Opening questions can't be saved: ${reason}`);
+    }
+}

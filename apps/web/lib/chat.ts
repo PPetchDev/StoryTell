@@ -198,6 +198,8 @@ export interface Chat extends ChatSummary {
     /** The pictures of the Personas this Chat shows: the worn one and those its User Messages were written as, where they have one. */
     personaImages: Array<{ personaId: number; imagePath: string }>;
     roleName: string;
+    /** What this Chat answered to its Story's Opening questions, by key; null when it was asked none. */
+    openingAnswers?: Record<string, string> | null;
     messages: Message[];
     /** The last Message is a User Message whose turn failed: show Retry. */
     awaitingReply: boolean;
@@ -441,7 +443,9 @@ export interface DiaryEntry {
 
 /** Writes answer with the whole Chat; the list and the Chat itself are read with useApiQuery. */
 export const chatApi = {
-    create: (storyId: number) => apiSend<Chat>('POST', `/stories/${storyId}/chats`),
+    /** With `answers` for the Story's Opening questions; a blank or missing one takes its default. */
+    create: (storyId: number, answers?: Record<string, string>) =>
+        apiSend<Chat>('POST', `/stories/${storyId}/chats`, answers ? { answers } : undefined),
     rename: (storyId: number, chatId: number, title: string) =>
         apiSend<Chat>('PATCH', `/stories/${storyId}/chats/${chatId}`, { title }),
     /** Read replies aloud (.scratch/read-aloud/spec.md, "Auto-read"), on or off. */

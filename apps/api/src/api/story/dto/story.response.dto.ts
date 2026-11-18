@@ -120,6 +120,9 @@ export class StorySummaryDTO implements StoryListItem {
 
     @ApiProperty({ description: "The Setting's first sentence, cut to about 120 characters; empty when there is none." })
     hook: string;
+
+    @ApiProperty({ description: 'Whether a new Chat asks Opening questions first (.scratch/opening-questions/spec.md).' })
+    asksOpeningQuestions: boolean;
 }
 
 export class ListStoriesResponseBodyDTO {
@@ -242,6 +245,18 @@ export class CharacterDTO implements CharacterResponse {
 
     @ApiProperty({ type: [ExpressionDTO], description: 'Their picture per emotion, in the fixed order of the emotions.' })
     expressions: ExpressionDTO[];
+}
+
+/** One Opening question (.scratch/opening-questions/spec.md). */
+export class OpeningQuestionDTO {
+    @ApiProperty({ description: 'The placeholder, written `{key}` in the Opening and the Role.', example: 'name' })
+    key: string;
+
+    @ApiProperty({ example: 'What is your name?' })
+    question: string;
+
+    @ApiProperty({ description: 'Used when the user skips the question or leaves it blank.', example: 'Aria' })
+    defaultAnswer: string;
 }
 
 export class StartingBeliefDTO implements StartingBeliefResponse {
@@ -446,6 +461,9 @@ export class StoryResponseBodyDTO implements StoryDetail {
 
     @ApiProperty()
     opening: string;
+
+    @ApiProperty({ type: [OpeningQuestionDTO], description: 'Asked when a Chat starts, in order; each answer fills `{key}` in the Opening and the Role.' })
+    openingQuestions: OpeningQuestionDTO[];
 
     @ApiProperty({ type: StyleDTO })
     style: StyleDTO;

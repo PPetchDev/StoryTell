@@ -62,6 +62,7 @@ import { UsageMessage1764330000000 } from './1764330000000-UsageMessage.js';
 import { MessageBookmarks1764340000000 } from './1764340000000-MessageBookmarks.js';
 import { PushSubscriptions1764350000000 } from './1764350000000-PushSubscriptions.js';
 import { SceneChapters1764390000000 } from './1764390000000-SceneChapters.js';
+import { OpeningQuestions1764400000000 } from './1764400000000-OpeningQuestions.js';
 
 // Listed by hand, oldest first, so migrations load the same way from compiled JS, the
 // TypeORM CLI and Vitest. Add every new migration here.
@@ -131,4 +132,5 @@ export const migrations = [
     MessageBookmarks1764340000000,
     PushSubscriptions1764350000000,
     SceneChapters1764390000000,
+    OpeningQuestions1764400000000,
 ];

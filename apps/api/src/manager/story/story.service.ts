@@ -8,6 +8,7 @@ import {
     EmptyStartingBeliefError,
     InvalidBondGateError,
     InvalidCoverChoiceError,
+    InvalidOpeningQuestionsError,
     InvalidOrderError,
     InvalidLorePatternError,
     LoreEntryNotFoundError,
@@ -48,6 +49,7 @@ import {
     Pacing,
     Pov,
     ReplyLength,
+    OpeningQuestion,
     StoryEntity,
     StoryResponse,
     StorySummary,
@@ -60,6 +62,7 @@ import { parseReply, ReplyPart } from '../chat/turn/reply-parser.js';
 import { storyHook } from '../excerpt.js';
 import { ReadAloudManagerService } from '../read-aloud/read-aloud.service.js';
 import { VoiceManagerService } from '../voice/voice.service.js';
+import { cleanOpeningQuestions, fillPlaceholders } from './opening-questions.js';
 import { MAX_CHARACTERS, playableStatus, PlayableStatus } from './playable.js';
 
 /** A Story as the editor and the list read it: its fields plus the derived playable status. */
@@ -86,6 +89,8 @@ export interface StoryListItem extends StorySummary, PlayableStatus {
     coverFocus: CoverFocus | null;
     /** The Setting's first sentence, cut to about 120 characters. */
     hook: string;
+    /** Whether a new Chat asks Opening questions first, so New Chat goes to their form. */
+    asksOpeningQuestions: boolean;
 }
 
 /** Where a Cover is picked from: exactly one of the two. */
@@ -293,6 +298,7 @@ export class StoryManagerService {
                 coverImagePath: cover?.imagePath ?? coverOf.get(story.id) ?? null,
                 coverFocus: cover?.focus ?? null,
                 hook: storyHook(story.setting),
+                asksOpeningQuestions: (story.openingQuestions ?? []).length > 0,
             };
         });
     }
@@ -310,10 +316,12 @@ export class StoryManagerService {
     /**
      * The stored Opening split by the same parser a new Chat uses for its first Message, so the
      * editor can preview how every Chat begins. The guard is off: the author wrote the Opening.
+     * Its placeholders read the default answers (.scratch/opening-questions/spec.md).
      */
     async openingParts(storyId: number): Promise<ReplyPart[]> {
         const story = await this.load(storyId);
-        return parseReply(story.opening, story.characters, story.role.name, { guard: false }).parts;
+        const fill = (text: string) => fillPlaceholders(text, story.openingQuestions, null);
+        return parseReply(fill(story.opening), story.characters, fill(story.role.name), { guard: false }).parts;
     }
 
     async updateStory(storyId: number, fields: StoryFields): Promise<StoryDetail> {
@@ -700,6 +708,19 @@ export class StoryManagerService {
         }
         await this.storyModel.replaceStartingBeliefs(storyId, cleaned);
         return this.saved(storyId);
+    }
+
+    /**
+     * .scratch/opening-questions/spec.md: the whole list at once, in order. A list that breaks a
+     * rule is refused whole and nothing changes. New Chats ask them; Chats already made keep their
+     * answers, and a question they weren't asked reads its default.
+     */
+    async setOpeningQuestions(storyId: number, questions: OpeningQuestion[]): Promise<StoryDetail> {
+        await this.load(storyId);
+        const cleaned = cleanOpeningQuestions(questions);
+        if (typeof cleaned === 'string') throw new InvalidOpeningQuestionsError(cleaned);
+        await this.storyModel.setOpeningQuestions(storyId, cleaned);
+        return this.reload(storyId);
     }
 
     async addScene(storyId: number, fields: SceneFields): Promise<StoryDetail> {
