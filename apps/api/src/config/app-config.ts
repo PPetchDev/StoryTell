@@ -74,7 +74,7 @@ export interface ProviderKeys {
     readonly openRouter: string | undefined;
     /** Venice inference key: image calls. */
     readonly venice: string | undefined;
-    /** Venice Admin key, optional: reading the image credit balance needs one. */
+    /** Venice Admin key, optional: the balance is read with it when set, else with the inference key. */
     readonly veniceAdmin: string | undefined;
 }
 

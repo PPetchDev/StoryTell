@@ -257,11 +257,28 @@ export class VeniceClient {
     }
 
     /**
-     * Remaining image credit. `GET /billing/balance` answers only to an Admin key; without
-     * one the balance is unknown and the usage view shows spend alone.
+     * Remaining Venice credit, which images, audio and text on Venice all spend. With an Admin key,
+     * `GET /billing/balance`; without one, `GET /api_keys/rate_limits`, which answers to the ordinary
+     * inference key (.scratch/text-fallback/spec.md, "Venice's balance without an Admin key"). With
+     * neither key the balance is unknown and the usage view shows spend alone.
      */
     async credit(): Promise<CreditBalance> {
-        if (!this.adminKey) return { remainingUsd: null, limitUsd: null };
+        if (this.adminKey) return this.adminBalance();
+        if (!this.apiKey) return { remainingUsd: null, limitUsd: null };
+        const response = await this.send('/api_keys/rate_limits', { method: 'GET', headers: this.inferenceHeaders() });
+        const json = await readJson(response);
+        if (!response.ok) throw this.toError(response.status, json);
+        // `{ data: { balances: { USD, DIEM, BUNDLED_CREDITS } } }`, measured 2026-11-17. Only USD is
+        // dollars, as `usd` is on the admin path; DIEM and bundled credits are left out of both.
+        const usd = json?.data?.balances?.USD;
+        if (usd !== null && typeof usd !== 'number') {
+            throw new UnparseableOutputError('Venice returned a balance that could not be read.');
+        }
+        return { remainingUsd: Math.max(0, usd ?? 0), limitUsd: null };
+    }
+
+    /** `GET /billing/balance`, which answers only to an Admin key. */
+    private async adminBalance(): Promise<CreditBalance> {
         const response = await this.send('/billing/balance', {
             method: 'GET',
             headers: { Authorization: `Bearer ${this.adminKey}` },

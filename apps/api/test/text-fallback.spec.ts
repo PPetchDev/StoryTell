@@ -26,20 +26,38 @@ interface Answer {
     sse?: string[];
 }
 
-function scripted(answers: Answer[]): { fetchImpl: FetchLike; sent: Sent[] } {
+/** A balance read: OpenRouter's `/credits` (or `/key`), Venice's `/billing/balance` or `/api_keys/rate_limits`. */
+const isBalanceRead = (url: string): boolean => /\/(credits|key|billing\/balance|api_keys\/rate_limits)$/.test(url);
+
+/** What a balance read gets when no answer `match`es it: $10 left, so the host is not passed over. */
+function plentyLeft(url: string): Answer {
+    if (url.includes('openrouter.ai')) return { json: { data: { total_credits: 30, total_usage: 20 } } };
+    if (url.endsWith('/billing/balance')) return { json: { balances: { usd: 10 } } };
+    return { json: { data: { balances: { USD: 10, DIEM: 0, BUNDLED_CREDITS: 0 } } } };
+}
+
+/**
+ * Answers in order. An answer without `match` is for a call (chat, stream, embeddings), never a
+ * balance read; a balance read takes a `match`ing answer, or reads $10 left. `sent` lists the calls
+ * and `balanceReads` the balance reads, so a test of where a call went isn't about the reads.
+ */
+function scripted(answers: Answer[]): { fetchImpl: FetchLike; sent: Sent[]; balanceReads: string[] } {
     const sent: Sent[] = [];
+    const balanceReads: string[] = [];
     const left = [...answers];
     const fetchImpl: FetchLike = async (url, init) => {
-        sent.push({ url: String(url), body: init?.body ? JSON.parse(String(init.body)) : {} });
-        const at = left.findIndex((answer) => !answer.match || answer.match(String(url)));
-        if (at < 0) throw new Error(`No scripted answer for ${url}`);
-        const [answer] = left.splice(at, 1);
+        const balance = isBalanceRead(String(url));
+        if (balance) balanceReads.push(String(url));
+        else sent.push({ url: String(url), body: init?.body ? JSON.parse(String(init.body)) : {} });
+        const at = left.findIndex((answer) => (answer.match ? answer.match(String(url)) : !balance));
+        if (at < 0 && !balance) throw new Error(`No scripted answer for ${url}`);
+        const [answer] = at < 0 ? [plentyLeft(String(url))] : left.splice(at, 1);
         if (answer.sse) {
             return new Response(answer.sse.map((data) => `data: ${data}\n\n`).join(''), { status: 200, headers: { 'content-type': 'text/event-stream' } });
         }
         return new Response(JSON.stringify(answer.json ?? {}), { status: answer.status ?? 200, headers: { 'content-type': 'application/json' } });
     };
-    return { fetchImpl, sent };
+    return { fetchImpl, sent, balanceReads };
 }
 
 const OPENROUTER_CHAT = 'https://openrouter.ai/api/v1/chat/completions';
@@ -249,6 +267,154 @@ describe('Text chain (contract)', () => {
         });
     });
 
+    // .scratch/text-fallback/spec.md, "Passing over a host whose balance reads used up": live's OpenRouter
+    // was below zero yet still served small background calls, so its debt grew by a call at a time.
+    describe('a host whose balance reads at or below zero', () => {
+        const OPENROUTER_EMBED = 'https://openrouter.ai/api/v1/embeddings';
+        const VENICE_EMBED = 'https://api.venice.ai/api/v1/embeddings';
+        const vector = Array.from({ length: 1024 }, (_, i) => i / 1024);
+        const veniceEmbedding: Answer = { json: { model: 'text-embedding-bge-m3', data: [{ index: 0, embedding: vector }], usage: { prompt_tokens: 10 } } };
+        const openRouterReads = (total_usage: number): Answer => ({ match: (url) => url.endsWith('/credits'), json: { data: { total_credits: 30, total_usage } } });
+        const veniceReads = (usd: number): Answer => ({ match: (url) => url.endsWith('/billing/balance'), json: { balances: { usd } } });
+        const passedOver = (lines: string[]) => lines.filter((line) => /passing \w+ over, its balance reads/.test(line));
+
+        it('is passed over for text before anything is sent to it, every kind, and said once', async () => {
+            const logged = warnings();
+            const { fetchImpl, sent, balanceReads } = scripted([
+                openRouterReads(30.14),
+                veniceReply('{"bond_changes":[]}'),
+                openRouterReads(30.14),
+                veniceReply('A memory.'),
+                openRouterReads(30.14),
+                veniceReply('A thought.'),
+            ]);
+            const { gateway, records } = gatewayUnderTest(fetchImpl, { textHosts: ['openrouter', 'venice', 'free'] });
+
+            await gateway.completeText(JUDGE);
+            await gateway.completeText({ kind: 'memory_extraction', messages: [{ role: 'user', content: 'Remember.' }], json: true });
+            await gateway.completeText({ kind: 'character_thought', messages: [{ role: 'user', content: 'Think.' }] });
+
+            expect(sent.map((request) => request.url)).toEqual([VENICE_CHAT, VENICE_CHAT, VENICE_CHAT]);
+            expect(balanceReads.filter((url) => url.endsWith('/credits'))).toHaveLength(3);
+            expect(records.map((record) => record.host)).toEqual(['venice', 'venice', 'venice']);
+            expect(passedOver(logged())).toEqual([
+                'judge: passing openrouter over, its balance reads -$0.14 (at or below zero); sending calls to venice until it reads above zero. Said once per 10 min.',
+            ]);
+        });
+
+        it('is passed over at exactly zero, and for a streamed turn', async () => {
+            const { fetchImpl, sent } = scripted([
+                openRouterReads(30),
+                { sse: [JSON.stringify({ id: 'c', choices: [{ delta: { content: 'Lit.' }, finish_reason: 'stop' }] }), JSON.stringify({ id: 'c', choices: [], usage: { prompt_tokens: 5, completion_tokens: 1 }, cost: { usd: 0.0001 } }), '[DONE]'] },
+            ]);
+            const { gateway } = gatewayUnderTest(fetchImpl, { settings: { playModel: 'deepseek-v4-pro' }, textHosts: ['openrouter', 'venice', 'free'] });
+
+            const result = await gateway.streamText(TURN, { onText: () => {}, signal: new AbortController().signal });
+
+            expect(result.text).toBe('Lit.');
+            expect(sent.map((request) => request.url)).toEqual([VENICE_CHAT]);
+        });
+
+        it('is passed over for embeddings before anything is sent to it', async () => {
+            const { fetchImpl, sent } = scripted([openRouterReads(30.14), veniceEmbedding]);
+            const { gateway, records } = gatewayUnderTest(fetchImpl, { textHosts: ['openrouter', 'venice', 'free'] });
+
+            await gateway.embedTexts({ kind: 'context_search', inputs: ['The lamp.'] });
+
+            expect(sent.map((request) => request.url)).toEqual([VENICE_EMBED]);
+            expect(sent.map((request) => request.url)).not.toContain(OPENROUTER_EMBED);
+            expect(records).toEqual([expect.objectContaining({ kind: 'context_search', host: 'venice' })]);
+        });
+
+        it('passes Venice over to the free model when Venice reads used up too', async () => {
+            const { fetchImpl, sent, balanceReads } = scripted([openRouterReads(30.14), veniceReads(0), freeReply('Fine.')]);
+            const { gateway, records } = gatewayUnderTest(fetchImpl, { textHosts: ['openrouter', 'venice', 'free'] });
+
+            await gateway.completeText(JUDGE);
+
+            expect(sent.map((request) => request.url)).toEqual([OPENROUTER_CHAT]);
+            expect(sent[0].body.model).toBe(FREE_TEXT_MODEL.id);
+            expect(records).toEqual([expect.objectContaining({ host: 'openrouter-free' })]);
+            // The free host is last, so its balance is never read before a call.
+            expect(balanceReads).toHaveLength(2);
+        });
+
+        it('is not passed over while its balance is unknown', async () => {
+            const { fetchImpl, sent } = scripted([{ match: (url) => url.endsWith('/credits'), status: 500, json: { error: { code: 500, message: 'Internal error' } } }, openRouterReply('Fine.')]);
+            const { gateway, records } = gatewayUnderTest(fetchImpl, { textHosts: ['openrouter', 'venice', 'free'] });
+            warnings();
+
+            await gateway.completeText(JUDGE);
+
+            expect(sent.map((request) => request.url)).toEqual([OPENROUTER_CHAT]);
+            expect(records).toEqual([expect.objectContaining({ host: 'deepinfra' })]);
+        });
+
+        it('still sends to the last host whatever its balance reads, and reads no balance for a chain of one', async () => {
+            const two = scripted([openRouterReads(30.14), veniceReply('Venice.')]);
+            const { gateway } = gatewayUnderTest(two.fetchImpl, { textHosts: ['openrouter', 'venice'] });
+            await gateway.completeText(JUDGE);
+            // Venice is last: its balance isn't read before the call, and the call goes to it.
+            expect(two.sent.map((request) => request.url)).toEqual([VENICE_CHAT]);
+            expect(two.balanceReads.filter((url) => url.endsWith('/billing/balance'))).toEqual([]);
+
+            const one = scripted([openRouterReply('OpenRouter.')]);
+            const alone = gatewayUnderTest(one.fetchImpl);
+            await alone.gateway.completeText(JUDGE);
+            expect(one.sent.map((request) => request.url)).toEqual([OPENROUTER_CHAT]);
+            expect(one.balanceReads).toEqual([]);
+        });
+
+        it('reuses a reading for the credit cache, says it again after the skip period, and again after a top-up', async () => {
+            const logged = warnings();
+            const { fetchImpl, sent, balanceReads } = scripted([
+                openRouterReads(30.14),
+                veniceReply('1'),
+                veniceReply('2'),
+                openRouterReads(30.14),
+                veniceReply('3'),
+                openRouterReads(20),
+                openRouterReply('4'),
+                openRouterReads(30.2),
+                veniceReply('5'),
+            ]);
+            const { gateway, clock } = gatewayUnderTest(fetchImpl, { textHosts: ['openrouter', 'venice', 'free'], creditCacheMs: 30_000 });
+
+            await gateway.completeText(JUDGE);
+            await gateway.completeText(JUDGE);
+            expect(balanceReads.filter((url) => url.endsWith('/credits'))).toHaveLength(1);
+            expect(passedOver(logged())).toHaveLength(1);
+
+            clock.now += OUT_OF_CREDIT_SKIP_MS;
+            await gateway.completeText(JUDGE);
+            expect(balanceReads.filter((url) => url.endsWith('/credits'))).toHaveLength(2);
+            expect(passedOver(logged())).toHaveLength(2);
+
+            // Topped up: read again once the cache is old, and asked.
+            clock.now += 30_000;
+            await gateway.completeText(JUDGE);
+            // Below zero again: said at once, not after the rest of a period.
+            clock.now += 30_000;
+            await gateway.completeText(JUDGE);
+
+            expect(sent.map((request) => request.url)).toEqual([VENICE_CHAT, VENICE_CHAT, VENICE_CHAT, OPENROUTER_CHAT, VENICE_CHAT]);
+            expect(passedOver(logged())).toHaveLength(3);
+        });
+
+        it('still passes over a host that refused for credit for ten minutes, without reading its balance', async () => {
+            const { fetchImpl, sent, balanceReads } = scripted([OPENROUTER_OUT, veniceReply('One.'), veniceReply('Two.')]);
+            const { gateway } = gatewayUnderTest(fetchImpl, { textHosts: ['openrouter', 'venice', 'free'] });
+            warnings();
+
+            await gateway.completeText(JUDGE);
+            const readsBefore = balanceReads.filter((url) => url.endsWith('/credits')).length;
+            await gateway.completeText(JUDGE);
+
+            expect(sent.map((request) => request.url)).toEqual([OPENROUTER_CHAT, VENICE_CHAT, VENICE_CHAT]);
+            expect(balanceReads.filter((url) => url.endsWith('/credits'))).toHaveLength(readsBefore);
+        });
+    });
+
     // The up-front checks (a send, a Document's Add, Suggestions...) refuse when `credit.text.remainingUsd <= 0`.
     describe('the text pool the up-front checks read', () => {
         const openRouterBelowZero: Answer = { match: (url) => url.endsWith('/credits'), json: { data: { total_credits: 30, total_usage: 30.01 } } };
@@ -279,14 +445,15 @@ describe('Text chain (contract)', () => {
         });
 
         it("passes over a host remembered out of credit without reading its balance", async () => {
-            const { fetchImpl, sent } = scripted([OPENROUTER_OUT, veniceReply('Fine.'), ...veniceBalance(2.1)]);
+            const { fetchImpl, balanceReads } = scripted([OPENROUTER_OUT, veniceReply('Fine.'), ...veniceBalance(2.1)]);
             const { gateway } = gatewayUnderTest(fetchImpl, { textHosts: ['openrouter', 'venice', 'free'] });
             await gateway.completeText(JUDGE);
+            balanceReads.length = 0;
 
             const credit = await gateway.remainingCredit();
 
             expect(credit.text).toMatchObject({ remainingUsd: 2.1, host: 'venice' });
-            expect(sent.some((request) => request.url.endsWith('/credits'))).toBe(false);
+            expect(balanceReads.some((url) => url.endsWith('/credits'))).toBe(false);
         });
     });
 });

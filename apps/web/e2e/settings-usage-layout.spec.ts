@@ -62,9 +62,9 @@ test('Usage figures have the card\'s width, spend by kind is a table, and nothin
     await expect(kinds.getByRole('cell')).toHaveText(['$1.10', '30', '$0.12', '10', '$0.01', '1']);
     await expect(text.getByRole('definition').first()).toHaveText('$1.23 · 41 calls');
 
-    // Why the Venice balance is unknown, in words; the setting's name is for README.
+    // Why the Venice balance is unknown, in words, with no setting's name.
     const image = page.getByRole('region', { name: 'Images and audio (Venice)' });
-    await expect(image).toContainText('Unknown. Venice tells its balance only to an admin key');
+    await expect(image).toContainText("Unknown. Venice's balance could not be read just now.");
     await expect(page.getByText('VENICE_ADMIN_KEY')).toHaveCount(0);
 
     // One way to Settings for both pools, not one under each.
