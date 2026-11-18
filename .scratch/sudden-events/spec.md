@@ -52,7 +52,7 @@ When the trigger happens in a Chat, the event begins. The Chat shows its name, t
 
 - The author setting the Gauge's start, goal or step, or more than one Gauge in an event.
 - An event that can happen more than once in a Chat, or one tied to a Scene.
-- The AI inventing events (zeta's Quests) and Endings.
+- The AI inventing events (zeta's Quests) and Endings. (Events: built since, see [Spec: Sudden events the story makes up](../ai-events/spec.md).)
 - AI drafts, the Story assistant and Character cards writing or carrying Sudden events.
 - A list of past events on the Dashboard, and the event in the wide-screen "At a glance" panel.
 - Suggested replies and Write for me knowing the event's goal.

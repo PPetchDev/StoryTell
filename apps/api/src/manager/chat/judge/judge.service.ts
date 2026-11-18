@@ -12,7 +12,9 @@ import { ModelGateway } from '../../../service/model-gateway/model-gateway.js';
 import { exchangeUserText } from '../exchange.js';
 import { exchangeIdentityName } from '../identity.js';
 import { repliesInScene } from '../scene-replies.js';
-import { applySuddenEvent, eventState, judgeSuddenEventSection } from '../sudden-event/sudden-event.js';
+import { applySuddenEvent, judgeSuddenEventSection } from '../sudden-event/sudden-event.js';
+import { aiEventOffered, chatEventState, readNewEventFrom, takeNewEvent, withAiEvents } from '../sudden-event/ai-events.js';
+import { SuddenEventStepKind } from '../../../model/ledger/entities/sudden-event-step.entity.js';
 import { applyDetails, currentDetails, judgeDetailsSection } from '../details/details.js';
 import { applyFacts, currentFacts, judgeFactsSection } from '../details/facts.js';
 import { applyNow, currentNowNotes, judgeNowSection } from '../details/now-notes.js';
@@ -141,13 +143,30 @@ export class JudgeManagerService {
             // Read with the Chat as it is now, like the Scene: who sits out when the judge runs.
             const sittingOut = chat.sittingOutIds();
             // The Chat's Sudden events before this reply (.scratch/sudden-events/spec.md): a step of its own, left by a judgement run before, is not counted.
-            const events = eventState(
+            // With the events the Chat made up (.scratch/ai-events/spec.md): an accepted one runs as the author's do.
+            const events = chatEventState(
                 story.suddenEvents ?? [],
+                state.chatSuddenEvents.filter((event) => event.messageId !== message.id),
                 state.suddenEventSteps.filter((step) => step.messageId !== message.id),
             );
             // An Epilogue stands outside the Sudden events (docs/ui-audit-2026-11-16.md M6): it closes the story, so it is
             // not one of an event's replies and starts none. The event is where it was if the user plays on.
             const eventsJudged = !message.epilogue;
+            // Sudden events the story makes up (.scratch/ai-events/spec.md): offered rarely, never with one under way.
+            const aiEvents = {
+                on: story.aiEvents === true,
+                offered: aiEventOffered({
+                    on: story.aiEvents === true,
+                    epilogue: !!message.epilogue,
+                    active: events.active !== null,
+                    replyIds: chat.messages
+                        .slice(0, index + 1)
+                        .filter((written) => written.kind === MessageKind.Ai && written.model !== AUTHOR_MODEL)
+                        .map((written) => written.id),
+                    proposalMessageIds: state.chatSuddenEvents.flatMap((event) => (event.messageId !== null && event.messageId !== message.id ? [event.messageId] : [])),
+                    stepMessageIds: state.suddenEventSteps.filter((step) => step.messageId !== message.id).map((step) => step.messageId),
+                }),
+            };
             // The Place, the Weather and the Outfits before this reply (.scratch/info-box/spec.md), read as the Sudden events are.
             const details = currentDetails(state.detailChanges.filter((change) => change.messageId !== message.id));
             const detailsCast = story.characters.map((character) => ({ id: character.id, name: character.name }));
@@ -171,7 +190,7 @@ export class JudgeManagerService {
             const replyParts = message.parts.map((part) => part.toResponse());
             // Lines are tagged only where a tag can show (.scratch/expressions/spec.md): otherwise the prompt is as before.
             const tagLines = story.characters.some((character) => (character.expressions ?? []).length > 0);
-            const prompt = buildJudgePrompt({
+            const prompt = withAiEvents(buildJudgePrompt({
                 cast: story.characters.map((character) => ({
                     name: character.name,
                     personality: character.personality,
@@ -213,7 +232,7 @@ export class JudgeManagerService {
                 endingSection: judgeEndingSection(endings),
                 factsSection: judgeFactsSection(facts),
                 nowSection: judgeNowSection(nowNotes, detailsCast),
-            });
+            }), aiEvents);
 
             const result = await this.gateway.completeText({
                 kind: 'judge',
@@ -252,6 +271,11 @@ export class JudgeManagerService {
             const ended = applyEnding(endings, judgement.ending ?? null);
             // Only the user's own words change a listed fact (.scratch/story-quality/spec.md).
             const facted = applyFacts(facts, judgement.facts ?? null, userText ?? '');
+            const proposed = takeNewEvent(
+                { offered: aiEvents.offered, startedAnother: stepped.step?.kind === SuddenEventStepKind.Start, exchange: `${userText ?? ''}\n${partsToText(replyParts)}` },
+                aiEvents.on ? readNewEventFrom(result.text) : null,
+            );
+            for (const reason of proposed.rejected) this.logger.log(`Chat ${chat.id}, Message ${message.id}: judge item dropped: ${reason}`);
             const noted = applyNow({ current: nowNotes, cast: detailsCast, sittingOut, identityName }, judgement.now ?? []);
             for (const reason of [...applied.rejected, ...stepped.rejected, ...detailed.rejected, ...noted.rejected, ...ended.rejected, ...facted.rejected]) {
                 this.logger.log(`Chat ${chat.id}, Message ${message.id}: judge item dropped: ${reason}`);
@@ -264,7 +288,7 @@ export class JudgeManagerService {
             // Written with the rest of the judgement, in its one transaction, never after it. Without
             // Expressions the parts are not touched, so the record is exactly as before.
             const emotions = tagLines ? emotionsOfParts(message.parts, judgement.expressions) : undefined;
-            await this.ledger.record(chat.id, message.id, { ...applied, suddenEvent: stepped.step, details: [...detailed.changes, ...facted.changes, ...noted.changes], ending: ended.reached, ...(emotions ? { emotions } : {}) });
+            await this.ledger.record(chat.id, message.id, { ...applied, suddenEvent: stepped.step, details: [...detailed.changes, ...facted.changes, ...noted.changes], ending: ended.reached, ...(proposed.event ? { newEvent: proposed.event } : {}), ...(emotions ? { emotions } : {}) });
             return { ok: true };
         } catch (error) {
             const reason = error instanceof AppError ? error.message : `Unexpected error: ${String(error)}`;

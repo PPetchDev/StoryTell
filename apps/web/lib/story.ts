@@ -288,6 +288,8 @@ export interface Story {
     scenes: Scene[];
     /** Its Sudden events, in the author's order. */
     suddenEvents: SuddenEvent[];
+    /** "Let the story make up events": the AI may propose Sudden events of its own in its Chats (.scratch/ai-events/spec.md). */
+    aiEvents: boolean;
     /** Its Endings, in the author's order. */
     endings: Ending[];
     /** In add order. */
@@ -453,6 +455,8 @@ export const storyApi = {
         apiSend<Story>('PATCH', `/stories/${storyId}/sudden-events/${eventId}`, fields),
     removeSuddenEvent: (storyId: number, eventId: number) =>
         apiSend<Story>('DELETE', `/stories/${storyId}/sudden-events/${eventId}`),
+    /** "Let the story make up events", on or off. */
+    setAiEvents: (storyId: number, on: boolean) => apiSend<Story>('PUT', `/stories/${storyId}/ai-events`, { on }),
 
     addEnding: (storyId: number, fields: EndingFields = {}) => apiSend<Story>('POST', `/stories/${storyId}/endings`, fields),
     updateEnding: (storyId: number, endingId: number, fields: EndingFields) =>

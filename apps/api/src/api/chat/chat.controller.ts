@@ -198,6 +198,25 @@ export class ChatApiController {
     }
 
     /**
+     * .scratch/ai-events/spec.md: starts the Sudden event the story proposes now; it runs as an
+     * authored one from the next reply. Refused unless it is the proposal the Chat shows.
+     */
+    @Post(':chatId/event-proposals/:eventId/accept')
+    @HttpCode(200)
+    @ApiOkResponse({ type: ChatResponseBodyDTO })
+    acceptEventProposal(@Id('storyId') storyId: number, @Id('chatId') chatId: number, @Id('eventId') eventId: number): Promise<ChatResponseBodyDTO> {
+        return this.chatManager.acceptEventProposal(storyId, chatId, eventId);
+    }
+
+    /** Declines the proposal the Chat shows; it never shows again. */
+    @Post(':chatId/event-proposals/:eventId/decline')
+    @HttpCode(200)
+    @ApiOkResponse({ type: ChatResponseBodyDTO })
+    declineEventProposal(@Id('storyId') storyId: number, @Id('chatId') chatId: number, @Id('eventId') eventId: number): Promise<ChatResponseBodyDTO> {
+        return this.chatManager.declineEventProposal(storyId, chatId, eventId);
+    }
+
+    /**
      * Rewrites a Message, deletes every Message after it and rolls back the changes they
      * caused. A User Message gets a fresh reply (on a failed turn the error is the
      * gateway's); an AI Message is re-split from its `@Name:` text, judged again, and no

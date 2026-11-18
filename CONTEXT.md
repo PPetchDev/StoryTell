@@ -29,7 +29,7 @@ A condition on a Scene that one Bond has reached at least a given level on one B
 _Avoid_: Bond requirement, unlock, threshold
 
 **Sudden event**:
-An optional, author-written moment of pressure in a Story: a trigger in plain language, a Gauge, a number of replies, and what follows a success and a failure. It begins in a Chat when its trigger happens there, runs once per Chat, and ends in success or failure; unlike a Scene it is not a stage of the plot and can begin at any point.
+An optional, author-written moment of pressure in a Story: a trigger in plain language, a Gauge, a number of replies, and what follows a success and a failure. It begins in a Chat when its trigger happens there, runs once per Chat, and ends in success or failure; unlike a Scene it is not a stage of the plot and can begin at any point. Where the author lets it, the story may also **make one up** in a Chat: the Judge proposes it, shaped the same, and it begins only when the user starts it; it belongs to that Chat alone, never to the Story.
 _Avoid_: Quest, challenge, encounter, mini-game, skill check
 
 **Gauge**:

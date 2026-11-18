@@ -28,6 +28,7 @@ import {
     StartingBondRequestBodyDTO,
     StoryRequestBodyDTO,
     SuddenEventRequestBodyDTO,
+    AiEventsRequestBodyDTO,
     EndingRequestBodyDTO,
     CreateLoreSetRequestBodyDTO,
     LinkLoreSetsRequestBodyDTO,
@@ -249,6 +250,13 @@ export class StoryApiController {
     @ApiOkResponse({ type: StoryResponseBodyDTO })
     removeSuddenEvent(@Id('storyId') storyId: number, @Id('eventId') eventId: number): Promise<StoryResponseBodyDTO> {
         return this.storyManager.removeSuddenEvent(storyId, eventId);
+    }
+
+    /** .scratch/ai-events/spec.md: "Let the story make up events", the author's switch. */
+    @Put(':storyId/ai-events')
+    @ApiOkResponse({ type: StoryResponseBodyDTO })
+    setAiEvents(@Id('storyId') storyId: number, @Body() body: AiEventsRequestBodyDTO): Promise<StoryResponseBodyDTO> {
+        return this.storyManager.setAiEvents(storyId, body.on);
     }
 
     /**

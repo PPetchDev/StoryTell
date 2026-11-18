@@ -111,6 +111,30 @@ export interface ChatSuddenEvent {
     reason: string;
 }
 
+/**
+ * A Sudden event the story made up and proposes now (.scratch/ai-events/spec.md), for the user to
+ * start or decline (mirrors ChatEventProposalDTO).
+ */
+export interface ChatEventProposal {
+    id: number;
+    name: string;
+    /** What is happening now, in a sentence. */
+    trigger: string;
+    /** What the Gauge measures. */
+    gauge: string;
+    direction: 'lower' | 'raise';
+    /** How many replies the user gets. */
+    turns: number;
+    /** Where the Gauge starts. */
+    start: number;
+    /** The Gauge the user must reach. */
+    goal: number;
+    /** The end of the Gauge that fails at once. */
+    fail: number;
+    /** Why the story proposes it now; may be empty. */
+    reason: string;
+}
+
 export type BackgroundStatus = 'pending' | 'done' | 'failed';
 
 export interface BackgroundCall {
@@ -164,6 +188,8 @@ export interface Chat extends ChatSummary {
     timeOfDay: TimeOfDay | null;
     /** The Sudden event under way, or the one that ended with the newest reply; null otherwise. */
     suddenEvent: ChatSuddenEvent | null;
+    /** A Sudden event the story made up and proposes now; null otherwise. */
+    eventProposal: ChatEventProposal | null;
     /** The Ending the Chat reached; null when it reached none. */
     ending: ChatEnding | null;
     /** Whether the Judge may suggest an Ending here; null when the Story has Endings of its author's (then it suggests none). */
@@ -455,6 +481,12 @@ export const chatApi = {
     epilogue: (storyId: number, chatId: number, stream?: TurnStream) => turn<Chat>('POST', `/stories/${storyId}/chats/${chatId}/epilogue`, undefined, stream),
     /** "Not yet": takes the Chat's suggested Ending away, and the AI suggests no more in this Chat. */
     dismissEnding: (storyId: number, chatId: number) => apiSend<Chat>('DELETE', `/stories/${storyId}/chats/${chatId}/ending`),
+    /** Starts the Sudden event the story proposes now (.scratch/ai-events/spec.md). */
+    acceptEventProposal: (storyId: number, chatId: number, eventId: number) =>
+        apiSend<Chat>('POST', `/stories/${storyId}/chats/${chatId}/event-proposals/${eventId}/accept`),
+    /** "Not now": declines it; it never shows again. */
+    declineEventProposal: (storyId: number, chatId: number, eventId: number) =>
+        apiSend<Chat>('POST', `/stories/${storyId}/chats/${chatId}/event-proposals/${eventId}/decline`),
     /** Three things the user might write next, as the worn identity. Nothing is stored. */
     suggest: (storyId: number, chatId: number) =>
         apiSend<{ suggestions: SuggestedReply[] }>('POST', `/stories/${storyId}/chats/${chatId}/suggestions`),

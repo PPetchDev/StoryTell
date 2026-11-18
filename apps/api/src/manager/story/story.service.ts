@@ -807,6 +807,16 @@ export class StoryManagerService {
     }
 
     /**
+     * .scratch/ai-events/spec.md: "Let the story make up events". Off stops new proposals; events a
+     * Chat already started run on and end as usual.
+     */
+    async setAiEvents(storyId: number, on: boolean): Promise<StoryDetail> {
+        await this.load(storyId);
+        await this.storyModel.setAiEvents(storyId, on);
+        return this.saved(storyId);
+    }
+
+    /**
      * .scratch/endings/spec.md: a new Ending at the end of the Story's list. Any Chat that has
      * reached none, existing ones included, can reach it once it has a condition.
      */

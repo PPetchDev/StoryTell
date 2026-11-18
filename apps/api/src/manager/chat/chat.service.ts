@@ -14,6 +14,7 @@ import {
     NoFailedExtractionError,
     NoFailedJudgeError,
     NoSuggestedEndingError,
+    NoEventProposalError,
     NoTurnToRetryError,
     NotRegenerableError,
     NudgeSittingOutError,
@@ -49,6 +50,7 @@ import { PersonaModelService } from '../../model/persona/persona.service.js';
 import { SnapshotModelService } from '../../model/snapshot/snapshot.service.js';
 import { SettingsModelService } from '../../model/settings/settings.service.js';
 import { StoryEntity } from '../../model/story/entities/story.entity.js';
+import { GaugeDirection } from '../../model/story/entities/sudden-event.entity.js';
 import { StoryModelService } from '../../model/story/story.service.js';
 import {
     DictationLanguage,
@@ -111,7 +113,8 @@ import { TurnStoppedError, TurnStream } from './turn/turn-stream.js';
 import { Dice } from '../../service/dice/dice.js';
 import { Roll, ROLL_SIDES, ROLL_TARGETS } from './roll.js';
 import { endingName, endingReady, endingState, EndingView, endingView, promptEpilogue } from './ending/ending.js';
-import { eventReady, eventState, promptSuddenEvent, SuddenEventView, suddenEventView } from './sudden-event/sudden-event.js';
+import { eventReady, GAUGE_RULES, promptSuddenEvent, SuddenEventView, suddenEventView } from './sudden-event/sudden-event.js';
+import { chatEventState, EventProposalView, eventProposalView, shownProposal } from './sudden-event/ai-events.js';
 import { currentDetails, promptDetails } from './details/details.js';
 import { promptFacts } from './details/facts.js';
 import { castNowNotes, currentNowNotes, tidyNow } from './details/now-notes.js';
@@ -158,6 +161,11 @@ export interface ChatDetail extends ChatSummary {
      * ended with the newest AI Message; null otherwise.
      */
     suddenEvent: SuddenEventView | null;
+    /**
+     * A Sudden event the story made up and proposes now (.scratch/ai-events/spec.md), for the user to
+     * start or decline; null otherwise. It shows only while its reply is the newest and none is under way.
+     */
+    eventProposal: EventProposalView | null;
     /** The Ending the Chat reached (.scratch/endings/spec.md), with the Message it reached it at; null when it reached none. */
     ending: EndingView | null;
     /** The number a Roll sent now must reach (.scratch/roll/spec.md), from the Story's Difficulty. */
@@ -1123,6 +1131,44 @@ export class ChatManagerService {
     }
 
     /**
+     * .scratch/ai-events/spec.md: starts the Sudden event the story proposes now. Its start step goes
+     * against the reply that proposed it, so the next reply finds it under way, as an authored event
+     * after its trigger. Refused unless it is the proposal the Chat shows.
+     */
+    async acceptEventProposal(storyId: number, chatId: number, eventId: number): Promise<ChatDetail> {
+        const { chat } = await this.load(storyId, chatId);
+        return this.writingTurn(chat.id, async () => {
+            // Read again under the lock: a turn may have finished since, and the proposal lapsed with it.
+            const { story, chat: now } = await this.load(storyId, chatId);
+            const shown = await this.shownEventProposal(story, now);
+            if (shown?.id !== eventId || !(await this.ledger.acceptEventProposal(chat.id, eventId, { gauge: GAUGE_RULES[shown.direction].start }))) {
+                throw new NoEventProposalError();
+            }
+            return this.getChat(storyId, chatId);
+        });
+    }
+
+    /** .scratch/ai-events/spec.md: declines the proposal the Chat shows; it never shows again. */
+    async declineEventProposal(storyId: number, chatId: number, eventId: number): Promise<ChatDetail> {
+        const { chat } = await this.load(storyId, chatId);
+        return this.writingTurn(chat.id, async () => {
+            // Read again under the lock: a turn may have finished since, and the proposal lapsed with it.
+            const { story, chat: now } = await this.load(storyId, chatId);
+            const shown = await this.shownEventProposal(story, now);
+            if (shown?.id !== eventId || !(await this.ledger.declineEventProposal(chat.id, eventId))) throw new NoEventProposalError();
+            return this.getChat(storyId, chatId);
+        });
+    }
+
+    /** The proposal the Chat shows now, read as the Chat screen reads it. */
+    private async shownEventProposal(story: StoryEntity, chat: ChatEntity): Promise<{ id: number; direction: GaugeDirection } | null> {
+        if (!story.aiEvents) return null;
+        const [chatEvents, steps] = await Promise.all([this.ledger.chatSuddenEventsOf(chat.id), this.ledger.suddenEventStepsOf(chat.id)]);
+        const events = chatEventState(story.suddenEvents ?? [], chatEvents, steps);
+        return shownProposal(chatEvents, events.active !== null, newestAiMessage(chat)?.id ?? null);
+    }
+
+    /**
      * Spec: "Retry re-runs only the failed call." Allowed on the latest judged AI Message
      * when its judge failed; it runs to the end before answering with the dashboard. It holds
      * the Chat's turn lock meanwhile, so a send, an edit, a reset or a Branch is refused.
@@ -1521,7 +1567,7 @@ export class ChatManagerService {
             nudge,
             cue,
             // The event as this reply finds it: `chat.messages` holds everything before the reply.
-            suddenEvent: promptSuddenEvent(eventState(story.suddenEvents ?? [], state.suddenEventSteps), newestAiMessage(chat)?.id ?? null),
+            suddenEvent: promptSuddenEvent(chatEventState(story.suddenEvents ?? [], state.chatSuddenEvents, state.suddenEventSteps), newestAiMessage(chat)?.id ?? null),
             roll: userText !== null ? rollOf(chat.messages[chat.messages.length - 1]) : null,
             epilogue: asEpilogue ? promptEpilogue(endingState(story.endings ?? [], state.endingsReached)) : null,
             thoughts: thoughts.map((thought) => ({ characterName: thought.name, text: thought.text })),
@@ -1658,7 +1704,8 @@ export class ChatManagerService {
             facts: promptFacts(state.detailChanges, newest?.id ?? null),
             lore: promptLore(story),
             hasDocuments: hasDocumentPassages(story),
-            hasSuddenEvents: (story.suddenEvents ?? []).some(eventReady),
+            // A Story that may make up events (.scratch/ai-events/spec.md) keeps the same room for the block.
+            hasSuddenEvents: (story.suddenEvents ?? []).some(eventReady) || story.aiEvents === true,
             authorsNote: chat.authorsNote,
             present: inLatestExchange(story, chat, null),
             sittingOut: sittingOutOf(story, chat).map((character) => character.name),
@@ -1742,7 +1789,7 @@ export class ChatManagerService {
     }
 
     private async detail(story: StoryEntity, chat: ChatEntity): Promise<ChatDetail> {
-        const [settings, creditOut, source, readings, appSavedReplies, appReplaceRules, bondChanges, beliefs, eventSteps, detailChanges, endingsReached, personas, diaryEntries, thoughtRows] = await Promise.all([
+        const [settings, creditOut, source, readings, appSavedReplies, appReplaceRules, bondChanges, beliefs, eventSteps, detailChanges, endingsReached, personas, diaryEntries, thoughtRows, chatEvents] = await Promise.all([
             this.settingsModel.get(),
             this.creditOut(),
             // Read live, so a rename of the source shows.
@@ -1752,15 +1799,17 @@ export class ChatManagerService {
             this.replaceRuleModel.findByScope(null),
             this.ledger.bondChangesOf(chat.id),
             this.beliefModel.findByChat(chat.id),
-            // Only a Story with Sudden events has steps to read.
-            (story.suddenEvents ?? []).length > 0 ? this.ledger.suddenEventStepsOf(chat.id) : [],
+            // Read for every Chat: one may hold events it made up (.scratch/ai-events/spec.md) after the switch went off.
+            this.ledger.suddenEventStepsOf(chat.id),
             this.ledger.detailChangesOf(chat.id),
             this.ledger.endingsReachedOf([chat.id]),
             // The Account's Personas: few, and only those this Chat shows are answered.
             this.personaModel.findAll(),
             this.ledger.diaryEntriesOf(chat.id),
             this.chatModel.findThoughts(chat.messages.map((message) => message.id)),
+            this.ledger.chatSuddenEventsOf(chat.id),
         ]);
+        const events = chatEventState(story.suddenEvents ?? [], chatEvents, eventSteps);
         // Oldest first, so each Character's newest entry is the one left.
         const newestEntry = new Map(diaryEntries.map((entry) => [entry.characterId, entry.id]));
         const inChat = new Set([chat.personaId, ...chat.messages.map((message) => message.personaId)]);
@@ -1772,7 +1821,9 @@ export class ChatManagerService {
             ...chat.toSummary(),
             currentScene: scene ? { id: scene.id, name: scene.name } : null,
             timeOfDay: chat.timeOfDay,
-            suddenEvent: suddenEventView(eventState(story.suddenEvents ?? [], eventSteps), newestAiMessage(chat)?.id ?? null),
+            suddenEvent: suddenEventView(events, newestAiMessage(chat)?.id ?? null),
+            // A proposal shows while the switch is on (.scratch/ai-events/spec.md): off stops new ones and hides one on show.
+            eventProposal: story.aiEvents ? eventProposalView(shownProposal(chatEvents, events.active !== null, newestAiMessage(chat)?.id ?? null)) : null,
             ending: endingView(endingState(story.endings ?? [], endingsReached)),
             rollTarget: ROLL_TARGETS[story.difficulty],
             place: details.place,

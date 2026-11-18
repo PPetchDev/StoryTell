@@ -23,6 +23,8 @@ export interface CopyContext {
     messageIds: IdMap;
     memoryIds: IdMap;
     beliefIds: IdMap;
+    /** The Sudden events the source Chat made up (.scratch/ai-events/spec.md), to the Branch's own. */
+    chatEventIds: IdMap;
 }
 
 export type CopyStep = (context: CopyContext) => Promise<void>;
@@ -58,7 +60,7 @@ export class BranchModelService {
     copy(sourceChatId: number, through: number, fields: BranchFields): Promise<{ chatId: number; messageIds: IdMap }> {
         return this.dataSource.transaction('REPEATABLE READ', async (manager) => {
             const chatId = await copyChat(manager, sourceChatId, through, fields);
-            const context: CopyContext = { manager, sourceChatId, chatId, through, messageIds: new Map(), memoryIds: new Map(), beliefIds: new Map() };
+            const context: CopyContext = { manager, sourceChatId, chatId, through, messageIds: new Map(), memoryIds: new Map(), beliefIds: new Map(), chatEventIds: new Map() };
             for (const step of COPY_STEPS) await step(context);
             // The ledger's step ends here: undo every change the Messages after N caused.
             await this.ledger.rollbackFrom(chatId, through + 1, manager);
@@ -202,7 +204,7 @@ const copyMemories: CopyStep = async ({ manager, sourceChatId, chatId, messageId
  * Scene advances and Time changes with their Messages remapped, and the copied Arc directions
  * the source holds (not the Story's current ones).
  */
-const copyLedger: CopyStep = async ({ manager, sourceChatId, chatId, messageIds }) => {
+const copyLedger: CopyStep = async ({ manager, sourceChatId, chatId, messageIds, chatEventIds }) => {
     const [olds, news] = oldAndNewIds(messageIds);
     const params = [chatId, sourceChatId, olds, news];
     const remap = `unnest($3::int[], $4::int[]) AS msg("old_id", "new_id") ON msg."old_id" = s."message_id"`;
@@ -233,11 +235,15 @@ const copyLedger: CopyStep = async ({ manager, sourceChatId, chatId, messageIds 
         params,
     );
     // Sudden event steps (.scratch/sudden-events/spec.md): the rollback then drops those of the Messages after N.
+    // A step of an event the Chat made up points at the Branch's copy of it (.scratch/ai-events/spec.md).
+    const [eventOlds, eventNews] = oldAndNewIds(chatEventIds);
     await manager.query(
         `INSERT INTO "sudden_event_step" ("chat_id", "sudden_event_id", "kind", "gauge", "turns_left", "reason", "message_id", "created_at")
-         SELECT $1, s."sudden_event_id", s."kind", s."gauge", s."turns_left", s."reason", msg."new_id", s."created_at"
-         FROM "sudden_event_step" s JOIN ${remap} WHERE s."chat_id" = $2 ORDER BY s."id"`,
-        params,
+         SELECT $1, COALESCE(ev."new_id", s."sudden_event_id"), s."kind", s."gauge", s."turns_left", s."reason", msg."new_id", s."created_at"
+         FROM "sudden_event_step" s JOIN ${remap}
+         LEFT JOIN unnest($5::int[], $6::int[]) AS ev("old_id", "new_id") ON ev."old_id" = s."sudden_event_id"
+         WHERE s."chat_id" = $2 ORDER BY s."id"`,
+        [...params, eventOlds, eventNews],
     );
     // The Place, the Weather and the Outfits (.scratch/info-box/spec.md): the rollback drops those the Messages after N set.
     // The user's own Now notes (.scratch/growing-cards/spec.md) have no Message, and come along as a Starting Bond does.
@@ -265,6 +271,26 @@ const copyLedger: CopyStep = async ({ manager, sourceChatId, chatId, messageIds 
         `INSERT INTO "chat_arc_direction" ("chat_id", "character_id", "text")
          SELECT $1, s."character_id", s."text" FROM "chat_arc_direction" s WHERE s."chat_id" = $2 ORDER BY s."id"`,
         [chatId, sourceChatId],
+    );
+};
+
+/**
+ * The Sudden events the source Chat made up (.scratch/ai-events/spec.md), every proposal, with fresh
+ * ids and their Messages remapped, before the steps that point at them. The rollback then drops
+ * those proposed after N, their steps with them.
+ */
+const copyChatEvents: CopyStep = async ({ manager, sourceChatId, chatId, messageIds, chatEventIds }) => {
+    const rows: Array<{ id: number }> = await manager.query('SELECT "id" FROM "sudden_event" WHERE "chat_id" = $1 ORDER BY "id"', [sourceChatId]);
+    mapInOrder(chatEventIds, rows.map((row) => row.id), await reserveIds(manager, 'sudden_event', rows.length));
+    const [eventOlds, eventNews] = oldAndNewIds(chatEventIds);
+    const [messageOlds, messageNews] = oldAndNewIds(messageIds);
+    await manager.query(
+        `INSERT INTO "sudden_event" ("id", "story_id", "chat_id", "message_id", "proposal", "reason", "position", "name", "trigger", "gauge", "direction", "turns", "success", "failure")
+         SELECT ev."new_id", NULL, $1, msg."new_id", s."proposal", s."reason", s."position", s."name", s."trigger", s."gauge", s."direction", s."turns", s."success", s."failure"
+         FROM "sudden_event" s JOIN unnest($3::int[], $4::int[]) AS ev("old_id", "new_id") ON ev."old_id" = s."id"
+         JOIN unnest($5::int[], $6::int[]) AS msg("old_id", "new_id") ON msg."old_id" = s."message_id"
+         WHERE s."chat_id" = $2 ORDER BY s."id"`,
+        [chatId, sourceChatId, eventOlds, eventNews, messageOlds, messageNews],
     );
 };
 
@@ -392,7 +418,7 @@ const remapMemoriesUsed: CopyStep = async ({ manager, chatId, memoryIds, beliefI
 };
 
 /** In order: Messages before anything that points at them, Memories before their changes and the Beliefs that contradict them. */
-const COPY_STEPS: CopyStep[] = [copyMessages, copyMessageParts, copyThaiReadings, copyThoughts, copyMemories, copyBeliefs, remapMemoriesUsed, copyLedger, copySittingOut];
+const COPY_STEPS: CopyStep[] = [copyMessages, copyMessageParts, copyThaiReadings, copyThoughts, copyMemories, copyBeliefs, remapMemoriesUsed, copyChatEvents, copyLedger, copySittingOut];
 
 /** `count` fresh ids from `table`'s id sequence, ascending. */
 async function reserveIds(manager: EntityManager, table: string, count: number): Promise<number[]> {

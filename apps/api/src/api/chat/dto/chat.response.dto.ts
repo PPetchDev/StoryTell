@@ -19,6 +19,7 @@ import type { Emotion } from '../../../model/story/emotion.js';
 import { BackgroundCallResponse, BackgroundStatus, MemoriesUsed, MessageRoll, ReplyVersionsResponse } from '../../../model/chat/entities/message.entity.js';
 import { GaugeDirection } from '../../../model/story/entities/sudden-event.entity.js';
 import type { SuddenEventView } from '../../../manager/chat/sudden-event/sudden-event.js';
+import type { EventProposalView } from '../../../manager/chat/sudden-event/ai-events.js';
 import type { EndingView } from '../../../manager/chat/ending/ending.js';
 import { BeliefDTO } from '../../memory/dto/belief.response.dto.js';
 import { BondLevels } from '../../../model/ledger/bond-axes.js';
@@ -233,6 +234,39 @@ export class ChatSuddenEventDTO implements SuddenEventView {
     reason: string;
 }
 
+/** A Sudden event the story made up and proposes now (.scratch/ai-events/spec.md). */
+export class ChatEventProposalDTO implements EventProposalView {
+    @ApiProperty()
+    id: number;
+
+    @ApiProperty()
+    name: string;
+
+    @ApiProperty({ description: 'What is happening now, in a sentence.' })
+    trigger: string;
+
+    @ApiProperty({ description: 'What the Gauge measures.' })
+    gauge: string;
+
+    @ApiProperty({ enum: GaugeDirection })
+    direction: GaugeDirection;
+
+    @ApiProperty({ description: 'How many replies the user gets.' })
+    turns: number;
+
+    @ApiProperty({ description: 'Where the Gauge starts.' })
+    start: number;
+
+    @ApiProperty({ description: 'The Gauge the user must reach.' })
+    goal: number;
+
+    @ApiProperty({ description: 'The end of the Gauge that fails at once.' })
+    fail: number;
+
+    @ApiProperty({ description: 'Why the story proposes it now; may be empty.' })
+    reason: string;
+}
+
 /** What one Character is wearing now in the Chat (.scratch/info-box/spec.md). */
 export class ChatOutfitDTO {
     @ApiProperty()
@@ -407,6 +441,9 @@ export class ChatResponseBodyDTO extends ChatSummaryDTO implements Omit<ChatDeta
 
     @ApiProperty({ type: ChatSuddenEventDTO, nullable: true, description: 'The Sudden event under way, or the one that ended with the newest reply; null otherwise.' })
     suddenEvent: ChatSuddenEventDTO | null;
+
+    @ApiProperty({ type: ChatEventProposalDTO, nullable: true, description: 'A Sudden event the story made up and proposes now, to start or decline; null otherwise.' })
+    eventProposal: ChatEventProposalDTO | null;
 
     @ApiProperty({ type: ChatEndingDTO, nullable: true, description: 'The Ending the Chat reached; null when it reached none.' })
     ending: ChatEndingDTO | null;
