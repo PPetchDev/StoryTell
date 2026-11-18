@@ -47,8 +47,9 @@ to the Message in the thread, outlined, as a Memory's jump link already does.
 - **A Bookmark is a mark on one Message**, per Chat, with no note and no name. Any Message can be
   bookmarked: the Opening, a user Message, an AI reply, the newest one.
 - **Marking.** "Bookmark" in the Message's actions: the newest reply's action row, and the tools a
-  tap shows under any other Message. On a bookmarked Message it reads "Bookmarked" (pressed), and
-  a tap removes it. A bookmarked Message shows a small "Bookmarked" line under it, so the user sees
+  tap shows under any other Message, just before Branch. It is a toggle: on a bookmarked Message
+  it shows pressed (a filled icon), and a tap removes the mark. Its label stays "Bookmark" either
+  way, so the action row's measured widths hold and the row never reflows under the finger. A bookmarked Message shows a small "Bookmarked" line under it, so the user sees
   their marks while scrolling. Marking needs no turn and is never held by a turn in flight; it is
   hidden while a turn or write runs only because the Message's actions are.
 - **The Bookmarks tab** lists the Chat's bookmarks in thread order (oldest first: they are

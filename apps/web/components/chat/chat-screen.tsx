@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { ChatBackdrop } from '@/components/chat/backdrop';
+import { BookmarksProvider, useChatBookmarks } from '@/components/chat/bookmarks';
 import { useOpenProfile, useProfileChat, useProfileGoals, useProfileNow, useProfileOutfits } from '@/components/chat/character-profile';
 import { diaryEntrySeen, markDiaryEntrySeen } from '@/lib/diary-seen';
 import { CharacterRow } from '@/components/chat/character-row';
@@ -12,6 +13,7 @@ import { ChatThread, OpenAt, PendingLine } from '@/components/chat/chat-thread';
 import { ChatTopBar } from '@/components/chat/chat-top-bar';
 import { ChatGlance } from '@/components/chat/chat-glance';
 import { CueSheet } from '@/components/chat/cue-sheet';
+import { FindSheet, FindTab } from '@/components/chat/find-sheet';
 import { MemoryDrawer } from '@/components/chat/memory-drawer';
 import { NovelRequest, NovelView } from '@/components/chat/novel-view';
 import { PersonaPictures } from '@/components/chat/persona-pictures';
@@ -160,6 +162,9 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
     const [error, setError] = useState<string | null>(null);
     const [rollback, setRollback] = useState<string | null>(null);
     const [drawer, setDrawer] = useState<{ open: boolean; focus: number | null; version: number }>({ open: false, focus: null, version: 0 });
+    /** "Find in this Chat" (.scratch/chat-search/spec.md): open or not, and its tab and query, kept for the next opening. */
+    const [find, setFind] = useState<{ open: boolean; tab: FindTab; query: string }>({ open: false, tab: 'search', query: '' });
+    const bookmarks = useChatBookmarks(initial.storyId, initial.id);
     const [toasts, setToasts] = useState<Toast[]>([]);
     const snaps = useChatSnapshots(initial.storyId, initial.id);
     const [viewing, setViewing] = useState<Snapshot | null>(null);
@@ -341,6 +346,18 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
         for (const marked of document.querySelectorAll('.message-target')) marked.classList.remove('message-target');
         target.scrollIntoView({ block: 'center' });
         target.classList.add('message-target');
+    };
+
+    /**
+     * A Search result's or a Bookmark's Message: the sheet closes, the thread goes there and
+     * outlines it, and focus lands on it once the sheet has handed focus back, without scrolling again.
+     */
+    const jumpFromFind = (messageId: number) => {
+        setFind((current) => ({ ...current, open: false }));
+        jumpTo(messageId);
+        requestAnimationFrame(() =>
+            requestAnimationFrame(() => document.getElementById(`message-${messageId}`)?.focus({ preventScroll: true })),
+        );
     };
 
     /**
@@ -660,6 +677,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                 }}
                 menuButtonRef={menuButtonRef}
                 novelToggleRef={novelToggleRef}
+                onOpenFind={() => setFind((current) => ({ ...current, open: true }))}
             />
             {!stripHidden && (
                 <SceneStrip
@@ -740,6 +758,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                 />
             )}
 
+            <BookmarksProvider value={bookmarks}>
             <ShownTextProvider rules={chat.replaceRules}>
             <ReadAloudProvider player={player}>
             {novel ? (
@@ -793,6 +812,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
             )}
             </ReadAloudProvider>
             </ShownTextProvider>
+            </BookmarksProvider>
 
             <ChatComposer
                 chat={chat}
@@ -850,6 +870,21 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                         if (againTarget !== null) again(againTarget, text);
                     }}
                     onClose={() => setCueSheet(false)}
+                />
+            )}
+
+            {find.open && (
+                <FindSheet
+                    storyId={chat.storyId}
+                    chatId={chat.id}
+                    messages={chat.messages}
+                    bookmarks={bookmarks}
+                    tab={find.tab}
+                    onTab={(tab) => setFind((current) => ({ ...current, tab }))}
+                    query={find.query}
+                    onQuery={(query) => setFind((current) => ({ ...current, query }))}
+                    onJump={jumpFromFind}
+                    onClose={() => setFind((current) => ({ ...current, open: false }))}
                 />
             )}
 

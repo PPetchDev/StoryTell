@@ -6,7 +6,7 @@ import { FormEvent, ReactNode, Ref, useEffect, useId, useState } from 'react';
 import { COLUMN, TEXT_BOX } from '@/components/chat/chat-classes';
 import { EPILOGUE_COST } from '@/components/chat/ending-banner';
 import { useApiQuery } from '@/components/connection';
-import { ChevronLeftIcon, ChevronRightIcon, MoreIcon } from '@/components/icons';
+import { ChevronLeftIcon, ChevronRightIcon, MoreIcon, SearchIcon } from '@/components/icons';
 import { CharacterPortrait } from '@/components/portrait/character-portrait';
 import { ConfirmDialog } from '@/components/sheet/confirm-dialog';
 import { Sheet } from '@/components/sheet/sheet';
@@ -421,6 +421,8 @@ interface ChatTopBarProps {
     menuButtonRef?: Ref<HTMLButtonElement>;
     /** The Visual novel view's toggle, for focus to come back to after leaving the view. */
     novelToggleRef?: Ref<HTMLButtonElement>;
+    /** 🔍 Opens "Find in this Chat": Search and Bookmarks (.scratch/chat-search/spec.md). */
+    onOpenFind?(): void;
 }
 
 /**
@@ -454,6 +456,7 @@ export function ChatTopBar({
     onToggleNovel,
     menuButtonRef,
     novelToggleRef,
+    onOpenFind,
 }: ChatTopBarProps) {
     const [menu, setMenu] = useState<'closed' | 'menu' | 'rename' | 'note' | 'who'>('closed');
     const sittingOutNames = chat.sittingOut.flatMap((id) => characters.find((character) => character.id === id)?.name ?? []);
@@ -489,6 +492,11 @@ export function ChatTopBar({
                         as {chat.identityName}
                     </span>
                 </div>
+                {onOpenFind && (
+                    <button type="button" className={BAR_ICON} aria-label="Search this Chat" aria-haspopup="dialog" onClick={onOpenFind}>
+                        <SearchIcon size={21} strokeWidth={2} />
+                    </button>
+                )}
                 {onToggleNovel && (
                     <button ref={novelToggleRef} type="button" className={BAR_TOGGLE} aria-label="Visual novel view" aria-pressed={novel} onClick={onToggleNovel}>
                         {/* A figure over a text box: the speaker large, their words below. */}

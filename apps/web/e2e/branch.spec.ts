@@ -70,6 +70,14 @@ async function tapBranch(group: Locator): Promise<void> {
     await branch.tap();
 }
 
+/** A group's actions in order, those behind ⋯ included (it is opened): their words, since ⋯ itself has none. */
+async function actionNames(group: Locator): Promise<string[]> {
+    const more = group.getByRole('button', { name: 'More actions' });
+    if (await more.isVisible()) await more.tap();
+    const names = await group.getByRole('button').evaluateAll((buttons) => buttons.map((button) => button.textContent?.trim() ?? ''));
+    return names.filter((name) => name !== '');
+}
+
 /** Neither the row nor the page runs past the screen sideways. */
 async function expectNoOverflow(page: Page, group: Locator): Promise<void> {
     await expect(group).toBeVisible();
@@ -86,10 +94,10 @@ test('⑂ Branch on an earlier reply opens "Chat 1 (branch)" ending on it, and t
         const replies = page.getByRole('article', { name: 'AI reply' });
         await expect(replies).toHaveCount(2);
 
-        // An earlier reply shows ✎ Edit · ▶ Read aloud · ไทย · ⑂ Branch once tapped, ⑂ last (integration: "Message actions").
+        // An earlier reply shows ✎ Edit · ▶ Read aloud · ไทย · 🔖 Bookmark · ⑂ Branch once tapped, ⑂ last (integration: "Message actions").
         await replies.first().tap();
         const tools = replies.first().getByRole('group', { name: 'Message tools' });
-        await expect(tools.getByRole('button')).toHaveText(['Edit', 'Read aloud', 'ไทย', 'Branch']);
+        expect(await actionNames(tools)).toEqual(['Edit', 'Read aloud', 'ไทย', 'Bookmark', 'Branch']);
         await tapBranch(tools);
 
         const branchId = await openedChat(page, played);
@@ -223,13 +231,13 @@ test('while the Story is unplayable a tapped User Message offers ⑂ Branch alon
         await page.goto(`/stories/${played.storyId}/chats/${played.chatId}`);
         const said = page.getByRole('article', { name: 'Ash said' }).first();
         await said.tap();
-        await expect(said.getByRole('group', { name: 'Message tools' }).getByRole('button')).toHaveText(['Edit', 'ไทย', 'Branch']);
+        expect(await actionNames(said.getByRole('group', { name: 'Message tools' }))).toEqual(['Edit', 'ไทย', 'Bookmark', 'Branch']);
 
         await request.patch(`/api/stories/${played.storyId}`, { data: { setting: '' } });
         await page.reload();
         await said.tap();
         const tools = said.getByRole('group', { name: 'Message tools' });
-        await expect(tools.getByRole('button')).toHaveText(['ไทย', 'Branch']);
+        expect(await actionNames(tools)).toEqual(['ไทย', 'Bookmark', 'Branch']);
         await tapBranch(tools);
 
         await openedChat(page, played);

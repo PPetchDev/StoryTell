@@ -304,10 +304,10 @@ test.describe('reading a Message aloud', () => {
         await opening.tap();
         const tools = opening.getByRole('group', { name: 'Message tools' });
         await expectNoOverflow(page, tools);
-        // ✎ Edit · ▶ · ไทย · ⑂, in that order, some of them maybe behind ⋯.
+        // ✎ Edit · ▶ · ไทย · 🔖 · ⑂, in that order, some of them maybe behind ⋯.
         const names = await tools.getByRole('button').evaluateAll((buttons) => buttons.map((button) => button.textContent));
         // The glyphs are SVG icons now (audit M10), so the words alone, and ⋯ has no text.
-        expect(names.filter((name) => name !== '')).toEqual(['Edit', 'Read aloud', 'ไทย', 'Branch'].slice(0, names.filter((name) => name !== '').length));
+        expect(names.filter((name) => name !== '')).toEqual(['Edit', 'Read aloud', 'ไทย', 'Bookmark', 'Branch'].slice(0, names.filter((name) => name !== '').length));
         await tapAction(tools, 'Read aloud');
         await expect(opening.getByRole('group', { name: 'Reading aloud' })).toBeVisible();
         await expectNoOverflow(page, opening.getByRole('group', { name: 'Reading aloud' }));

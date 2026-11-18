@@ -17,6 +17,7 @@ import {
     useState,
 } from 'react';
 
+import { BookmarkAction, BookmarkedMark } from '@/components/chat/bookmarks';
 import { ACTION, ACTION_ICON, MessageTabStop } from '@/components/chat/chat-classes';
 import { AiMessageParts, MessageBody, UserLine } from '@/components/chat/message-body';
 import { ReadAloudAction, ReadAloudControls, readingNowOf, useReadAloud } from '@/components/chat/read-aloud';
@@ -302,15 +303,17 @@ interface ActionRowProps {
     versions: VersionSwitchProps | null;
     /** ▶ Read aloud, after the existing actions; null while this Message is the one being read. */
     read: ReactNode;
-    /** ไทย, just before ⑂ Branch (integration: "Message actions"). */
+    /** ไทย, just before 🔖 Bookmark and ⑂ Branch (integration: "Message actions"). */
     thai: ReactNode;
+    /** 🔖 Bookmark (.scratch/chat-search/spec.md), just before ⑂ Branch. */
+    bookmark: ReactNode;
 }
 
 /**
  * Under the newest AI Message while no turn is in flight (spec: "Action row"). ‹ n/m › goes
  * first when the reply has versions, then ↺ Again, never on the Opening; ▶ Read aloud, ไทย, then ⑂ Branch last.
  */
-function ActionRow({ onAgain, onEdit, onSnapshot, onBranch, versions, read, thai }: ActionRowProps) {
+function ActionRow({ onAgain, onEdit, onSnapshot, onBranch, versions, read, thai, bookmark }: ActionRowProps) {
     const items: OverflowItem[] = [];
     if (versions) items.push({ key: 'versions', node: <VersionSwitch {...versions} /> });
     if (onAgain) {
@@ -336,6 +339,7 @@ function ActionRow({ onAgain, onEdit, onSnapshot, onBranch, versions, read, thai
     });
     if (read) items.push({ key: 'read', node: read });
     items.push({ key: 'thai', node: thai });
+    items.push({ key: 'bookmark', node: bookmark });
     items.push({ key: 'branch', node: <BranchAction onBranch={onBranch} /> });
     return <OverflowActions label="Message actions" className="mt-2" items={items} />;
 }
@@ -520,6 +524,7 @@ const MessageView = memo(function MessageView({
                 versions={versions ? { versions, onVersion: (version) => handlers.onVersion(message.id, version) } : null}
                 read={read}
                 thai={<ThaiReadingAction message={message} readings={readings} />}
+                bookmark={<BookmarkAction messageId={message.id} />}
             />
         );
     } else if (tapped) {
@@ -529,6 +534,7 @@ const MessageView = memo(function MessageView({
         if (editable) items.push({ key: 'edit', node: <EditAction onEdit={edit} /> });
         if (read) items.push({ key: 'read', node: read });
         items.push({ key: 'thai', node: <ThaiReadingAction message={message} readings={readings} /> });
+        items.push({ key: 'bookmark', node: <BookmarkAction messageId={message.id} /> });
         items.push({ key: 'branch', node: <BranchAction onBranch={branch} /> });
         tools = <OverflowActions label="Message tools" className={message.kind === 'user' ? 'mt-1.5 justify-end' : 'mt-1.5'} items={items} />;
     }
@@ -621,6 +627,8 @@ const MessageView = memo(function MessageView({
                 {message.kind === 'ai' && (
                     <MessageSnapshots snapshots={snapshots} jobs={jobs} onOpen={handlers.onOpenSnapshot} onDismiss={handlers.onDismissSnapshot} />
                 )}
+                {/* A bookmarked Message says so, so the marks show while scrolling (.scratch/chat-search/spec.md). */}
+                {!editing && <BookmarkedMark messageId={message.id} end={message.kind === 'user'} />}
                 {!editing && tools}
                 {/* Read aloud's Pause, Resume and Stop while it is being read, whether or not its tools show. */}
                 {!editing && message.kind === 'ai' && beingRead && <ReadAloudControls messageId={message.id} />}
