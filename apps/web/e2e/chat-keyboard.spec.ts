@@ -150,8 +150,9 @@ test.describe('on a PC', () => {
             const inThread = stops.filter((label) => /^(Opening|AI reply|Ash said)$/.test(label));
             expect(inThread).toEqual(['AI reply']);
             // Few stops between the thread and the box, however long the Chat: the newest reply's own controls
-            // and the composer's tools (five since the Cue tool, .scratch/cue/spec.md).
-            expect(stops.length).toBeLessThan(17);
+            // and the composer's tools (five since the Cue tool, .scratch/cue/spec.md; one more since the reply's
+            // Bookmark, .scratch/chat-search/spec.md).
+            expect(stops.length).toBeLessThan(18);
 
             // The arrow keys move between Messages; the one focused becomes the thread's stop.
             await articles.last().focus();
