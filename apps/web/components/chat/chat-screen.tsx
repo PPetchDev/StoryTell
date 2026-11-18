@@ -26,7 +26,7 @@ import { SnapshotViewer, useChatSnapshots } from '@/components/chat/snapshots';
 import { useThaiReadings } from '@/components/chat/thai-reading';
 import { useConnection } from '@/components/connection';
 import { LowCreditLine } from '@/components/low-credit-banner';
-import { ApiError, apiFetch, ApiUnreachableError, StreamBrokenError, StreamStoppedError } from '@/lib/api';
+import { ApiError, apiFetch, ApiUnreachableError, StreamBrokenError, StreamStoppedError, TurnLostError } from '@/lib/api';
 import { backdropOf } from '@/lib/backdrop';
 import { handOffBranch, takeBranchHandoff } from '@/lib/branch';
 import { Cast, Portraits } from '@/lib/character-colour';
@@ -428,11 +428,15 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                 setError(caught instanceof ApiError || caught instanceof StreamBrokenError ? caught.message : 'The turn failed.');
             }
             // A stream that broke off had begun, so the API had stored the User Message by then.
-            const stored = caught instanceof StreamBrokenError;
+            // A turn the API no longer knows (.scratch/resume-reply/spec.md) may or may not have been.
+            const stored = caught instanceof StreamBrokenError && !(caught instanceof TurnLostError);
             try {
                 const reread = await apiFetch<Chat>(`/stories/${chat.storyId}/chats/${chat.id}`);
                 setChat(reread);
-                if (!reread.awaitingReply) unsent?.();
+                // A broken or lost turn the API wrote to the end after all left its reply: nothing failed, and nothing is unsent.
+                const answered = !reread.awaitingReply && reread.messages.length > chat.messages.length;
+                if (answered && caught instanceof StreamBrokenError) setError(null);
+                if (!reread.awaitingReply && !answered) unsent?.();
             } catch (rereadFailed) {
                 // The error above already tells the user; a reload shows the rest.
                 if (!stored) unsent?.();
@@ -456,7 +460,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
         if (next.autoRead && reply?.kind === 'ai') player.play(reply.id);
     };
 
-    /** ■ Stop: ends the reply being written; the API keeps nothing of it. */
+    /** ■ Stop: ends the reply being written, with its own request to the API, which keeps nothing of it. */
     const stopTurn = () => stopRef.current?.abort();
 
     /** A write that runs no turn: an AI Message edit, Reset, or a judge retry. */

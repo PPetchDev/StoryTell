@@ -1,4 +1,5 @@
-import { apiFetch, apiSend, apiSendStream } from './api';
+import { apiFetch, apiSend } from './api';
+import { resumableTurn } from './turn-stream';
 import type { Belief } from './memory';
 import type { BondLevels } from './bonds';
 import type { Emotion } from './expressions';
@@ -359,6 +360,8 @@ export interface SuggestedReply {
 /**
  * A turn asked for as a stream (spec: streaming replies): each `parts` event is the whole
  * reply so far, and aborting `signal` stops it (Stop). The answer is the same Chat either way.
+ * A dropped stream is picked up again by itself (.scratch/resume-reply/spec.md), so `onParts`
+ * may start again from the reply so far.
  */
 export interface TurnStream {
     signal: AbortSignal;
@@ -368,7 +371,7 @@ export interface TurnStream {
 /** A turn write: streamed when `stream` is given, else answered once as JSON. */
 function turn<T>(method: 'POST' | 'PATCH', path: string, body: object | undefined, stream?: TurnStream): Promise<T> {
     if (!stream) return apiSend<T>(method, path, body);
-    return apiSendStream<T>(method, path, body, {
+    return resumableTurn<T>(method, path, body, {
         signal: stream.signal,
         onEvent: (event, data) => {
             if (event === 'parts') stream.onParts((data as { parts: MessagePart[] }).parts);

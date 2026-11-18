@@ -29,7 +29,8 @@ import { SuggestionsResponseBodyDTO } from './dto/suggestions.response.dto.js';
 import { WriteForMeResponseBodyDTO } from './dto/write-for-me.response.dto.js';
 import { ThaiReadingResponseBodyDTO } from './dto/thai-reading.response.dto.js';
 import { DiaryEntryResponseBodyDTO, DiaryResponseBodyDTO } from './dto/diary.response.dto.js';
-import { answerTurn } from './turn-response.js';
+import { LiveTurns } from './live-turns.js';
+import { answerTurn, followTurn } from './turn-response.js';
 
 const Id = (name: string) => Param(name, ParseIntPipe);
 
@@ -39,12 +40,17 @@ const Id = (name: string) => Param(name, ParseIntPipe);
  *
  * The five turn endpoints (send, retry, continue, a User Message edit, regenerate) answer
  * server-sent events instead when asked with `Accept: text/event-stream` (see turn-response.ts),
- * so they write their own answer.
+ * so they write their own answer. A streamed turn is written to the end whatever happens to its
+ * request; the client picks it up again by its id, and stops it with its own request
+ * (.scratch/resume-reply/spec.md).
  */
 @ApiTags('Chats')
 @Controller('stories/:storyId/chats')
 export class ChatApiController {
-    constructor(private readonly chatManager: ChatManagerService) {}
+    constructor(
+        private readonly chatManager: ChatManagerService,
+        private readonly turns: LiveTurns,
+    ) {}
 
     @Get()
     @ApiOkResponse({ type: ListChatsResponseBodyDTO })
@@ -144,7 +150,7 @@ export class ChatApiController {
         @Req() request: Request,
         @Res() response: Response,
     ): Promise<void> {
-        return answerTurn<ChatResponseBodyDTO>(request, response, 201, (stream) =>
+        return answerTurn<ChatResponseBodyDTO>(request, response, 201, this.turns, chatId, (stream) =>
             this.chatManager.send(storyId, chatId, body.text, stream, body.nudgeCharacterId, body.cue, body.roll === true),
         );
     }
@@ -159,7 +165,7 @@ export class ChatApiController {
         @Req() request: Request,
         @Res() response: Response,
     ): Promise<void> {
-        return answerTurn<ChatResponseBodyDTO>(request, response, 200, (stream) =>
+        return answerTurn<ChatResponseBodyDTO>(request, response, 200, this.turns, chatId, (stream) =>
             this.chatManager.retry(storyId, chatId, stream, body?.nudgeCharacterId, body?.cue),
         );
     }
@@ -178,7 +184,7 @@ export class ChatApiController {
         @Req() request: Request,
         @Res() response: Response,
     ): Promise<void> {
-        return answerTurn<ChatResponseBodyDTO>(request, response, 200, (stream) =>
+        return answerTurn<ChatResponseBodyDTO>(request, response, 200, this.turns, chatId, (stream) =>
             this.chatManager.continueChat(storyId, chatId, stream, body?.nudgeCharacterId, body?.cue),
         );
     }
@@ -192,7 +198,37 @@ export class ChatApiController {
     @ApiOkResponse({ type: ChatResponseBodyDTO })
     @ApiProduces('application/json', 'text/event-stream')
     epilogue(@Id('storyId') storyId: number, @Id('chatId') chatId: number, @Req() request: Request, @Res() response: Response): Promise<void> {
-        return answerTurn<ChatResponseBodyDTO>(request, response, 200, (stream) => this.chatManager.writeEpilogue(storyId, chatId, stream));
+        return answerTurn<ChatResponseBodyDTO>(request, response, 200, this.turns, chatId, (stream) => this.chatManager.writeEpilogue(storyId, chatId, stream));
+    }
+
+    /**
+     * .scratch/resume-reply/spec.md, "Resume": a streamed turn of this Chat picked up again by the
+     * id its client gave it, as server-sent events: the reply so far, the rest as it is written,
+     * then `done`, `error` or `stopped`. A turn the API doesn't know (any more) answers 204.
+     */
+    @Get(':chatId/turns/:turnId')
+    @ApiProduces('text/event-stream')
+    @ApiOkResponse({ description: 'The turn as server-sent events.' })
+    @ApiNoContentResponse({ description: 'No such turn: read the Chat as stored.' })
+    async resumeTurn(@Id('storyId') _storyId: number, @Id('chatId') chatId: number, @Param('turnId') turnId: string, @Res() response: Response): Promise<void> {
+        const turn = this.turns.find(turnId, chatId);
+        if (!turn) {
+            response.status(204).end();
+            return;
+        }
+        await followTurn(turn, response);
+    }
+
+    /**
+     * ■ Stop (.scratch/resume-reply/spec.md, "Stop"): aborts the streamed turn, which then fails
+     * as a failed call does and stores nothing, and answers once it has unwound. A turn that
+     * ended, or an unknown one, is left as it is.
+     */
+    @Post(':chatId/turns/:turnId/stop')
+    @HttpCode(204)
+    @ApiNoContentResponse({ description: 'The turn is stopped, or had already ended.' })
+    stopTurn(@Id('storyId') _storyId: number, @Id('chatId') chatId: number, @Param('turnId') turnId: string): Promise<void> {
+        return this.turns.stop(turnId, chatId);
     }
 
     /**
@@ -222,7 +258,7 @@ export class ChatApiController {
         @Req() request: Request,
         @Res() response: Response,
     ): Promise<void> {
-        return answerTurn<EditMessageResponseBodyDTO>(request, response, 200, (stream) =>
+        return answerTurn<EditMessageResponseBodyDTO>(request, response, 200, this.turns, chatId, (stream) =>
             this.chatManager.editMessage(storyId, chatId, messageId, body.text, stream, body.nudgeCharacterId, body.cue),
         );
     }
@@ -245,7 +281,7 @@ export class ChatApiController {
         @Req() request: Request,
         @Res() response: Response,
     ): Promise<void> {
-        return answerTurn<EditMessageResponseBodyDTO>(request, response, 200, (stream) =>
+        return answerTurn<EditMessageResponseBodyDTO>(request, response, 200, this.turns, chatId, (stream) =>
             this.chatManager.regenerateMessage(storyId, chatId, messageId, stream, body?.nudgeCharacterId, body?.cue),
         );
     }

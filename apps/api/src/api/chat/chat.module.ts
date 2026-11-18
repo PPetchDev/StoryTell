@@ -7,10 +7,12 @@ import { ChatSearchApiController } from './chat-search.controller.js';
 import { ChatTranscriptApiController } from './chat-transcript.controller.js';
 import { ChatApiController } from './chat.controller.js';
 import { DictationApiController } from './dictation.controller.js';
+import { LiveTurns } from './live-turns.js';
 import { ReadAloudApiController } from './read-aloud.controller.js';
 
 @Module({
     imports: [ChatManagerModule, ReadAloudManagerModule, ChatSearchManagerModule],
     controllers: [ChatApiController, ChatTranscriptApiController, ChatSearchApiController, DictationApiController, ReadAloudApiController],
+    providers: [LiveTurns],
 })
 export class ChatApiModule {}

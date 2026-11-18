@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { AddressInfo } from 'node:net';
 
 import { FetchLike } from '../src/service/model-gateway/real/http.js';
@@ -94,19 +95,28 @@ describe('Streaming replies', () => {
     }
 
     /**
-     * Asks for a turn as the Chat screen does, with `Accept: text/event-stream`, and reads the
-     * events until the stream ends. `onEvent` may abort the request, as Stop does.
+     * Asks for a turn as the Chat screen does, with `Accept: text/event-stream` and a turn id,
+     * and reads the events until the stream ends. `onEvent` may stop the turn, as ■ Stop does,
+     * with its own request (.scratch/resume-reply/spec.md, "Stop").
      */
     async function streamTurn(
         method: string,
         path: string,
         body?: unknown,
-        onEvent?: (event: StreamEvent, abort: () => void) => void,
+        onEvent?: (event: StreamEvent, stop: () => void) => void,
     ): Promise<{ status: number; contentType: string; events: StreamEvent[]; json?: any }> {
         const controller = new AbortController();
+        const turnId = randomUUID();
+        const chatPath = /^\/api\/stories\/\d+\/chats\/\d+/.exec(path)![0];
+        let stopped = false;
+        const stop = () => {
+            if (stopped) return;
+            stopped = true;
+            void fetch(`${origin}${chatPath}/turns/${turnId}/stop`, { method: 'POST' });
+        };
         const response = await fetch(`${origin}${path}`, {
             method,
-            headers: { Accept: 'text/event-stream', ...(body ? { 'Content-Type': 'application/json' } : {}) },
+            headers: { Accept: 'text/event-stream', 'X-Turn-Id': turnId, ...(body ? { 'Content-Type': 'application/json' } : {}) },
             body: body ? JSON.stringify(body) : undefined,
             signal: controller.signal,
         });
@@ -129,7 +139,7 @@ describe('Streaming replies', () => {
                     const event = parseEvent(block);
                     if (!event) continue;
                     events.push(event);
-                    onEvent?.(event, () => controller.abort());
+                    onEvent?.(event, stop);
                 }
             }
         } catch (error) {
@@ -262,12 +272,15 @@ describe('Streaming replies', () => {
             const { storyId, chatId } = await playableChat();
             t.gateway.scriptText('turn', { text: REPLY, pieceSize: 4, pieceDelayMs: 30 });
 
-            const { events } = await streamTurn('POST', `/api/stories/${storyId}/chats/${chatId}/messages`, { text: 'Evening.' }, (event, abort) => {
-                if (event.event === 'parts') abort();
+            const { events } = await streamTurn('POST', `/api/stories/${storyId}/chats/${chatId}/messages`, { text: 'Evening.' }, (event, stop) => {
+                if (event.event === 'parts') stop();
             });
             await stoppedCall();
 
-            expect(events.map((event) => event.event)).toEqual(['parts']);
+            // The stream that asked for the turn hears that it was stopped.
+            expect(events[0].event).toBe('parts');
+            expect(events[events.length - 1]).toEqual({ event: 'stopped', data: {} });
+            expect(events.some((event) => event.event === 'done')).toBe(false);
             const chat = await getChat(storyId, chatId);
             expect(chat.messages).toHaveLength(2);
             expect(chat.messages[1]).toMatchObject({ kind: 'user', text: 'Evening.' });
@@ -298,20 +311,20 @@ describe('Streaming replies', () => {
                 await streamTurn('POST', `/api/stories/${storyId}/chats/${chatId}/continue`);
                 t.gateway.scriptText('turn', REPLY);
 
-                const controller = new AbortController();
+                const turnId = randomUUID();
                 const sent = fetch(`${origin}/api/stories/${storyId}/chats/${chatId}/messages`, {
                     method: 'POST',
-                    headers: { Accept: 'text/event-stream', 'Content-Type': 'application/json' },
+                    headers: { Accept: 'text/event-stream', 'Content-Type': 'application/json', 'X-Turn-Id': turnId },
                     body: JSON.stringify({ text: 'Evening.' }),
-                    signal: controller.signal,
-                }).catch(() => undefined);
+                }).then((response) => response.text());
                 await new Promise((resolve) => setTimeout(resolve, 200));
-                controller.abort();
-                await sent;
+                // Stopped while the gate waits: the Stop's answer waits for the turn, so it is not awaited before the judge is let go.
+                const stopped = fetch(`${origin}/api/stories/${storyId}/chats/${chatId}/turns/${turnId}/stop`, { method: 'POST' });
                 // The judge settles after the Stop, inside the send's wait: the gate then passes.
                 await new Promise((resolve) => setTimeout(resolve, 200));
                 releaseJudge();
-                await new Promise((resolve) => setTimeout(resolve, 600));
+                expect((await stopped).status).toBe(204);
+                expect(await sent).toContain('event: stopped');
 
                 const chat = await getChat(storyId, chatId);
                 expect(chat.messages.map((message) => message.kind)).toEqual(['ai', 'ai']);
@@ -332,8 +345,8 @@ describe('Streaming replies', () => {
             t.gateway.scriptText('turn', { text: REPLY, pieceSize: 4, pieceDelayMs: 30 });
             scriptBackground();
             await onceUnlocked(() =>
-                streamTurn('POST', `/api/stories/${storyId}/chats/${chatId}/messages/${reply.id}/regenerate`, undefined, (event, abort) => {
-                    if (event.event === 'parts') abort();
+                streamTurn('POST', `/api/stories/${storyId}/chats/${chatId}/messages/${reply.id}/regenerate`, undefined, (event, stop) => {
+                    if (event.event === 'parts') stop();
                 }),
             );
             await stoppedCall();
@@ -481,8 +494,8 @@ describe('Streaming replies', () => {
             const saved = origin;
             origin = realOrigin;
             try {
-                const { events } = await streamTurn('POST', `/api/stories/${storyId}/chats/${chatId}/messages`, { text: 'Hello?' }, (event, abort) => {
-                    if (event.event === 'parts') abort();
+                const { events } = await streamTurn('POST', `/api/stories/${storyId}/chats/${chatId}/messages`, { text: 'Hello?' }, (event, stop) => {
+                    if (event.event === 'parts') stop();
                 });
                 expect(partsEvents(events)[0]).toEqual([{ kind: 'narration', text: 'The keeper' }]);
             } finally {

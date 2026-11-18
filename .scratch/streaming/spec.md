@@ -37,7 +37,7 @@ Every turn the user starts shows its reply as it is written, word by word, in th
   - `done`: the same body the JSON answer has today: the Chat, plus the rollback count where the endpoint reports one.
   - `error`: `{ error: { code, message } }` with the same typed errors as today. Errors found before the turn starts (the send gate, a turn in progress, a bad Message) answer as plain JSON errors with their status, before any stream begins.
 - **The guard while streaming:** Text is released to the client only up to the last point that can't become a line written as the worn identity. The start of an unfinished line is held back while it could still turn out to be `Name:`, `@Name:`, `*Name*:` or `You:` (the guard's pattern). When a line is written as the identity, the stream ends there, the call is aborted, and the reply is the text before it, as the guard cuts today. Stop strings are still sent.
-- **Stop:** The client aborts the request. The API sees the request close, aborts the model call, and follows the failure path of that endpoint: nothing new is stored, a sent User Message stays awaiting Retry, a Regenerate ends at the previous Message as a failed one does, the turn lock is released. A stopped call that the provider bills is recorded in Usage.
+- **Stop:** (Changed by `.scratch/resume-reply/spec.md`: Stop is now its own request, `POST …/turns/:turnId/stop`, and a closed request no longer stops the turn.) The client aborts the request. The API sees the request close, aborts the model call, and follows the failure path of that endpoint: nothing new is stored, a sent User Message stays awaiting Retry, a Regenerate ends at the previous Message as a failed one does, the turn lock is released. A stopped call that the provider bills is recorded in Usage.
 - **Client:**
   - The Chat screen asks for the stream when it can and renders each `parts` event through the same Message rendering, in place of the writing indicator, with the indicator after it.
   - The thread's follow-the-end key includes the streamed reply's length, so it follows as it grows, but only while the user is at the end.
@@ -68,7 +68,7 @@ Every turn the user starts shows its reply as it is written, word by word, in th
 
 - Streaming any call other than turns.
 - Showing the model's reasoning.
-- Resuming a stream after the phone sleeps or the connection drops. That reply simply fails, with Retry.
+- Resuming a stream after the phone sleeps or the connection drops. That reply simply fails, with Retry. (Superseded by `.scratch/resume-reply/spec.md`: the reply is now written to the end and picked up again.)
 - Typing-speed effects. Text shows as it arrives.
 
 ## Further Notes
