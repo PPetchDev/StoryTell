@@ -193,6 +193,12 @@ export interface TurnPromptInput {
      * and the turn's Sudden event, Nudge and Cue lines are left out. Null or left out on every other turn.
      */
     epilogue?: PromptEpilogue | null;
+    /**
+     * Set on a turn of Watch (.scratch/watch-mode/spec.md): a Continue whose instruction keeps the
+     * worn identity in the background while the Characters play on. Only read when `userText` is
+     * null and it is not an Epilogue. Turn-only.
+     */
+    watch?: boolean;
     /** Whether the Story has a Sudden event that can run: the Story so far then reserves room for its block. */
     hasSuddenEvents?: boolean;
     /** Total prompt budget in tokens; recent Messages are trimmed from the oldest to fit. */
@@ -592,8 +598,17 @@ export function continueInstruction(identity: string): string {
     return `(${identity} does nothing new this turn and waits.) Continue the story from exactly where it stands: let the Characters and the world move it forward. Do not write anything ${identity} says, thinks, feels, decides or does, and stop where ${identity} can respond.`;
 }
 
+/**
+ * .scratch/watch-mode/spec.md: stands in for the continue instruction on a turn of Watch. The story
+ * plays on by itself while the worn identity stays in the background; the Characters carry it. Only
+ * the manual battery (the spec's "Real-model check") shows whether the play model obeys.
+ */
+export function watchInstruction(identity: string): string {
+    return `(${identity} stays in the background this turn: present, but quiet, doing nothing new.) Let the story play on by itself from exactly where it stands: the Characters talk with one another and act on their own aims, and the Narrator moves the scene forward. Keep the focus on the Characters; nobody waits on ${identity} for an answer. Do not write anything ${identity} says, thinks, feels, decides or does. End on a natural beat, so the story can go on from there.`;
+}
+
 /** The layers a prompt is built on: everything of a turn's input but the Messages. */
-export type PromptLayersInput = Omit<TurnPromptInput, 'history' | 'userText' | 'tokenBudget' | 'nudge' | 'cue' | 'suddenEvent' | 'roll' | 'epilogue'>;
+export type PromptLayersInput = Omit<TurnPromptInput, 'history' | 'userText' | 'tokenBudget' | 'nudge' | 'cue' | 'suddenEvent' | 'roll' | 'epilogue' | 'watch'>;
 
 /**
  * The layers in two parts (.scratch/prompt-cache/spec.md). `standing` changes only when the Story
@@ -788,7 +803,8 @@ export function buildTurnPrompt(input: TurnPromptInput): TurnPrompt {
     const identity = input.identity.name;
     // An Epilogue is a turn without a User Message, like a Continue, with its own instruction.
     const epilogue = input.userText === null ? (input.epilogue ?? null) : null;
-    const userText = input.userText ?? (epilogue ? epilogueInstruction(identity, epilogue) : continueInstruction(identity));
+    const userText =
+        input.userText ?? (epilogue ? epilogueInstruction(identity, epilogue) : input.watch ? watchInstruction(identity) : continueInstruction(identity));
     const layers = promptLayers(input);
     const lore = loreBlock(input.chosenLore ?? []);
     // Phrases the last few replies keep reusing (.scratch/story-quality/spec.md), named just before the final instruction.

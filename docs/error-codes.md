@@ -126,6 +126,8 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | `404.004.091` | `ChapterNotFoundError` | No Chapter with that id in this Chat (`PUT …/chapters/:chapterId`, `POST …/chapters/:chapterId/write`): taken back with its Scene advance, or another Chat's. Nothing changes. |
 | `422.004.092` | `EmptyChapterError` | A Chapter summary saved with nothing but whitespace. Nothing changes. |
 | `409.004.093` | `ChapterNotFailedError` | Try again (`POST …/chapters/:chapterId/write`) on a Chapter whose summary did not fail: written, being written, waiting, or with no Messages. No call. |
+| `409.004.160` | `WatchRunningError` | Watch started (`POST /api/stories/:storyId/chats/:chatId/watch`) while one already runs in the Chat (`.scratch/watch-mode/spec.md`). Nothing changes; Stop it first. Other refusals of a start are a Continue's: `409.004.013`, `422.004.002`, `409.004.004`, out of credit, the Monthly cap. |
+| `409.004.161` | `WatchNeedsYouError` | Watch started while a Sudden event is under way: its Gauge moves by how the user plays, so the user must play it. Nothing changes. |
 | `502.005.001` | `UnreadableDraftError` | The model's draft or rewrite could not be read (no JSON object, or no text). Nothing saved. Show with Retry. |
 | `502.005.002` | `InvalidDraftError` | The draft does not fit a Story (0 or 7 Characters, a Style value outside its set, a required field empty, a bad StartingBond). Nothing saved. Show with Retry. |
 | `422.005.003` | `EmptyIdeaError` | A draft was asked for with a blank idea. |

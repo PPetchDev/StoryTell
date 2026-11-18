@@ -31,6 +31,7 @@ import { WriteForMeResponseBodyDTO } from './dto/write-for-me.response.dto.js';
 import { ThaiReadingResponseBodyDTO } from './dto/thai-reading.response.dto.js';
 import { DiaryEntryResponseBodyDTO, DiaryResponseBodyDTO } from './dto/diary.response.dto.js';
 import { LiveTurns } from './live-turns.js';
+import { StopsWatch } from './stop-watch.interceptor.js';
 import { answerTurn, followTurn } from './turn-response.js';
 
 const Id = (name: string) => Param(name, ParseIntPipe);
@@ -144,6 +145,7 @@ export class ChatApiController {
     }
 
     @Delete(':chatId')
+    @StopsWatch()
     @HttpCode(204)
     @ApiNoContentResponse({ description: 'The Chat and its Messages are gone.' })
     remove(@Id('storyId') storyId: number, @Id('chatId') chatId: number): Promise<void> {
@@ -152,6 +154,7 @@ export class ChatApiController {
 
     /** Stores the User Message and writes the turn. On a failed turn the error is the gateway's. */
     @Post(':chatId/messages')
+    @StopsWatch()
     @ApiCreatedResponse({ type: ChatResponseBodyDTO })
     @ApiProduces('application/json', 'text/event-stream')
     send(
@@ -167,6 +170,7 @@ export class ChatApiController {
     }
 
     @Post(':chatId/retry')
+    @StopsWatch()
     @ApiOkResponse({ type: ChatResponseBodyDTO })
     @ApiProduces('application/json', 'text/event-stream')
     retry(
@@ -186,6 +190,7 @@ export class ChatApiController {
      * an AI Message and nothing else. A failed call stores nothing; the error is the gateway's.
      */
     @Post(':chatId/continue')
+    @StopsWatch()
     @ApiOkResponse({ type: ChatResponseBodyDTO })
     @ApiProduces('application/json', 'text/event-stream')
     continue(
@@ -206,6 +211,7 @@ export class ChatApiController {
      * reply is an AI Message marked as the Epilogue. Refused right after an Epilogue.
      */
     @Post(':chatId/epilogue')
+    @StopsWatch()
     @ApiOkResponse({ type: ChatResponseBodyDTO })
     @ApiProduces('application/json', 'text/event-stream')
     epilogue(@Id('storyId') storyId: number, @Id('chatId') chatId: number, @Req() request: Request, @Res() response: Response): Promise<void> {
@@ -278,6 +284,7 @@ export class ChatApiController {
      * turn runs.
      */
     @Patch(':chatId/messages/:messageId')
+    @StopsWatch()
     @ApiOkResponse({ type: EditMessageResponseBodyDTO })
     @ApiProduces('application/json', 'text/event-stream')
     editMessage(
@@ -301,6 +308,7 @@ export class ChatApiController {
      * the Message keeps the reply it had, judged and extracted from again.
      */
     @Post(':chatId/messages/:messageId/regenerate')
+    @StopsWatch()
     @ApiOkResponse({ type: EditMessageResponseBodyDTO })
     @ApiProduces('application/json', 'text/event-stream')
     regenerate(
@@ -322,6 +330,7 @@ export class ChatApiController {
      * like an AI Message edit; the version already shown changes nothing.
      */
     @Put(':chatId/messages/:messageId/version')
+    @StopsWatch()
     @ApiOkResponse({ type: EditMessageResponseBodyDTO })
     chooseVersion(
         @Id('storyId') storyId: number,
@@ -472,6 +481,7 @@ export class ChatApiController {
 
     /** Clears every Message and copies the current Opening in again; title and identity stay. */
     @Post(':chatId/reset')
+    @StopsWatch()
     @HttpCode(200)
     @ApiOkResponse({ type: ChatResponseBodyDTO })
     reset(@Id('storyId') storyId: number, @Id('chatId') chatId: number): Promise<ChatResponseBodyDTO> {

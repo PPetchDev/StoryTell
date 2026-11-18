@@ -9,10 +9,13 @@ import { ChatApiController } from './chat.controller.js';
 import { DictationApiController } from './dictation.controller.js';
 import { LiveTurns } from './live-turns.js';
 import { ReadAloudApiController } from './read-aloud.controller.js';
+import { StopWatchInterceptor } from './stop-watch.interceptor.js';
+import { WatchApiController } from './watch.controller.js';
+import { WatchRuns } from './watch-runs.js';
 
 @Module({
     imports: [ChatManagerModule, ReadAloudManagerModule, ChatSearchManagerModule],
-    controllers: [ChatApiController, ChatTranscriptApiController, ChatSearchApiController, DictationApiController, ReadAloudApiController],
-    providers: [LiveTurns],
+    controllers: [ChatApiController, ChatTranscriptApiController, ChatSearchApiController, DictationApiController, ReadAloudApiController, WatchApiController],
+    providers: [LiveTurns, WatchRuns, StopWatchInterceptor],
 })
 export class ChatApiModule {}
