@@ -29,6 +29,7 @@ import {
     EndingFields,
     StoryFields,
 } from '../../../manager/story/story.service.js';
+import { OPENING_QUESTION_TEXT_MAX } from '../../../manager/story/opening-questions.js';
 import { BOND_AXES, BOND_AXIS_RANGE } from '../../../model/ledger/bond-axes.js';
 import type { BondAxis } from '../../../model/ledger/bond-axes.js';
 import { LORE_GROUP_MAX, LORE_SECONDARY_MODES, LORE_TIMED_MAX } from '../../../model/story/entities/lore-entry.entity.js';
@@ -532,4 +533,33 @@ export class StartingBeliefsRequestBodyDTO {
     @ValidateNested({ each: true })
     @Type(() => StartingBeliefRequestDTO)
     startingBeliefs: StartingBeliefRequestDTO[];
+}
+
+/** One Opening question (.scratch/opening-questions/spec.md). The rules beyond shape are the manager's (422). */
+export class OpeningQuestionRequestDTO {
+    @ApiProperty({ description: 'The placeholder, written `{key}` in the Opening and the Role: a–z, 0–9 and _, starting with a letter.', example: 'name' })
+    @IsString()
+    @MaxLength(OPENING_QUESTION_TEXT_MAX)
+    key: string;
+
+    @ApiProperty({ description: 'What the user is asked when a Chat starts.', example: 'What is your name?' })
+    @IsString()
+    @MaxLength(OPENING_QUESTION_TEXT_MAX)
+    question: string;
+
+    @ApiProperty({ description: 'Used when the user skips the question or leaves it blank.', example: 'Aria' })
+    @IsString()
+    @MaxLength(OPENING_QUESTION_TEXT_MAX)
+    defaultAnswer: string;
+}
+
+/** The whole list of Opening questions, in order: it replaces what the Story has. */
+export class OpeningQuestionsRequestBodyDTO {
+    @ApiProperty({ type: [OpeningQuestionRequestDTO] })
+    @IsArray()
+    // A runaway client only: more than MAX_OPENING_QUESTIONS is the manager's 422.
+    @ArrayMaxSize(50)
+    @ValidateNested({ each: true })
+    @Type(() => OpeningQuestionRequestDTO)
+    openingQuestions: OpeningQuestionRequestDTO[];
 }

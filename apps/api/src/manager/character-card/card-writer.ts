@@ -1,4 +1,5 @@
 import { Backdrop, Balance, Difficulty, Pacing, StoryResponse } from '../../model/story/entities/story.entity.js';
+import { fillPlaceholders } from '../story/opening-questions.js';
 import { SELECTIVE_LOGIC } from './card-mapping.js';
 
 /**
@@ -6,7 +7,9 @@ import { SELECTIVE_LOGIC } from './card-mapping.js';
  * V3 card JSON. Pure. Every text has the Role's name, as a whole word, written as `{{user}}`,
  * so another app's user sees their own name. Never written: ids, Chats, Memories, Bonds,
  * Scenes, Starting Bonds, Snapshots, Documents, Expressions, Saved replies, Replace rules. Storytell's
- * own block carries the voices and the Backdrop choice, each only when it isn't the default.
+ * own block carries the voices and the Backdrop choice, each only when it isn't the default, and
+ * the Opening questions with the Opening as written when there are some; the card's own Opening
+ * and the `{{user}}` name read the default answers (.scratch/opening-questions/spec.md).
  */
 
 type Character = StoryResponse['characters'][number];
@@ -74,7 +77,10 @@ export interface CardDefinitions {
 const unixSeconds = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 
 export function writeCard(story: StoryResponse, character: Character): CardDefinitions {
-    const role = story.role.name;
+    const questions = story.openingQuestions ?? [];
+    // Another app reads the Opening and the user's name with the default answers in.
+    const withDefaults = (text: string) => fillPlaceholders(text, questions, null);
+    const role = withDefaults(story.role.name);
     const u = (text: string) => userMacro(text.trim(), role);
     const lore = [...story.lore, ...(story.loreSets ?? []).flatMap((set) => set.entries)].filter((entry) => entry.text.trim() !== '');
     // The Lore trigger settings go where SillyTavern reads them (card-mapping.ts reads them back):
@@ -109,7 +115,7 @@ export function writeCard(story: StoryResponse, character: Character): CardDefin
         description: u(labelledDescription(character)),
         personality: u(character.personality),
         scenario: u(story.setting),
-        first_mes: u(story.opening),
+        first_mes: u(withDefaults(story.opening)),
         mes_example: exampleBlocks(character.exampleLines, character.name, role),
         creator_notes: EXPORT_CREATOR_NOTES,
         system_prompt: '',
@@ -133,7 +139,12 @@ export function writeCard(story: StoryResponse, character: Character): CardDefin
                     // Ticket 06: written only when set, so another app's block stays as before.
                     ...(character.speakingVoice !== null && { speakingVoice: character.speakingVoice }),
                 },
-                role: { name: role, description: u(story.role.description) },
+                // As written, placeholders kept, so a Storytell import asks the questions again.
+                role: { name: story.role.name, description: u(story.role.description) },
+                ...(questions.length > 0 && {
+                    openingQuestions: questions.map((question) => ({ ...question })),
+                    opening: u(story.opening),
+                }),
                 style: {
                     pov: story.style.pov,
                     tense: story.style.tense,

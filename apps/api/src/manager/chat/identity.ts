@@ -1,6 +1,7 @@
 import { ChatEntity } from '../../model/chat/entities/chat.entity.js';
 import { MessageEntity, MessageKind } from '../../model/chat/entities/message.entity.js';
 import { StoryEntity } from '../../model/story/entities/story.entity.js';
+import { fillPlaceholders } from '../story/opening-questions.js';
 
 /**
  * Who the user is playing in a Chat (spec: "worn identity: the Role, or a Persona"). The
@@ -15,12 +16,17 @@ export interface WornIdentity {
     description: string;
 }
 
-/** The Chat needs its `persona` relation loaded (ChatModelService.findWithMessages). */
+/**
+ * The Chat needs its `persona` relation loaded (ChatModelService.findWithMessages). The Role's
+ * placeholders read the Chat's answers to the Opening questions (.scratch/opening-questions/spec.md);
+ * a Persona is the user's own text and is never filled.
+ */
 export function wornIdentity(story: StoryEntity, chat: ChatEntity): WornIdentity {
     if (chat.persona) {
         return { personaId: chat.persona.id, name: chat.persona.name, description: chat.persona.description };
     }
-    return { personaId: null, name: story.role.name, description: story.role.description };
+    const fill = (text: string) => fillPlaceholders(text, story.openingQuestions, chat.openingAnswers);
+    return { personaId: null, name: fill(story.role.name), description: fill(story.role.description) };
 }
 
 /**

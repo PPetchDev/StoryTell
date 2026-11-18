@@ -17,7 +17,7 @@ import { EndingEntity } from './entities/ending.entity.js';
 import { LoreSetEntity, StoryLoreSetEntity } from './entities/lore-set.entity.js';
 import { StartingBeliefEntity } from './entities/starting-belief.entity.js';
 import { StartingBondEntity } from './entities/starting-bond.entity.js';
-import { CoverFocus, StoryEntity } from './entities/story.entity.js';
+import { CoverFocus, OpeningQuestion, StoryEntity } from './entities/story.entity.js';
 import { AccountModelService } from '../account/account.service.js';
 
 // Relations are opted into here only; nothing on the entities auto-loads.
@@ -145,12 +145,13 @@ export class StoryModelService {
      */
     async duplicate(source: StoryEntity, title: string): Promise<{ storyId: number; characterIds: Map<number, number> }> {
         return this.dataSource.transaction(async (manager) => {
-            const { setting, opening, pov, tense, replyLength, pacing, balance, difficulty, imageStyle, narrationVoice, backdrop } = source;
+            const { setting, opening, openingQuestions, pov, tense, replyLength, pacing, balance, difficulty, imageStyle, narrationVoice, backdrop } = source;
             const story = await manager.save(
                 manager.create(StoryEntity, {
                     title,
                     setting,
                     opening,
+                    openingQuestions: (openingQuestions ?? []).map((question) => ({ ...question })),
                     pov,
                     tense,
                     replyLength,
@@ -274,6 +275,11 @@ export class StoryModelService {
             { id: story.id },
             { title, setting, opening, pov, tense, replyLength, pacing, balance, difficulty, imageStyle, narrationVoice, backdrop, updatedAt: () => 'now()' },
         );
+    }
+
+    /** Replaces the Opening questions (.scratch/opening-questions/spec.md) and marks the Story saved. */
+    async setOpeningQuestions(storyId: number, questions: OpeningQuestion[]): Promise<void> {
+        await this.stories.update({ id: storyId }, { openingQuestions: questions, updatedAt: () => 'now()' });
     }
 
     /** Bumps `updated_at`, so a change anywhere under the Story counts as saving it. */

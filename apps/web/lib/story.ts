@@ -40,6 +40,8 @@ export interface StorySummary {
     coverFocus: CoverFocus | null;
     /** The Setting's first sentence, cut to about 120 characters. */
     hook: string;
+    /** Whether a new Chat asks Opening questions first: New Chat then opens their form. */
+    asksOpeningQuestions: boolean;
 }
 
 export interface Style {
@@ -93,6 +95,14 @@ export interface StartingBond extends BondLevels {
     toCharacterId: number | null;
     label: string;
     description: string;
+}
+
+/** One question asked when a Chat starts; its answer fills `{key}` in the Opening and the Role (.scratch/opening-questions/spec.md). */
+export interface OpeningQuestion {
+    key: string;
+    question: string;
+    /** Used when the user skips it or leaves it blank. */
+    defaultAnswer: string;
 }
 
 /** What a Character believes when a Chat starts, which may be false (.scratch/memory-by-meaning/spec.md). */
@@ -279,6 +289,8 @@ export interface Story {
     title: string;
     setting: string;
     opening: string;
+    /** Asked when a Chat starts, in the author's order. */
+    openingQuestions: OpeningQuestion[];
     style: Style;
     role: Role;
     characters: Character[];
@@ -444,6 +456,8 @@ export const storyApi = {
     removeStartingBond: (storyId: number, bondId: number) =>
         apiSend<Story>('DELETE', `/stories/${storyId}/starting-bonds/${bondId}`),
     /** The whole list of Starting Beliefs, in order; it replaces the Story's. */
+    setOpeningQuestions: (storyId: number, openingQuestions: OpeningQuestion[]) =>
+        apiSend<Story>('PUT', `/stories/${storyId}/opening-questions`, { openingQuestions }),
     setStartingBeliefs: (storyId: number, beliefs: Array<{ characterId: number; text: string }>) =>
         apiSend<Story>('PUT', `/stories/${storyId}/starting-beliefs`, { startingBeliefs: beliefs }),
 

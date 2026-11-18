@@ -32,6 +32,7 @@ import {
     RewriteRequest,
     SceneBondGate,
     StartingBelief,
+    OpeningQuestion,
     Story,
     storyApi,
     storyTitle,
@@ -73,6 +74,7 @@ import { EndingCard } from './ending-card';
 import { SharedLore } from './shared-lore';
 import { SuddenEventCard } from './sudden-event-card';
 import { StartingBeliefsCard } from './starting-beliefs-card';
+import { OpeningQuestionsCard, savableQuestions } from './opening-questions-card';
 import { StartingBondsCard } from './starting-bonds-card';
 import { StatusBox } from './status-box';
 
@@ -341,6 +343,9 @@ export function StoryEditor({ initial }: { initial: Story }) {
     const castIds = story.characters.map((character) => character.id);
     const portraits = portraitsOf(story.characters);
     const tabsMissing = useMemo(() => missingByTab(story.missing, story), [story]);
+    // Only for a Story that asks Opening questions (.scratch/opening-questions/spec.md).
+    const askedKeys = savableQuestions(story.openingQuestions ?? []).map((question) => `{${question.key}}`);
+    const placeholderHint = askedKeys.length > 0 ? ` ${askedKeys.join(', ')} take${askedKeys.length === 1 ? 's' : ''} each Chat's answer.` : '';
 
     const setStoryText = (field: StoryText, value: string) => {
         setStory((current) => ({ ...current, [field]: value }));
@@ -404,6 +409,15 @@ export function StoryEditor({ initial }: { initial: Story }) {
         setStory((current) => ({ ...current, startingBeliefs: beliefs }));
         const written = beliefs.filter((belief) => belief.text.trim() !== '').map((belief) => ({ characterId: belief.characterId, text: belief.text }));
         queue('startingBeliefs', () => storyApi.setStartingBeliefs(storyId, written), applyStatus);
+    };
+    /**
+     * The Opening questions as the author now has them: the whole list is saved, without the ones
+     * still being written (.scratch/opening-questions/spec.md).
+     */
+    const setOpeningQuestions = (questions: OpeningQuestion[]) => {
+        setStory((current) => ({ ...current, openingQuestions: questions }));
+        const whole = savableQuestions(questions).map((question) => ({ ...question, question: question.question.trim(), defaultAnswer: question.defaultAnswer.trim() }));
+        queue('openingQuestions', () => storyApi.setOpeningQuestions(storyId, whole), applyStatus);
     };
     const setSceneText = (sceneId: number, field: 'name' | 'situation' | 'moveOnCondition', value: string) => {
         setStory((current) => ({
@@ -653,7 +667,7 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                         multiline
                                         rows={4}
                                         required
-                                        hint="The passage that begins every Chat. Start a line with @Name: for a Character's speech."
+                                        hint={`The passage that begins every Chat. Start a line with @Name: for a Character's speech.${placeholderHint}`}
                                         onChange={(v) => setStoryText('opening', v)}
                                         {...rewritable({ target: 'story', field: 'opening' })}
                                     />
@@ -662,6 +676,11 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                         Preview the Opening
                                     </button>
                                 </section>
+                                <OpeningQuestionsCard
+                                    questions={story.openingQuestions ?? []}
+                                    texts={[story.opening, story.role.name, story.role.description]}
+                                    onChange={setOpeningQuestions}
+                                />
                                 {/* Delete Story: quiet, at the very foot of the Story tab, and it asks first. */}
                                 <div className="mt-6 mb-2 text-center [&_.confirm]:justify-center [&_.confirm]:text-left">
                                     <ConfirmButton
@@ -796,7 +815,7 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                     label="Name"
                                     value={story.role.name}
                                     required
-                                    hint="Who you are in this Story."
+                                    hint={`Who you are in this Story.${placeholderHint}`}
                                     onChange={(v) => setRoleText('name', v)}
                                     {...rewritable({ target: 'role', field: 'name' })}
                                 />
@@ -805,7 +824,7 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                     value={story.role.description}
                                     multiline
                                     required
-                                    hint="The part you play. The Characters always know who they are talking to."
+                                    hint={`The part you play. The Characters always know who they are talking to.${placeholderHint}`}
                                     onChange={(v) => setRoleText('description', v)}
                                     {...rewritable({ target: 'role', field: 'description' })}
                                 />

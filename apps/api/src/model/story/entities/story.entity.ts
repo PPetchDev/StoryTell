@@ -96,6 +96,18 @@ export interface StoryCover {
     characterId: number | null;
 }
 
+/**
+ * One Opening question (.scratch/opening-questions/spec.md): asked when a Chat starts; its answer
+ * fills `{key}` in the Opening and the Role.
+ */
+export interface OpeningQuestion {
+    /** The placeholder's name: `name` is written `{name}`. */
+    key: string;
+    question: string;
+    /** Used when the user skips the question or leaves it blank. */
+    defaultAnswer: string;
+}
+
 export interface StorySummary {
     id: number;
     title: string;
@@ -107,6 +119,8 @@ export interface StorySummary {
 export interface StoryResponse extends StorySummary {
     setting: string;
     opening: string;
+    /** Asked when a Chat starts (.scratch/opening-questions/spec.md), in the author's order. */
+    openingQuestions: OpeningQuestion[];
     style: { pov: Pov; tense: Tense; replyLength: ReplyLength; pacing: Pacing; balance: Balance; difficulty: Difficulty; imageStyle: string };
     role: RoleResponse;
     characters: CharacterResponse[];
@@ -153,6 +167,10 @@ export class StoryEntity {
 
     @Column({ type: 'text', default: '' })
     opening: string;
+
+    /** In the author's order; written whole by StoryModelService.setOpeningQuestions(). */
+    @Column({ name: 'opening_questions', type: 'jsonb', default: () => "'[]'" })
+    openingQuestions: OpeningQuestion[];
 
     @Column({ type: 'enum', enum: Pov, enumName: 'story_pov_enum', default: Pov.Second })
     pov: Pov;
@@ -280,6 +298,7 @@ export class StoryEntity {
             ...this.toSummary(),
             setting: this.setting,
             opening: this.opening,
+            openingQuestions: (this.openingQuestions ?? []).map((question) => ({ ...question })),
             style: {
                 pov: this.pov,
                 tense: this.tense,

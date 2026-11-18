@@ -7,6 +7,7 @@ import {
     ChooseReplyVersionRequestBodyDTO,
     EditMessageRequestBodyDTO,
     UpdateChatRequestBodyDTO,
+    CreateChatRequestBodyDTO,
     SendMessageRequestBodyDTO,
     SetAuthorsNoteRequestBodyDTO,
     SetNowNoteRequestBodyDTO,
@@ -53,8 +54,8 @@ export class ChatApiController {
 
     @Post()
     @ApiCreatedResponse({ type: ChatResponseBodyDTO })
-    create(@Id('storyId') storyId: number): Promise<ChatResponseBodyDTO> {
-        return this.chatManager.createChat(storyId);
+    create(@Id('storyId') storyId: number, @Body() body: CreateChatRequestBodyDTO): Promise<ChatResponseBodyDTO> {
+        return this.chatManager.createChat(storyId, body?.answers);
     }
 
     @Get(':chatId')

@@ -25,6 +25,7 @@ import {
     SceneOrderRequestBodyDTO,
     SceneRequestBodyDTO,
     StartingBeliefsRequestBodyDTO,
+    OpeningQuestionsRequestBodyDTO,
     StartingBondRequestBodyDTO,
     StoryRequestBodyDTO,
     SuddenEventRequestBodyDTO,
@@ -177,6 +178,13 @@ export class StoryApiController {
     @ApiOkResponse({ type: StoryResponseBodyDTO })
     setStartingBeliefs(@Id('storyId') storyId: number, @Body() body: StartingBeliefsRequestBodyDTO): Promise<StoryResponseBodyDTO> {
         return this.storyManager.setStartingBeliefs(storyId, body.startingBeliefs);
+    }
+
+    /** The whole list of Opening questions (.scratch/opening-questions/spec.md): it replaces the Story's, and answers the Story. */
+    @Put(':storyId/opening-questions')
+    @ApiOkResponse({ type: StoryResponseBodyDTO })
+    setOpeningQuestions(@Id('storyId') storyId: number, @Body() body: OpeningQuestionsRequestBodyDTO): Promise<StoryResponseBodyDTO> {
+        return this.storyManager.setOpeningQuestions(storyId, body.openingQuestions);
     }
 
     @Post(':storyId/scenes')

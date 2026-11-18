@@ -138,6 +138,7 @@ export class CharacterCardManagerService {
             storyId = (await this.storyManager.createStory({})).id;
             await this.storyManager.updateStory(storyId, plan.story);
             await this.storyManager.updateRole(storyId, plan.role);
+            if (plan.openingQuestions.length > 0) await this.storyManager.setOpeningQuestions(storyId, plan.openingQuestions);
             const withCharacter = await this.storyManager.addCharacter(storyId, plan.character);
             const characterId = withCharacter.characters[withCharacter.characters.length - 1].id;
             for (const entry of plan.lore) await this.storyManager.addLoreEntry(storyId, entry);

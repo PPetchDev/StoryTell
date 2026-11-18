@@ -64,6 +64,10 @@ _Avoid_: Tavern card, bot card, character file
 The author-written passage that begins every Chat of a Story.
 _Avoid_: Intro, greeting, first message
 
+**Opening question**:
+A question the author has a Story ask when a Chat starts ("What is your name?"), with a placeholder key and a default answer. The answer fills `{key}` in the Opening and the Role for that Chat alone and is kept on it; skipping takes the default. Reset keeps a Chat's answers and a Branch copies them.
+_Avoid_: Prompt, form field, variable, intro question
+
 **Character**:
 An AI-played figure with its own personality and voice, belonging to one Story's cast.
 _Avoid_: Bot, agent, AI
@@ -85,7 +89,7 @@ The picture the author chooses for a Story, shown on its card on Home and at the
 _Avoid_: Thumbnail, banner, key art
 
 **Duplicate**:
-Making a new Story, "<title> (copy)", from everything the author wrote in another: its text, style, Narration voice and Backdrop choice, Role, Characters with their Reference images, Portraits, Expressions and Speaking voices, Scenes, Sudden events, Endings, Starting Bonds, its own Lore and its links to Lore sets (the sets themselves are shared, not copied), Documents, its own Saved replies and Replace rules, and Cover, each image in a file of its own. No Chats or Snapshots come along, so a Cover that is a Snapshot is dropped.
+Making a new Story, "<title> (copy)", from everything the author wrote in another: its text, Opening questions, style, Narration voice and Backdrop choice, Role, Characters with their Reference images, Portraits, Expressions and Speaking voices, Scenes, Sudden events, Endings, Starting Bonds, its own Lore and its links to Lore sets (the sets themselves are shared, not copied), Documents, its own Saved replies and Replace rules, and Cover, each image in a file of its own. No Chats or Snapshots come along, so a Cover that is a Snapshot is dropped.
 _Avoid_: Clone, fork, template
 
 ## Playing
