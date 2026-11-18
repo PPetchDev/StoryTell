@@ -74,6 +74,7 @@ import { SceneCard } from './scene-card';
 import { EndingCard } from './ending-card';
 import { SharedLore } from './shared-lore';
 import { SuddenEventCard } from './sudden-event-card';
+import { AiEventsSwitch } from './ai-events-switch';
 import { StatsCard } from './stats-card';
 import { StartingBeliefsCard } from './starting-beliefs-card';
 import { OpeningQuestionsCard, savableQuestions } from './opening-questions-card';
@@ -991,6 +992,8 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                     >
                                         + Add Sudden event
                                     </button>
+                                    {/* .scratch/ai-events/spec.md: the story's own events, proposed in play. */}
+                                    <AiEventsSwitch on={story.aiEvents ?? false} onChange={(on) => void commit(() => storyApi.setAiEvents(storyId, on), applyWhole)} />
                                 </section>
                                 {/* Endings (.scratch/endings/spec.md): where the plot can come to rest, after what moves it. */}
                                 <section aria-labelledby="endings-heading" className="mt-6">

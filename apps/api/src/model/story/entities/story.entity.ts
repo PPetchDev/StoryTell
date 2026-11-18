@@ -130,6 +130,8 @@ export interface StoryResponse extends StorySummary {
     scenes: SceneResponse[];
     /** Its Sudden events (.scratch/sudden-events/spec.md), in the author's order. */
     suddenEvents: SuddenEventResponse[];
+    /** Whether the story may make up Sudden events of its own in its Chats (.scratch/ai-events/spec.md). */
+    aiEvents: boolean;
     /** Its Endings (.scratch/endings/spec.md), in the author's order. */
     endings: EndingResponse[];
     /** In add order. */
@@ -197,6 +199,10 @@ export class StoryEntity {
 
     @Column({ type: 'enum', enum: Difficulty, enumName: 'story_difficulty_enum', default: Difficulty.Normal })
     difficulty: Difficulty;
+
+    /** "Let the story make up events" (.scratch/ai-events/spec.md): the Judge may propose Sudden events in its Chats. */
+    @Column({ name: 'ai_events', type: 'boolean', default: false })
+    aiEvents: boolean;
 
     @Column({ name: 'image_style', type: 'text', default: '' })
     imageStyle: string;
@@ -320,6 +326,7 @@ export class StoryEntity {
             startingBeliefs: (this.startingBeliefs ?? []).map((belief) => belief.toResponse()),
             scenes: this.scenes.map((scene) => scene.toResponse()),
             suddenEvents: (this.suddenEvents ?? []).map((event) => event.toResponse()),
+            aiEvents: this.aiEvents ?? false,
             endings: (this.endings ?? []).map((ending) => ending.toResponse()),
             lore: this.lore.map((entry) => entry.toResponse()),
             loreSets: (this.loreSetLinks ?? []).flatMap((link) => (link.loreSet ? [link.loreSet.toResponse()] : [])),

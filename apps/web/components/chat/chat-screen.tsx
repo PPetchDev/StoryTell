@@ -22,6 +22,7 @@ import { SceneStrip } from '@/components/chat/scene-strip';
 import { ChaptersSheet } from '@/components/chat/chapters-sheet';
 import { RollOfferBand } from '@/components/chat/roll-offer-band';
 import { SuddenEventBanner, suddenEventAnnouncement } from '@/components/chat/sudden-event-banner';
+import { EventProposalCard, eventProposalAnnouncement } from '@/components/chat/event-proposal-card';
 import { EndingBanner, endingAnnouncement, epilogueWritten } from '@/components/chat/ending-banner';
 import { SnapshotSheet } from '@/components/chat/snapshot-sheet';
 import { SnapshotViewer, useChatSnapshots } from '@/components/chat/snapshots';
@@ -258,6 +259,14 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
         eventRef.current = chat.suddenEvent;
         if (said) announce(said);
     }, [chat.suddenEvent]);
+
+    // A Sudden event the story proposes is said once as well (.scratch/ai-events/spec.md); the card shows it.
+    const proposalRef = useRef(initial.eventProposal ?? null);
+    useEffect(() => {
+        const said = eventProposalAnnouncement(proposalRef.current, chat.eventProposal ?? null);
+        proposalRef.current = chat.eventProposal ?? null;
+        if (said) announce(said);
+    }, [chat.eventProposal]);
 
     // An Ending reached is said once too (.scratch/endings/spec.md); the banner shows it.
     const endingRef = useRef(initial.ending);
@@ -723,6 +732,16 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
             )}
             {/* An Epilogue stands outside a Sudden event (docs/ui-audit-2026-11-16.md M6): right after one, only the Ending shows. */}
             {chat.suddenEvent && !newestIsEpilogue && <SuddenEventBanner event={chat.suddenEvent} />}
+            {/* .scratch/ai-events/spec.md: an event the story made up waits for the user's answer where the banner goes. */}
+            {chat.eventProposal && !chat.suddenEvent && !newestIsEpilogue && (
+                <EventProposalCard
+                    key={chat.eventProposal.id}
+                    proposal={chat.eventProposal}
+                    busy={writing || busy}
+                    onStart={() => void runWrite(() => chatApi.acceptEventProposal(chat.storyId, chat.id, chat.eventProposal!.id))}
+                    onDecline={() => void runWrite(() => chatApi.declineEventProposal(chat.storyId, chat.id, chat.eventProposal!.id))}
+                />
+            )}
             {chat.ending && (
                 <EndingBanner
                     key={`${chat.ending.messageId}:${chat.ending.name}`}

@@ -163,6 +163,8 @@ export class StoryModelService {
                     backdrop,
                     // The switch for Roll offers (.scratch/judge-rolls/spec.md).
                     rollOffers: source.rollOffers ?? true,
+                    // The author's switch (.scratch/ai-events/spec.md); the events a Chat made up stay with that Chat.
+                    aiEvents: source.aiEvents,
                     userId: this.accounts.currentId(),
                 }),
             );
@@ -437,6 +439,11 @@ export class StoryModelService {
 
     saveSuddenEvent(event: SuddenEventEntity): Promise<SuddenEventEntity> {
         return this.suddenEvents.save(event);
+    }
+
+    /** "Let the story make up events" (.scratch/ai-events/spec.md), on or off. */
+    async setAiEvents(storyId: number, on: boolean): Promise<void> {
+        await this.stories.update({ id: storyId }, { aiEvents: on });
     }
 
     /** Its steps in every Chat go with it (ON DELETE CASCADE), so one under way simply ends. */

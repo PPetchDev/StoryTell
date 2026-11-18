@@ -62,6 +62,7 @@ import { UsageMessage1764330000000 } from './1764330000000-UsageMessage.js';
 import { MessageBookmarks1764340000000 } from './1764340000000-MessageBookmarks.js';
 import { PushSubscriptions1764350000000 } from './1764350000000-PushSubscriptions.js';
 import { JudgeRolls1764370000000 } from './1764370000000-JudgeRolls.js';
+import { AiEvents1764380000000 } from './1764380000000-AiEvents.js';
 import { SceneChapters1764390000000 } from './1764390000000-SceneChapters.js';
 import { OpeningQuestions1764400000000 } from './1764400000000-OpeningQuestions.js';
 
@@ -133,6 +134,7 @@ export const migrations = [
     MessageBookmarks1764340000000,
     PushSubscriptions1764350000000,
     JudgeRolls1764370000000,
+    AiEvents1764380000000,
     SceneChapters1764390000000,
     OpeningQuestions1764400000000,
 ];

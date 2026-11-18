@@ -354,6 +354,13 @@ export class SuddenEventRequestBodyDTO implements SuddenEventFields {
     failure?: string;
 }
 
+/** "Let the story make up events" (.scratch/ai-events/spec.md). */
+export class AiEventsRequestBodyDTO {
+    @ApiProperty({ description: "On: the Judge may propose Sudden events of its own in the Story's Chats." })
+    @IsBoolean()
+    on: boolean;
+}
+
 /** An Ending's fields (.scratch/endings/spec.md). Every field is optional, so autosave can send one at a time. */
 export class EndingRequestBodyDTO implements EndingFields {
     @ApiPropertyOptional()

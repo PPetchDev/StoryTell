@@ -9,6 +9,7 @@ import { MemoryKnownByEntity } from '../memory/entities/memory-known-by.entity.j
 import { MemoryAuthor, MemoryEntity, MemorySnapshot } from '../memory/entities/memory.entity.js';
 import { createMemory, setKnownBy } from '../memory/memory.service.js';
 import type { Emotion } from '../story/emotion.js';
+import { EventProposal, GaugeDirection, SuddenEventEntity } from '../story/entities/sudden-event.entity.js';
 import { BondLevels } from './bond-axes.js';
 import { ArcStepEntity } from './entities/arc-step.entity.js';
 import { BeliefChangeEntity, BeliefChangeKind } from './entities/belief-change.entity.js';
@@ -91,6 +92,18 @@ export interface NewSuddenEventStep {
     reason: string;
 }
 
+/** A Sudden event the Judge proposed in one Chat (.scratch/ai-events/spec.md), after the apply rules. */
+export interface NewChatEvent {
+    name: string;
+    trigger: string;
+    gauge: string;
+    direction: GaugeDirection;
+    turns: number;
+    success: string;
+    failure: string;
+    reason: string;
+}
+
 /** The emotion the judge tagged one speech part of the judged Message with (.scratch/expressions/spec.md). */
 export interface PartEmotion {
     partId: number;
@@ -119,6 +132,8 @@ export interface MessageChanges {
     details?: NewDetailChange[];
     /** The Ending this reply reached; null or left out when it reached none. */
     ending?: NewEndingReached | null;
+    /** A Sudden event this reply's judgement proposed (.scratch/ai-events/spec.md); null or left out when none. */
+    newEvent?: NewChatEvent | null;
     /**
      * The emotion of each tagged speech part of the Message; every other part of it is cleared. Not
      * ledger rows: nothing rolls them back, since whatever undoes a judgement replaces the parts.
@@ -163,6 +178,8 @@ export interface LedgerState {
     detailChanges: DetailChangeEntity[];
     /** The Chat's record of reaching an Ending (.scratch/endings/spec.md); at most one in practice. */
     endingsReached: EndingReachedEntity[];
+    /** The Sudden events the Chat made up (.scratch/ai-events/spec.md), every proposal, oldest first. */
+    chatSuddenEvents: SuddenEventEntity[];
 }
 
 /** Counts by kind for the rollback notice (spec: "3 Memories rolled back"). */
@@ -262,7 +279,7 @@ export class LedgerModelService {
     }
 
     async state(chatId: number): Promise<LedgerState> {
-        const [bondChanges, arcSteps, sceneAdvances, arcDirections, suddenEventSteps, detailChanges, endingsReached] = await Promise.all([
+        const [bondChanges, arcSteps, sceneAdvances, arcDirections, suddenEventSteps, detailChanges, endingsReached, chatSuddenEvents] = await Promise.all([
             this.bondChanges.find({ where: { chatId }, order: { id: 'ASC' } }),
             this.arcSteps.find({ where: { chatId }, order: { id: 'ASC' } }),
             this.sceneAdvances.find({ where: { chatId }, order: { id: 'ASC' } }),
@@ -270,8 +287,9 @@ export class LedgerModelService {
             this.suddenEventStepsOf(chatId),
             this.detailChangesOf(chatId),
             this.endingsReachedOf([chatId]),
+            this.chatSuddenEventsOf(chatId),
         ]);
-        return { bondChanges, arcSteps, sceneAdvances, arcDirections, suddenEventSteps, detailChanges, endingsReached };
+        return { bondChanges, arcSteps, sceneAdvances, arcDirections, suddenEventSteps, detailChanges, endingsReached, chatSuddenEvents };
     }
 
     /** The records of these Chats reaching an Ending (.scratch/endings/spec.md), oldest first. */
@@ -329,6 +347,44 @@ export class LedgerModelService {
      */
     async setUserFact(chatId: number, value: string): Promise<void> {
         await this.detailChanges.save(this.detailChanges.create({ chatId, kind: DetailKind.Fact, characterId: null, value, messageId: null }));
+    }
+
+    /** The Sudden events the Chat made up (.scratch/ai-events/spec.md), every proposal, oldest first. */
+    chatSuddenEventsOf(chatId: number): Promise<SuddenEventEntity[]> {
+        return this.dataSource.getRepository(SuddenEventEntity).find({ where: { chatId }, order: { id: 'ASC' } });
+    }
+
+    /**
+     * Starts a proposed event (.scratch/ai-events/spec.md): it is accepted, and its start step is
+     * recorded against the Message that proposed it, at its direction's start with all its replies.
+     * Answers false when the Chat has no such proposal still offered.
+     */
+    acceptEventProposal(chatId: number, eventId: number, start: { gauge: number }): Promise<boolean> {
+        return this.dataSource.transaction(async (manager) => {
+            const event = await manager.findOne(SuddenEventEntity, { where: { id: eventId, chatId, proposal: EventProposal.Offered } });
+            if (!event || event.messageId === null) return false;
+            await manager.update(SuddenEventEntity, { id: event.id }, { proposal: EventProposal.Accepted });
+            await manager.save(
+                manager.create(SuddenEventStepEntity, {
+                    chatId,
+                    suddenEventId: event.id,
+                    kind: SuddenEventStepKind.Start,
+                    gauge: start.gauge,
+                    turnsLeft: event.turns,
+                    reason: event.reason,
+                    messageId: event.messageId,
+                }),
+            );
+            return true;
+        });
+    }
+
+    /** Declines a proposed event: it never shows again. False when the Chat has no such proposal still offered. */
+    async declineEventProposal(chatId: number, eventId: number): Promise<boolean> {
+        const result = await this.dataSource
+            .getRepository(SuddenEventEntity)
+            .update({ id: eventId, chatId, proposal: EventProposal.Offered }, { proposal: EventProposal.Declined });
+        return (result.affected ?? 0) > 0;
     }
 
     /** The Chat's Sudden event steps alone, oldest first: what its event state is read from. */
@@ -433,6 +489,12 @@ export class LedgerModelService {
             }
             if (changes.ending) {
                 await manager.save(manager.create(EndingReachedEntity, { chatId, messageId, ...changes.ending }));
+            }
+            if (changes.newEvent) {
+                // A made-up event belongs to its Chat and the Message that proposed it, never to the Story (.scratch/ai-events/spec.md).
+                await manager.save(
+                    manager.create(SuddenEventEntity, { ...changes.newEvent, storyId: null, chatId, messageId, proposal: EventProposal.Offered, position: 0 }),
+                );
             }
             if (changes.details && changes.details.length > 0) {
                 await manager.save(changes.details.map((detail) => manager.create(DetailChangeEntity, { chatId, messageId, ...detail })));
@@ -581,6 +643,8 @@ export class LedgerModelService {
             }
             // Not counted either: a Sudden event's steps hold their own state, so taking them away is the whole undo.
             await manager.delete(SuddenEventStepEntity, { messageId: In(ids) });
+            // An event the story made up goes with the Message that proposed it, its steps with it (.scratch/ai-events/spec.md).
+            await manager.delete(SuddenEventEntity, { chatId, messageId: In(ids) });
             // The same for the Place, the Weather and the Outfits: the record before each is current again.
             await manager.delete(DetailChangeEntity, { messageId: In(ids) });
             // An Ending reached there is no longer reached (.scratch/endings/spec.md). Not counted.
@@ -614,6 +678,7 @@ export class LedgerModelService {
             // A fresh start: the Judge may suggest an Ending again (.scratch/endings/spec.md).
             await manager.update(ChatEntity, { id: chatId }, { timeOfDay: null, endingSuggestions: true });
             await manager.delete(SuddenEventStepEntity, { chatId });
+            await manager.delete(SuddenEventEntity, { chatId });
             await manager.delete(DetailChangeEntity, { chatId });
             await manager.delete(DiaryEntryEntity, { chatId });
             await manager.delete(EndingReachedEntity, { chatId });

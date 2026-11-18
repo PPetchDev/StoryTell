@@ -497,6 +497,9 @@ export class StoryResponseBodyDTO implements StoryDetail {
     @ApiProperty({ type: [SuddenEventDTO], description: "The Story's Sudden events, in the author's order." })
     suddenEvents: SuddenEventDTO[];
 
+    @ApiProperty({ description: '"Let the story make up events": whether the Judge may propose Sudden events in its Chats (.scratch/ai-events/spec.md).' })
+    aiEvents: boolean;
+
     @ApiProperty({ type: [EndingDTO], description: "The Story's Endings, in the author's order." })
     endings: EndingDTO[];
 

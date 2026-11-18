@@ -260,3 +260,10 @@ export class ChapterNotFailedError extends AppError {
         super('409.004.093', 'This Chapter has nothing to try again.');
     }
 }
+
+/** Starting or declining a Sudden event the story proposed, when the Chat shows no such proposal now (.scratch/ai-events/spec.md). Nothing changes. */
+export class NoEventProposalError extends AppError {
+    constructor() {
+        super('409.004.041', 'That event is no longer on offer: the story has moved on.');
+    }
+}
