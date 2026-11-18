@@ -137,6 +137,20 @@ export interface PoolUsage {
      * host reported it, and how many of those it read from its cache; null while none did.
      */
     cache?: { promptTokens: number; cachedTokens: number } | null;
+    /**
+     * This month's spend per model and per host, most spent first (.scratch/cost-view/spec.md). The
+     * Owner's only: empty for a Member.
+     */
+    byModel?: NamedSpend[];
+    byHost?: NamedSpend[];
+}
+
+/** One model's, or one host's, share of a pool's spend this month, with its prompt cache. */
+export interface NamedSpend {
+    name: string;
+    spentUsd: number;
+    calls: number;
+    cache: { promptTokens: number; cachedTokens: number } | null;
 }
 
 /** How the Usage page names the host serving text (.scratch/text-fallback/spec.md). */

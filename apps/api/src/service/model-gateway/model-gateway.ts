@@ -240,6 +240,8 @@ export interface PromptMessage {
 export interface ServedFor {
     storyId?: number;
     chatId?: number;
+    /** The AI Message whose reply caused the call (.scratch/cost-view/spec.md: "What a reply's cost holds"). */
+    messageId?: number;
 }
 
 export interface TextCompletionRequest {

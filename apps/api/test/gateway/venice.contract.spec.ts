@@ -61,6 +61,7 @@ describe('Venice contract', () => {
                 costUsd: 0.04,
                 storyId: 7,
                 chatId: null,
+                messageId: null,
             },
         ]);
     });

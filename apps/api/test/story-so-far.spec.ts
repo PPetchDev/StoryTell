@@ -219,7 +219,9 @@ describe('Story so far', () => {
         const turns = await playUntilSummarised(storyId, chat.id, 'Ash came through the storm and Mira took the first watch.');
 
         const [call] = t.gateway.textCalls('story_summary');
-        expect(call.servedFor).toEqual({ storyId, chatId: chat.id });
+        // The cost of the reply that set it off, the newest (.scratch/cost-view/spec.md).
+        const played = (await t.http.get(`/api/stories/${storyId}/chats/${chat.id}`).expect(200)).body as { messages: Array<{ id: number; kind: string }> };
+        expect(call.servedFor).toEqual({ storyId, chatId: chat.id, messageId: played.messages.findLast((message) => message.kind === 'ai')!.id });
         // Spec: "Length cap": the hard stop sits well above the ~500 words asked for.
         expect(call.maxTokens).toBe(2_000);
         const input = call.messages.map((message) => message.content).join('\n');

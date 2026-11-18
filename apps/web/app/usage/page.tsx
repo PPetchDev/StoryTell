@@ -6,7 +6,7 @@ import { BackupBanner } from '@/components/backup-banner';
 import { useAccount } from '@/lib/account';
 import { useApiQuery } from '@/components/connection';
 import { ErrorState, Loading } from '@/components/query-state';
-import { CALL_KIND_LABEL, CreditPool, POOL_LABEL, PoolUsage, TEXT_HOST_LABEL, UsageResponse, usd } from '@/lib/types';
+import { CALL_KIND_LABEL, CreditPool, NamedSpend, POOL_LABEL, PoolUsage, TEXT_HOST_LABEL, UsageResponse, usd } from '@/lib/types';
 
 /**
  * Label and value, the label muted: the label over its value on a phone, so the value has the
@@ -119,6 +119,49 @@ function KindTable({ pool, usage }: { pool: CreditPool; usage: PoolUsage }) {
     );
 }
 
+/** A host as the Usage page names it: the text chain's names, and DeepInfra behind OpenRouter. */
+const HOST_LABEL: Record<string, string> = { ...TEXT_HOST_LABEL, deepinfra: 'DeepInfra' };
+
+/**
+ * This month's spend per model or per host (.scratch/cost-view/spec.md): a row each, the cached
+ * share of its prompt tokens under its name, so the amounts keep their own column at 320px.
+ */
+function NamedTable({ pool, title, rows, label }: { pool: CreditPool; title: string; rows: NamedSpend[]; label(name: string): string }) {
+    const cell = 'py-1.5 text-right align-top';
+    return (
+        <table className="mt-4 w-full border-collapse text-md tabular-nums" aria-label={`${POOL_LABEL[pool]} spend by ${title.toLowerCase()}`}>
+            <thead>
+                <tr className="text-sm text-muted">
+                    <th scope="col" className="pb-1 text-left font-normal">
+                        {title}
+                    </th>
+                    <th scope="col" className="pb-1 text-right font-normal">
+                        Amount
+                    </th>
+                    <th scope="col" className="pb-1 pl-4 text-right font-normal">
+                        Calls
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+                {rows.map((row) => {
+                    const cached = cachedShare(row.cache);
+                    return (
+                        <tr key={row.name} className="border-t border-line">
+                            <th scope="row" className="py-1.5 pr-2 text-left align-top font-normal [overflow-wrap:anywhere]">
+                                {label(row.name)}
+                                {cached !== null && <span className="block text-sm text-muted">{cached}% read from cache</span>}
+                            </th>
+                            <td className={cell}>{usd(row.spentUsd)}</td>
+                            <td className={`${cell} pl-4 text-muted`}>{row.calls}</td>
+                        </tr>
+                    );
+                })}
+            </tbody>
+        </table>
+    );
+}
+
 function PoolCard({ pool, usage, member }: { pool: CreditPool; usage: PoolUsage; member: boolean }) {
     // The Venice pool's label already names its provider; text names the host of its chain serving now.
     const provider = pool === 'text' ? (TEXT_HOST_LABEL[usage.host ?? 'openrouter'] ?? usage.host) : null;
@@ -184,6 +227,9 @@ function PoolCard({ pool, usage, member }: { pool: CreditPool; usage: PoolUsage;
                 )}
             </dl>
             {usage.byKind.length > 0 && <KindTable pool={pool} usage={usage} />}
+            {/* The Owner's only: where the month's money went, by model and by host (.scratch/cost-view/spec.md). */}
+            {(usage.byModel?.length ?? 0) > 0 && <NamedTable pool={pool} title="Model" rows={usage.byModel!} label={(name) => name} />}
+            {(usage.byHost?.length ?? 0) > 0 && <NamedTable pool={pool} title="Host" rows={usage.byHost!} label={(name) => HOST_LABEL[name] ?? name} />}
         </section>
     );
 }

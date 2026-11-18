@@ -76,6 +76,7 @@ describe('Venice contract: speech', () => {
                 costUsd: 0.000072,
                 storyId: null,
                 chatId: null,
+                messageId: null,
             },
         ]);
     });

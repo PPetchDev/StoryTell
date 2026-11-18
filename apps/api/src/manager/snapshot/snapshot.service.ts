@@ -21,6 +21,8 @@ import { MemoryModelService } from '../../model/memory/memory.service.js';
 import { SnapshotEntity, SnapshotResponse } from '../../model/snapshot/entities/snapshot.entity.js';
 import { SnapshotModelService } from '../../model/snapshot/snapshot.service.js';
 import { PushAlertsManagerService } from '../push/push-alerts.service.js';
+import { SettingsModelService } from '../../model/settings/settings.service.js';
+import { snapshotListPrice } from '../../service/model-gateway/real/model-table.js';
 import { CharacterEntity } from '../../model/story/entities/character.entity.js';
 import { StoryEntity } from '../../model/story/entities/story.entity.js';
 import { StoryModelService } from '../../model/story/story.service.js';
@@ -79,6 +81,8 @@ export interface SnapshotPrompt {
     inFrame: SnapshotPromptCharacter[];
     /** The whole prompt the image model would be given: `text` with the fixed rules around it. */
     imagePrompt: string;
+    /** What drawing it will cost at list price, in USD (.scratch/cost-view/spec.md: "Snapshot price"). */
+    priceUsd: number;
 }
 
 /** What a draw needs besides the text, fixed when the Snapshot prompt is written so every retry sends the same. */
@@ -149,6 +153,7 @@ export class SnapshotManagerService {
         private readonly gateway: ModelGateway,
         private readonly config: AppConfig,
         private readonly pushAlerts: PushAlertsManagerService,
+        private readonly settingsModel: SettingsModelService,
     ) {}
 
     /**
@@ -174,6 +179,7 @@ export class SnapshotManagerService {
             text: scene.text,
             inFrame,
             imagePrompt: this.imagePrompt(story, chat, scene.text, scene.inFrame, scene.pieceLabels, trimmed, (character) => character.referenceImagePath !== null),
+            priceUsd: snapshotListPrice(await this.settingsModel.get(), scene.inFrame.filter((character) => character.referenceImagePath !== null).length),
             plan: { inFrameIds: inFrame.map((character) => character.characterId), pieceLabels: scene.pieceLabels, moment: momentText(message) },
             writtenAt: Date.now(),
         };

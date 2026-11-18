@@ -34,6 +34,7 @@ import { backgroundPending, Chat, chatApi, EditedChat, isOpening, latestReply, M
 import { Memory, memoryApi, renderUser } from '@/lib/memory';
 import { setSceneStripHidden, useSceneStripHidden } from '@/lib/scene-strip';
 import { inThreadOrder, Snapshot, snapshotApi } from '@/lib/snapshot';
+import { useReplyCosts } from '@/lib/reply-cost';
 import { Scene, Story } from '@/lib/story';
 
 import { announce } from '@/components/announcer';
@@ -130,6 +131,8 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
             messages: current.messages.map((message) => (message.id === messageId ? { ...message, thaiReading: text } : message)),
         })),
     );
+    // What each reply cost, while "Show cost per reply" is on (.scratch/cost-view/spec.md).
+    const replyCosts = useReplyCosts(chat);
     const [draft, setDraft] = useState('');
     /** The line just sent, shown in the thread until the turn settles. */
     const [pending, setPending] = useState<PendingLine | null>(null);
@@ -808,6 +811,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                 onDismissSnapshot={(job) => void snaps.dismiss(job)}
                 thaiReadings={thaiReadings}
                 openAt={threadAt}
+                costs={replyCosts}
             />
             )}
             </ReadAloudProvider>

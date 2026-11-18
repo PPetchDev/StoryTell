@@ -44,10 +44,10 @@ import {
 import {
     backgroundSamplers,
     drawnSize,
+    imageListPrice,
     EMBEDDING_MODELS,
     IMAGE_MODELS,
     imageModelForKind,
-    ImageModelSpec,
     isPlayModelKind,
     isSampledKind,
     SPEECH_MODELS,
@@ -87,6 +87,8 @@ export interface NewUsageRecord {
     costUsd: number;
     storyId: number | null;
     chatId: number | null;
+    /** The AI Message the call served (.scratch/cost-view/spec.md); left out (null) for a call that served none. */
+    messageId?: number | null;
 }
 
 export interface RealModelGatewayDeps {
@@ -338,6 +340,7 @@ export class RealModelGateway extends ModelGateway {
             costUsd: bill.costUsd,
             storyId: request.servedFor?.storyId ?? null,
             chatId: request.servedFor?.chatId ?? null,
+            messageId: request.servedFor?.messageId ?? null,
         });
     }
 
@@ -391,6 +394,7 @@ export class RealModelGateway extends ModelGateway {
             costUsd,
             storyId: request.servedFor?.storyId ?? null,
             chatId: request.servedFor?.chatId ?? null,
+            messageId: request.servedFor?.messageId ?? null,
         });
         return { vectors: result.vectors, model: modelName, usage: { promptTokens: result.promptTokens }, costUsd };
     }
@@ -426,6 +430,7 @@ export class RealModelGateway extends ModelGateway {
             costUsd,
             storyId: request.servedFor?.storyId ?? null,
             chatId: request.servedFor?.chatId ?? null,
+            messageId: request.servedFor?.messageId ?? null,
         });
 
         return { image, model: modelName, costUsd };
@@ -455,6 +460,7 @@ export class RealModelGateway extends ModelGateway {
             costUsd,
             storyId: request.servedFor?.storyId ?? null,
             chatId: request.servedFor?.chatId ?? null,
+            messageId: request.servedFor?.messageId ?? null,
         });
         return { text: answer.text.trim(), model: modelName, costUsd };
     }
@@ -488,6 +494,7 @@ export class RealModelGateway extends ModelGateway {
             costUsd,
             storyId: request.servedFor?.storyId ?? null,
             chatId: request.servedFor?.chatId ?? null,
+            messageId: request.servedFor?.messageId ?? null,
         });
         return { audio: { bytes, mimeType: 'audio/mpeg' }, model: modelName, characters, costUsd };
     }
@@ -552,8 +559,3 @@ function forUser(error: unknown, modelName: TextModel): unknown {
 }
 
 /** An image's list price: the model's price, plus each input image past the first where the model charges for them. */
-function imageListPrice(model: ImageModelSpec, size: SnapshotSize, inputImages: number): number {
-    const extra = (model.extraInputImageUsd ?? 0) * Math.max(0, inputImages - 1);
-    // Whole millionths of a dollar, so $0.06 + 2 × $0.00345 records as 0.0669 and not 0.06690000000000001.
-    return Math.round(((model.prices[size] ?? model.prices['1K']) + extra) * 1e6) / 1e6;
-}

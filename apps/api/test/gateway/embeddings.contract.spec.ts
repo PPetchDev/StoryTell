@@ -74,6 +74,7 @@ describe('OpenRouter embeddings contract', () => {
                 costUsd: 0.00000042,
                 storyId: 3,
                 chatId: 9,
+                messageId: null,
             },
         ]);
     });

@@ -41,11 +41,12 @@ export class MemoryEmbeddingManagerService implements OnApplicationBootstrap {
 
     /**
      * After an extraction is recorded: every Memory of the Chat with no vector, or another
-     * model's, which takes in the ones it added or reworded. Never rejects.
+     * model's, which takes in the ones it added or reworded. Never rejects. The calls are the
+     * cost of the reply `messageId` (.scratch/cost-view/spec.md).
      */
-    async embedAfterExtraction(storyId: number, chatId: number): Promise<void> {
+    async embedAfterExtraction(storyId: number, chatId: number, messageId?: number): Promise<void> {
         try {
-            await this.embed(storyId, chatId, await this.memoryModel.findUnembedded(chatId, this.gateway.embeddingModel()));
+            await this.embed(storyId, chatId, await this.memoryModel.findUnembedded(chatId, this.gateway.embeddingModel()), messageId);
         } catch (error) {
             this.logger.warn(`Chat ${chatId}: could not look up the Memories to embed: ${String(error)}`);
         }
@@ -83,7 +84,7 @@ export class MemoryEmbeddingManagerService implements OnApplicationBootstrap {
     }
 
     /** Embeds these Memories in batches, storing each vector at unit length. Never rejects. */
-    private async embed(storyId: number, chatId: number, memories: MemoryEntity[]): Promise<{ embedded: number; outOfCredit: boolean }> {
+    private async embed(storyId: number, chatId: number, memories: MemoryEntity[], messageId?: number): Promise<{ embedded: number; outOfCredit: boolean }> {
         let embedded = 0;
         for (let at = 0; at < memories.length; at += MEMORY_EMBEDDING_BATCH) {
             const batch = memories.slice(at, at + MEMORY_EMBEDDING_BATCH);
@@ -91,7 +92,7 @@ export class MemoryEmbeddingManagerService implements OnApplicationBootstrap {
                 const result = await this.gateway.embedTexts({
                     kind: 'memory_embedding',
                     inputs: batch.map((memory) => memory.text),
-                    servedFor: { storyId, chatId },
+                    servedFor: { storyId, chatId, ...(messageId === undefined ? {} : { messageId }) },
                 });
                 for (const [index, memory] of batch.entries()) {
                     await this.memoryModel.setEmbedding(memory.id, memory.text, unitLength(result.vectors[index]), result.model);

@@ -16,6 +16,7 @@ import { AlertsSetting } from '@/components/settings/alerts-setting';
 import { SignOutSetting } from '@/components/sign-in-gate';
 import { useAccount } from '@/lib/account';
 import { TextSizeSetting } from '@/components/text-size-setting';
+import { ReplyCostSetting } from '@/components/reply-cost-setting';
 import { ThemeSetting } from '@/components/theme-setting';
 import { apiSend } from '@/lib/api';
 import { ImageModelOption, ModelOption, PlayModelOption, Settings, SettingsResponse, SnapshotSize } from '@/lib/types';
@@ -339,6 +340,7 @@ export default function SettingsPage() {
             <SettingsGroup id="settings-device" title="This device">
                 <ThemeSetting />
                 <TextSizeSetting />
+                <ReplyCostSetting />
                 {/* Last in the group: it shows only once the server says alerts are set up. */}
                 <AlertsSetting />
             </SettingsGroup>

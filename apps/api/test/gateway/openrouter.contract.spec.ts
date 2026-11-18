@@ -120,6 +120,7 @@ describe('OpenRouter contract', () => {
                 costUsd: 0.000987,
                 storyId: 7,
                 chatId: 3,
+                messageId: null,
             },
         ]);
     });
@@ -426,6 +427,7 @@ describe('OpenRouter contract', () => {
                     costUsd: 0.000432,
                     storyId: 3,
                     chatId: 4,
+                    messageId: null,
                 },
             ]);
         });
@@ -517,6 +519,7 @@ describe('OpenRouter contract', () => {
                     costUsd: 0.000187,
                     storyId: 3,
                     chatId: 4,
+                    messageId: null,
                 },
             ]);
         });

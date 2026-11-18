@@ -56,6 +56,14 @@ export interface SnapshotPrompt {
     inFrame: { characterId: number; name: string }[];
     /** The whole prompt the image model would be given: `text` with the fixed rules around it. */
     imagePrompt: string;
+    /** What drawing it will cost at list price, in USD (.scratch/cost-view/spec.md: "Snapshot price"). */
+    priceUsd?: number;
+}
+
+/** A Snapshot's price on Draw: whole cents as cents, a price with a fraction of a cent to four places. */
+export function snapshotPrice(priceUsd: number): string {
+    const cents = Math.round(priceUsd * 100);
+    return Math.abs(priceUsd * 100 - cents) < 1e-9 ? `$${priceUsd.toFixed(2)}` : `$${priceUsd.toFixed(4)}`;
 }
 
 /** The whole image prompt with the user's edit in place of what the writer wrote. */
