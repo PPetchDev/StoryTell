@@ -5,6 +5,7 @@ import { MessagePartEntity } from '../../model/chat/entities/message-part.entity
 import { MessageEntity } from '../../model/chat/entities/message.entity.js';
 import { ReplyVersionEntity } from '../../model/chat/entities/reply-version.entity.js';
 import { ThaiReadingEntity } from '../../model/chat/entities/thai-reading.entity.js';
+import { MessageBookmarkEntity } from '../../model/chat/entities/message-bookmark.entity.js';
 import { MessageThoughtEntity } from '../../model/chat/entities/message-thought.entity.js';
 import { ArcStepEntity } from '../../model/ledger/entities/arc-step.entity.js';
 import { BondChangeEntity } from '../../model/ledger/entities/bond-change.entity.js';
@@ -63,6 +64,7 @@ export const entities = [
     MessagePartEntity,
     ReplyVersionEntity,
     ThaiReadingEntity,
+    MessageBookmarkEntity,
     MessageThoughtEntity,
     BondChangeEntity,
     ArcStepEntity,
