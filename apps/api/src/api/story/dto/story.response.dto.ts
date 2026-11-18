@@ -8,7 +8,7 @@ import { EXPRESSION_EMOTIONS } from '../../../model/story/emotion.js';
 import type { ExpressionEmotion } from '../../../model/story/emotion.js';
 import { ExpressionResponse } from '../../../model/story/entities/character-expression.entity.js';
 import { CharacterResponse, PortraitCrop } from '../../../model/story/entities/character.entity.js';
-import { RoleResponse } from '../../../model/story/entities/role.entity.js';
+import { RoleResponse, RoleStat } from '../../../model/story/entities/role.entity.js';
 import { SavedReplyDTO } from '../../saved-reply/dto/saved-reply.response.dto.js';
 import { ReplaceRuleDTO } from '../../replace-rule/dto/replace-rule.response.dto.js';
 import { LORE_SECONDARY_MODES, LoreEntryResponse } from '../../../model/story/entities/lore-entry.entity.js';
@@ -156,6 +156,14 @@ export class StyleDTO {
     imageStyle: string;
 }
 
+export class RoleStatDTO implements RoleStat {
+    @ApiProperty()
+    name: string;
+
+    @ApiProperty({ description: "What it adds to a Roll made for it, -3 to 5." })
+    value: number;
+}
+
 export class RoleDTO implements RoleResponse {
     @ApiProperty()
     id: number;
@@ -165,6 +173,9 @@ export class RoleDTO implements RoleResponse {
 
     @ApiProperty()
     description: string;
+
+    @ApiProperty({ type: [RoleStatDTO], description: "Its Stats, in the author's order (.scratch/judge-rolls/spec.md); empty without." })
+    stats: RoleStatDTO[];
 }
 
 export class PortraitCropDTO implements PortraitCrop {
@@ -512,6 +523,9 @@ export class StoryResponseBodyDTO implements StoryDetail {
 
     @ApiProperty({ enum: Backdrop, description: "What sits behind the Story's Chats: nothing, the Cover, or the Chat's newest Snapshot." })
     backdrop: Backdrop;
+
+    @ApiProperty({ description: "Whether the Judge may offer a Roll at a key moment (.scratch/judge-rolls/spec.md)." })
+    rollOffers: boolean;
 
     @ApiProperty({ description: 'True when `missing` is empty.' })
     playable: boolean;

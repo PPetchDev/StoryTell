@@ -39,6 +39,7 @@ import {
     EndingFields,
     SuddenEventFields,
     TENSE_LABELS,
+    RoleStat,
 } from '@/lib/story';
 import { ADD_BUTTON, ADD_BUTTON_IN_CARD } from './add-button';
 import { focusChoice, movedIndex } from './arrow-keys';
@@ -73,6 +74,7 @@ import { SceneCard } from './scene-card';
 import { EndingCard } from './ending-card';
 import { SharedLore } from './shared-lore';
 import { SuddenEventCard } from './sudden-event-card';
+import { StatsCard } from './stats-card';
 import { StartingBeliefsCard } from './starting-beliefs-card';
 import { OpeningQuestionsCard, savableQuestions } from './opening-questions-card';
 import { StartingBondsCard } from './starting-bonds-card';
@@ -362,6 +364,15 @@ export function StoryEditor({ initial }: { initial: Story }) {
     const setNarrationVoice = (voice: string | null) => {
         setStory((current) => ({ ...current, narrationVoice: voice }));
         queue('story.narrationVoice', () => storyApi.update(storyId, { narrationVoice: voice }), applyStatus);
+    };
+    /** The Role's Stats as one list, and the switch for Roll offers (.scratch/judge-rolls/spec.md). */
+    const setRoleStats = (stats: RoleStat[]) => {
+        setStory((current) => ({ ...current, role: { ...current.role, stats } }));
+        queue('role.stats', () => storyApi.updateRole(storyId, { stats }), applyStatus);
+    };
+    const setRollOffers = (rollOffers: boolean) => {
+        setStory((current) => ({ ...current, rollOffers }));
+        queue('story.rollOffers', () => storyApi.update(storyId, { rollOffers }), applyStatus);
     };
     const setRoleText = (field: 'name' | 'description', value: string) => {
         setStory((current) => ({ ...current, role: { ...current.role, [field]: value } }));
@@ -829,6 +840,15 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                     {...rewritable({ target: 'role', field: 'description' })}
                                 />
                             </section>
+                        )}
+                        {tab === 'role' && (
+                            <StatsCard
+                                stats={story.role.stats ?? []}
+                                rollOffers={story.rollOffers ?? true}
+                                onStats={setRoleStats}
+                                onInvalid={() => cancel('role.stats')}
+                                onRollOffers={setRollOffers}
+                            />
                         )}
 
                         {tab === 'characters' && (

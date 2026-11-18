@@ -8,6 +8,7 @@ import { BackgroundStatus, MessageEntity, MessageKind } from '../../../model/cha
 import { BondChangeEntity } from '../../../model/ledger/entities/bond-change.entity.js';
 import { LedgerModelService } from '../../../model/ledger/ledger.service.js';
 import { StoryEntity } from '../../../model/story/entities/story.entity.js';
+import { RoleStat } from '../../../model/story/entities/role.entity.js';
 import { ModelGateway } from '../../../service/model-gateway/model-gateway.js';
 import { exchangeUserText } from '../exchange.js';
 import { exchangeIdentityName } from '../identity.js';
@@ -22,6 +23,7 @@ import { Attempt, BackgroundRuns } from '../background-runs.js';
 import { partsToText } from '../turn/reply-parser.js';
 import { applyJudgement, emotionsOfParts } from './apply-judgement.js';
 import { buildJudgePrompt, JUDGE_CONTEXT_MESSAGES, parseJudgement } from './judge-prompt.js';
+import { applyRollOffer, judgeRollOfferSection, rollOfferAllowed } from '../roll-offer/roll-offer.js';
 
 /** What a send found when it looked at the previous AI Message's judge. */
 export interface SettledBackground {
@@ -173,6 +175,7 @@ export class JudgeManagerService {
             const replyParts = message.parts.map((part) => part.toResponse());
             // Lines are tagged only where a tag can show (.scratch/expressions/spec.md): otherwise the prompt is as before.
             const tagLines = story.characters.some((character) => (character.expressions ?? []).length > 0);
+            const offering = rollOffering(story, chat, index);
             const prompt = buildJudgePrompt({
                 cast: story.characters.map((character) => ({
                     name: character.name,
@@ -215,6 +218,7 @@ export class JudgeManagerService {
                 endingSection: judgeEndingSection(endings),
                 factsSection: judgeFactsSection(facts),
                 nowSection: judgeNowSection(nowNotes, detailsCast),
+                rollOfferSection: offering.section,
             });
 
             const result = await this.gateway.completeText({
@@ -254,6 +258,8 @@ export class JudgeManagerService {
             const ended = applyEnding(endings, judgement.ending ?? null);
             // Only the user's own words change a listed fact (.scratch/story-quality/spec.md).
             const facted = applyFacts(facts, judgement.facts ?? null, userText ?? '', factsBefore.clearedByUser);
+            const offered = applyRollOffer(offering, judgement.rollOffer ?? null);
+            for (const reason of offered.rejected) this.logger.log(`Chat ${chat.id}, Message ${message.id}: judge item dropped: ${reason}`);
             const noted = applyNow({ current: nowNotes, cast: detailsCast, sittingOut, identityName }, judgement.now ?? []);
             for (const reason of [...applied.rejected, ...stepped.rejected, ...detailed.rejected, ...noted.rejected, ...ended.rejected, ...facted.rejected]) {
                 this.logger.log(`Chat ${chat.id}, Message ${message.id}: judge item dropped: ${reason}`);
@@ -266,7 +272,7 @@ export class JudgeManagerService {
             // Written with the rest of the judgement, in its one transaction, never after it. Without
             // Expressions the parts are not touched, so the record is exactly as before.
             const emotions = tagLines ? emotionsOfParts(message.parts, judgement.expressions) : undefined;
-            await this.ledger.record(chat.id, message.id, { ...applied, suddenEvent: stepped.step, details: [...detailed.changes, ...facted.changes, ...noted.changes], ending: ended.reached, ...(emotions ? { emotions } : {}) });
+            await this.ledger.record(chat.id, message.id, { ...applied, suddenEvent: stepped.step, details: [...detailed.changes, ...facted.changes, ...noted.changes], ending: ended.reached, ...(emotions ? { emotions } : {}), rollOffer: offered.offer });
             return { ok: true };
         } catch (error) {
             const reason = error instanceof AppError ? error.message : `Unexpected error: ${String(error)}`;
@@ -282,6 +288,16 @@ export class JudgeManagerService {
             this.logger.error(`Chat ${chatId}, Message ${messageId}: could not record the judge failure: ${String(writeError)}`);
         }
     }
+}
+
+/**
+ * Whether the judged reply may carry a Roll offer, and the Judge's section when it may
+ * (.scratch/judge-rolls/spec.md): read with the Chat up to and including the reply.
+ */
+function rollOffering(story: StoryEntity, chat: ChatEntity, index: number): { allowed: boolean; stats: RoleStat[]; section: string | null } {
+    const stats = story.role.stats ?? [];
+    const allowed = rollOfferAllowed({ rollOffers: story.rollOffers ?? true, messages: chat.messages.slice(0, index + 1), index });
+    return { allowed, stats, section: allowed ? judgeRollOfferSection(stats) : null };
 }
 
 /** A Message as the judge's context shows it: `Name: text` for the user, `@Name:` text for the AI. */

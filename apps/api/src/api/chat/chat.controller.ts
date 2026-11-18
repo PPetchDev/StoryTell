@@ -122,6 +122,16 @@ export class ChatApiController {
         return this.chatManager.setFact(storyId, chatId, body.topic, body.fact);
     }
 
+    /**
+     * Dismisses the pending Roll offer (.scratch/judge-rolls/spec.md); it still counts for the gap
+     * between offers. With none pending, answers the same Chat.
+     */
+    @Delete(':chatId/roll-offer')
+    @ApiOkResponse({ type: ChatResponseBodyDTO })
+    dismissRollOffer(@Id('storyId') storyId: number, @Id('chatId') chatId: number): Promise<ChatResponseBodyDTO> {
+        return this.chatManager.dismissRollOffer(storyId, chatId);
+    }
+
     /** Replaces who is sitting out, read from the next turn on. Never rolled back. */
     @Put(':chatId/sitting-out')
     @ApiOkResponse({ type: ChatResponseBodyDTO })
@@ -152,7 +162,7 @@ export class ChatApiController {
         @Res() response: Response,
     ): Promise<void> {
         return answerTurn<ChatResponseBodyDTO>(request, response, 201, this.turns, chatId, (stream) =>
-            this.chatManager.send(storyId, chatId, body.text, stream, body.nudgeCharacterId, body.cue, body.roll === true),
+            this.chatManager.send(storyId, chatId, body.text, stream, body.nudgeCharacterId, body.cue, body.roll === true, body.rollStat ?? null),
         );
     }
 

@@ -9,6 +9,7 @@ import {
     ChaptersIcon,
     CloseIcon,
     DawnIcon,
+    DiceIcon,
     EveningIcon,
     IconProps,
     MorningIcon,
@@ -21,8 +22,8 @@ import {
     WeatherIcon,
 } from '@/components/icons';
 import { bondGateInWords } from '@/lib/bonds';
-import { Chat, TimeOfDay } from '@/lib/chat';
-import { Scene } from '@/lib/story';
+import { Chat, signedStat, TimeOfDay } from '@/lib/chat';
+import { RoleStat, Scene } from '@/lib/story';
 
 interface SceneStripProps {
     /** The Chat's current Scene; null in free play. */
@@ -45,6 +46,8 @@ interface SceneStripProps {
     onOpenFacts?(): void;
     /** Opens the Chapters, with Move on (.scratch/scene-chapters/spec.md); left out where the Story has no Scenes. */
     onOpenChapters?(): void;
+    /** The Role's Stats (CONTEXT.md, "Stat"), shown once opened; empty without. */
+    stats?: readonly RoleStat[];
     onHide(): void;
 }
 
@@ -81,6 +84,7 @@ export function SceneStrip({
     factCount = 0,
     onOpenFacts,
     onOpenChapters,
+    stats = [],
     onHide,
 }: SceneStripProps) {
     const [open, setOpen] = useState(false);
@@ -161,6 +165,14 @@ export function SceneStrip({
                             {entry.outfit}
                         </span>
                     ))}
+                {/* What the user's part is good at (.scratch/judge-rolls/spec.md), once opened: one line, wrapping. */}
+                {open && stats.length > 0 && (
+                    <span className="min-w-0 flex-[1_0_100%] [overflow-wrap:anywhere]" data-stats>
+                        <DiceIcon size={14} className={STRIP_ICON} />
+                        <span className="font-semibold text-text">Your Stats</span>{' '}
+                        {stats.map((stat) => `${stat.name} ${signedStat(stat.value)}`).join(' · ')}
+                    </span>
+                )}
             </button>
             {onOpenChapters && (
                 <button

@@ -6,7 +6,7 @@ import { usePersonaPicture } from '@/components/chat/persona-pictures';
 import { CharacterPortrait } from '@/components/portrait/character-portrait';
 import { Cast, characterColour, Portrait, Portraits } from '@/lib/character-colour';
 import { DiceIcon } from '@/components/icons';
-import { Message, MessagePart, MessageRoll, ROLL_OUTCOME_LABELS } from '@/lib/chat';
+import { Message, MessagePart, MessageRoll, ROLL_OUTCOME_LABELS, signedStat } from '@/lib/chat';
 import { linePicture } from '@/lib/expressions';
 import { personaImageUrl } from '@/lib/persona';
 
@@ -66,6 +66,12 @@ export function RollLine({ roll }: { roll: MessageRoll | 'pending' }) {
                 <>
                     <span className="sr-only">Roll: </span>
                     <strong className="font-semibold">{roll.value}</strong>
+                    {/* The Stat it was made for (.scratch/judge-rolls/spec.md): "+2 Strength". */}
+                    {roll.stat && (
+                        <span data-roll-stat>
+                            {signedStat(roll.stat.bonus)} {roll.stat.name}
+                        </span>
+                    )}
                     <span className="text-muted">needed {roll.target}</span>
                     <strong className="font-semibold">{ROLL_OUTCOME_LABELS[roll.outcome]}</strong>
                 </>

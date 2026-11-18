@@ -115,6 +115,23 @@ export class StoryRequestBodyDTO implements StoryFields {
     @ValidateIf((_body, value) => value !== undefined)
     @IsEnum(Backdrop)
     backdrop?: Backdrop;
+
+    @ApiPropertyOptional({ description: "Whether the Judge may offer a Roll at a key moment (.scratch/judge-rolls/spec.md). On by default." })
+    @ValidateIf((_body, value) => value !== undefined)
+    @IsBoolean()
+    rollOffers?: boolean;
+}
+
+/** One of a Role's Stats (.scratch/judge-rolls/spec.md); the manager checks the rules across the list. */
+export class RoleStatRequestDTO {
+    @ApiProperty({ description: "The Stat's name, 1 to 24 characters on one line, unique in the Role ignoring case." })
+    @IsString()
+    @MaxLength(100)
+    name: string;
+
+    @ApiProperty({ description: "What it adds to a Roll made for it: a whole number from -3 to 5." })
+    @IsInt()
+    value: number;
 }
 
 export class RoleRequestBodyDTO implements RoleFields {
@@ -129,6 +146,14 @@ export class RoleRequestBodyDTO implements RoleFields {
     @IsString()
     @MaxLength(TEXT_MAX)
     description?: string;
+
+    @ApiPropertyOptional({ type: [RoleStatRequestDTO], description: "The Role's Stats, at most 6, replacing the whole list (.scratch/judge-rolls/spec.md)." })
+    @ValidateIf((_body, value) => value !== undefined)
+    @IsArray()
+    @ArrayMaxSize(50)
+    @ValidateNested({ each: true })
+    @Type(() => RoleStatRequestDTO)
+    stats?: RoleStatRequestDTO[];
 }
 
 export class CharacterRequestBodyDTO implements CharacterFields {

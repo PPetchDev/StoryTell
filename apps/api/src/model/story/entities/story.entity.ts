@@ -148,6 +148,8 @@ export interface StoryResponse extends StorySummary {
     narrationVoice: string | null;
     /** What sits behind its Chats' Messages (.scratch/chat-looks/spec.md, "Backdrop"). */
     backdrop: Backdrop;
+    /** Whether the Judge may offer a Roll at a key moment (.scratch/judge-rolls/spec.md). */
+    rollOffers: boolean;
 }
 
 @Entity('story')
@@ -205,6 +207,10 @@ export class StoryEntity {
 
     @Column({ type: 'enum', enum: Backdrop, enumName: 'story_backdrop_enum', default: Backdrop.None })
     backdrop: Backdrop;
+
+    /** Whether the Judge may offer a Roll at a key moment (.scratch/judge-rolls/spec.md); on by default. */
+    @Column({ name: 'roll_offers', type: 'boolean', default: true })
+    rollOffers: boolean;
 
     // The Cover is at most one of the next three (CHECK chk_story_one_cover); see cover().
     // Written only by StoryModelService.setCover(); saveStory() writes the authored fields alone,
@@ -323,6 +329,7 @@ export class StoryEntity {
             cover: this.cover(),
             narrationVoice: this.narrationVoice,
             backdrop: this.backdrop,
+            rollOffers: this.rollOffers ?? true,
         };
     }
 

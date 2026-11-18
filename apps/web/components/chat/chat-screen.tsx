@@ -20,6 +20,7 @@ import { NovelRequest, NovelView } from '@/components/chat/novel-view';
 import { PersonaPictures } from '@/components/chat/persona-pictures';
 import { SceneStrip } from '@/components/chat/scene-strip';
 import { ChaptersSheet } from '@/components/chat/chapters-sheet';
+import { RollOfferBand } from '@/components/chat/roll-offer-band';
 import { SuddenEventBanner, suddenEventAnnouncement } from '@/components/chat/sudden-event-banner';
 import { EndingBanner, endingAnnouncement, epilogueWritten } from '@/components/chat/ending-banner';
 import { SnapshotSheet } from '@/components/chat/snapshot-sheet';
@@ -32,12 +33,12 @@ import { backdropOf } from '@/lib/backdrop';
 import { handOffBranch, takeBranchHandoff } from '@/lib/branch';
 import { Cast, Portraits } from '@/lib/character-colour';
 import { setChatView, useChatView } from '@/lib/chat-view';
-import { backgroundPending, Chat, chatApi, EditedChat, isOpening, latestReply, Message, MessagePart, rollbackNotice, TurnStream } from '@/lib/chat';
+import { backgroundPending, Chat, chatApi, EditedChat, isOpening, latestReply, Message, MessagePart, rollbackNotice, RollStat, signedStat, TurnStream } from '@/lib/chat';
 import { Memory, memoryApi, renderUser } from '@/lib/memory';
 import { setSceneStripHidden, useSceneStripHidden } from '@/lib/scene-strip';
 import { inThreadOrder, Snapshot, snapshotApi } from '@/lib/snapshot';
 import { useReplyCosts } from '@/lib/reply-cost';
-import { Scene, Story } from '@/lib/story';
+import { RoleStat, Scene, Story } from '@/lib/story';
 
 import { announce } from '@/components/announcer';
 import { COLUMN } from '@/components/chat/chat-classes';
@@ -120,9 +121,11 @@ interface ChatScreenProps {
     scenes: Scene[];
     /** The Story's Backdrop choice and Cover; null if the Story can't be read, which shows no Backdrop. */
     looks: Pick<Story, 'backdrop' | 'cover'> | null;
+    /** The Role's Stats (.scratch/judge-rolls/spec.md), for the Scene strip; empty without, or if the Story can't be read. */
+    stats?: readonly RoleStat[];
 }
 
-export function ChatScreen({ initial, cast, characters, portraits, scenes, looks }: ChatScreenProps) {
+export function ChatScreen({ initial, cast, characters, portraits, scenes, looks, stats = [] }: ChatScreenProps) {
     const { reportUnreachable } = useConnection();
     const router = useRouter();
     const [chat, setChat] = useState(initial);
@@ -165,6 +168,8 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
      * the app throws the dice. Gone on leaving, like the nudge and the Cue.
      */
     const [roll, setRoll] = useState(false);
+    /** The Stat of the Roll offer taken (.scratch/judge-rolls/spec.md), sent with the armed Roll; null when it was armed by hand. */
+    const [rollStat, setRollStat] = useState<RollStat | null>(null);
     /** Each tap on the Character row's "Who's here" opens the sheet in the top bar. */
     const [whoRequest, setWhoRequest] = useState(0);
     const [editing, setEditing] = useState<number | null>(null);
@@ -502,13 +507,16 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
         player.unlock();
         // The Roll rides on this send and no other; a send the API never stored arms it again with the draft.
         const rolled = roll;
+        const rolledStat = rolled ? rollStat : null;
         setRoll(false);
+        setRollStat(null);
         setPending({ text, identityName: chat.identityName, personaId: chat.personaId, roll: rolled });
         void runTurn(
-            (stream) => chatApi.send(chat.storyId, chat.id, text, stream, { nudge, cue, roll: rolled }),
+            (stream) => chatApi.send(chat.storyId, chat.id, text, stream, { nudge, cue, roll: rolled, rollStat: rolledStat?.name ?? null }),
             () => {
                 setDraft((current) => (current === '' ? typed : current));
                 if (rolled) setRoll(true);
+                if (rolled) setRollStat(rolledStat);
             },
         );
     };
@@ -700,6 +708,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                     place={chat.place}
                     weather={chat.weather}
                     outfits={chat.outfits}
+                    stats={stats}
                     scenes={scenes}
                     characters={characters}
                     factCount={chat.facts?.length ?? 0}
@@ -857,8 +866,31 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                 roll={roll}
                 onRoll={(next) => {
                     setRoll(next);
+                    // Armed by hand, the Roll adds no Stat; turned off, a pending offer shows again.
+                    setRollStat(null);
                     announce(next ? `The dice will decide your next message: ${chat.rollTarget} or more succeeds.` : 'Roll off.');
                 }}
+                rollStat={roll ? rollStat : null}
+                rollOfferBand={
+                    // The Judge's Roll offer (.scratch/judge-rolls/spec.md): gone once taken, while a reply is written, or with a failed turn.
+                    chat.rollOffer && !roll && !writing && !chat.awaitingReply ? (
+                        <RollOfferBand
+                            offer={chat.rollOffer}
+                            target={chat.rollTarget}
+                            busy={busy}
+                            onTake={() => {
+                                const offered = chat.rollOffer;
+                                if (!offered) return;
+                                setRoll(true);
+                                setRollStat(offered.stat);
+                                announce(
+                                    `The dice will decide your next message: ${chat.rollTarget} or more succeeds${offered.stat ? `, ${signedStat(offered.stat.bonus)} ${offered.stat.name}` : ''}.`,
+                                );
+                            }}
+                            onDismiss={() => void runWrite(() => chatApi.dismissRollOffer(chat.storyId, chat.id))}
+                        />
+                    ) : null
+                }
                 characterRow={(writingForMe) => (
                     <CharacterRow
                         characters={characters}

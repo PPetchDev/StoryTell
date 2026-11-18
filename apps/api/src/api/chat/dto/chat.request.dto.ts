@@ -93,6 +93,15 @@ export class SendMessageRequestBodyDTO extends TurnRequestBodyDTO {
     @IsOptional()
     @IsBoolean()
     roll?: boolean;
+
+    @ApiPropertyOptional({
+        description:
+            "Optional, with `roll: true`: the Role's Stat the Roll is made for, by name ignoring case (.scratch/judge-rolls/spec.md); its number adds to the throw. A name the Role doesn't have makes a Roll without a Stat. Ignored without a Roll.",
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(100)
+    rollStat?: string;
 }
 
 export class EditMessageRequestBodyDTO extends TurnRequestBodyDTO {

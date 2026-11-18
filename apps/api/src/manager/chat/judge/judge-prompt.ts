@@ -11,6 +11,7 @@ import { ENDING_EXTRA_TOKENS, JudgedEnding, readJudgedEnding } from '../ending/e
 import { FACTS_EXTRA_TOKENS, JudgedFacts, readJudgedFacts } from '../details/facts.js';
 import { JudgedNow, NOW_EXTRA_TOKENS, readJudgedNow } from '../details/now-notes.js';
 import { ReplyPart } from '../turn/reply-parser.js';
+import { JudgedRollOffer, readJudgedRollOffer, ROLL_OFFER_EXTRA_TOKENS } from '../roll-offer/roll-offer.js';
 
 /**
  * The Bond, Arc, Scene and Time of day judge's prompt and output (spec: "Background judge"), from the turn
@@ -259,7 +260,7 @@ export function numberedReplyText(parts: ReplyPart[]): string {
         .join('\n\n');
 }
 
-export function buildJudgePrompt(input: JudgePromptInput): { messages: PromptMessage[]; maxTokens: number } {
+function buildJudgePromptCore(input: JudgePromptInput): { messages: PromptMessage[]; maxTokens: number } {
     const cast = input.cast
         .map(
             (member) =>
@@ -386,7 +387,7 @@ const isObject = (value: unknown): value is Record<string, unknown> => typeof va
 const list = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
 
 /** Reads the judge's JSON. Throws `UnparseableOutputError` when there is no JSON object to read. */
-export function parseJudgement(text: string): Judgement {
+function parseJudgementCore(text: string): Judgement {
     const match = text.match(/\{[\s\S]*\}/);
     if (!match) throw new UnparseableOutputError('The judge wrote no JSON object.');
     let json: unknown;
@@ -460,4 +461,51 @@ function detailsWithGoals(details: unknown, goals: unknown): unknown {
     if (!Array.isArray(goals)) return details;
     const base = typeof details === 'object' && details !== null && !Array.isArray(details) ? (details as Record<string, unknown>) : {};
     return { ...base, goals: [...(Array.isArray(base.goals) ? base.goals : []), ...goals] };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Roll offers (.scratch/judge-rolls/spec.md). Kept in a section of their own: the prompt and the
+// judgement are built as before, then the offer's section, shape, tokens and field are added here.
+// ---------------------------------------------------------------------------------------------
+
+/** What a judgement asking about a Roll offer adds to the prompt's input. */
+export interface RollOfferJudgeInput {
+    /**
+     * The "# Roll offer" section (`judgeRollOfferSection`), sent only when an offer is allowed for
+     * this reply. It goes last. Null or left out: no section, and the user message is as before.
+     */
+    rollOfferSection?: string | null;
+}
+
+/**
+ * The reply shape with `"roll_offer":null`, on the system message sent with the facts section:
+ * every judgement on live, whether or not an offer is allowed, so the system message stays the same
+ * from call to call. As with `withFactsShape`, a field the user message alone asks for is not
+ * returned by DeepSeek V4 Flash. Null in the shape, not an example, so the default is no offer.
+ */
+function withRollOfferShape(system: string): string {
+    return system.replace(/\}\nEmpty arrays when nothing changed\.$/, ',\n "roll_offer":null}\nEmpty arrays when nothing changed.');
+}
+const ROLL_OFFER_SYSTEMS = new Map([SYSTEM_WITH_FACTS, SYSTEM_WITH_EXPRESSIONS_AND_FACTS].map((system) => [system, withRollOfferShape(system)]));
+if ([...ROLL_OFFER_SYSTEMS].some(([before, after]) => before === after)) throw new Error('judge prompt: the reply shape no longer ends as expected');
+
+export function buildJudgePrompt(input: JudgePromptInput & RollOfferJudgeInput): { messages: PromptMessage[]; maxTokens: number } {
+    const prompt = buildJudgePromptCore(input);
+    const section = input.rollOfferSection?.trim();
+    return {
+        messages: prompt.messages.map((message) => {
+            if (message.role === 'system') return { ...message, content: ROLL_OFFER_SYSTEMS.get(message.content) ?? message.content };
+            return section && message.role === 'user' ? { ...message, content: `${message.content}\n\n${section}` } : message;
+        }),
+        maxTokens: prompt.maxTokens + (section ? ROLL_OFFER_EXTRA_TOKENS : 0),
+    };
+}
+
+/** The judgement with the Roll offer it gave, if any; read loosely, so anything else is none. */
+export function parseJudgement(text: string): Judgement & { rollOffer?: JudgedRollOffer | null } {
+    const judgement = parseJudgementCore(text);
+    // The core has already read the JSON, so this match parses.
+    const json = JSON.parse(text.match(/\{[\s\S]*\}/)![0]) as Record<string, unknown>;
+    const rollOffer = readJudgedRollOffer(json.roll_offer);
+    return rollOffer ? { ...judgement, rollOffer } : judgement;
 }

@@ -229,3 +229,10 @@ export class InvalidOpeningQuestionsError extends AppError {
         super('422.003.040', `Those Opening questions can't be saved: ${reason}`);
     }
 }
+
+/** A Role's Stats that break a rule (.scratch/judge-rolls/spec.md): too many, a bad name, a repeat, or a number out of range. */
+export class InvalidStatsError extends AppError {
+    constructor(reason: string) {
+        super('422.003.041', reason);
+    }
+}

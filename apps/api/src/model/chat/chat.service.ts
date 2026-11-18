@@ -170,7 +170,7 @@ export class ChatModelService {
         position: number,
         text: string,
         identity: StampedIdentity,
-        roll: { value: number; target: number } | null = null,
+        roll: { value: number; target: number; stat?: { name: string; bonus: number } | null } | null = null,
     ): Promise<MessageEntity> {
         return this.messages.save(
             this.messages.create({
@@ -182,8 +182,16 @@ export class ChatModelService {
                 personaId: identity.personaId,
                 roll: roll?.value ?? null,
                 rollTarget: roll?.target ?? null,
+                rollStat: roll?.stat?.name ?? null,
+                rollBonus: roll?.stat?.bonus ?? null,
             }),
         );
+    }
+
+    /** Marks a Roll offer dismissed (.scratch/judge-rolls/spec.md); it still counts for the gap. */
+    async dismissRollOffer(message: MessageEntity): Promise<void> {
+        if (!message.rollOffer || message.rollOffer.dismissed) return;
+        await this.messages.update({ id: message.id }, { rollOffer: { ...message.rollOffer, dismissed: true } });
     }
 
     /** Swaps the worn identity: a Persona's id, or null for the Story's Role. */
