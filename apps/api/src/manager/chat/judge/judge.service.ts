@@ -27,6 +27,7 @@ import { partsToText } from '../turn/reply-parser.js';
 import { applyJudgement, emotionsOfParts } from './apply-judgement.js';
 import { buildJudgePrompt, JUDGE_CONTEXT_MESSAGES, parseJudgement } from './judge-prompt.js';
 import { applyRollOffer, judgeRollOfferSection, rollOfferAllowed } from '../roll-offer/roll-offer.js';
+import { StageManagerService } from '../stage/stage.service.js';
 import { applySecretReveals, hasLevelledSecret, judgeSecretsSection, secretsState, storySecrets } from '../secrets/secrets.js';
 
 /** What a send found when it looked at the previous AI Message's judge. */
@@ -74,6 +75,7 @@ export class JudgeManagerService {
         private readonly ledger: LedgerModelService,
         private readonly gateway: ModelGateway,
         private readonly config: AppConfig,
+        private readonly stage: StageManagerService,
     ) {
         this.runs = new BackgroundRuns(config.backgroundRetryMs);
     }
@@ -319,6 +321,8 @@ export class JudgeManagerService {
             // Expressions the parts are not touched, so the record is exactly as before.
             const emotions = tagLines ? emotionsOfParts(message.parts, judgement.expressions) : undefined;
             await this.ledger.record(chat.id, message.id, { ...applied, suddenEvent: stepped.step, details: [...detailed.changes, ...facted.changes, ...noted.changes, ...itemed.changes], ending: ended.reached, ...(emotions ? { emotions } : {}), ...(proposed.event ? { newEvent: proposed.event } : {}), rollOffer: offered.offer, ...(revealed.reveals.length > 0 ? { secretReveals: revealed.reveals } : {}) });
+            // The place, light, outfits and line emotions are settled: dress the stage (.scratch/dressed-stage/spec.md).
+            this.stage.dress(story.id, chat.id);
             return { ok: true };
         } catch (error) {
             const reason = error instanceof AppError ? error.message : `Unexpected error: ${String(error)}`;

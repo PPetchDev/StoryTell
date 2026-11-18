@@ -68,6 +68,8 @@ export enum Backdrop {
     None = 'none',
     Cover = 'cover',
     Snapshot = 'snapshot',
+    /** The place the Chat is in, drawn with no one in it (.scratch/dressed-stage/spec.md); the Cover until it is drawn. */
+    Place = 'place',
 }
 
 /** The point of a Cover kept in view when it is cropped, in fractions of the picture's width and height. */

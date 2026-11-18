@@ -411,7 +411,7 @@ export class RealModelGateway extends ModelGateway {
         const modelName = imageModelForKind(request.kind, settings.imageModel, referenceCount);
         const model = IMAGE_MODELS[modelName];
         // Reference images ask for 2K, Expressions for 1K (their price in the editor), Snapshots for the Settings size.
-        const wanted = request.kind === 'reference_image' ? '2K' : request.kind === 'expression_image' ? '1K' : settings.snapshotSize;
+        const wanted = request.kind === 'reference_image' ? '2K' : request.kind === 'snapshot_image' ? settings.snapshotSize : '1K';
         const size = drawnSize(model, wanted);
 
         const image = await this.deps.venice.generate({

@@ -151,6 +151,14 @@ export class ChatEntity {
     autoDiary: boolean;
 
     /**
+     * Whether the stage is dressed as the story goes (.scratch/dressed-stage/spec.md): places drawn
+     * as the Chat reaches them, and the Characters drawn in the outfits it has them in. Off by
+     * default, since it draws on the Venice pool; a Branch copies it, Reset keeps it.
+     */
+    @Column({ name: 'dress_stage', type: 'boolean', default: false })
+    dressStage: boolean;
+
+    /**
      * Whether each Character thinks on their own before a reply (.scratch/character-minds/spec.md).
      * On by default; the user turns it off or on, a Branch copies it, Reset keeps it.
      */

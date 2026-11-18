@@ -811,7 +811,7 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                         label="Chat backdrop"
                                         value={story.backdrop}
                                         options={BACKDROP_LABELS}
-                                        hint="Dimmed behind the Messages. Snapshot is the Chat's newest; without one yet, the Cover shows."
+                                        hint="Dimmed behind the Messages. Snapshot is the Chat's newest; Place is where the Chat is, drawn when its stage is dressed. Without one yet, the Cover shows."
                                         onChange={setBackdrop}
                                     />
                                 </section>

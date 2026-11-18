@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { DocumentModelModule } from '../../model/document/document.module.js';
+import { StageModelModule } from '../../model/stage/stage.module.js';
 import { ChatModelModule } from '../../model/chat/chat.module.js';
 import { LedgerModelModule } from '../../model/ledger/ledger.module.js';
 import { SnapshotModelModule } from '../../model/snapshot/snapshot.module.js';
@@ -12,7 +13,7 @@ import { StoryManagerService } from './story.service.js';
 import { CharacterSecretsManagerService } from './character-secrets.service.js';
 
 @Module({
-    imports: [StoryModelModule, DocumentModelModule, ChatModelModule, LedgerModelModule, SnapshotModelModule, ImageStoreModule, ReadAloudManagerModule, VoiceManagerModule],
+    imports: [StageModelModule, StoryModelModule, DocumentModelModule, ChatModelModule, LedgerModelModule, SnapshotModelModule, ImageStoreModule, ReadAloudManagerModule, VoiceManagerModule],
     providers: [StoryManagerService, CharacterSecretsManagerService],
     exports: [StoryManagerService, CharacterSecretsManagerService],
 })

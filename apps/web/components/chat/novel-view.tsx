@@ -12,8 +12,9 @@ import { CameraIcon, ChevronLeftIcon, ChevronRightIcon, PencilIcon, PlayIcon, Un
 import { initialOf } from '@/components/portrait/character-portrait';
 import { snapshotAlt } from '@/components/snapshot/snapshot-viewer';
 import { Cast, characterColour } from '@/lib/character-colour';
-import { isOpening, Message, MessagePart } from '@/lib/chat';
-import { linePicture } from '@/lib/expressions';
+import { ChatStage, isOpening, Message, MessagePart } from '@/lib/chat';
+import { linePicture, outfitPicture } from '@/lib/expressions';
+import { referenceImageUrl } from '@/lib/story';
 import { firstStepOf, isLive, novelSteps, NovelStep, openingStep, readingStep, stepIndex } from '@/lib/novel-steps';
 import { ChatSnapshots, Snapshot, snapshotImageUrl } from '@/lib/snapshot';
 import type { SpeechItem } from '@/lib/read-aloud';
@@ -72,6 +73,8 @@ interface NovelViewProps {
     onOpenSnapshot(snapshot: Snapshot): void;
     /** The Message of the step on show, so switching to the thread can scroll to it. */
     onPosition(messageId: number | null): void;
+    /** The dressed stage (.scratch/dressed-stage/spec.md): the place behind, and the outfits; null with it off. */
+    stage?: ChatStage | null;
 }
 
 /** Taps on these do their own thing and never step. */
@@ -310,7 +313,29 @@ export function NovelView(props: NovelViewProps) {
                     </>
                 ) : (
                     <>
-                        <div className="relative flex min-h-0 flex-1 items-end justify-center">{step?.kind === 'speech' && <SpeakerPicture key={step.key} step={step} cast={props.cast} />}</div>
+                        <div className="relative flex min-h-0 flex-1 items-end justify-center">
+                            {props.stage?.placePicturePath && (
+                                // The place, drawn with no one in it, behind whoever speaks (.scratch/dressed-stage/spec.md).
+                                // eslint-disable-next-line @next/next/no-img-element -- served by the API from the image folder
+                                <img
+                                    key={props.stage.placePicturePath}
+                                    className="pointer-events-none absolute inset-0 size-full object-cover motion-safe:animate-fade-in"
+                                    src={referenceImageUrl(props.stage.placePicturePath)}
+                                    alt=""
+                                    aria-hidden="true"
+                                    data-stage-place=""
+                                    draggable={false}
+                                />
+                            )}
+                            {step?.kind === 'speech' && (
+                                <SpeakerPicture
+                                    key={step.key}
+                                    step={step}
+                                    cast={props.cast}
+                                    sprites={props.stage?.outfits.find((outfit) => outfit.characterId === step.characterId)?.sprites}
+                                />
+                            )}
+                        </div>
                         {step && (
                             <div className="mt-2 flex max-h-[40%] min-h-0 cursor-auto flex-col gap-1.5 rounded-xl border border-line bg-surface px-3.5 pt-3 pb-2 select-text lg:max-h-[30%]">
                                 {/* Quiet while the words on show are still streaming in, so a screen reader isn't read every piece (audit M24). */}
@@ -349,10 +374,11 @@ export function NovelView(props: NovelViewProps) {
 }
 
 /** The large picture of a speech step: the whole Expression or Reference image, else a large initial on their colour. */
-function SpeakerPicture({ step, cast }: { step: Extract<NovelStep, { kind: 'speech' }>; cast: Cast }) {
+function SpeakerPicture({ step, cast, sprites }: { step: Extract<NovelStep, { kind: 'speech' }>; cast: Cast; sprites?: ChatStage['outfits'][number]['sprites'] }) {
     const character = useCastCharacter(step.characterId);
     const openProfile = useCharacterProfile(step.characterId);
-    const { whole, cutout } = linePicture(character, step.emotion);
+    // The outfit the Chat has them in, when the stage is dressed; else their Expressions.
+    const { whole, cutout } = outfitPicture(sprites, step.emotion) ?? linePicture(character, step.emotion);
     const colour = characterColour(step.characterId, cast);
     if (whole && cutout) {
         // A cut-out (.scratch/stage-pictures/spec.md): the figure alone, standing on the Backdrop from

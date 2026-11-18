@@ -60,6 +60,7 @@ import { UsageCachedTokens1764295000000 } from './1764295000000-UsageCachedToken
 import { GrowingCards1764310000000 } from './1764310000000-GrowingCards.js';
 import { SecretReveals1764450000010 } from './1764450000010-SecretReveals.js';
 import { StagePictures1764460000000 } from './1764460000000-StagePictures.js';
+import { DressedStage1764470000000 } from './1764470000000-DressedStage.js';
 import { UsageMessage1764330000000 } from './1764330000000-UsageMessage.js';
 import { MessageBookmarks1764340000000 } from './1764340000000-MessageBookmarks.js';
 import { PushSubscriptions1764350000000 } from './1764350000000-PushSubscriptions.js';
@@ -149,4 +150,5 @@ export const migrations = [
     StoryItems1764440000010,
     SecretReveals1764450000010,
     StagePictures1764460000000,
+    DressedStage1764470000000,
 ];

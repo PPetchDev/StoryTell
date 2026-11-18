@@ -116,3 +116,20 @@ function expressionFor(character: PictureSource, emotion: ExpressionEmotion): Ex
     const everyday = EVERYDAY_FALLBACK[emotion as IntimateEmotion];
     return character.expressions.find((one) => one.emotion === everyday);
 }
+
+/**
+ * The dressed stage's picture of a line (.scratch/dressed-stage/spec.md): the sprite of the outfit
+ * the Chat has the Character in, for the line's emotion; for an intimate one without it, its nearest
+ * everyday one; else the outfit's plain drawing. Null when the Character has no outfit drawn.
+ */
+export function outfitPicture(
+    sprites: readonly { emotion: string; imagePath: string; cutOut: boolean }[] | undefined,
+    emotion: Emotion | null | undefined,
+): { whole: string; cutout: boolean } | null {
+    if (!sprites || sprites.length === 0) return null;
+    const find = (wanted: string) => sprites.find((sprite) => sprite.emotion === wanted);
+    const wanted = emotion && emotion !== 'neutral' ? emotion : null;
+    const sprite =
+        (wanted && find(wanted)) || (wanted && wanted in EVERYDAY_FALLBACK ? find(EVERYDAY_FALLBACK[wanted as IntimateEmotion]) : undefined) || find('neutral');
+    return sprite ? { whole: referenceImageUrl(sprite.imagePath), cutout: sprite.cutOut } : null;
+}

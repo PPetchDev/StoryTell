@@ -29,10 +29,13 @@ import { ThaiReadingManagerService } from './thai-reading/thai-reading.service.j
 import { StorySoFarManagerService } from './story-so-far/story-so-far.service.js';
 import { ChaptersManagerService } from './chapters/chapters.service.js';
 import { ChatTranscriptManagerService } from './transcript.service.js';
+import { StageManagerService } from './stage/stage.service.js';
+import { StageModelModule } from '../../model/stage/stage.module.js';
+import { ImageStoreModule } from '../../store/image/image-store.module.js';
 
 @Module({
-    imports: [ChatModelModule, BranchModelModule, StoryModelModule, SettingsModelModule, LedgerModelModule, MemoryModelModule, PersonaModelModule, SnapshotModelModule, DocumentModelModule, SavedReplyModelModule, ReplaceRuleModelModule, ReadAloudManagerModule, UsageRecordModelModule],
-    providers: [ChatManagerService, DocumentSearchManagerService, JudgeManagerService, BeliefManagerService, MemoryEmbeddingManagerService, MemoryExtractionManagerService, MemoryManagerService, SuggestedRepliesManagerService, WriteForMeManagerService, ThaiReadingManagerService, DiaryManagerService, ThoughtsManagerService, SpeechRepairManagerService, StorySoFarManagerService, ChaptersManagerService, ChatTranscriptManagerService],
+    imports: [ChatModelModule, BranchModelModule, StoryModelModule, SettingsModelModule, LedgerModelModule, MemoryModelModule, PersonaModelModule, SnapshotModelModule, DocumentModelModule, SavedReplyModelModule, ReplaceRuleModelModule, ReadAloudManagerModule, UsageRecordModelModule, StageModelModule, ImageStoreModule],
+    providers: [ChatManagerService, DocumentSearchManagerService, JudgeManagerService, BeliefManagerService, MemoryEmbeddingManagerService, MemoryExtractionManagerService, MemoryManagerService, SuggestedRepliesManagerService, WriteForMeManagerService, ThaiReadingManagerService, DiaryManagerService, ThoughtsManagerService, SpeechRepairManagerService, StorySoFarManagerService, ChaptersManagerService, ChatTranscriptManagerService, StageManagerService],
     exports: [ChatManagerService, MemoryManagerService, BeliefManagerService, StorySoFarManagerService, ChaptersManagerService, ChatTranscriptManagerService],
 })
 export class ChatManagerModule {}

@@ -82,6 +82,8 @@ export type CallKind =
     | 'reference_image'
     | 'expression_image'
     | 'image_cutout'
+    | 'place_picture'
+    | 'outfit_sprite'
     | 'document_embedding'
     | 'document_search'
     | 'memory_embedding'
@@ -115,6 +117,8 @@ export const CALL_KIND_LABEL: Record<CallKind, string> = {
     reference_image: 'Reference images',
     expression_image: 'Expression pictures',
     image_cutout: 'Picture cut-outs',
+    place_picture: 'Place pictures',
+    outfit_sprite: 'Outfit pictures',
     document_embedding: 'Document adding',
     document_search: 'Document search',
     memory_embedding: 'Memory embedding',

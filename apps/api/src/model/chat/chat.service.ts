@@ -225,6 +225,10 @@ export class ChatModelService {
         await this.chats.update({ id: chatId }, { autoDiary });
     }
 
+    async setDressStage(chatId: number, dressStage: boolean): Promise<void> {
+        await this.chats.update({ id: chatId }, { dressStage });
+    }
+
     /** Whether the Judge may suggest an Ending in this Chat (.scratch/endings/spec.md). */
     async setEndingSuggestions(chatId: number, endingSuggestions: boolean): Promise<void> {
         await this.chats.update({ id: chatId }, { endingSuggestions });

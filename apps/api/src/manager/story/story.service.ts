@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
+import { StageModelService } from '../../model/stage/stage.service.js';
 
 import {
     CastFullError,
@@ -283,6 +284,7 @@ export class StoryManagerService {
         private readonly documentModel: DocumentModelService,
         private readonly voices: VoiceManagerService,
         private readonly readAloud: ReadAloudManagerService,
+        private readonly stageModel: StageModelService,
     ) {}
 
     async listStories(): Promise<StoryListItem[]> {
@@ -447,6 +449,8 @@ export class StoryManagerService {
         const story = await this.load(storyId);
         // Read before the delete: the Gallery's records go with the Story through CASCADE.
         const galleryFiles = await this.snapshotModel.imagePathsByStory(storyId);
+        // Its place pictures and its Chats' outfit pictures (.scratch/dressed-stage/spec.md).
+        const stageFiles = await this.stageModel.storyFiles(storyId);
         await this.storyModel.deleteStory(storyId);
         // Its Documents went with it through CASCADE; their passages leave memory too.
         this.documentModel.forget(storyId);
@@ -455,6 +459,7 @@ export class StoryManagerService {
             await this.removeExpressionFiles(character);
         }
         for (const imagePath of galleryFiles) await this.removeFile(imagePath);
+        for (const imagePath of stageFiles) await this.removeFile(imagePath);
         if (story.coverImagePath) await this.removeFile(story.coverImagePath);
         // Its Messages went with it through CASCADE; their Read aloud audio goes too.
         await this.readAloud.sweep();

@@ -412,6 +412,8 @@ interface ChatTopBarProps {
     onSetEndingSuggestions(on: boolean): void;
     /** Turns the Characters' own Diary entries on or off in this Chat. */
     onSetAutoDiary(on: boolean): void;
+    /** Dresses the stage as the story goes, or stops (.scratch/dressed-stage/spec.md). */
+    onSetDressStage(on: boolean): void;
     /** Turns the Characters' Thoughts before each reply on or off in this Chat. */
     onSetCharacterThoughts(on: boolean): void;
     onReset(): void;
@@ -460,6 +462,7 @@ export function ChatTopBar({
     onSetAutoRead,
     onSetEndingSuggestions,
     onSetAutoDiary,
+    onSetDressStage,
     onSetCharacterThoughts,
     onReset,
     onEndStory,
@@ -768,6 +771,22 @@ export function ChatTopBar({
                                 <MenuButton onClick={() => setMenu('reach')} title={reachOutSummary(reachOutHours)}>
                                     <MenuText label="Characters message first" sub={reachOutSummary(reachOutHours)} />
                                 </MenuButton>
+                                {/* The stage follows the story (.scratch/dressed-stage/spec.md): off by default, since it draws. */}
+                                <button
+                                    type="button"
+                                    role="switch"
+                                    aria-checked={chat.dressStage ?? false}
+                                    className={`${ITEM} flex-row items-center gap-3 text-text`}
+                                    disabled={busy}
+                                    onClick={() => onSetDressStage(!(chat.dressStage ?? false))}
+                                >
+                                    <span className="flex min-w-0 flex-1 flex-col items-start">
+                                        <MenuText label="Dress the stage" sub="Draws places and outfits as they change · up to $1 a day" />
+                                    </span>
+                                    <span aria-hidden="true" className={SWITCH_TRACK}>
+                                        <span className={SWITCH_KNOB} />
+                                    </span>
+                                </button>
                             </section>
                             <div className="border-t border-line pt-1">
                                 {/* .scratch/watch-mode/spec.md: the story plays on by itself for a few replies. */}

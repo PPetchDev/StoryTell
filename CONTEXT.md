@@ -174,7 +174,7 @@ Playing an AI Message as speech: narration in the Story's Narration voice and ea
 _Avoid_: TTS, narrate, voice playback
 
 **Backdrop**:
-The dimmed picture behind a Chat's Messages: the Story's Cover or the Chat's newest Snapshot.
+The dimmed picture behind a Chat's Messages: the Story's Cover, the Chat's newest Snapshot, or the place the Chat is in when its stage is dressed.
 _Avoid_: Background, wallpaper
 
 **Visual novel view**:
@@ -300,6 +300,10 @@ _Avoid_: Avatar, profile picture, icon
 **Expression**:
 A Character's picture for one emotion, drawn from their Reference image or uploaded by the author. When a line of theirs carries that emotion it shows in place of their Portrait; without one, the Portrait shows as usual. Six of the thirteen emotions belong to intimate scenes between adults; a line with one of those and no picture for it shows the nearest everyday Expression.
 _Avoid_: Sprite, emote, mood picture
+
+**Dressed stage**:
+A Chat whose novel view follows the story: the place it is in drawn with no one in it behind the stage, and each Character drawn in the outfit the story has them in, for the feelings their lines show. Off until the user turns it on; it draws only what is needed, at most a dollar's worth a day.
+_Avoid_: Dynamic backgrounds, auto-sprites
 
 **Cut-out**:
 An Expression or Reference image with its background taken away, so the Character stands on the Backdrop in the Visual novel view. A drawn Expression is cut out by itself; an uploaded one when the author asks.

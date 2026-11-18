@@ -74,7 +74,7 @@ test('the Chat backdrop on the Style tab: None by default; Cover shows the Cover
         await page.getByRole('tab', { name: 'Style' }).tap();
         const choice = page.getByRole('radiogroup', { name: 'Chat backdrop' });
         await expect(choice.getByRole('radio', { name: 'None' })).toHaveAttribute('aria-checked', 'true');
-        await expect(page.getByText("Dimmed behind the Messages. Snapshot is the Chat's newest; without one yet, the Cover shows.")).toBeVisible();
+        await expect(page.getByText("Dimmed behind the Messages. Snapshot is the Chat's newest; Place is where the Chat is, drawn when its stage is dressed. Without one yet, the Cover shows.")).toBeVisible();
         await page.goto(`/stories/${storyId}/chats/${chatId}`);
         await expect(page.getByRole('article', { name: 'Opening' })).toContainText('Boots off, keeper.');
         await expect(backdrop(page)).toHaveCount(0);

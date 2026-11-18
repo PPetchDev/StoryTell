@@ -349,13 +349,15 @@ test.describe('Read replies aloud', () => {
         const at = labels.findIndex((label) => label.startsWith('Read replies aloud'));
         expect(labels[at - 1]).toMatch(/^Who's in this Chat/);
         expect(
-            labels.slice(at + 1).map((label) => label.replace(/^(Suggest an ending|Characters keep diaries|Characters think for themselves|Characters message first|Watch the story|End the story|Reset Chat).*$/, '$1')),
+            labels.slice(at + 1).map((label) => label.replace(/^(Suggest an ending|Characters keep diaries|Characters think for themselves|Characters message first|Dress the stage|Watch the story|End the story|Reset Chat).*$/, '$1')),
         ).toEqual([
             'Suggest an ending',
             'Characters keep diaries',
             'Characters think for themselves',
             // .scratch/reach-outs/spec.md
             'Characters message first',
+            // .scratch/dressed-stage/spec.md
+            'Dress the stage',
             'Watch the story',
             'End the story',
             'Reset Chat',

@@ -53,6 +53,14 @@ export class UpdateChatRequestBodyDTO implements ChatFields {
     @IsBoolean()
     autoDiary?: boolean;
 
+    @ApiPropertyOptional({
+        description:
+            'Whether the stage is dressed as the story goes: places drawn as the Chat reaches them, and the Characters in the outfits it has them in (.scratch/dressed-stage/spec.md). Off by default.',
+    })
+    @IsOptional()
+    @IsBoolean()
+    dressStage?: boolean;
+
     @ApiPropertyOptional({ description: 'Whether each Character thinks on their own before a reply. Off, no Thoughts are asked for.' })
     @IsOptional()
     @IsBoolean()

@@ -220,6 +220,10 @@ export interface Chat extends ChatSummary {
     endingSuggestions: boolean | null;
     /** Whether the Characters write Diary entries by themselves as the story goes (.scratch/diary/spec.md). */
     autoDiary: boolean;
+    /** Whether the stage is dressed as the story goes (.scratch/dressed-stage/spec.md). Off by default. */
+    dressStage?: boolean;
+    /** What the dressed stage shows now; null (or left out) with the switch off. */
+    stage?: ChatStage | null;
     /** Whether each Character thinks on their own before a reply (.scratch/character-minds/spec.md). */
     characterThoughts: boolean;
     /** What each Character is after now, for those who are after something (.scratch/character-minds/spec.md). */
@@ -560,6 +564,8 @@ export const chatApi = {
         apiSend<Chat>('PATCH', `/stories/${storyId}/chats/${chatId}`, { characterThoughts }),
     /** Whether the Characters write Diary entries by themselves in this Chat. */
     setAutoDiary: (storyId: number, chatId: number, autoDiary: boolean) => apiSend<Chat>('PATCH', `/stories/${storyId}/chats/${chatId}`, { autoDiary }),
+    /** Dresses the stage as the story goes, or stops (.scratch/dressed-stage/spec.md). */
+    setDressStage: (storyId: number, chatId: number, dressStage: boolean) => apiSend<Chat>('PATCH', `/stories/${storyId}/chats/${chatId}`, { dressStage }),
     /** Sets the Author's note, read from the next turn on; an empty text clears it. */
     setAuthorsNote: (storyId: number, chatId: number, text: string) =>
         apiSend<Chat>('PUT', `/stories/${storyId}/chats/${chatId}/authors-note`, { text }),
@@ -722,4 +728,23 @@ export function messageText(message: Message): string {
 
 export function formatWhen(iso: string): string {
     return new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+/** One drawn emotion of a Character's outfit on the dressed stage (.scratch/dressed-stage/spec.md). */
+export interface StageSprite {
+    /** "neutral" for the plain drawing, else an Expression emotion. */
+    emotion: string;
+    imagePath: string;
+    /** A cut-out, to stand on the stage; false when the cut-out failed. */
+    cutOut: boolean;
+}
+
+/** What the dressed stage shows now (.scratch/dressed-stage/spec.md). */
+export interface ChatStage {
+    /** The place the Chat is in, drawn with no one in it; null for none yet. */
+    placePicturePath: string | null;
+    /** Each Character in an outfit drawn for this Chat, with its drawn emotions. */
+    outfits: { characterId: number; sprites: StageSprite[] }[];
+    /** How many drawings are under way. */
+    drawing: number;
 }

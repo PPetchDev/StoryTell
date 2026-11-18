@@ -30,6 +30,8 @@ export const CALL_KINDS = Object.keys({
     reference_image: true,
     expression_image: true,
     image_cutout: true,
+    place_picture: true,
+    outfit_sprite: true,
     document_embedding: true,
     document_search: true,
     memory_embedding: true,

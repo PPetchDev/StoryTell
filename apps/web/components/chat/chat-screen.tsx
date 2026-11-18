@@ -238,7 +238,8 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
 
     // While the last reply's background calls run, re-read the Chat until they settle.
     useEffect(() => {
-        if (!backgroundPending(chat)) return;
+        // So does a dressed stage still drawing (.scratch/dressed-stage/spec.md).
+        if (!backgroundPending(chat) && !((chat.stage?.drawing ?? 0) > 0)) return;
         const timer = setTimeout(() => {
             apiFetch<Chat>(`/stories/${chat.storyId}/chats/${chat.id}`).then(setChat, (caught: unknown) => {
                 if (caught instanceof ApiUnreachableError) reportUnreachable();
@@ -655,7 +656,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
         });
 
     // The Backdrop follows the thread: a new Snapshot, or one an edit or Reset took away, changes it.
-    const backdrop = looks ? backdropOf(looks, snaps.state.snapshots, chat.messages) : null;
+    const backdrop = looks ? backdropOf(looks, snaps.state.snapshots, chat.messages, chat.stage?.placePicturePath ?? null) : null;
 
     const failedJobs = snaps.state.jobs.filter((job) => job.status === 'failed');
 
@@ -707,6 +708,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                 onSetAutoRead={(autoRead) => void runWrite(() => chatApi.setAutoRead(chat.storyId, chat.id, autoRead))}
                 onSetEndingSuggestions={(on) => void runWrite(() => chatApi.setEndingSuggestions(chat.storyId, chat.id, on))}
                 onSetAutoDiary={(on) => void runWrite(() => chatApi.setAutoDiary(chat.storyId, chat.id, on))}
+                onSetDressStage={(on) => void runWrite(() => chatApi.setDressStage(chat.storyId, chat.id, on))}
                 onSetCharacterThoughts={(on) => void runWrite(() => chatApi.setCharacterThoughts(chat.storyId, chat.id, on))}
                 onSetSittingOut={(characterIds) =>
                     void runWrite(() => chatApi.setSittingOut(chat.storyId, chat.id, characterIds))
@@ -861,6 +863,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                     }}
                     onOpenSnapshot={setViewing}
                     onPosition={onNovelPosition}
+                    stage={chat.stage ?? null}
                 />
             ) : (
             <ChatThread

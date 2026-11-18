@@ -290,6 +290,42 @@ export class ChatEventProposalDTO implements EventProposalView {
     reason: string;
 }
 
+/** One drawn emotion of a Character's outfit (.scratch/dressed-stage/spec.md). */
+export class StageSpriteDTO {
+    @ApiProperty({ description: '"neutral" for the plain drawing, else an Expression emotion.' })
+    emotion: string;
+
+    @ApiProperty({ description: 'Relative to the image folder, served at `GET /api/images/{path}`.' })
+    imagePath: string;
+
+    @ApiProperty({ description: 'Whether it is a cut-out, to stand on the stage; false when the cut-out failed.' })
+    cutOut: boolean;
+}
+
+export class StageOutfitDTO {
+    @ApiProperty()
+    characterId: number;
+
+    @ApiProperty({ type: [StageSpriteDTO] })
+    sprites: StageSpriteDTO[];
+}
+
+/** What the dressed stage shows now (.scratch/dressed-stage/spec.md). */
+export class ChatStageDTO {
+    @ApiProperty({
+        type: String,
+        nullable: true,
+        description: 'The place the Chat is in, drawn with no one in it, in its light (or another until that is drawn); null for none yet.',
+    })
+    placePicturePath: string | null;
+
+    @ApiProperty({ type: [StageOutfitDTO], description: 'Each Character in an outfit drawn for this Chat, with its drawn emotions.' })
+    outfits: StageOutfitDTO[];
+
+    @ApiProperty({ description: 'How many drawings are under way.' })
+    drawing: number;
+}
+
 /** What one Character is wearing now in the Chat (.scratch/info-box/spec.md). */
 export class ChatOutfitDTO {
     @ApiProperty()
@@ -528,6 +564,12 @@ export class ChatResponseBodyDTO extends ChatSummaryDTO implements Omit<ChatDeta
 
     @ApiProperty({ description: 'Whether the Characters write Diary entries by themselves as the story goes. On by default.' })
     autoDiary: boolean;
+
+    @ApiProperty({ description: 'Whether the stage is dressed as the story goes (.scratch/dressed-stage/spec.md). Off by default.' })
+    dressStage: boolean;
+
+    @ApiProperty({ type: ChatStageDTO, nullable: true, description: 'What the dressed stage shows now; null with the switch off.' })
+    stage: ChatStageDTO | null;
 
     @ApiProperty({ description: 'Whether each Character thinks on their own before a reply. On by default.' })
     characterThoughts: boolean;

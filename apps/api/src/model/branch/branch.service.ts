@@ -95,6 +95,7 @@ async function copyChat(manager: EntityManager, sourceChatId: number, through: n
         // Whether the user waved suggested Endings away (.scratch/endings/spec.md): the Branch keeps their choice.
         endingSuggestions: source.endingSuggestions,
         autoDiary: source.autoDiary,
+        dressStage: source.dressStage,
         characterThoughts: source.characterThoughts,
         // What the user answered when the Chat began (.scratch/opening-questions/spec.md).
         openingAnswers: source.openingAnswers,

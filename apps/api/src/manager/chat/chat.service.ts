@@ -30,6 +30,9 @@ import {
 import { OutOfCreditError, UnparseableOutputError } from '../../errors/model-gateway.errors.js';
 import { WatchNeedsYouError } from '../../errors/watch.errors.js';
 import { SpendCap } from '../../service/model-gateway/spend-cap.js';
+import { ChatStage, chatStage, StageManagerService } from './stage/stage.service.js';
+import { StageModelService } from '../../model/stage/stage.service.js';
+import { ImageStoreService } from '../../store/image/image-store.service.js';
 import { PersonaNotFoundError } from '../../errors/persona.errors.js';
 import { CharacterNotFoundError, StoryNotFoundError } from '../../errors/story.errors.js';
 import { BranchModelService } from '../../model/branch/branch.service.js';
@@ -250,6 +253,10 @@ export interface ChatDetail extends ChatSummary {
     endingSuggestions: boolean | null;
     /** Whether the Characters write Diary entries by themselves in this Chat (.scratch/diary/spec.md). */
     autoDiary: boolean;
+    /** Whether the stage is dressed as the story goes (.scratch/dressed-stage/spec.md). */
+    dressStage: boolean;
+    /** What the dressed stage shows now; null with the switch off. */
+    stage: ChatStage | null;
     /** Whether each Character thinks before a reply in this Chat (.scratch/character-minds/spec.md). */
     characterThoughts: boolean;
     /** Entries are being written by themselves right now: the Chat screen re-reads until they are done. */
@@ -400,6 +407,8 @@ export interface ChatFields {
     autoDiary?: boolean;
     /** Whether each Character thinks before a reply (.scratch/character-minds/spec.md). */
     characterThoughts?: boolean;
+    /** Whether the stage is dressed as the story goes (.scratch/dressed-stage/spec.md). */
+    dressStage?: boolean;
 }
 @Injectable()
 export class ChatManagerService {
@@ -448,6 +457,9 @@ export class ChatManagerService {
         private readonly dice: Dice,
         private readonly pushAlerts: PushAlertsManagerService,
         private readonly reachOutModel: ReachOutModelService,
+        private readonly stageManager: StageManagerService,
+        private readonly stageModel: StageModelService,
+        private readonly imageStore: ImageStoreService,
     ) {}
 
     async listChats(storyId: number): Promise<ChatList> {
@@ -1117,6 +1129,12 @@ export class ChatManagerService {
             chat.autoDiary = fields.autoDiary;
             await this.chatModel.setAutoDiary(chat.id, chat.autoDiary);
         }
+        if (fields.dressStage !== undefined) {
+            chat.dressStage = fields.dressStage;
+            await this.chatModel.setDressStage(chat.id, chat.dressStage);
+            // Turned on: draw what the stage needs now, not only after the next reply.
+            if (chat.dressStage) this.stageManager.dress(story.id, chat.id);
+        }
         if (fields.endingSuggestions !== undefined) {
             // Chat state outside the ledger, like the title: no rollback turns it back. Reset does (the ledger's clear).
             chat.endingSuggestions = fields.endingSuggestions;
@@ -1220,7 +1238,10 @@ export class ChatManagerService {
      */
     async deleteChat(storyId: number, chatId: number): Promise<void> {
         const { chat } = await this.load(storyId, chatId);
+        // Its outfit pictures (.scratch/dressed-stage/spec.md): the rows go with it, the files here.
+        const stageFiles = await this.stageModel.chatFiles(chat.id);
         await this.chatModel.deleteChat(chat.id);
+        for (const file of stageFiles) await this.imageStore.remove(file).catch(() => undefined);
         await this.readAloud.sweep();
     }
 
@@ -2244,6 +2265,8 @@ export class ChatManagerService {
             endingSuggestions: (story.endings ?? []).some(endingReady) ? null : chat.endingSuggestions,
             autoDiary: chat.autoDiary,
             characterThoughts: chat.characterThoughts,
+            dressStage: chat.dressStage,
+            stage: await chatStage(this.stageModel, story, chat, details),
             diaryWriting: this.diaryRuns.has(chat.id),
             diaryLatest: story.characters.flatMap((character) => {
                 const entryId = newestEntry.get(character.id);

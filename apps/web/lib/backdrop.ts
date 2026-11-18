@@ -15,16 +15,20 @@ export interface BackdropPicture {
  * - `none`: no picture;
  * - `cover`: the Story's Cover, at its focus point, else none;
  * - `snapshot`: the newest Snapshot still in this Chat's thread (it is under one of `messages`), else
- *   the Cover, else none.
+ *   the Cover, else none;
+ * - `place`: the place the Chat is in, drawn by its dressed stage (.scratch/dressed-stage/spec.md),
+ *   else the Cover, else none.
  */
 export function backdropOf(
     story: { backdrop: Backdrop; cover: StoryCover | null },
     snapshots: readonly Snapshot[],
     messages: readonly { id: number }[],
+    placePicturePath: string | null = null,
 ): BackdropPicture | null {
     const cover = story.cover ? picture(referenceImageUrl(story.cover.imagePath), story.cover.focus) : null;
     if (story.backdrop === 'none') return null;
     if (story.backdrop === 'cover') return cover;
+    if (story.backdrop === 'place') return placePicturePath ? picture(referenceImageUrl(placePicturePath), null) : cover;
     const inThread = new Set(messages.map((message) => message.id));
     const newest = snapshots
         .filter((snapshot) => snapshot.messageId !== null && inThread.has(snapshot.messageId))

@@ -81,8 +81,10 @@ export type TextCallKind =
  * `expression_image`: a Character's Expression, drawn from their Reference image (.scratch/expressions/spec.md).
  * `image_cutout`: one picture (the one reference image) given back with its background taken away, as a PNG
  * with transparency, for the Visual novel stage (.scratch/stage-pictures/spec.md); its prompt is not used.
+ * `place_picture`: a place with no one in it, behind the stage; `outfit_sprite`: a Character in the outfit
+ * the Chat has them in (.scratch/dressed-stage/spec.md).
  */
-export type ImageCallKind = 'snapshot_image' | 'reference_image' | 'expression_image' | 'image_cutout';
+export type ImageCallKind = 'snapshot_image' | 'reference_image' | 'expression_image' | 'image_cutout' | 'place_picture' | 'outfit_sprite';
 
 /**
  * A Document's passages turned into vectors on Add; a Chat's Memories turned into vectors as they
