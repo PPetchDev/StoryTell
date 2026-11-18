@@ -761,7 +761,8 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
             )}
             {/* .scratch/previously-on/spec.md: where the story stands, on coming back after a while away. */}
             <RecapCard
-                key={chat.id}
+                // Its own key space: a bare Chat id could equal a sibling's (the proposal card is keyed by its id).
+                key={`recap-${chat.id}`}
                 storyId={chat.storyId}
                 chatId={chat.id}
                 newestMessageId={chat.messages.at(-1)?.id ?? null}
