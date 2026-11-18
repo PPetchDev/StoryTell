@@ -220,7 +220,7 @@ export class JudgeManagerService {
                 messages: prompt.messages,
                 maxTokens: prompt.maxTokens,
                 json: true,
-                servedFor: { storyId: story.id, chatId: chat.id },
+                servedFor: { storyId: story.id, chatId: chat.id, messageId: message.id },
             });
             const judgement = parseJudgement(result.text);
             const applied = applyJudgement(

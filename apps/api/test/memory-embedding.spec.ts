@@ -84,7 +84,8 @@ describe('Memory embeddings', () => {
             {
                 kind: 'memory_embedding',
                 inputs: ['The oil is kept in the cellar.', 'Mira lost the cellar key.'],
-                servedFor: { storyId, chatId },
+                // The reply's cost (.scratch/cost-view/spec.md).
+                servedFor: { storyId, chatId, messageId: expect.any(Number) },
             },
         ]);
         const stored = await rows(chatId);

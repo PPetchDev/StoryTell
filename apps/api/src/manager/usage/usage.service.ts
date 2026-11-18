@@ -4,7 +4,7 @@ import { AccountModelService } from '../../model/account/account.service.js';
 import { AccountRole } from '../../model/account/entities/account.entity.js';
 import { SettingsModelService } from '../../model/settings/settings.service.js';
 import { startOfMonthUtc } from '../../service/model-gateway/spend-cap.js';
-import { KindSpend, PromptCacheSpend, UsageRecordModelService } from '../../model/usage-record/usage-record.service.js';
+import { KindSpend, NamedSpend, PromptCacheSpend, UsageRecordModelService } from '../../model/usage-record/usage-record.service.js';
 import { CreditPool, ModelGateway } from '../../service/model-gateway/model-gateway.js';
 
 export interface PoolUsage {
@@ -31,6 +31,12 @@ export interface PoolUsage {
      * call reported it, and for the image pool.
      */
     cache: PromptCacheSpend | null;
+    /**
+     * This month's spend per model and per host, most spent first, each with its prompt cache
+     * (.scratch/cost-view/spec.md: "Usage page"). The Owner's only: empty for a Member, who can't see the Models.
+     */
+    byModel: NamedSpend[];
+    byHost: NamedSpend[];
 }
 
 /** A Member's Monthly cap and how much of it is spent (.scratch/accounts/spec.md). */
@@ -66,10 +72,11 @@ export class UsageManagerService {
         const account = this.accounts.current();
         const member = account.role === AccountRole.Member;
         const monthStart = member ? startOfMonthUtc(now) : new Date(now.getFullYear(), now.getMonth(), 1);
-        const [spend, settings, ownerCredit] = await Promise.all([
+        const [spend, settings, ownerCredit, named] = await Promise.all([
             this.usageModel.spendSince(monthStart, member ? account.id : undefined),
             this.settingsModel.get(),
             this.gateway.remainingCredit(),
+            member ? null : this.usageModel.spendByModelSince(monthStart),
         ]);
         const credit = member ? { text: { remainingUsd: null }, image: { remainingUsd: null } } : ownerCredit;
 
@@ -90,6 +97,8 @@ export class UsageManagerService {
                 // Which host serves text is not a balance, so a Member sees it too.
                 host: ownerCredit[name].host ?? null,
                 cache: spend[name].cache,
+                byModel: (named?.[name].byModel ?? []).map(rounded),
+                byHost: (named?.[name].byHost ?? []).map(rounded),
             };
         };
 
@@ -113,6 +122,10 @@ export class UsageManagerService {
     private capUsage(capUsd: number, spentUsd: number): MonthlyCapUsage {
         return { capUsd, spentUsd: round(spentUsd), reached: spentUsd >= capUsd };
     }
+}
+
+function rounded(spend: NamedSpend): NamedSpend {
+    return { ...spend, spentUsd: round(spend.spentUsd) };
 }
 
 function round(usd: number): number {

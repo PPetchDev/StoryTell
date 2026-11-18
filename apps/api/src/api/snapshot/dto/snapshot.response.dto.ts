@@ -117,6 +117,9 @@ export class SnapshotPromptDTO implements SnapshotPrompt {
 
     @ApiProperty({ description: 'The whole prompt the image model would be given: `text` with the fixed rules around it.' })
     imagePrompt: string;
+
+    @ApiProperty({ description: 'What drawing it will cost at list price, in USD: the Settings Snapshot model and size, and how many in-frame Characters send a Reference image.' })
+    priceUsd: number;
 }
 
 export class ChatSnapshotsResponseBodyDTO implements ChatSnapshots {

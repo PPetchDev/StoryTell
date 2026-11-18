@@ -23,6 +23,8 @@ import { ReadAloudAction, ReadAloudControls, readingNowOf, useReadAloud } from '
 import { MessageSnapshots } from '@/components/chat/snapshots';
 import { ThaiReadingAction, ThaiReadingBlock, ThaiReadings } from '@/components/chat/thai-reading';
 import { MessageThoughts } from '@/components/chat/message-thoughts';
+import { ReplyCostLine } from '@/components/chat/reply-cost';
+import { ReplyCost, ReplyCosts } from '@/lib/reply-cost';
 import { BranchIcon, CameraIcon, ChevronLeftIcon, ChevronRightIcon, MoreIcon, PencilIcon, UndoIcon } from '@/components/icons';
 import { ConfirmButton } from '@/components/story-editor/fields';
 import { Cast, Portraits } from '@/lib/character-colour';
@@ -387,6 +389,8 @@ interface MessageViewProps {
     /** Its Snapshots and Snapshot jobs. */
     snapshots: Snapshot[];
     jobs: SnapshotJob[];
+    /** What it cost, while "Show cost per reply" is on (.scratch/cost-view/spec.md); null otherwise. */
+    cost: ReplyCost | null;
     handlers: RowHandlers;
 }
 
@@ -439,6 +443,9 @@ function sameRow(prev: MessageViewProps, next: MessageViewProps): boolean {
             if (!sameMessage(prev.message, next.message)) return false;
         } else if (key === 'snapshots' || key === 'jobs') {
             if (!sameItems<object>(prev[key], next[key])) return false;
+        } else if (key === 'cost') {
+            // Read again as new objects after every reply: compared by what they hold.
+            if (JSON.stringify(prev.cost) !== JSON.stringify(next.cost)) return false;
         } else if (!Object.is(prev[key], next[key])) return false;
     }
     return true;
@@ -487,6 +494,7 @@ const MessageView = memo(function MessageView({
     thaiFailed,
     snapshots,
     jobs,
+    cost,
     handlers,
 }: MessageViewProps) {
     const readingNow = useMemo(() => (readPart === null ? null : { partIndex: readPart, paragraph: readParagraph }), [readPart, readParagraph]);
@@ -613,7 +621,8 @@ const MessageView = memo(function MessageView({
                         )}
                         <MessageBody message={message} cast={cast} portraits={portraits} readingNow={readingNow} />
                         {/* What each Character thought before it, behind a tap (.scratch/character-minds/spec.md). */}
-                        {message.kind === 'ai' && <MessageThoughts thoughts={message.thoughts} />}
+                        {/* And, with "Show cost per reply" on, what it cost, in the same row (.scratch/cost-view/spec.md). */}
+                        {message.kind === 'ai' && <MessageThoughts thoughts={message.thoughts} after={cost ? <ReplyCostLine cost={cost} /> : undefined} />}
                     </>
                 )}
                 {/* Its Thai reading, or why one failed: under the story text, above the Snapshots. */}
@@ -838,6 +847,8 @@ interface ChatThreadProps {
     thaiReadings: ThaiReadings;
     /** Opens at this Message rather than the end (coming from the Visual novel view); read once, on opening. */
     openAt?: OpenAt | null;
+    /** Each reply's cost while "Show cost per reply" is on (.scratch/cost-view/spec.md); null while it is off. */
+    costs?: ReplyCosts | null;
 }
 
 type Handlers = Pick<
@@ -854,6 +865,7 @@ interface MessageListProps {
     blocked: boolean;
     snapshots: ChatSnapshots;
     thaiReadings: ThaiReadings;
+    costs: ReplyCosts | null;
     tapped: number | null;
     /** The Message that is the thread's tab stop. */
     tabStop: number | null;
@@ -891,6 +903,7 @@ const MessageList = memo(function MessageList({
     blocked,
     snapshots,
     thaiReadings,
+    costs,
     tapped,
     tabStop,
     keysHintId,
@@ -933,6 +946,7 @@ const MessageList = memo(function MessageList({
                 thaiFailed={thaiReadings.failed(message.id)}
                 snapshots={snapshotsOf.get(message.id) ?? NONE}
                 jobs={jobsOf.get(message.id) ?? NONE}
+                cost={costs?.get(message.id) ?? null}
                 handlers={handlers}
             />
         );
@@ -945,7 +959,7 @@ const MessageList = memo(function MessageList({
  * the others, and Tab again goes on to that Message's controls and then the composer.
  */
 export function ChatThread(props: ChatThreadProps) {
-    const { messages, cast, portraits, pending, writing, replySoFar, editing, canEdit, blocked, snapshots, replacing, thaiReadings, openAt = null } =
+    const { messages, cast, portraits, pending, writing, replySoFar, editing, canEdit, blocked, snapshots, replacing, thaiReadings, openAt = null, costs = null } =
         props;
     // ↺ Again replaces the reply in place: it leaves the thread while the writing indicator shows.
     const shown = useMemo(() => (replacing === null ? messages : messages.filter((message) => message.id !== replacing)), [messages, replacing]);
@@ -1016,6 +1030,7 @@ export function ChatThread(props: ChatThreadProps) {
                     blocked={blocked}
                     snapshots={snapshots}
                     thaiReadings={thaiReadings}
+                    costs={costs}
                     tapped={tapped}
                     tabStop={tabStop}
                     keysHintId={keysHintId}

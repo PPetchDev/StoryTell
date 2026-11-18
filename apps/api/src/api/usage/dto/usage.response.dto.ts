@@ -2,11 +2,11 @@ import { ApiProperty } from '@nestjs/swagger';
 
 import { MonthlyCapUsage, PoolUsage, UsageSummary } from '../../../manager/usage/usage.service.js';
 
-import type { KindSpend, PromptCacheSpend } from '../../../model/usage-record/usage-record.service.js';
+import type { KindSpend, NamedSpend, PromptCacheSpend } from '../../../model/usage-record/usage-record.service.js';
 import type { CallKind } from '../../../service/model-gateway/model-gateway.js';
 
 /** Every call kind, for the docs; a Record so a new kind fails the typecheck until it is listed. */
-const CALL_KINDS = Object.keys({
+export const CALL_KINDS = Object.keys({
     turn: true,
     judge: true,
     memory_extraction: true,
@@ -53,6 +53,20 @@ export class PromptCacheSpendDTO implements PromptCacheSpend {
     cachedTokens: number;
 }
 
+export class NamedSpendDTO implements NamedSpend {
+    @ApiProperty({ description: "The model's own name (as Settings and usage records carry it), or the host's.", example: 'deepseek-v4-pro' })
+    name: string;
+
+    @ApiProperty({ description: "This month's spend on it, in USD." })
+    spentUsd: number;
+
+    @ApiProperty({ description: 'How many calls it served this month.' })
+    calls: number;
+
+    @ApiProperty({ type: PromptCacheSpendDTO, nullable: true, description: 'Its prompt cache over the calls that reported one; null when none did.' })
+    cache: PromptCacheSpendDTO | null;
+}
+
 export class PoolUsageDTO implements PoolUsage {
     @ApiProperty({ description: "This month's spend for the pool, the sum of its usage records, in USD." })
     spentUsd: number;
@@ -95,6 +109,12 @@ export class PoolUsageDTO implements PoolUsage {
         description: "This month's prompt cache over the calls whose host reported it. Null while none did, and for the image pool.",
     })
     cache: PromptCacheSpendDTO | null;
+
+    @ApiProperty({ type: [NamedSpendDTO], description: "This month's spend per model, most spent first. The Owner's only: empty for a Member." })
+    byModel: NamedSpendDTO[];
+
+    @ApiProperty({ type: [NamedSpendDTO], description: "This month's spend per host, most spent first. The Owner's only: empty for a Member." })
+    byHost: NamedSpendDTO[];
 }
 
 export class UsagePoolsDTO {

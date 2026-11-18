@@ -47,6 +47,7 @@ import { BeliefResponse } from '../../model/memory/entities/belief.entity.js';
 import { MemoryModelService } from '../../model/memory/memory.service.js';
 import { PersonaModelService } from '../../model/persona/persona.service.js';
 import { SnapshotModelService } from '../../model/snapshot/snapshot.service.js';
+import { UsageRecordModelService } from '../../model/usage-record/usage-record.service.js';
 import { SettingsModelService } from '../../model/settings/settings.service.js';
 import { StoryEntity } from '../../model/story/entities/story.entity.js';
 import { StoryModelService } from '../../model/story/story.service.js';
@@ -396,6 +397,7 @@ export class ChatManagerService {
         private readonly speechRepair: SpeechRepairManagerService,
         private readonly storySoFar: StorySoFarManagerService,
         private readonly documentSearch: DocumentSearchManagerService,
+        private readonly usageModel: UsageRecordModelService,
         private readonly gateway: ModelGateway,
         private readonly spendCap: SpendCap,
         private readonly dice: Dice,
@@ -890,7 +892,7 @@ export class ChatManagerService {
                 if (newestAiMessage(now)?.id !== at.id) return;
                 const written = await this.ledger.diaryEntriesOf(chatId);
                 if (written.some((entry) => entry.characterId === characterId && entry.messageId === at.id)) continue;
-                await this.composeDiaryEntry(story, now, character, at, written);
+                await this.composeDiaryEntry(story, now, character, at, written, true);
             } catch (error) {
                 this.logger.warn(`Chat ${chatId}, Message ${messageId}: ${character.name}'s Diary entry not written: ${error instanceof Error ? error.message : String(error)}`);
             }
@@ -1356,6 +1358,8 @@ export class ChatManagerService {
         character: StoryEntity['characters'][number],
         at: ChatEntity['messages'][number],
         entries: DiaryEntryEntity[],
+        /** Written by themselves at the reply, so its cost is the reply's (.scratch/cost-view/spec.md); not one the user asked for. */
+        byThemselves = false,
     ): Promise<DiaryEntryEntity> {
         {
             const [state, held, memories] = await Promise.all([
@@ -1398,7 +1402,7 @@ export class ChatManagerService {
                     })),
                     moment,
                 },
-                { storyId: story.id, chatId: chat.id },
+                { storyId: story.id, chatId: chat.id, ...(byThemselves ? { messageId: at.id } : {}) },
             );
             return this.ledger.addDiaryEntry({ chatId: chat.id, characterId: character.id, messageId: at.id, moment, text, innerLife });
         }
@@ -1453,6 +1457,8 @@ export class ChatManagerService {
     ): Promise<void> {
         // An Epilogue written again (Regenerate) is written as one again.
         const asEpilogue = epilogue || replacing?.epilogue === true;
+        // The calls this turn makes before its Message exists go to it once stored (.scratch/cost-view/spec.md).
+        const costsFrom = await this.usageModel.lastId();
         const userText = exchangeUserText(chat.messages, chat.messages.length);
         const history: PromptHistoryMessage[] = (userText !== null ? chat.messages.slice(0, -1) : chat.messages)
             .map((message) => ({
@@ -1575,6 +1581,7 @@ export class ChatManagerService {
             // A Message after the one with versions settles it on its shown version.
             await this.chatModel.dropReplyVersions(chat.id);
         }
+        await this.usageModel.claimForReply(chat.id, costsFrom, aiMessageId);
         // Kept with the reply they were thought for; a reply written again keeps only its own.
         await this.chatModel.setThoughts(aiMessageId, thoughts.map((thought) => ({ characterId: thought.characterId, text: thought.text })));
         // Last, and only once stored: the client's final parts are the stored Message.

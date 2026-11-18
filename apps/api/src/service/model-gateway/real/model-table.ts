@@ -342,6 +342,23 @@ export function drawnSize(model: ImageModelSpec, wanted: SnapshotSize): Snapshot
     return wanted === '2K' || twoK <= model.prices['1K'] ? '2K' : '1K';
 }
 
+/** The list price of one image of `model` at `size`, with Venice's price for each input image past the first. */
+export function imageListPrice(model: ImageModelSpec, size: SnapshotSize, inputImages: number): number {
+    const extra = (model.extraInputImageUsd ?? 0) * Math.max(0, inputImages - 1);
+    // Whole millionths of a dollar, so $0.06 + 2 × $0.00345 records as 0.0669 and not 0.06690000000000001.
+    return Math.round(((model.prices[size] ?? model.prices['1K']) + extra) * 1e6) / 1e6;
+}
+
+/**
+ * What a Snapshot drawn now with `referenceCount` Reference images will cost, at the list price its
+ * usage record will carry (.scratch/cost-view/spec.md: "Snapshot price"): the model and size the
+ * real gateway would draw it with.
+ */
+export function snapshotListPrice(settings: { imageModel: SnapshotModel; snapshotSize: SnapshotSize }, referenceCount: number): number {
+    const model = IMAGE_MODELS[imageModelForKind('snapshot_image', settings.imageModel, referenceCount)];
+    return imageListPrice(model, drawnSize(model, settings.snapshotSize), referenceCount);
+}
+
 /** A Snapshot with no reference image goes to its model's text-to-image sibling, which needs no base image. */
 export function imageModelForKind(kind: ImageCallKind, snapshotModel: SnapshotModel, referenceCount: number): ImageModel {
     if (kind === 'reference_image') return REFERENCE_IMAGE_MODEL;

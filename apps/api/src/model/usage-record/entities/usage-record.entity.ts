@@ -62,4 +62,11 @@ export class UsageRecordEntity {
 
     @Column({ name: 'chat_id', type: 'integer', nullable: true })
     chatId: number | null;
+
+    /**
+     * The AI Message whose reply caused the call (.scratch/cost-view/spec.md). A plain reference like
+     * `chatId`; null for a call that served no reply, and on the records from before.
+     */
+    @Column({ name: 'message_id', type: 'integer', nullable: true })
+    messageId: number | null;
 }

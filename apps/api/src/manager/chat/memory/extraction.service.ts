@@ -134,7 +134,7 @@ export class MemoryExtractionManagerService {
                 messages: prompt.messages,
                 maxTokens: prompt.maxTokens,
                 json: true,
-                servedFor: { storyId: story.id, chatId: chat.id },
+                servedFor: { storyId: story.id, chatId: chat.id, messageId: message.id },
             });
             const extraction = parseExtraction(result.text);
             const applied = applyExtraction(
@@ -158,7 +158,7 @@ export class MemoryExtractionManagerService {
             }
             await this.ledger.recordMemories(chat.id, message.id, applied.changes, applied.beliefChanges);
             // Once recorded, the new and reworded Memories are embedded; a failure there never fails the extraction.
-            await this.memoryEmbedding.embedAfterExtraction(story.id, chat.id);
+            await this.memoryEmbedding.embedAfterExtraction(story.id, chat.id, message.id);
             return { ok: true };
         } catch (error) {
             const reason = error instanceof AppError ? error.message : `Unexpected error: ${String(error)}`;

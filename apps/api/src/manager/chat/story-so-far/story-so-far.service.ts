@@ -151,7 +151,8 @@ export class StorySoFarManagerService {
                     corrections: chat.storySoFarCorrections,
                 }),
                 maxTokens: STORY_SO_FAR_MAX_TOKENS,
-                servedFor: { storyId: story.id, chatId },
+                // Set off by the newest reply's background calls: its cost (.scratch/cost-view/spec.md).
+                servedFor: { storyId: story.id, chatId, ...newestReplyOf(chat) },
             };
             const speakers = [...new Set(messages.map((message) => message.speaker))];
             // Spec: "Writer output guard". A cut-off or off-form answer is asked for once more, then fails.
@@ -207,4 +208,10 @@ function view(chat: ChatEntity): StorySoFarView {
         updatedAt: chat.storySoFarUpdatedAt?.toISOString() ?? null,
         failedReason: chat.storySoFarFailed,
     };
+}
+
+/** The newest AI Message of the Chat, as a `ServedFor`'s Message; none before the first reply. */
+function newestReplyOf(chat: ChatEntity): { messageId?: number } {
+    const newest = chat.messages.findLast((message) => message.kind === MessageKind.Ai);
+    return newest ? { messageId: newest.id } : {};
 }

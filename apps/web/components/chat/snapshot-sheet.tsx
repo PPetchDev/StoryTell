@@ -6,7 +6,7 @@ import { TEXT_BOX } from '@/components/chat/chat-classes';
 import { ChevronDownIcon } from '@/components/icons';
 import { Sheet } from '@/components/sheet/sheet';
 import { ApiError, ApiUnreachableError } from '@/lib/api';
-import { SnapshotPrompt, withEditedText } from '@/lib/snapshot';
+import { SnapshotPrompt, snapshotPrice, withEditedText } from '@/lib/snapshot';
 
 
 /** A labelled field: the words above, the box below. */
@@ -160,6 +160,8 @@ export function SnapshotSheet({ imageCreditOut, initialHint = '', messageId, wri
                         </details>
                         <button type="submit" name="draw" className="button w-full" disabled={imageCreditOut || reading.text.trim() === ''}>
                             Draw Snapshot
+                            {/* What it will cost, before anything is paid (.scratch/cost-view/spec.md). */}
+                            {reading.prompt.priceUsd !== undefined && <> · {snapshotPrice(reading.prompt.priceUsd)}</>}
                         </button>
                         <div className="grid grid-cols-2 gap-2">
                             <button type="button" className="button button-quiet" onClick={() => void writePrompt()}>

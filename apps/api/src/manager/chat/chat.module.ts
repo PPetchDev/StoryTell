@@ -11,6 +11,7 @@ import { ReplaceRuleModelModule } from '../../model/replace-rule/replace-rule.mo
 import { SettingsModelModule } from '../../model/settings/settings.module.js';
 import { SnapshotModelModule } from '../../model/snapshot/snapshot.module.js';
 import { StoryModelModule } from '../../model/story/story.module.js';
+import { UsageRecordModelModule } from '../../model/usage-record/usage-record.module.js';
 import { ReadAloudManagerModule } from '../read-aloud/read-aloud.module.js';
 import { ChatManagerService } from './chat.service.js';
 import { DiaryManagerService } from './diary/diary.service.js';
@@ -29,7 +30,7 @@ import { StorySoFarManagerService } from './story-so-far/story-so-far.service.js
 import { ChatTranscriptManagerService } from './transcript.service.js';
 
 @Module({
-    imports: [ChatModelModule, BranchModelModule, StoryModelModule, SettingsModelModule, LedgerModelModule, MemoryModelModule, PersonaModelModule, SnapshotModelModule, DocumentModelModule, SavedReplyModelModule, ReplaceRuleModelModule, ReadAloudManagerModule],
+    imports: [ChatModelModule, BranchModelModule, StoryModelModule, SettingsModelModule, LedgerModelModule, MemoryModelModule, PersonaModelModule, SnapshotModelModule, DocumentModelModule, SavedReplyModelModule, ReplaceRuleModelModule, ReadAloudManagerModule, UsageRecordModelModule],
     providers: [ChatManagerService, DocumentSearchManagerService, JudgeManagerService, BeliefManagerService, MemoryEmbeddingManagerService, MemoryExtractionManagerService, MemoryManagerService, SuggestedRepliesManagerService, WriteForMeManagerService, ThaiReadingManagerService, DiaryManagerService, ThoughtsManagerService, SpeechRepairManagerService, StorySoFarManagerService, ChatTranscriptManagerService],
     exports: [ChatManagerService, MemoryManagerService, BeliefManagerService, StorySoFarManagerService, ChatTranscriptManagerService],
 })

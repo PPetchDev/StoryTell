@@ -15,6 +15,7 @@ import { PeopleCard } from '@/components/settings/people-card';
 import { SignOutSetting } from '@/components/sign-in-gate';
 import { useAccount } from '@/lib/account';
 import { TextSizeSetting } from '@/components/text-size-setting';
+import { ReplyCostSetting } from '@/components/reply-cost-setting';
 import { ThemeSetting } from '@/components/theme-setting';
 import { apiSend } from '@/lib/api';
 import { ImageModelOption, ModelOption, PlayModelOption, Settings, SettingsResponse, SnapshotSize } from '@/lib/types';
@@ -338,6 +339,7 @@ export default function SettingsPage() {
             <SettingsGroup id="settings-device" title="This device">
                 <ThemeSetting />
                 <TextSizeSetting />
+                <ReplyCostSetting />
             </SettingsGroup>
             {(settings.status === 'loading' || backup === undefined) && settings.status !== 'error' && (
                 <Loading label="Loading Settings…" className="card" />
