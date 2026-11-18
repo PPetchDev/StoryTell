@@ -214,6 +214,10 @@ _Avoid_: Mind map, knowledge graph, relationship map
 A Chat's account, in order, of the events in its oldest Messages: what the AI reads in place of those Messages once the whole Chat no longer fits in a turn. A Chat has at most one, and none while the whole Chat still fits. It is written again from all the Messages it covers each time, and the user may correct it; their corrections win. A Story so far is events, where a Memory is a fact.
 _Avoid_: Summary, recap, chat history
 
+**Recap**:
+A short, dramatic account of where one Chat's story stands now, shown under "Previously on…" when the user comes back after 6 hours or more away, or asks for it from the Chat menu: what just happened, how the Characters feel and what is unresolved, written from the Story so far, the Chapters, the newest Messages, the Bonds and the Now notes, never a Character's Secrets or Arc direction. It is for the user alone: no prompt reads it. It is written once for each gap and kept until the user dismisses it, and goes when the Message it was written at is taken back or changed.
+_Avoid_: Summary, Story so far, Chapter, previously
+
 **Time of day**:
 Where a Chat's story is in the day — dawn, morning, noon, afternoon, evening or night — or none until the story makes it clear; it changes only when an AI Message moves the story on to a new time, and editing or regenerating that Message takes the change back.
 _Avoid_: Clock, hour, daytime

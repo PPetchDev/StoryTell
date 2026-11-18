@@ -20,6 +20,7 @@ import { NovelRequest, NovelView } from '@/components/chat/novel-view';
 import { PersonaPictures } from '@/components/chat/persona-pictures';
 import { SceneStrip } from '@/components/chat/scene-strip';
 import { ChaptersSheet } from '@/components/chat/chapters-sheet';
+import { RecapCard } from '@/components/chat/recap-card';
 import { RollOfferBand } from '@/components/chat/roll-offer-band';
 import { SuddenEventBanner, suddenEventAnnouncement } from '@/components/chat/sudden-event-banner';
 import { EventProposalCard, eventProposalAnnouncement } from '@/components/chat/event-proposal-card';
@@ -164,6 +165,8 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
     const [factsSheet, setFactsSheet] = useState(false);
     /** The Chapters sheet, with Move on (.scratch/scene-chapters/spec.md). */
     const [chaptersOpen, setChaptersOpen] = useState(false);
+    /** Counts the asks for "Previously on…" from the Chat menu (.scratch/previously-on/spec.md). */
+    const [recapRequest, setRecapRequest] = useState(0);
     /**
      * The Roll armed for the next Message (CONTEXT.md, "Roll"): sent with the next send only, where
      * the app throws the dice. Gone on leaving, like the nudge and the Cue.
@@ -677,6 +680,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                 stripHidden={stripHidden}
                 onShowStrip={() => setSceneStripHidden(false)}
                 onOpenChapters={scenes.length > 0 ? () => setChaptersOpen(true) : undefined}
+                onOpenRecap={() => setRecapRequest((count) => count + 1)}
                 onSwapIdentity={swapIdentity}
                 onOpenMemory={() => openMemory()}
                 onRename={(title) =>
@@ -755,6 +759,14 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                     onDismiss={() => void runWrite(() => chatApi.dismissEnding(chat.storyId, chat.id))}
                 />
             )}
+            {/* .scratch/previously-on/spec.md: where the story stands, on coming back after a while away. */}
+            <RecapCard
+                key={chat.id}
+                storyId={chat.storyId}
+                chatId={chat.id}
+                newestMessageId={chat.messages.at(-1)?.id ?? null}
+                openRequest={recapRequest}
+            />
 
             {/*
              * The low-credit line (audit M3) and the "Memory added" toasts lie over the top of the

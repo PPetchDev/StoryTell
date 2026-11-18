@@ -65,6 +65,7 @@ export type TextCallKind =
     | 'suggested_replies'
     | 'story_summary'
     | 'chapter_summary'
+    | 'previously_on'
     | 'write_for_me'
     | 'thai_reading'
     | 'diary_entry'

@@ -10,6 +10,7 @@ import { PageFetchModule } from './service/page-fetch/page-fetch.module.js';
 import { DbModule } from './store/db/db.module.js';
 import { FakeGatewayControlController } from './testing/fake-gateway-control.controller.js';
 import { FakePushControlController } from './testing/fake-push-control.controller.js';
+import { FakeClockControlController } from './testing/fake-clock-control.controller.js';
 import { PushAlertsManagerModule } from './manager/push/push.module.js';
 import { PushSenderModule } from './service/push/push-sender.module.js';
 
@@ -29,7 +30,7 @@ export class AppModule {
                 PushAlertsManagerModule,
                 ApiModule,
             ],
-            controllers: config.modelGateway === 'fake' ? [FakeGatewayControlController, FakePushControlController] : [],
+            controllers: config.modelGateway === 'fake' ? [FakeGatewayControlController, FakePushControlController, FakeClockControlController] : [],
         };
     }
 }

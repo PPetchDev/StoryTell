@@ -126,6 +126,7 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | `404.004.091` | `ChapterNotFoundError` | No Chapter with that id in this Chat (`PUT …/chapters/:chapterId`, `POST …/chapters/:chapterId/write`): taken back with its Scene advance, or another Chat's. Nothing changes. |
 | `422.004.092` | `EmptyChapterError` | A Chapter summary saved with nothing but whitespace. Nothing changes. |
 | `409.004.093` | `ChapterNotFailedError` | Try again (`POST …/chapters/:chapterId/write`) on a Chapter whose summary did not fail: written, being written, waiting, or with no Messages. No call. |
+| `409.004.120` | `NothingToRecapError` | A "Previously on…" Recap asked for (`POST /api/stories/:storyId/chats/:chatId/recap`) in a Chat with nothing after its Opening (`.scratch/previously-on/spec.md`). No call. A failed write answers the gateway's own error (`502.001.001` and the like), and a Member at their cap `402.010.009`; nothing is stored either way. |
 | `502.005.001` | `UnreadableDraftError` | The model's draft or rewrite could not be read (no JSON object, or no text). Nothing saved. Show with Retry. |
 | `502.005.002` | `InvalidDraftError` | The draft does not fit a Story (0 or 7 Characters, a Style value outside its set, a required field empty, a bad StartingBond). Nothing saved. Show with Retry. |
 | `422.005.003` | `EmptyIdeaError` | A draft was asked for with a blank idea. |
