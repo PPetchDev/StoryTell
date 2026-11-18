@@ -387,7 +387,7 @@ function capitalise(word: string): string {
 }
 
 export interface CreditBalance {
-    /** Null when the provider can't report it (Venice without an Admin key). */
+    /** Null when the provider can't report it (a provider error, the free model, or Venice with no key). */
     remainingUsd: number | null;
     /** The pool's cap, when the provider reports one. */
     limitUsd: number | null;

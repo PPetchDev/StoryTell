@@ -4,6 +4,7 @@ import {
     ProviderOutageError,
 } from '../../src/errors/model-gateway.errors.js';
 import { FAKE_PNG } from '../../src/service/model-gateway/fake-model-gateway.js';
+import { VeniceClient } from '../../src/service/model-gateway/real/venice-client.js';
 import { gatewayUnderTest } from '../harness/gateway-under-test.js';
 import { recordedFetch, RecordedResponse } from '../harness/recorded-fetch.js';
 
@@ -345,16 +346,50 @@ describe('Venice contract', () => {
             const balance = net.requests.find((r) => r.url === `${BASE}/billing/balance`)!;
             expect(balance.headers.Authorization).toBe('Bearer venice-admin-test-not-a-real-key');
             expect(credit.image).toEqual({ remainingUsd: 6.4, limitUsd: null });
+            // The Admin path is unchanged: the inference key's rate limits are not asked.
+            expect(net.requests.map((r) => r.url)).not.toContain(`${BASE}/api_keys/rate_limits`);
         });
 
-        it('reports the image pool as unknown without an Admin key, and asks Venice nothing', async () => {
-            const net = recordedFetch([{ fixture: 'openrouter/credits.json' }]);
+        // .scratch/text-fallback/spec.md, "Venice's balance without an Admin key".
+        it('reads the balance with the inference key from the rate limits without an Admin key', async () => {
+            const net = recordedFetch([{ fixture: 'openrouter/credits.json' }, { fixture: 'venice/rate-limits.json' }]);
             const { gateway } = gatewayUnderTest(net.fetch, { veniceAdminKey: undefined });
 
             const credit = await gateway.remainingCredit();
 
-            expect(credit.image).toEqual({ remainingUsd: null, limitUsd: null });
-            expect(net.requests.map((r) => r.url)).toEqual(['https://openrouter.ai/api/v1/credits']);
+            const balance = net.requests.find((r) => r.url === `${BASE}/api_keys/rate_limits`)!;
+            expect(balance.method).toBe('GET');
+            expect(balance.headers.Authorization).toBe('Bearer venice-test-not-a-real-key');
+            expect(credit.image).toEqual({ remainingUsd: 1.0474704, limitUsd: null });
+            expect(net.requests.map((r) => r.url)).not.toContain(`${BASE}/billing/balance`);
+        });
+
+        it('reads text on Venice from the same balance, so the up-front checks and the warning see it', async () => {
+            const net = recordedFetch([{ fixture: 'venice/rate-limits.json' }, { fixture: 'venice/rate-limits.json' }]);
+            const { gateway } = gatewayUnderTest(net.fetch, { veniceAdminKey: undefined, textOnVenice: true });
+
+            const credit = await gateway.remainingCredit();
+
+            expect(credit.text).toEqual({ remainingUsd: 1.0474704, limitUsd: null, host: 'venice' });
+            expect(credit.image).toEqual({ remainingUsd: 1.0474704, limitUsd: null });
+        });
+
+        it('reads a used-up balance as zero, and one it cannot read as unknown rather than failing the view', async () => {
+            const used = recordedFetch([{ fixture: 'openrouter/credits.json' }, { json: { data: { balances: { USD: null, DIEM: 0, BUNDLED_CREDITS: 0 } } } }]);
+            expect((await gatewayUnderTest(used.fetch, { veniceAdminKey: undefined }).gateway.remainingCredit()).image).toEqual({ remainingUsd: 0, limitUsd: null });
+
+            const odd = recordedFetch([{ fixture: 'openrouter/credits.json' }, { json: { data: { apiTier: { id: 'paid' } } } }]);
+            expect((await gatewayUnderTest(odd.fetch, { veniceAdminKey: undefined }).gateway.remainingCredit()).image).toEqual({ remainingUsd: null, limitUsd: null });
+
+            const refused = recordedFetch([{ fixture: 'openrouter/credits.json' }, { status: 401, json: { error: 'Authentication failed' } }]);
+            expect((await gatewayUnderTest(refused.fetch, { veniceAdminKey: undefined }).gateway.remainingCredit()).image).toEqual({ remainingUsd: null, limitUsd: null });
+        });
+
+        it('reports the balance as unknown with no Venice key at all, and asks Venice nothing', async () => {
+            const net = recordedFetch([]);
+
+            expect(await new VeniceClient(undefined, undefined, net.fetch).credit()).toEqual({ remainingUsd: null, limitUsd: null });
+            expect(net.requests).toEqual([]);
         });
     });
 });

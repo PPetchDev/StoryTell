@@ -132,9 +132,9 @@ function PoolCard({ pool, usage, member }: { pool: CreditPool; usage: PoolUsage;
                             {usage.remainingUsd === null ? (
                                 <span className="muted">
                                     Unknown
-                                    {pool === 'image' && (
-                                        // Why, in words (M15): the setting's name is in README, for whoever runs the server.
-                                        <>. Venice tells its balance only to an admin key, and the server has none set up.</>
+                                    {(pool === 'image' || usage.host === 'venice') && (
+                                        // Why, in words (M15). Venice tells its balance to the ordinary key too, so unknown means the read failed.
+                                        <>. Venice&apos;s balance could not be read just now.</>
                                     )}
                                     {pool === 'text' && usage.host === 'free' && <>. Text is on a free model while the paid hosts are out of credit.</>}
                                 </span>

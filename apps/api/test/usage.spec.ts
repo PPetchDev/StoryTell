@@ -157,6 +157,28 @@ describe('Usage', () => {
             expect((await t.http.get('/api/usage')).body.pools.image.lowCredit).toBe(false);
         });
 
+        it('sizes and warns text on Venice as the Venice pool, since it spends that balance', async () => {
+            t.gateway.setRemainingCredit({ text: { remainingUsd: 3, limitUsd: null, host: 'venice' }, image: { remainingUsd: 3, limitUsd: null } });
+
+            const { body } = await t.http.get('/api/usage').expect(200);
+
+            // 20% of the Venice pool's $8 is $1.60, so $3 is not low; on the text cap's $22 ($4.40) it would be.
+            expect(body.pools.text).toMatchObject({ remainingUsd: 3, capUsd: 8, lowCreditPercent: 20, lowCredit: false, host: 'venice' });
+
+            t.gateway.setRemainingCredit({ text: { remainingUsd: 1.05, limitUsd: null, host: 'venice' }, image: { remainingUsd: 1.05, limitUsd: null } });
+            const low = (await t.http.get('/api/usage').expect(200)).body;
+            expect(low.pools.text).toMatchObject({ capUsd: 8, lowCredit: true });
+            expect(low.pools.image).toMatchObject({ capUsd: 8, lowCredit: true });
+        });
+
+        it('keeps the text cap while text is on OpenRouter', async () => {
+            t.gateway.setRemainingCredit({ text: { remainingUsd: 3, limitUsd: 30, host: 'openrouter' } });
+
+            const { body } = await t.http.get('/api/usage').expect(200);
+
+            expect(body.pools.text).toMatchObject({ capUsd: 22, lowCredit: true });
+        });
+
         it('stays off when the remaining credit is unknown, and still shows spend', async () => {
             t.gateway.setRemainingCredit({ image: { remainingUsd: null, limitUsd: null } });
             t.gateway.scriptImage('snapshot_image', { image: FAKE_PNG, costUsd: 0.05 });

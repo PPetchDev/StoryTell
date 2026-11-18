@@ -87,7 +87,7 @@ A throwaway probe on 2026-11-17 sent one real turn prompt and one Judge prompt t
   - So the pool reads out only when every host is out, and the free model's unknown balance never refuses.
 - **Balances by host:**
   - OpenRouter: `/credits`.
-  - Venice: the Venice balance images use. It needs `VENICE_ADMIN_KEY`; without one it is unknown.
+  - Venice: the Venice balance images use. `/billing/balance` with `VENICE_ADMIN_KEY`, else `/api_keys/rate_limits` with the inference key (see "Venice's balance without an Admin key").
   - The free host: unknown.
 - **The cache:** credit is still cached for 30 s, and the cache is dropped when a host is remembered out.
 
@@ -100,7 +100,7 @@ A throwaway probe on 2026-11-17 sent one real turn prompt and one Judge prompt t
 
 ## Turning it on (live)
 
-Set `TEXT_HOSTS=openrouter,venice,free` in the API's environment and restart `storytell-api`. Live's current drop-in sets `TEXT_HOST=venice`; it can stay, since `TEXT_HOSTS` wins, or be replaced by a drop-in with `TEXT_HOSTS`. While OpenRouter is below zero, the first call after each restart, and one call every 10 minutes, pays a failed round trip to OpenRouter (a 402, no charge).
+Set `TEXT_HOSTS=openrouter,venice,free` in the API's environment and restart `storytell-api`. Live's current drop-in sets `TEXT_HOST=venice`; it can stay, since `TEXT_HOSTS` wins, or be replaced by a drop-in with `TEXT_HOSTS`. While OpenRouter is below zero, its balance read passes it over before any call (see "Passing over a host whose balance reads used up"), so it is asked nothing but `/credits`, at most every 30 s.
 
 ## Testing
 
@@ -118,3 +118,41 @@ Set `TEXT_HOSTS=openrouter,venice,free` in the API's environment and restart `st
   - the text pool reads Venice while OpenRouter is below zero (so the up-front checks pass), unknown on the free model, out only when the last host is, and skips reading a remembered host.
 - **Config** (`test/config.spec.ts`): the default, `TEXT_HOST=venice`, `TEXT_HOSTS` order and precedence, and the refusals.
 - **The turn** (`test/documents-in-turns.spec.ts`): a `NoEmbeddingCreditError` at the turn's search plays the turn without Documents and records `failed`.
+
+## Passing over a host whose balance reads used up
+
+Added 2026-11-18. On live, OpenRouter's balance was below zero, yet it refused only big prompts ("Prompt tokens limit exceeded: 11436 > 9473"). It still served the small background calls (Judge, Memory extraction, Thoughts, a turn's search), so the debt went from -$0.015 to -$0.14 in a day. A host was passed over only after it refused a call, and these calls were never refused.
+
+- **Before any call:** a host whose balance reads **at or below zero** is passed over up front, for every call kind, text and embeddings alike. Nothing is sent to it.
+- **The reading:** the per-host balance the text pool already reads (OpenRouter `/credits`, Venice's balance, the free host's unknown).
+  - It is cached per host for the credit cache's 30 s, and shared by the up-front skip and the text pool. A reading in flight is shared by the calls that wait on it.
+  - A top-up is noticed within 30 s.
+  - While a host reads used up, each call pays no failed round trip, only a cached read. Every 30 s, at most one balance read per host.
+- **Unknown never blocks:** a balance that can't be read (`null`) does not pass a host over.
+- **Unchanged:**
+  - the last host in the chain is always tried, and its balance is not read before a call. So a chain of one reads no balance and behaves as before;
+  - a host that refused for credit is still passed over for 10 minutes, without its balance being read;
+  - embeddings never go to the free host.
+- **The log:** once per host per 10 minutes while it stays used up, not per call, and again at once after a reading above zero:
+  `judge: passing openrouter over, its balance reads -$0.14 (at or below zero); sending calls to venice until it reads above zero. Said once per 10 min.`
+
+## Venice's balance without an Admin key
+
+- **Before:** `GET /billing/balance` answers only to an Admin key. Live has none, so the Venice balance read unknown: no low-credit warning, and the chain couldn't tell Venice was running out.
+- **Now:** without `VENICE_ADMIN_KEY`, the balance is read with the ordinary inference key from `GET /api_keys/rate_limits`. It answers `{ data: { balances: { USD, DIEM, BUNDLED_CREDITS }, ... } }` (measured 2026-11-17, and again read-only on 2026-11-18: USD 1.047, DIEM 0, bundled credits 0).
+- **Only `USD` counts,** as only `usd` does on the Admin path. DIEM and bundled credits are not dollars and are 0 on this account. A null `USD` reads as zero; a missing one, or a refused read, reads unknown.
+- **With an Admin key,** `/billing/balance` is read as before, and the rate limits are not asked.
+- **With no Venice key at all,** the balance is unknown and Venice is asked nothing.
+
+## Low credit on Venice
+
+- **How "low" is worked out:** the low-credit warning (banner, Chat line, Usage page) never used the provider's `limitUsd`. A pool is low when its balance is known and at or below the Settings low-credit percent of its Settings size (`textCreditCapUsd` / `imageCreditCapUsd`), what the Owner says it holds when topped up. So a pool with a balance and no top-up cap already has a meaningful "low": the Venice pool is low at or below 20% of $8 ($1.60) by default. At $1.05 it now warns.
+- **Text on Venice:** while the text chain is serving from Venice (`host: 'venice'`), the text pool is sized and warned with the **Venice pool's** size and percent, not the text one. It is the same balance, and the text size is OpenRouter's top-up. Before, $1.05 of Venice would have read "of $22.00".
+  - Both lines then show while Venice is low, one per pool. They read the same balance.
+- **The Usage page's "Unknown"** for the Venice pool (or text on Venice) now reads "Venice's balance could not be read just now." It no longer says "only to an admin key", since that is no longer why.
+
+### Testing these
+
+- **`test/text-fallback.spec.ts`**, "a host whose balance reads at or below zero": passed over before any call for Judge, Memory extraction and Thoughts, logged once; at exactly zero, and for a streamed turn; for embeddings; Venice used up too sends to the free model; an unknown balance is not passed over; the last host is still asked and its balance not read, and a chain of one reads no balance; the 30 s cache, the log again after 10 min and at once after a top-up; a remembered refusal still skips without a read. The scripted fetch answers an unscripted balance read with $10, so the older tests keep testing where calls go.
+- **`test/gateway/venice.contract.spec.ts`**: the Admin path unchanged (and no rate-limits read); without an Admin key, the rate limits with the inference key; text on Venice reads the same balance; a null `USD` is zero, a missing one or a 401 unknown; no key at all asks nothing.
+- **`test/usage.spec.ts`**: text on Venice is sized and warned with the Venice pool's $8 and 20%; text on OpenRouter keeps the text size.

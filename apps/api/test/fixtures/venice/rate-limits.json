@@ -1,0 +1,10 @@
+{
+    "data": {
+        "accessPermitted": true,
+        "apiTier": { "id": "paid", "isCharged": true },
+        "balances": { "USD": 1.0474704, "DIEM": 0, "BUNDLED_CREDITS": 0 },
+        "keyExpiration": null,
+        "nextEpochBegins": "2026-11-18T00:00:00.000Z",
+        "rateLimits": []
+    }
+}

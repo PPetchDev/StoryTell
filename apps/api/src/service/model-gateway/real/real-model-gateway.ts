@@ -123,6 +123,10 @@ export class RealModelGateway extends ModelGateway {
     private readonly now: () => number;
     /** Each host that answered out of credit, and until when it is passed over. */
     private readonly outUntil = new Map<TextHost['name'], number>();
+    /** Each host's last balance reading, reused for `creditCacheMs`; a reading in flight is shared. */
+    private readonly hostCredit = new Map<TextHost['name'], { readAt: number; reading: Promise<CreditBalance> }>();
+    /** Each host passed over for a balance at or below zero, and until when that is not logged again. */
+    private readonly usedUpLoggedUntil = new Map<TextHost['name'], number>();
 
     constructor(private readonly deps: RealModelGatewayDeps) {
         super();
@@ -176,7 +180,8 @@ export class RealModelGateway extends ModelGateway {
      * Runs a call on the chain of hosts (.scratch/text-fallback/spec.md). A host that answers out
      * of credit is remembered for `outOfCreditSkipMs`, and the call goes once to the next host, with
      * the same request, if `mayMoveOn` still allows it. A remembered host is passed over while a
-     * host follows it; the last host is always tried, so a chain of one behaves as before the chain.
+     * host follows it, and so is one whose balance reads at or below zero, before anything is sent
+     * to it; the last host is always tried, so a chain of one behaves as before the chain.
      */
     private async onHosts<T>(
         what: string,
@@ -187,6 +192,9 @@ export class RealModelGateway extends ModelGateway {
         const tried = hosts.filter((host, at) => at === hosts.length - 1 || !this.isOutOfCredit(host));
         for (let at = 0; ; at++) {
             const host = tried[at];
+            const following = tried[at + 1];
+            // A host below zero may still serve small calls on credit it doesn't have (OpenRouter does), so its balance is read first.
+            if (following && (await this.readsUsedUp(what, host, following))) continue;
             try {
                 const result = await call(host);
                 this.outUntil.delete(host.name);
@@ -205,6 +213,40 @@ export class RealModelGateway extends ModelGateway {
 
     private isOutOfCredit(host: TextHost): boolean {
         return (this.outUntil.get(host.name) ?? 0) > this.now();
+    }
+
+    /**
+     * Whether a host's balance reads at or below zero, so a call passes it over for `next` without
+     * asking it. An unknown balance never does. Logged once per host per `outOfCreditSkipMs` while
+     * it stays used up, and again after a reading above zero.
+     */
+    private async readsUsedUp(what: string, host: TextHost, next: TextHost): Promise<boolean> {
+        const { remainingUsd } = await this.creditOf(host);
+        if (remainingUsd === null || remainingUsd > 0) {
+            this.usedUpLoggedUntil.delete(host.name);
+            return false;
+        }
+        if ((this.usedUpLoggedUntil.get(host.name) ?? 0) <= this.now()) {
+            this.usedUpLoggedUntil.set(host.name, this.now() + this.outOfCreditSkipMs);
+            this.logger.warn(
+                `${what}: passing ${host.name} over, its balance reads ${remainingUsd < 0 ? '-' : ''}$${Math.abs(remainingUsd)} (at or below zero); sending calls to ${next.name} until it reads above zero. Said once per ${Math.round(this.outOfCreditSkipMs / 60_000)} min.`,
+            );
+        }
+        return true;
+    }
+
+    /** A host's balance, read at most once per `creditCacheMs`: the up-front skip and the text pool share it. */
+    private creditOf(host: TextHost): Promise<CreditBalance> {
+        const cached = this.hostCredit.get(host.name);
+        if (cached && this.now() - cached.readAt < this.creditCacheMs) return cached.reading;
+        const reading = this.readCredit('text', () => host.credit());
+        const entry = { readAt: this.now(), reading };
+        this.hostCredit.set(host.name, entry);
+        // Only a provider error is read as unknown; anything else fails this call and is read again next time.
+        reading.catch(() => {
+            if (this.hostCredit.get(host.name) === entry) this.hostCredit.delete(host.name);
+        });
+        return reading;
     }
 
     private rememberOutOfCredit(host: TextHost): void {
@@ -477,7 +519,7 @@ export class RealModelGateway extends ModelGateway {
             const host = hosts[at];
             const last = at === hosts.length - 1;
             if (!last && this.isOutOfCredit(host)) continue;
-            const reading = await this.readCredit('text', () => host.credit());
+            const reading = await this.creditOf(host);
             if (!last && reading.remainingUsd !== null && reading.remainingUsd <= 0) continue;
             return { ...reading, host: host.name };
         }

@@ -13,7 +13,7 @@ export interface PoolUsage {
     calls: number;
     /** This month's spend per call kind, most spent first; kinds with no calls are left out. */
     byKind: KindSpend[];
-    /** Read from the provider; null when it can't be read (Venice without an Admin key). */
+    /** Read from the provider; null when it can't be read (a provider error, or Venice with no key). */
     remainingUsd: number | null;
     /** What the pool holds when topped up (Settings); the base of the percent threshold. */
     capUsd: number;
@@ -91,7 +91,12 @@ export class UsageManagerService {
                 ? `${monthStart.getUTCFullYear()}-${String(monthStart.getUTCMonth() + 1).padStart(2, '0')}`
                 : `${monthStart.getFullYear()}-${String(monthStart.getMonth() + 1).padStart(2, '0')}`,
             pools: {
-                text: pool('text', settings.textCreditCapUsd, settings.textLowCreditPercent),
+                // Text on Venice spends the Venice balance, so it is sized and warned as the Venice pool is
+                // (.scratch/text-fallback/spec.md, "Low credit on Venice"): the text cap is OpenRouter's top-up.
+                text:
+                    ownerCredit.text.host === 'venice'
+                        ? pool('text', settings.imageCreditCapUsd, settings.imageLowCreditPercent)
+                        : pool('text', settings.textCreditCapUsd, settings.textLowCreditPercent),
                 image: pool('image', settings.imageCreditCapUsd, settings.imageLowCreditPercent),
             },
             monthlyCap: member && account.monthlyCapUsd !== null ? this.capUsage(account.monthlyCapUsd, spend.text.spentUsd + spend.image.spentUsd) : null,

@@ -30,7 +30,14 @@ export interface GatewayUnderTest {
  */
 export function gatewayUnderTest(
     fetchImpl: FetchLike,
-    options: { settings?: Partial<GatewayModelSettings>; veniceAdminKey?: string | undefined; textOnVenice?: boolean; textHosts?: TextHostName[] } = {},
+    options: {
+        settings?: Partial<GatewayModelSettings>;
+        veniceAdminKey?: string | undefined;
+        textOnVenice?: boolean;
+        textHosts?: TextHostName[];
+        /** How long a balance reading is reused; 0 (read every time) by default. */
+        creditCacheMs?: number;
+    } = {},
 ): GatewayUnderTest {
     const settings: GatewayModelSettings = {
         playModel: 'glm-5.3',
@@ -56,7 +63,7 @@ export function gatewayUnderTest(
                 records.push(record);
             },
         },
-        creditCacheMs: 0,
+        creditCacheMs: options.creditCacheMs ?? 0,
         sleep,
         now: () => clock.now,
     });
