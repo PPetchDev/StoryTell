@@ -464,6 +464,21 @@ export class BondLevelsDTO implements BondLevels {
     tension: number;
 }
 
+/** A Secret the Chat has revealed (.scratch/secret-reveals/spec.md). */
+export class SecretRevealDTO {
+    @ApiProperty()
+    secretId: number;
+
+    @ApiProperty({ description: 'Whose Secret it is.' })
+    characterId: number;
+
+    @ApiProperty({ description: 'The AI Message that told it: the "Secret revealed" card goes under it.' })
+    messageId: number;
+
+    @ApiProperty({ description: "The Secret, in the author's current words." })
+    text: string;
+}
+
 export class ChatBondDTO implements ChatBond {
     @ApiProperty()
     fromCharacterId: number;
@@ -632,6 +647,9 @@ export class ChatResponseBodyDTO extends ChatSummaryDTO implements Omit<ChatDeta
 
     @ApiProperty({ type: [BeliefDTO], description: 'Every Belief of the Chat, given-up ones included, oldest first.' })
     beliefs: BeliefDTO[];
+
+    @ApiProperty({ type: [SecretRevealDTO], description: 'The Secrets this Chat has revealed, in the order they came out (.scratch/secret-reveals/spec.md). Never one not yet revealed.' })
+    secretReveals: SecretRevealDTO[];
 }
 
 /** A Branch answers with the new Chat, plus the User Message's text when it was branched from one. */

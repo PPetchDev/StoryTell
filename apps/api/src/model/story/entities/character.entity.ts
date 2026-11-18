@@ -11,6 +11,7 @@ import type { Relation } from 'typeorm';
 
 import { EXPRESSION_EMOTIONS } from '../emotion.js';
 import type { CharacterExpressionEntity, ExpressionResponse } from './character-expression.entity.js';
+import type { CharacterSecretEntity, CharacterSecretResponse } from './character-secret.entity.js';
 import type { StoryEntity } from './story.entity.js';
 
 /** A square of the Reference image, in fractions of the image's width: left edge, top edge, side. */
@@ -38,6 +39,8 @@ export interface CharacterResponse {
     speakingVoice: string | null;
     /** Their pictures per emotion, in the fixed order of the emotions (.scratch/expressions/spec.md). */
     expressions: ExpressionResponse[];
+    /** Their Secrets one by one, in order, each with the Bond level it needs or none (.scratch/secret-reveals/spec.md). */
+    secretList: CharacterSecretResponse[];
 }
 
 /** An AI-played figure in one Story's cast. Ordered by `position` within the Story. */
@@ -99,6 +102,10 @@ export class CharacterEntity {
     @OneToMany('CharacterExpressionEntity', 'character')
     expressions: Relation<CharacterExpressionEntity[]>;
 
+    // Loaded only through StoryModelService.findFull(), in order; saved only through its own routes.
+    @OneToMany('CharacterSecretEntity', 'character')
+    secretList: Relation<CharacterSecretEntity[]>;
+
     toResponse(): CharacterResponse {
         return {
             id: this.id,
@@ -116,6 +123,7 @@ export class CharacterEntity {
             expressions: [...(this.expressions ?? [])]
                 .sort((a, b) => EXPRESSION_EMOTIONS.indexOf(a.emotion) - EXPRESSION_EMOTIONS.indexOf(b.emotion))
                 .map((expression) => expression.toResponse(this.referenceImagePath)),
+            secretList: [...(this.secretList ?? [])].sort((a, b) => a.position - b.position || a.id - b.id).map((secret) => secret.toResponse()),
         };
     }
 }

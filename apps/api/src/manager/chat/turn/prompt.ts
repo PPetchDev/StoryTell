@@ -16,6 +16,7 @@ import { nowLayer, PromptNowNote } from '../details/now-notes.js';
 import { EPILOGUE_MIN_TOKENS, epilogueFinalInstruction, epilogueInstruction, PromptEpilogue } from '../ending/ending.js';
 import { factsBlock, PromptFacts } from '../details/facts.js';
 import { ChatItem, itemsBlock } from '../details/items.js';
+import { CardSecret, cardSecretLines, secretsBlock, StorySecret } from '../secrets/secrets.js';
 import { repeatedPhrases, repeatedPhrasesLine } from '../speech/repeated-phrases.js';
 import { estimateTokens } from './prompt-tokens.js';
 
@@ -50,6 +51,8 @@ export interface PromptCharacter {
     exampleLines: string[];
     background: string;
     secrets: string;
+    /** Their Secrets one by one (.scratch/secret-reveals/spec.md); none, or left out, and the card is as before. */
+    secretList?: CardSecret[] | null;
 }
 
 export interface PromptScene {
@@ -265,6 +268,11 @@ export interface TurnPromptInput {
      * right after the Established facts. None, null or left out sends no block.
      */
     items?: ChatItem[] | null;
+    /**
+     * The Secrets each Character may now tell and those already told (.scratch/secret-reveals/spec.md),
+     * read in the trailing blocks after the Established facts. None, null or left out sends no block.
+     */
+    secrets?: { offered: StorySecret[]; revealed: StorySecret[] } | null;
 }
 
 export interface TurnPrompt {
@@ -440,11 +448,8 @@ function castCard(character: PromptCharacter): string {
         for (const line of character.exampleLines) lines.push(`- ${line}`);
     }
     if (character.background.trim()) lines.push(`Background: ${character.background}`);
-    if (character.secrets.trim()) {
-        lines.push(
-            `Secrets (known only to ${character.name}; no one else knows these unless ${character.name} reveals them): ${character.secrets}`,
-        );
-    }
+    // With their Secrets one by one (.scratch/secret-reveals/spec.md); with none, the line is as before.
+    lines.push(...cardSecretLines(character));
     return lines.join('\n');
 }
 
@@ -820,13 +825,14 @@ export function buildTurnPrompt(input: TurnPromptInput): TurnPrompt {
             [identity, ...input.story.characters.map((character) => character.name)],
         ),
     );
-    // One order (.scratch/sillytavern-gaps/integration.md): Lore, Documents, Author's note, Established facts, Items, Where things stand, Sudden event, Roll, Nudge, Cue, Repeated phrases, the final instruction.
+    // One order (.scratch/sillytavern-gaps/integration.md): Lore, Documents, Author's note, Established facts, Items, Secrets, Where things stand, Sudden event, Roll, Nudge, Cue, Repeated phrases, the final instruction.
     const finalInstruction = joinBlocks([
         lore,
         documentsBlock(input.documentPassages ?? []),
         authorsNoteBlock(input.authorsNote, identity),
         factsBlock(input.facts),
         itemsBlock(input.items, identity),
+        secretsBlock(input.secrets, identity),
         // With none of the turn's own lines, exactly the reminder and the final instruction as before.
         [
             stateReminder(input),

@@ -25,6 +25,7 @@ import { MessageSnapshots } from '@/components/chat/snapshots';
 import { ThaiReadingAction, ThaiReadingBlock, ThaiReadings } from '@/components/chat/thai-reading';
 import { MessageThoughts } from '@/components/chat/message-thoughts';
 import { ReplyCostLine } from '@/components/chat/reply-cost';
+import { RevealedSecretCards } from '@/components/chat/secret-reveals';
 import { ReplyCost, ReplyCosts } from '@/lib/reply-cost';
 import { BranchIcon, CameraIcon, ChevronLeftIcon, ChevronRightIcon, MoreIcon, PencilIcon, UndoIcon } from '@/components/icons';
 import { ConfirmButton } from '@/components/story-editor/fields';
@@ -641,6 +642,8 @@ const MessageView = memo(function MessageView({
                         {/* What each Character thought before it, behind a tap (.scratch/character-minds/spec.md). */}
                         {/* And, with "Show cost per reply" on, what it cost, in the same row (.scratch/cost-view/spec.md). */}
                         {message.kind === 'ai' && <MessageThoughts thoughts={message.thoughts} after={cost ? <ReplyCostLine cost={cost} /> : undefined} />}
+                        {/* A Secret this reply told the user (.scratch/secret-reveals/spec.md). */}
+                        {message.kind === 'ai' && <RevealedSecretCards messageId={message.id} />}
                     </>
                 )}
                 {/* Its Thai reading, or why one failed: under the story text, above the Snapshots. */}

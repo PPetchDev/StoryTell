@@ -23,6 +23,7 @@ import { StartingBondResponse } from '../../../model/story/entities/starting-bon
 import { SceneBondGateResponse } from '../../../model/story/entities/scene-bond-gate.entity.js';
 import { BOND_AXES } from '../../../model/ledger/bond-axes.js';
 import type { BondAxis } from '../../../model/ledger/bond-axes.js';
+import { CharacterSecretDTO } from './character-secret.dto.js';
 import {
     Backdrop,
     Balance,
@@ -256,6 +257,9 @@ export class CharacterDTO implements CharacterResponse {
 
     @ApiProperty({ type: [ExpressionDTO], description: 'Their picture per emotion, in the fixed order of the emotions.' })
     expressions: ExpressionDTO[];
+
+    @ApiProperty({ type: [CharacterSecretDTO], description: 'Their Secrets one by one, in order, each with the Bond level it needs (.scratch/secret-reveals/spec.md).' })
+    secretList: CharacterSecretDTO[];
 }
 
 /** One Opening question (.scratch/opening-questions/spec.md). */

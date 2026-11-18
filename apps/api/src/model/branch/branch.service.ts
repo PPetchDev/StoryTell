@@ -265,6 +265,13 @@ const copyLedger: CopyStep = async ({ manager, sourceChatId, chatId, messageIds,
          FROM "ending_reached" s JOIN ${remap} WHERE s."chat_id" = $2 ORDER BY s."id"`,
         params,
     );
+    // Secret reveals (.scratch/secret-reveals/spec.md): the Secrets are the Story's, so only the Message is remapped.
+    await manager.query(
+        `INSERT INTO "secret_reveal" ("chat_id", "secret_id", "message_id", "created_at")
+         SELECT $1, s."secret_id", msg."new_id", s."created_at"
+         FROM "secret_reveal" s JOIN ${remap} WHERE s."chat_id" = $2 ORDER BY s."id"`,
+        params,
+    );
     // Diary entries (.scratch/diary/spec.md): the rollback drops those written after N.
     await manager.query(
         `INSERT INTO "diary_entry" ("chat_id", "character_id", "message_id", "moment", "text", "inner_life", "created_at")

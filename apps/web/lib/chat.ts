@@ -282,6 +282,19 @@ export interface Chat extends ChatSummary {
     memoriesInPlay: MemoriesInPlay;
     /** Every Belief of the Chat, given-up ones included, oldest first. */
     beliefs: Belief[];
+    /**
+     * The Secrets this Chat has revealed (.scratch/secret-reveals/spec.md), in the order they came out,
+     * each with the AI Message that told it. Never one not yet revealed. Left out by an older API.
+     */
+    secretReveals?: SecretReveal[];
+}
+
+/** A Secret the Chat has revealed: a "Secret revealed" card under its Message, and in the profile. */
+export interface SecretReveal {
+    secretId: number;
+    characterId: number;
+    messageId: number;
+    text: string;
 }
 
 /** What the last turn's Memory choice sent, by id. */

@@ -21,6 +21,7 @@ import { SuddenEventStepEntity, SuddenEventStepKind } from './entities/sudden-ev
 import { DetailChangeEntity, DetailKind } from './entities/detail-change.entity.js';
 import { DiaryEntryEntity } from './entities/diary-entry.entity.js';
 import { EndingReachedEntity } from './entities/ending-reached.entity.js';
+import { SecretRevealEntity } from './entities/secret-reveal.entity.js';
 import { TimeChangeEntity } from './entities/time-change.entity.js';
 
 /** A StartingBond as it is seeded into a Chat: no event, no causing Message. */
@@ -145,6 +146,8 @@ export interface MessageChanges {
      * for none, which clears an earlier one. Left out, the Message keeps what it has.
      */
     rollOffer?: { stakes: string; stat: string | null } | null;
+    /** The Secrets this reply revealed, by id (.scratch/secret-reveals/spec.md); left out or empty when none. */
+    secretReveals?: number[];
 }
 
 /**
@@ -180,6 +183,8 @@ export interface LedgerState {
     endingsReached: EndingReachedEntity[];
     /** The Sudden events the Chat made up (.scratch/ai-events/spec.md), every proposal, oldest first. */
     chatSuddenEvents: SuddenEventEntity[];
+    /** The Secrets the Chat has revealed (.scratch/secret-reveals/spec.md), in the order they came out. */
+    secretReveals: SecretRevealEntity[];
 }
 
 /** Counts by kind for the rollback notice (spec: "3 Memories rolled back"). */
@@ -279,7 +284,7 @@ export class LedgerModelService {
     }
 
     async state(chatId: number): Promise<LedgerState> {
-        const [bondChanges, arcSteps, sceneAdvances, arcDirections, suddenEventSteps, detailChanges, endingsReached, chatSuddenEvents] = await Promise.all([
+        const [bondChanges, arcSteps, sceneAdvances, arcDirections, suddenEventSteps, detailChanges, endingsReached, chatSuddenEvents, secretReveals] = await Promise.all([
             this.bondChanges.find({ where: { chatId }, order: { id: 'ASC' } }),
             this.arcSteps.find({ where: { chatId }, order: { id: 'ASC' } }),
             this.sceneAdvances.find({ where: { chatId }, order: { id: 'ASC' } }),
@@ -288,8 +293,14 @@ export class LedgerModelService {
             this.detailChangesOf(chatId),
             this.endingsReachedOf([chatId]),
             this.chatSuddenEventsOf(chatId),
+            this.secretRevealsOf(chatId),
         ]);
-        return { bondChanges, arcSteps, sceneAdvances, arcDirections, suddenEventSteps, detailChanges, endingsReached, chatSuddenEvents };
+        return { bondChanges, arcSteps, sceneAdvances, arcDirections, suddenEventSteps, detailChanges, endingsReached, chatSuddenEvents, secretReveals };
+    }
+
+    /** The Secrets the Chat has revealed (.scratch/secret-reveals/spec.md), in the order they came out. */
+    secretRevealsOf(chatId: number): Promise<SecretRevealEntity[]> {
+        return this.dataSource.getRepository(SecretRevealEntity).find({ where: { chatId }, order: { id: 'ASC' } });
     }
 
     /** The records of these Chats reaching an Ending (.scratch/endings/spec.md), oldest first. */
@@ -504,6 +515,16 @@ export class LedgerModelService {
                     manager.create(SuddenEventEntity, { ...changes.newEvent, storyId: null, chatId, messageId, proposal: EventProposal.Offered, position: 0 }),
                 );
             }
+            if (changes.secretReveals && changes.secretReveals.length > 0) {
+                // Once per Secret per Chat: a Secret already revealed keeps its first record.
+                await manager
+                    .createQueryBuilder()
+                    .insert()
+                    .into(SecretRevealEntity)
+                    .values(changes.secretReveals.map((secretId) => ({ chatId, secretId, messageId })))
+                    .orIgnore()
+                    .execute();
+            }
             if (changes.details && changes.details.length > 0) {
                 await manager.save(changes.details.map((detail) => manager.create(DetailChangeEntity, { chatId, messageId, ...detail })));
             }
@@ -657,6 +678,8 @@ export class LedgerModelService {
             await manager.delete(DetailChangeEntity, { messageId: In(ids) });
             // An Ending reached there is no longer reached (.scratch/endings/spec.md). Not counted.
             await manager.delete(EndingReachedEntity, { messageId: In(ids) });
+            // A Secret revealed there is a Secret again (.scratch/secret-reveals/spec.md). Not counted.
+            await manager.delete(SecretRevealEntity, { messageId: In(ids) });
             // A Diary entry tells the story up to its Message: it goes with it (.scratch/diary/spec.md). Not counted.
             await manager.delete(DiaryEntryEntity, { messageId: In(ids) });
             // A Roll offer goes with the judgement that made it (.scratch/judge-rolls/spec.md), so it never shows on a new reply. Not counted.
@@ -690,6 +713,7 @@ export class LedgerModelService {
             await manager.delete(DetailChangeEntity, { chatId });
             await manager.delete(DiaryEntryEntity, { chatId });
             await manager.delete(EndingReachedEntity, { chatId });
+            await manager.delete(SecretRevealEntity, { chatId });
             await manager.delete(BeliefChangeEntity, { chatId });
             await manager.delete(BeliefEntity, { chatId });
             await manager.delete(MemoryChangeEntity, { chatId });

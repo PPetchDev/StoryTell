@@ -2,10 +2,11 @@
 
 import { useRef } from 'react';
 
+import { announce } from '@/components/announcer';
 import { CloseIcon } from '@/components/icons';
 import { CharacterPortrait } from '@/components/portrait/character-portrait';
 import { Portrait } from '@/lib/character-colour';
-import { Character, characterRemovalWarning, Story } from '@/lib/story';
+import { Character, characterRemovalWarning, CharacterSecretFields, Story, storyApi } from '@/lib/story';
 import { VoiceList } from '@/lib/voices';
 import { ADD_CHARACTER_ID } from './editor-tabs';
 import { useFieldMarks } from './field-marks';
@@ -14,6 +15,7 @@ import { Expressions } from './expressions';
 import { ChangedMark, ConfirmButton, FIELD_FLASH, FIELD_HINT, FIELD_INPUT, OrderButtons, TextField, Toolbar, WrappingLine } from './fields';
 import { cardToggle, FoldingCard, SUBSECTION, SUBSECTION_LEGEND } from './folding-card';
 import { ReferenceImage } from './reference-image';
+import { CharacterSecrets } from './character-secrets';
 import { VoiceField } from './voice-field';
 import { fieldDomId, FieldRewrites, rewritableField, rewriteKey } from './rewrite';
 import { UndoNotice, useUndo } from './undo-notice';
@@ -53,6 +55,9 @@ interface CharacterCardProps {
     commit(run: () => Promise<Story>, onError: (message: string) => void): Promise<Story | undefined>;
     /** A drawn Expression's answer, of which only the Expressions are taken. */
     onExpressionDrawn(story: Story): void;
+    /** Their Secrets one by one (.scratch/secret-reveals/spec.md): the Role's name the level reads, and one Secret's change. */
+    roleName?: string;
+    onSecret?(secretId: number, fields: CharacterSecretFields): void;
 }
 
 /** One Character on the Characters tab, folding. Their starting Bonds are on the Bonds tab. */
@@ -236,6 +241,15 @@ export function CharacterCard(props: CharacterCardProps) {
                 onChange={(v) => props.onText('secrets', v)}
                 {...ofCharacter('secrets')}
             />
+            {props.onSecret && (
+                <CharacterSecrets
+                    character={character}
+                    roleName={props.roleName ?? 'the Role'}
+                    onChange={props.onSecret}
+                    onAdd={() => props.commit(() => storyApi.addSecret(props.storyId, character.id), (message) => announce(message, 'assertive'))}
+                    onRemove={(secretId) => props.commit(() => storyApi.removeSecret(props.storyId, character.id, secretId), (message) => announce(message, 'assertive'))}
+                />
+            )}
             <TextField
                 label="Arc directions"
                 value={character.arcDirections}
