@@ -64,10 +64,14 @@ async function sentAlerts(page: Page): Promise<Sent[]> {
     return ((await (await page.request.get('/api/testing/push')).json()) as { sends: Sent[] }).sends;
 }
 
+/** Every Story a test here made, deleted after it so later files see none of them. */
+const madeStories: number[] = [];
+
 /** A Story with Mira and a Chat, and one reply played through the API. */
 async function playOneReply(page: Page): Promise<{ storyId: number; chatId: number; title: string }> {
     const { request } = page;
     const storyId = (await (await request.post('/api/stories', { data: { title: 'The Lighthouse' } })).json()).id as number;
+    madeStories.push(storyId);
     await request.patch(`/api/stories/${storyId}`, { data: { setting: 'A lighthouse on a storm-cut island.', opening: OPENING } });
     await request.patch(`/api/stories/${storyId}/role`, { data: { name: 'Ash', description: 'The new keeper.' } });
     await request.post(`/api/stories/${storyId}/characters`, {
@@ -111,6 +115,10 @@ test.describe('with VAPID keys', () => {
     test.beforeEach(async ({ page }) => {
         await page.request.delete('/api/testing/push');
         await stubPushService(page);
+    });
+
+    test.afterEach(async ({ request }) => {
+        for (const id of madeStories.splice(0)) await request.delete(`/api/stories/${id}`);
     });
 
     test('turning the switch on subscribes this device; a reply then alerts it; off stops that', async ({ page }) => {
@@ -158,7 +166,6 @@ test.describe('with VAPID keys', () => {
         // The turn's alert would have been sent by now; none was.
         await page.waitForTimeout(500);
         expect(await sentAlerts(page)).toEqual([]);
-        await page.request.delete(`/api/stories/${storyId}`);
     });
 
     test('blocked notifications keep the switch off and say where to allow them', async ({ page }) => {
