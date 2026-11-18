@@ -8,6 +8,7 @@ import { PASSED_BY_REPLIES } from '../scene-replies.js';
 import { JudgedSuddenEvent, readJudgedSuddenEvent } from '../sudden-event/sudden-event.js';
 import { DETAILS_EXTRA_TOKENS, JudgedDetails, readJudgedDetails } from '../details/details.js';
 import { ENDING_EXTRA_TOKENS, JudgedEnding, readJudgedEnding } from '../ending/ending.js';
+import { JudgedNow, NOW_EXTRA_TOKENS, readJudgedNow } from '../details/now-notes.js';
 import { ReplyPart } from '../turn/reply-parser.js';
 
 /**
@@ -101,6 +102,11 @@ export interface JudgePromptInput {
      * prompt is as it was before.
      */
     endingSection?: string | null;
+    /**
+     * The Now notes section (.scratch/growing-cards/spec.md), already worded, with its rule. It goes
+     * last, after the details section. Left out, the prompt is as it was before.
+     */
+    nowSection?: string | null;
 }
 
 /** How a Character sitting out is marked in the judge's cast (.scratch/speaker-controls/spec.md). */
@@ -276,7 +282,7 @@ ${input.recent.join('\n\n') || '(start)'}
 # LATEST EXCHANGE (judge this)
 ${exchangeUserLine(input.identityName, input.userText)}
 
-${input.expressionParts ? numberedReplyText(input.expressionParts) : input.aiText}${input.endingSection ? `\n\n${input.endingSection}` : ''}${input.detailsSection ? `\n\n${input.detailsSection}` : ''}`;
+${input.expressionParts ? numberedReplyText(input.expressionParts) : input.aiText}${input.endingSection ? `\n\n${input.endingSection}` : ''}${input.detailsSection ? `\n\n${input.detailsSection}` : ''}${input.nowSection ? `\n\n${input.nowSection}` : ''}`;
     return {
         messages: [
             { role: 'system', content: input.expressionParts ? SYSTEM_WITH_EXPRESSIONS : SYSTEM },
@@ -287,7 +293,8 @@ ${input.expressionParts ? numberedReplyText(input.expressionParts) : input.aiTex
             (input.expressionParts ? EXPRESSION_EXTRA_TOKENS : 0) +
             (input.suddenEventSection ? SUDDEN_EVENT_EXTRA_TOKENS : 0) +
             (input.endingSection ? ENDING_EXTRA_TOKENS : 0) +
-            (input.detailsSection ? DETAILS_EXTRA_TOKENS : 0),
+            (input.detailsSection ? DETAILS_EXTRA_TOKENS : 0) +
+            (input.nowSection ? NOW_EXTRA_TOKENS : 0),
     };
 }
 
@@ -332,6 +339,8 @@ export interface Judgement {
     details?: JudgedDetails | null;
     /** The Ending it says the story reached (.scratch/endings/spec.md); null or left out when none. */
     ending?: JudgedEnding | null;
+    /** The Now notes it gave (.scratch/growing-cards/spec.md); empty or left out when none. */
+    now?: JudgedNow[];
 }
 
 /** One numbered line's emotion (.scratch/expressions/spec.md). */
@@ -386,7 +395,12 @@ export function parseJudgement(text: string): Judgement {
         const emotion = str(item.emotion).toLowerCase();
         return isEmotion(emotion) ? [{ line: item.line, emotion }] : [];
     });
-    return { bondChanges, arcSteps, scenes, timeOfDay: readTimeOfDay(json.time_of_day), expressions, suddenEvent: readJudgedSuddenEvent(json.sudden_event), details: readJudgedDetails(detailsWithGoals(json.details, json.goals)), ending: readJudgedEnding(json.ending) };
+    return { bondChanges, arcSteps, scenes, timeOfDay: readTimeOfDay(json.time_of_day), expressions, suddenEvent: readJudgedSuddenEvent(json.sudden_event), details: readJudgedDetails(detailsWithGoals(json.details, json.goals)), ending: readJudgedEnding(json.ending), ...withNow(readJudgedNow(json.details, json.now)) };
+}
+
+/** The Now notes as a field of the judgement only when there are some, so a judgement without them reads as before. */
+function withNow(now: JudgedNow[]): { now?: JudgedNow[] } {
+    return now.length > 0 ? { now } : {};
 }
 
 /** Read loosely: an axis whose level is not a whole number in its range, or an unknown axis, is ignored. */

@@ -428,7 +428,7 @@ export class SnapshotManagerService {
         // The Place, the Weather and the Outfits as they stood at this moment (.scratch/info-box/spec.md):
         // only what the Messages up to the one shown had set, so a retake of an earlier moment is dressed as it was.
         const upTo = new Set(chat.messages.slice(0, index + 1).map((message) => message.id));
-        const details = currentDetails((await this.ledger.detailChangesOf(chat.id)).filter((change) => upTo.has(change.messageId)));
+        const details = currentDetails((await this.ledger.detailChangesOf(chat.id)).filter((change) => change.messageId !== null && upTo.has(change.messageId)));
         const written = await this.gateway.completeText({
             kind: 'snapshot_prompt',
             messages: snapshotPromptMessages({

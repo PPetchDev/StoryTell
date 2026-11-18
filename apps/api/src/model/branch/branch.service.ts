@@ -240,10 +240,11 @@ const copyLedger: CopyStep = async ({ manager, sourceChatId, chatId, messageIds 
         params,
     );
     // The Place, the Weather and the Outfits (.scratch/info-box/spec.md): the rollback drops those the Messages after N set.
+    // The user's own Now notes (.scratch/growing-cards/spec.md) have no Message, and come along as a Starting Bond does.
     await manager.query(
         `INSERT INTO "detail_change" ("chat_id", "kind", "character_id", "value", "message_id", "created_at")
          SELECT $1, s."kind", s."character_id", s."value", msg."new_id", s."created_at"
-         FROM "detail_change" s JOIN ${remap} WHERE s."chat_id" = $2 ORDER BY s."id"`,
+         FROM "detail_change" s LEFT JOIN ${remap} WHERE s."chat_id" = $2 AND (s."message_id" IS NULL OR msg."new_id" IS NOT NULL) ORDER BY s."id"`,
         params,
     );
     // The Ending reached (.scratch/endings/spec.md): the rollback drops it when a Message after N reached it.

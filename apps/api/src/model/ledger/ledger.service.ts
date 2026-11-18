@@ -308,6 +308,15 @@ export class LedgerModelService {
         return this.detailChanges.find({ where: { chatId }, order: { id: 'ASC' } });
     }
 
+    /**
+     * The user's own Now note for one Character (.scratch/growing-cards/spec.md): a detail record tied
+     * to no Message, so no rewind takes it away; "" clears the note. It is the newest record, so it is
+     * current until a later judgement changes the note.
+     */
+    async setUserNowNote(chatId: number, characterId: number, value: string): Promise<void> {
+        await this.detailChanges.save(this.detailChanges.create({ chatId, kind: DetailKind.Now, characterId, value, messageId: null }));
+    }
+
     /** The Chat's Sudden event steps alone, oldest first: what its event state is read from. */
     suddenEventStepsOf(chatId: number): Promise<SuddenEventStepEntity[]> {
         return this.suddenEventSteps.find({ where: { chatId }, order: { id: 'ASC' } });

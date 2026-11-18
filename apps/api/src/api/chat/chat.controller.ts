@@ -9,6 +9,7 @@ import {
     UpdateChatRequestBodyDTO,
     SendMessageRequestBodyDTO,
     SetAuthorsNoteRequestBodyDTO,
+    SetNowNoteRequestBodyDTO,
     SetSittingOutRequestBodyDTO,
     SwapIdentityRequestBodyDTO,
     TurnRequestBodyDTO,
@@ -92,6 +93,18 @@ export class ChatApiController {
         @Body() body: SetAuthorsNoteRequestBodyDTO,
     ): Promise<ChatResponseBodyDTO> {
         return this.chatManager.setAuthorsNote(storyId, chatId, body.text);
+    }
+
+    /** Sets the user's own Now note for one Character (.scratch/growing-cards/spec.md); whitespace only clears it. Never rolled back. */
+    @Put(':chatId/characters/:characterId/now')
+    @ApiOkResponse({ type: ChatResponseBodyDTO })
+    setNowNote(
+        @Id('storyId') storyId: number,
+        @Id('chatId') chatId: number,
+        @Id('characterId') characterId: number,
+        @Body() body: SetNowNoteRequestBodyDTO,
+    ): Promise<ChatResponseBodyDTO> {
+        return this.chatManager.setNowNote(storyId, chatId, characterId, body.text);
     }
 
     /** Replaces who is sitting out, read from the next turn on. Never rolled back. */

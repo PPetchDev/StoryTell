@@ -12,6 +12,8 @@ export const DETAIL_MAX: Record<DetailKind, number> = {
     [DetailKind.Weather]: 60,
     [DetailKind.Outfit]: 160,
     [DetailKind.Goal]: 160,
+    // A Now note (.scratch/growing-cards/spec.md): about three short sentences; see now-notes.ts.
+    [DetailKind.Now]: 300,
 };
 
 /** A recorded change, oldest first in a list. */

@@ -12,6 +12,7 @@ import { Roll, rollBlock } from '../roll.js';
 import { LINGERING_REPLIES } from '../scene-replies.js';
 import { PromptSuddenEvent, suddenEventBlock } from '../sudden-event/sudden-event.js';
 import { detailsReminder, PromptDetails } from '../details/details.js';
+import { nowLayer, PromptNowNote } from '../details/now-notes.js';
 import { EPILOGUE_MIN_TOKENS, epilogueFinalInstruction, epilogueInstruction, PromptEpilogue } from '../ending/ending.js';
 import { estimateTokens } from './prompt-tokens.js';
 
@@ -198,6 +199,11 @@ export interface TurnPromptInput {
      * the end: the Outfits of the Characters in the latest exchange only. Null or left out for none.
      */
     details?: PromptDetails | null;
+    /**
+     * Each Character's Now note (.scratch/growing-cards/spec.md), in cast order, with `{user}`: the
+     * "Changed in this Chat" moment layer, after the Arcs. None, or left out, and the prompt is as before.
+     */
+    nowNotes?: PromptNowNote[];
     /** Every Lore entry of the Story (spec: "Lore"); the Story so far reserves room for the most they can take. */
     lore?: PromptLoreEntry[];
     /**
@@ -578,6 +584,7 @@ export function promptLayers(input: PromptLayersInput): { standing: string; mome
         sceneLayer(input.scene, identity),
         feelingsLayer(input.bonds, identity),
         arcsLayer(input.arcs),
+        ...[nowLayer(input.nowNotes, identity)].filter((layer): layer is string => layer !== null),
         memory.text,
         ...(input.diaries && input.diaries.length > 0 ? [innerLifeLayer(input.diaries)] : []),
     ].join('\n\n');
@@ -644,7 +651,7 @@ export function turnFinalInstruction(identity: string): string {
  * essentials close.
  */
 export function stateReminder(
-    input: Pick<TurnPromptInput, 'story' | 'identity' | 'scene' | 'present' | 'timeOfDay' | 'sittingOut' | 'details'>,
+    input: Pick<TurnPromptInput, 'story' | 'identity' | 'scene' | 'present' | 'timeOfDay' | 'sittingOut' | 'details' | 'nowNotes'>,
 ): string {
     const sittingOut = input.sittingOut ?? [];
     // Someone sitting out is never "in the latest exchange", so the two hints never disagree.
@@ -657,7 +664,9 @@ export function stateReminder(
     if (details.wearing) lines.push(details.wearing);
     if (details.goals) lines.push(details.goals);
     if (sittingOut.length > 0) lines.push(sittingOutSentence(sittingOut));
-    lines.push(`Narrate in ${povAndTense(input.story, input.identity.name)}, and keep each Character as their card describes.`);
+    // With a Now note (.scratch/growing-cards/spec.md), the card as it has changed in this Chat; without one, as before.
+    const changed = (input.nowNotes ?? []).length > 0 ? ', with what has changed in this Chat' : '';
+    lines.push(`Narrate in ${povAndTense(input.story, input.identity.name)}, and keep each Character as their card describes${changed}.`);
     lines.push(`Gender ${input.identity.name} only as their description or the user's own messages do, whatever earlier turns said.`);
     return `Where things stand: ${lines.join(' ')}`;
 }

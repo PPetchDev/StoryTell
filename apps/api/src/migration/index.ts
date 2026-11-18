@@ -55,6 +55,7 @@ import { AutoDiary1764250000000 } from './1764250000000-AutoDiary.js';
 import { DiaryInnerLife1764260000000 } from './1764260000000-DiaryInnerLife.js';
 import { CharacterGoals1764270000000 } from './1764270000000-CharacterGoals.js';
 import { CharacterThoughts1764280000000 } from './1764280000000-CharacterThoughts.js';
+import { GrowingCards1764300000000 } from './1764300000000-GrowingCards.js';
 
 // Listed by hand, oldest first, so migrations load the same way from compiled JS, the
 // TypeORM CLI and Vitest. Add every new migration here.
@@ -116,4 +117,5 @@ export const migrations = [
     DiaryInnerLife1764260000000,
     CharacterGoals1764270000000,
     CharacterThoughts1764280000000,
+    GrowingCards1764300000000,
 ];
