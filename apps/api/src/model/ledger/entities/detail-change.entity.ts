@@ -21,6 +21,11 @@ export enum DetailKind {
     Fact = 'fact',
     /** What a reply said against an established fact, as `topic: what was said`; read by the next turn only. */
     Slip = 'slip',
+    /**
+     * What has lastingly changed about one Character in this Chat compared with their card, as facts
+     * (.scratch/growing-cards/spec.md); an empty value clears it.
+     */
+    Now = 'now',
 }
 
 /**
@@ -55,13 +60,17 @@ export class DetailChangeEntity {
     @Column({ type: 'text' })
     value: string;
 
+    /**
+     * The AI Message whose judgement set it; NULL for the user's own Now note
+     * (.scratch/growing-cards/spec.md), which no rewind of a Message takes away.
+     */
     @Index()
-    @Column({ name: 'message_id', type: 'integer' })
-    messageId: number;
+    @Column({ name: 'message_id', type: 'integer', nullable: true })
+    messageId: number | null;
 
-    @ManyToOne('MessageEntity', { onDelete: 'CASCADE' })
+    @ManyToOne('MessageEntity', { onDelete: 'CASCADE', nullable: true })
     @JoinColumn({ name: 'message_id' })
-    message: Relation<MessageEntity>;
+    message: Relation<MessageEntity> | null;
 
     @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
     createdAt: Date;

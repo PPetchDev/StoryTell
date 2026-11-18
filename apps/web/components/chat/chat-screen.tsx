@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { ChatBackdrop } from '@/components/chat/backdrop';
-import { useOpenProfile, useProfileChat, useProfileGoals, useProfileOutfits } from '@/components/chat/character-profile';
+import { useOpenProfile, useProfileChat, useProfileGoals, useProfileNow, useProfileOutfits } from '@/components/chat/character-profile';
 import { diaryEntrySeen, markDiaryEntrySeen } from '@/lib/diary-seen';
 import { CharacterRow } from '@/components/chat/character-row';
 import { ChatComposer } from '@/components/chat/chat-composer';
@@ -219,6 +219,16 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
     useProfileOutfits(chat.outfits);
     // And what they are after now (.scratch/character-minds/spec.md).
     useProfileGoals(chat.goals);
+    // And what has lastingly changed about them, which the user can edit there (.scratch/growing-cards/spec.md).
+    useProfileNow(chat.nowNotes, chat.identityName, async (characterId, text) => {
+        try {
+            setChat(await chatApi.setNowNote(chat.storyId, chat.id, characterId, text));
+            return null;
+        } catch (caught) {
+            if (caught instanceof ApiUnreachableError) reportUnreachable();
+            return caught instanceof ApiError ? caught.message : 'Something went wrong.';
+        }
+    });
     // And their Diary, which is written at the Chat's newest AI Message (.scratch/diary/spec.md).
     useProfileChat(chat.storyId, chat.id, chat.messages.findLast((message) => message.kind === 'ai')?.id ?? null);
 

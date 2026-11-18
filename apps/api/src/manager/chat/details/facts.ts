@@ -34,7 +34,8 @@ export interface FactSlip {
 export interface FactRecord {
     kind: DetailKind;
     value: string;
-    messageId?: number;
+    /** Null for a record the user made, which has no Message (.scratch/growing-cards/spec.md); facts and slips always have one. */
+    messageId?: number | null;
 }
 
 /** The facts and the slips a turn reads. */

@@ -1,12 +1,14 @@
 'use client';
 
-import { CSSProperties, createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { CSSProperties, createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
+import { TEXT_BOX } from '@/components/chat/chat-classes';
 import { DiaryChat, DiarySection } from '@/components/chat/diary-section';
 import { PortraitImage } from '@/components/portrait/portrait-image';
 import { Sheet } from '@/components/sheet/sheet';
 import { characterColour } from '@/lib/character-colour';
 import { EMOTION_LABEL } from '@/lib/expressions';
+import { renderUser } from '@/lib/memory';
 import { Character, referenceImageUrl } from '@/lib/story';
 
 
@@ -16,12 +18,27 @@ type OpenProfile = (characterId: number) => void;
 /** What the Characters are wearing now in the Chat on screen, by Character id (CONTEXT.md, "Outfit"). */
 type Outfits = Readonly<Record<number, string>>;
 
+/** The most a Now note may be (.scratch/growing-cards/spec.md): about three short sentences. */
+export const NOW_NOTE_MAX = 300;
+
+/**
+ * The Now notes of the Chat on screen (.scratch/growing-cards/spec.md): by Character id, with
+ * `{user}`; the worn identity's name to show it with; and how to save the user's own note, which
+ * answers an error to show, or null once saved.
+ */
+interface NowNotes {
+    notes: Readonly<Record<number, string>>;
+    identityName: string;
+    save(characterId: number, text: string): Promise<string | null>;
+}
+
 const ProfileContext = createContext<{
     open: OpenProfile;
     has(characterId: number): boolean;
     character(characterId: number): Character | undefined;
     setOutfits(outfits: Outfits): void;
     setGoals(goals: Outfits): void;
+    setNow(now: NowNotes | null): void;
     setChat(chat: DiaryChat | null): void;
 } | null>(null);
 
@@ -63,6 +80,33 @@ export function useProfileGoals(goals: ReadonlyArray<{ characterId: number; goal
 }
 
 /**
+ * Tells the profiles each Character's Now note in the Chat on screen (.scratch/growing-cards/spec.md),
+ * and how to save the user's own, so a profile shows "Changed in this Chat" and can edit it.
+ * Outside a Chat it does nothing, and no profile offers one.
+ */
+export function useProfileNow(
+    notes: ReadonlyArray<{ characterId: number; note: string }> | undefined,
+    identityName: string,
+    save: (characterId: number, text: string) => Promise<string | null>,
+): void {
+    const setNow = useContext(ProfileContext)?.setNow;
+    // The latest save, so a new one each render does not set the notes again.
+    const saveRef = useRef(save);
+    useEffect(() => {
+        saveRef.current = save;
+    });
+    const key = JSON.stringify(notes ?? []);
+    useEffect(() => {
+        setNow?.({
+            notes: Object.fromEntries((JSON.parse(key) as Array<{ characterId: number; note: string }>).map((entry) => [entry.characterId, entry.note])),
+            identityName,
+            save: (characterId, text) => saveRef.current(characterId, text),
+        });
+    }, [setNow, key, identityName]);
+    useEffect(() => () => setNow?.(null), [setNow]);
+}
+
+/**
  * The opener of a Character's profile, for a tap on their Portrait in a Chat; null outside a
  * Chat (as in the Opening preview) and for a speaker with no Character in the cast.
  */
@@ -100,8 +144,9 @@ export function CharacterProfiles({ characters, children }: { characters: readon
     const find = useCallback((characterId: number) => characters.find((character) => character.id === characterId), [characters]);
     const [outfits, setOutfits] = useState<Outfits>({});
     const [goals, setGoals] = useState<Outfits>({});
+    const [now, setNow] = useState<NowNotes | null>(null);
     const [chat, setChat] = useState<DiaryChat | null>(null);
-    const value = useMemo(() => ({ open: setOpenId, has, character: find, setOutfits, setGoals, setChat }), [has, find]);
+    const value = useMemo(() => ({ open: setOpenId, has, character: find, setOutfits, setGoals, setNow, setChat }), [has, find]);
     const character = characters.find((candidate) => candidate.id === openId);
     const close = useCallback(() => setOpenId(null), []);
 
@@ -114,6 +159,7 @@ export function CharacterProfiles({ characters, children }: { characters: readon
                     colour={characterColour(character.id, characters.map((member) => member.id))}
                     outfit={outfits[character.id] ?? null}
                     goal={goals[character.id] ?? null}
+                    now={now}
                     chat={chat}
                     onClose={close}
                 />
@@ -134,6 +180,7 @@ function CharacterProfileSheet({
     colour,
     outfit,
     goal,
+    now,
     chat,
     onClose,
 }: {
@@ -142,6 +189,8 @@ function CharacterProfileSheet({
     outfit: string | null;
     /** What they are after now in this Chat (.scratch/character-minds/spec.md); null with none. */
     goal: string | null;
+    /** The Chat's Now notes (.scratch/growing-cards/spec.md); null outside a Chat. */
+    now: NowNotes | null;
     chat: DiaryChat | null;
     onClose(): void;
 }) {
@@ -178,6 +227,8 @@ function CharacterProfileSheet({
                         <p className="m-0 leading-normal [overflow-wrap:anywhere]">{goal}</p>
                     </section>
                 )}
+                {/* What has lastingly changed about them in this Chat (.scratch/growing-cards/spec.md), which the user can edit. */}
+                {now && <NowSection key={character.id} characterId={character.id} name={name} now={now} />}
                 {/* Their Diary in this Chat, above who they are: it is what changes as the story goes. */}
                 {chat && <DiarySection chat={chat} characterId={character.id} name={name} />}
                 {character.expressions.length > 0 && (
@@ -201,5 +252,105 @@ function CharacterProfileSheet({
                 ))}
             </div>
         </Sheet>
+    );
+}
+
+/**
+ * "Changed in this Chat" (.scratch/growing-cards/spec.md): the Character's Now note, kept by the
+ * Judge as the story changes them, which the user can write, correct or clear. Shown with the worn
+ * identity's name for `{user}`; the API turns that name back into `{user}` when it keeps the note.
+ * With no note, a quiet button to write one.
+ */
+function NowSection({ characterId, name, now }: { characterId: number; name: string; now: NowNotes }) {
+    const stored = now.notes[characterId] ?? '';
+    const shown = renderUser(stored, now.identityName);
+    const [editing, setEditing] = useState(false);
+    const [value, setValue] = useState(shown);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const start = () => {
+        setValue(shown);
+        setError(null);
+        setEditing(true);
+    };
+    const save = async (text: string) => {
+        setSaving(true);
+        setError(null);
+        const failed = await now.save(characterId, text);
+        setSaving(false);
+        if (failed === null) setEditing(false);
+        else setError(failed);
+    };
+
+    if (!editing) {
+        return stored ? (
+            <section className="rounded-lg bg-surface-raised px-3.5 py-3" data-now-note>
+                <div className="mb-1 flex items-center justify-between gap-2">
+                    <h3 className="m-0 text-sm font-semibold text-muted">Changed in this Chat</h3>
+                    <button type="button" className="button button-quiet button-small" aria-label={`Edit what changed for ${name}`} onClick={start}>
+                        Edit
+                    </button>
+                </div>
+                <p className="m-0 leading-normal [overflow-wrap:anywhere]">{shown}</p>
+            </section>
+        ) : (
+            <button type="button" className="button button-quiet w-full" onClick={start}>
+                Add what changed in this Chat
+            </button>
+        );
+    }
+
+    const countId = `now-note-count-${characterId}`;
+    return (
+        <form
+            className="grid gap-2 rounded-lg bg-surface-raised px-3.5 py-3"
+            aria-label={`What changed for ${name} in this Chat`}
+            onSubmit={(event) => {
+                event.preventDefault();
+                void save(value);
+            }}
+            onKeyDown={(event) => {
+                if (event.key !== 'Escape') return;
+                event.stopPropagation();
+                setEditing(false);
+            }}
+        >
+            <h3 className="m-0 text-sm font-semibold text-muted">Changed in this Chat</h3>
+            <p className="m-0 text-md text-muted">
+                What is true of {name} now in this Chat, as facts: what they call you, what they are to you, what the story changed for good. The Narrator reads it
+                next to their card.
+            </p>
+            <textarea
+                className={`${TEXT_BOX} min-h-24 resize-y leading-[1.4]`}
+                aria-label={`What changed for ${name}`}
+                aria-describedby={countId}
+                placeholder={`Calls ${now.identityName} "my love". Married to ${now.identityName}.`}
+                value={value}
+                autoFocus
+                rows={4}
+                maxLength={NOW_NOTE_MAX}
+                onChange={(event) => setValue(event.target.value)}
+            />
+            <span id={countId} className="-mt-1 justify-self-end text-sm text-muted tabular-nums">
+                {value.length} / {NOW_NOTE_MAX}
+            </span>
+            {error && (
+                <p className="turn-error m-0 text-md" role="alert">
+                    {error}
+                </p>
+            )}
+            <button type="submit" className="button w-full" disabled={saving}>
+                Save
+            </button>
+            <div className="grid grid-cols-2 gap-2">
+                <button type="button" className="button button-quiet" disabled={saving || stored === ''} onClick={() => void save('')}>
+                    Clear
+                </button>
+                <button type="button" className="button button-quiet" disabled={saving} onClick={() => setEditing(false)}>
+                    Cancel
+                </button>
+            </div>
+        </form>
     );
 }

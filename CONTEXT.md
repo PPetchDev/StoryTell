@@ -218,6 +218,10 @@ _Avoid_: Affinity, relationship, love meter, stat, score
 An intended, lasting change to a Character's personality within one Chat, always traceable to an event in the story that caused it; a later event can turn it back. The user can see that a Character has changed and the events that changed them, but never the direction the author set, which would give the story away.
 _Avoid_: Drift, character development, evolution
 
+**Now note**:
+What has lastingly changed about one Character in one Chat compared with their card, in a few sentences of plain fact: what they call the user now, what they are to the user or to others, and what the story has changed in their life for good. The Judge keeps it as the story goes, and the user can write, correct or clear it on the Character's profile, under "Changed in this Chat"; the Narrator reads it next to the card, and where the two differ, the note holds. A change the Judge made goes back with the Message that caused it; the user's own wording stays until the story changes the note again. It is never a feeling (a Bond), a change of personality (an Arc), an aim, or a direction to the Narrator (an Author's note).
+_Avoid_: Status, override, character state, card edit
+
 **Diary**:
 What one Character writes in private, in their own voice, about one Chat's story: an **entry** now and then as the story goes (when a Scene ends, at an Ending or the Epilogue, and every so often between), or when the user asks, telling of what happened since their last one as they saw it, coloured by how they feel and what they know. It is for the user to read. With each entry the Character also writes a line or two of how they feel and what they mean to do, never shown; the Narrator reads only that line from their newest recent entry, never the entry, so nothing an entry tells becomes part of the story or a fact (a Memory). It never tells the Character's Secrets or Arc direction, and the Character never speaks of it. An entry is written at the Chat's newest AI Message and goes when that Message is taken back.
 _Avoid_: Journal, inner thoughts, monologue, log
@@ -259,7 +263,7 @@ The synthetic voice a Character's lines are read aloud in, chosen by the author;
 _Avoid_: TTS voice, audio voice
 
 **Character profile**:
-What a tap on a Character's Portrait in a Chat opens: their whole Reference image, name, what they are wearing, their Diary, Appearance, Personality, Voice and Background, but never their Secrets or Arc directions, which would give the story away.
+What a tap on a Character's Portrait in a Chat opens: their whole Reference image, name, what they are wearing, their Now note, their Diary, Appearance, Personality, Voice and Background, but never their Secrets or Arc directions, which would give the story away.
 _Avoid_: Bio, character card
 
 ## Accounts

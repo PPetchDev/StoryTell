@@ -80,7 +80,10 @@ test("a tap on a Character's picture opens their profile, which closes again", a
         await expect(profile).toBeFocused();
         await page.keyboard.press('Tab');
         await expect(profile.getByRole('button', { name: 'Close' })).toBeFocused();
-        // Her Diary's button is the only other stop (.scratch/diary/spec.md); past it, focus comes round to Close.
+        // Writing what changed in this Chat (.scratch/growing-cards/spec.md) and her Diary's button
+        // (.scratch/diary/spec.md) are the only other stops; past them, focus comes round to Close.
+        await page.keyboard.press('Tab');
+        await expect(profile.getByRole('button', { name: 'Add what changed in this Chat' })).toBeFocused();
         await page.keyboard.press('Tab');
         await expect(profile.getByRole('region', { name: 'Diary' }).getByRole('button', { name: 'Write an entry' })).toBeFocused();
         await page.keyboard.press('Tab');

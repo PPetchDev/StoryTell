@@ -57,6 +57,7 @@ import { CharacterGoals1764270000000 } from './1764270000000-CharacterGoals.js';
 import { EstablishedFacts1764300000000 } from './1764300000000-EstablishedFacts.js';
 import { CharacterThoughts1764280000000 } from './1764280000000-CharacterThoughts.js';
 import { UsageCachedTokens1764295000000 } from './1764295000000-UsageCachedTokens.js';
+import { GrowingCards1764310000000 } from './1764310000000-GrowingCards.js';
 
 // Listed by hand, oldest first, so migrations load the same way from compiled JS, the
 // TypeORM CLI and Vitest. Add every new migration here.
@@ -120,4 +121,6 @@ export const migrations = [
     CharacterThoughts1764280000000,
     UsageCachedTokens1764295000000,
     EstablishedFacts1764300000000,
+    // After EstablishedFacts, which writes the kind check as a fixed list without `now`.
+    GrowingCards1764310000000,
 ];

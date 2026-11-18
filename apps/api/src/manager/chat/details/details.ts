@@ -15,6 +15,8 @@ export const DETAIL_MAX: Record<DetailKind, number> = {
     // Established facts keep their own limits (facts.ts); these only bound a record.
     [DetailKind.Fact]: 190,
     [DetailKind.Slip]: 190,
+    // A Now note (.scratch/growing-cards/spec.md): about three short sentences; see now-notes.ts.
+    [DetailKind.Now]: 300,
 };
 
 /** A recorded change, oldest first in a list. */

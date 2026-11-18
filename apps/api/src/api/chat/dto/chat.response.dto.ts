@@ -250,6 +250,14 @@ export class ChatGoalDTO {
     goal: string;
 }
 
+export class ChatNowNoteDTO {
+    @ApiProperty()
+    characterId: number;
+
+    @ApiProperty({ description: 'What has lastingly changed about the Character in this Chat, as facts (.scratch/growing-cards/spec.md); `{user}` stands for the user.' })
+    note: string;
+}
+
 export class MessageDTO {
     @ApiProperty()
     id: number;
@@ -436,6 +444,9 @@ export class ChatResponseBodyDTO extends ChatSummaryDTO implements Omit<ChatDeta
 
     @ApiProperty({ type: () => ChatGoalDTO, isArray: true, description: 'What each Character is after now, for those who are after something, in cast order.' })
     goals: ChatGoalDTO[];
+
+    @ApiProperty({ type: () => ChatNowNoteDTO, isArray: true, description: "Each Character's Now note, for those with one, in cast order." })
+    nowNotes: ChatNowNoteDTO[];
 
     @ApiProperty({ description: 'The worn identity, under which the next User Message shows.' })
     identityName: string;

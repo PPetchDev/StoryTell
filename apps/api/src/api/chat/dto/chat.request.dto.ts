@@ -3,6 +3,7 @@ import { IsArray, IsBoolean, IsInt, IsOptional, IsString, MaxLength, Min, Valida
 
 import type { ChatFields } from '../../../manager/chat/chat.service.js';
 import { CUE_MAX } from '../../../manager/chat/turn/prompt.js';
+import { NOW_MAX } from '../../../manager/chat/details/now-notes.js';
 import { WRITE_FOR_ME_DRAFT_MAX } from '../../../manager/chat/write-for-me/write-for-me-prompt.js';
 
 const TITLE_MAX = 200;
@@ -93,6 +94,16 @@ export class ChooseReplyVersionRequestBodyDTO {
     @IsInt()
     @Min(1)
     version: number;
+}
+
+export class SetNowNoteRequestBodyDTO {
+    @ApiProperty({
+        maxLength: NOW_MAX,
+        description: "The user's own Now note for the Character (.scratch/growing-cards/spec.md): what has lastingly changed about them in this Chat, as facts. Trimmed; whitespace only clears it.",
+    })
+    @IsString()
+    @MaxLength(NOW_MAX)
+    text: string;
 }
 
 /** .scratch/authors-note/spec.md: about 250 tokens, so the note never crowds the story out of the prompt. */

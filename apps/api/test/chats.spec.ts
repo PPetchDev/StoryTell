@@ -1217,7 +1217,7 @@ describe('Chats through the real gateway', () => {
             provider: { only: ['deepinfra'], allow_fallbacks: false },
             reasoning: { enabled: false },
             response_format: { type: 'json_object' },
-            max_tokens: 1040, // 700, the 180 the Place, weather, outfits and goals answer takes (.scratch/info-box/spec.md, .scratch/character-minds/spec.md) and 160 for the Established facts (.scratch/story-quality/spec.md)
+            max_tokens: 1160, // 700, the 180 the Place, weather, outfits and goals answer takes (.scratch/info-box/spec.md, .scratch/character-minds/spec.md), 160 for the Established facts (.scratch/story-quality/spec.md) and 120 for the Now notes (.scratch/growing-cards/spec.md)
         });
         expect(judgeRequest.body).not.toHaveProperty('stop');
         expect(memoryRequest.body).toMatchObject({

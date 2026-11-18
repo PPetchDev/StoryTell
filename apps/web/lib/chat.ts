@@ -174,6 +174,8 @@ export interface Chat extends ChatSummary {
     characterThoughts: boolean;
     /** What each Character is after now, for those who are after something (.scratch/character-minds/spec.md). */
     goals?: Array<{ characterId: number; goal: string }>;
+    /** What has lastingly changed about each Character in this Chat (.scratch/growing-cards/spec.md), for those with a Now note; `note` with `{user}`. */
+    nowNotes?: Array<{ characterId: number; note: string }>;
     /** Entries are being written by themselves right now: the Chat screen re-reads until they are done. */
     diaryWriting: boolean;
     /** Each Character's newest Diary entry: a new one is shown as a toast. */
@@ -435,6 +437,9 @@ export const chatApi = {
     /** Sets the Author's note, read from the next turn on; an empty text clears it. */
     setAuthorsNote: (storyId: number, chatId: number, text: string) =>
         apiSend<Chat>('PUT', `/stories/${storyId}/chats/${chatId}/authors-note`, { text }),
+    /** Sets the user's own Now note for one Character (.scratch/growing-cards/spec.md); an empty text clears it. */
+    setNowNote: (storyId: number, chatId: number, characterId: number, text: string) =>
+        apiSend<Chat>('PUT', `/stories/${storyId}/chats/${chatId}/characters/${characterId}/now`, { text }),
     /** Replaces who is sitting out, read from the next turn on; an empty list brings everyone back. */
     setSittingOut: (storyId: number, chatId: number, characterIds: number[]) =>
         apiSend<Chat>('PUT', `/stories/${storyId}/chats/${chatId}/sitting-out`, { characterIds }),

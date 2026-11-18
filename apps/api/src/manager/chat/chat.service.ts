@@ -114,6 +114,8 @@ import { endingName, endingReady, endingState, EndingView, endingView, promptEpi
 import { eventReady, eventState, promptSuddenEvent, SuddenEventView, suddenEventView } from './sudden-event/sudden-event.js';
 import { currentDetails, promptDetails } from './details/details.js';
 import { promptFacts } from './details/facts.js';
+import { castNowNotes, currentNowNotes, tidyNow } from './details/now-notes.js';
+import type { PromptNowNote } from './details/now-notes.js';
 
 /** A Chat as a Story's Chat list shows it (spec: "Lists and Home"). */
 export interface ChatListItem extends ChatSummary {
@@ -168,6 +170,11 @@ export interface ChatDetail extends ChatSummary {
     outfits: Array<{ characterId: number; outfit: string }>;
     /** What each Character is after now (.scratch/character-minds/spec.md), for those who are after something, in cast order. */
     goals: Array<{ characterId: number; goal: string }>;
+    /**
+     * What has lastingly changed about each Character in this Chat (.scratch/growing-cards/spec.md),
+     * for those with a Now note, in cast order; `note` with `{user}`.
+     */
+    nowNotes: Array<{ characterId: number; note: string }>;
     /** The worn identity's name, under which the next User Message shows. */
     identityName: string;
     /** The worn Persona; null while the Chat wears its Story's Role. */
@@ -978,6 +985,22 @@ export class ChatManagerService {
     }
 
     /**
+     * .scratch/growing-cards/spec.md: the user's own Now note for one Character of the cast, tidied
+     * as the Judge's is (one line, the worn identity's name as `{user}`, at most `NOW_MAX`), read from
+     * the next turn on; whitespace only clears it. Tied to no Message, so no rewind takes it away.
+     * Like the Author's note it takes no turn lock: a judgement already running may still change it.
+     */
+    async setNowNote(storyId: number, chatId: number, characterId: number, text: string): Promise<ChatDetail> {
+        const { story, chat } = await this.load(storyId, chatId);
+        if (!story.characters.some((character) => character.id === characterId)) throw new CharacterNotFoundError();
+        const value = tidyNow(text, wornIdentity(story, chat).name);
+        const current = castNowNotes(currentNowNotes(await this.ledger.detailChangesOf(chat.id)), story.characters).find((entry) => entry.characterId === characterId);
+        // Clearing what is not there, or writing what is, changes nothing.
+        if (value === '' ? current !== undefined : current?.note !== value) await this.ledger.setUserNowNote(chat.id, characterId, value);
+        return this.getChat(storyId, chatId);
+    }
+
+    /**
      * .scratch/speaker-controls/spec.md, "Sitting out": replaces the whole set of Characters kept
      * out of this Chat's turns. An id outside the Story's cast is refused. Like the Author's note
      * it takes no turn lock and waits for no background call: a turn already being written
@@ -1763,6 +1786,7 @@ export class ChatManagerService {
                 const goal = details.goals.find((entry) => entry.characterId === character.id)?.goal;
                 return goal ? [{ characterId: character.id, goal }] : [];
             }),
+            nowNotes: castNowNotes(currentNowNotes(detailChanges), story.characters).map(({ characterId, note }) => ({ characterId, note })),
             identityName: identity.name,
             personaId: identity.personaId,
             roleName: story.role.name,
@@ -1856,7 +1880,7 @@ function promptScene(story: StoryEntity, chat: ChatEntity, state: LedgerState, i
     };
 }
 
-function promptLayers(story: StoryEntity, state: LedgerState): { bonds: PromptBond[]; arcs: PromptArc[] } {
+function promptLayers(story: StoryEntity, state: LedgerState): { bonds: PromptBond[]; arcs: PromptArc[]; nowNotes: PromptNowNote[] } {
     const nameOf = (characterId: number): string | null =>
         story.characters.find((character) => character.id === characterId)?.name ?? null;
     return {
@@ -1871,6 +1895,8 @@ function promptLayers(story: StoryEntity, state: LedgerState): { bonds: PromptBo
             steps: state.arcSteps.filter((step) => step.characterId === character.id).map((step) => step.step),
             direction: state.arcDirections.find((direction) => direction.characterId === character.id)?.text ?? '',
         })),
+        // Each Character's Now note (.scratch/growing-cards/spec.md), in cast order, next to the Arcs.
+        nowNotes: castNowNotes(currentNowNotes(state.detailChanges), story.characters).map(({ name, note }) => ({ name, note })),
     };
 }
 

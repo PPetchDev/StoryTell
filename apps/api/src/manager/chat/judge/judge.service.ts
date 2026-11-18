@@ -15,6 +15,7 @@ import { repliesInScene } from '../scene-replies.js';
 import { applySuddenEvent, eventState, judgeSuddenEventSection } from '../sudden-event/sudden-event.js';
 import { applyDetails, currentDetails, judgeDetailsSection } from '../details/details.js';
 import { applyFacts, currentFacts, judgeFactsSection } from '../details/facts.js';
+import { applyNow, currentNowNotes, judgeNowSection } from '../details/now-notes.js';
 import { applyEnding, ENDING_SUGGEST_AFTER_REPLIES, endingState, judgeEndingSection } from '../ending/ending.js';
 import { AUTHOR_MODEL } from '../../../model/chat/entities/message.entity.js';
 import { Attempt, BackgroundRuns } from '../background-runs.js';
@@ -152,6 +153,8 @@ export class JudgeManagerService {
             const detailsCast = story.characters.map((character) => ({ id: character.id, name: character.name }));
             // The Chat's Established facts before this reply (.scratch/story-quality/spec.md), read the same way.
             const facts = currentFacts(state.detailChanges.filter((change) => change.messageId !== message.id));
+            // The Now notes before this reply (.scratch/growing-cards/spec.md), read the same way; the user's own have no Message.
+            const nowNotes = currentNowNotes(state.detailChanges.filter((change) => change.messageId !== message.id));
             // The Chat's Ending before this reply (.scratch/endings/spec.md), read the same way: only one not yet reached is asked about.
             const endings = endingState(
                 story.endings ?? [],
@@ -209,6 +212,7 @@ export class JudgeManagerService {
                 detailsSection: judgeDetailsSection(details, detailsCast),
                 endingSection: judgeEndingSection(endings),
                 factsSection: judgeFactsSection(facts),
+                nowSection: judgeNowSection(nowNotes, detailsCast),
             });
 
             const result = await this.gateway.completeText({
@@ -247,7 +251,8 @@ export class JudgeManagerService {
             const detailed = applyDetails({ current: details, cast: detailsCast, sittingOut }, judgement.details ?? null);
             const ended = applyEnding(endings, judgement.ending ?? null);
             const facted = applyFacts(facts, judgement.facts ?? null);
-            for (const reason of [...applied.rejected, ...stepped.rejected, ...detailed.rejected, ...ended.rejected, ...facted.rejected]) {
+            const noted = applyNow({ current: nowNotes, cast: detailsCast, sittingOut, identityName }, judgement.now ?? []);
+            for (const reason of [...applied.rejected, ...stepped.rejected, ...detailed.rejected, ...noted.rejected, ...ended.rejected, ...facted.rejected]) {
                 this.logger.log(`Chat ${chat.id}, Message ${message.id}: judge item dropped: ${reason}`);
             }
             if (applied.passedBy !== null && applied.scene) {
@@ -258,7 +263,7 @@ export class JudgeManagerService {
             // Written with the rest of the judgement, in its one transaction, never after it. Without
             // Expressions the parts are not touched, so the record is exactly as before.
             const emotions = tagLines ? emotionsOfParts(message.parts, judgement.expressions) : undefined;
-            await this.ledger.record(chat.id, message.id, { ...applied, suddenEvent: stepped.step, details: [...detailed.changes, ...facted.changes], ending: ended.reached, ...(emotions ? { emotions } : {}) });
+            await this.ledger.record(chat.id, message.id, { ...applied, suddenEvent: stepped.step, details: [...detailed.changes, ...facted.changes, ...noted.changes], ending: ended.reached, ...(emotions ? { emotions } : {}) });
             return { ok: true };
         } catch (error) {
             const reason = error instanceof AppError ? error.message : `Unexpected error: ${String(error)}`;
