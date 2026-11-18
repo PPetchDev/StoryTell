@@ -16,6 +16,8 @@ import {
 import { documentsReserveTokens } from '../../document/document-search.js';
 import { loreReserveTokens } from '../lore/lore-select.js';
 import { beliefCost, memoryCost } from '../memory/memory-choice.js';
+import { factsBlock } from '../details/facts.js';
+import { REPEATS_RESERVE_TOKENS } from '../speech/repeated-phrases.js';
 
 /**
  * The Story so far (spec: "Story so far"): when it is written, and the call that writes it.
@@ -71,6 +73,9 @@ export function storySoFarCoverage(layers: PromptLayersInput, history: PromptHis
         (layers.hasSuddenEvents ? SUDDEN_EVENT_RESERVE_TOKENS : 0) +
         // The Author's note, as the Chat holds it when the check runs.
         estimateTokens(authorsNoteBlock(layers.authorsNote, layers.identity.name) ?? '') +
+        // The Established facts as they stand, and a line of repeated phrases (.scratch/story-quality/spec.md).
+        estimateTokens(factsBlock(layers.facts) ?? '') +
+        REPEATS_RESERVE_TOKENS +
         estimateTokens(`${reminder}
 ${turnFinalInstruction(layers.identity.name)}`);
     const room = budget - fixed;

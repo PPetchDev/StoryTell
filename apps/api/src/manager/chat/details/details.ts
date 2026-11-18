@@ -12,6 +12,9 @@ export const DETAIL_MAX: Record<DetailKind, number> = {
     [DetailKind.Weather]: 60,
     [DetailKind.Outfit]: 160,
     [DetailKind.Goal]: 160,
+    // Established facts keep their own limits (facts.ts); these only bound a record.
+    [DetailKind.Fact]: 190,
+    [DetailKind.Slip]: 190,
 };
 
 /** A recorded change, oldest first in a list. */

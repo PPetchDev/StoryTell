@@ -5,6 +5,7 @@ import { ProviderOutageError } from '../src/errors/model-gateway.errors.js';
 import { FAKE_TEXT_MODEL } from '../src/service/model-gateway/fake-model-gateway.js';
 import { TextCompletionRequest } from '../src/service/model-gateway/model-gateway.js';
 import { judgeDetailsSection } from '../src/manager/chat/details/details.js';
+import { judgeFactsSection } from '../src/manager/chat/details/facts.js';
 import { startTestApp, TestApp } from './harness/test-app.js';
 
 /** The rule line that closes the judge's Place, weather and outfits section (.scratch/info-box/spec.md): the same words every turn. */
@@ -328,7 +329,7 @@ describe('The Bond, Arc and Scene judge, the ledger and the dashboard', () => {
             expect(lastAi(played).judge).toEqual({ status: 'done', error: null });
             const calls = t.gateway.textCalls('judge');
             expect(calls).toHaveLength(1);
-            expect(calls[0]).toMatchObject({ kind: 'judge', json: true, maxTokens: 880, servedFor: { storyId: story.id, chatId: chat.id } });
+            expect(calls[0]).toMatchObject({ kind: 'judge', json: true, maxTokens: 1040, servedFor: { storyId: story.id, chatId: chat.id } });
             expect(calls[0].messages.map((message) => message.role)).toEqual(['system', 'user']);
             expect(calls[0].messages[0].content).toContain('At most one change per Bond per turn.');
             expect(calls[0].messages[1].content).toBe(`# Cast
@@ -371,7 +372,9 @@ Weather: not yet known
 Wearing: Mira: not yet known; Kai: not yet known
 Goals: Mira: none yet; Kai: none yet
 ${DETAILS_RULE}
-${GOALS_RULE}`);
+${GOALS_RULE}
+
+${judgeFactsSection([])}`);
         });
 
         it('applies a judgement: the Bond change, Arc step and Scene advance are recorded with their events, before and after, and the causing Message', async () => {

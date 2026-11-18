@@ -182,6 +182,10 @@ _Avoid_: Note, lorebook entry, context, summary
 Something one Character holds to be true within one Chat, which may be false: a lie they were told, a mistake, a guess. Unlike a Memory it is that Character's alone, and it may contradict a Memory; when the story shows them the truth, the Belief is given up. A Story may set **Starting Beliefs** that every new Chat begins with.
 _Avoid_: False memory, misconception, rumour
 
+**Established fact**:
+One of a Chat's canon numbers, ages, lengths of time, dates, names and ties ("Nara's years at the stall: nine summers"), recorded by the Judge as the story states it and changed only when the story itself changes it. The Narrator reads them every turn, and they win over a Memory, the Story so far or an earlier Message that says otherwise. A Message that told one differently is a **slip**, which the next turn is told not to repeat.
+_Avoid_: Canon, lore fact, stat
+
 **Memory graph**:
 A picture of a Chat's Memories, shown in place of their list when the user chooses it: the identity the user wears and the Characters as people, and each Memory as a dot linked to the people it is about. Who a Memory is about is read from its text (`{user}` or a name), or failing that is the Characters who know it; it is not stored, and it is a different thing from who knows the Memory. On request it also draws the Bonds between the people.
 _Avoid_: Mind map, knowledge graph, relationship map
