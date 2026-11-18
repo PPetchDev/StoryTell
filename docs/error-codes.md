@@ -32,6 +32,7 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | 008 | Saved replies and Replace rules |
 | 009 | Audio (Dictation) |
 | 010 | Sign-in |
+| 011 | Alerts (Web Push) |
 
 ## Codes
 
@@ -159,3 +160,5 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | `404.010.012` | `PersonNotFoundError` | A People id that isn't listed (or was removed). |
 | `429.010.013` | `TooManyCallsAtOnceError` | A Member starting a paid call while 4 of theirs still run. Try again when they finish. |
 | `403.010.014` | `EmailNotProvenError` | A first Supabase sign-in by email + password claiming a listed email, while `SUPABASE_EMAILS_CONFIRMED` isn't set: with "Confirm email" off in Supabase, anyone could have made that Supabase user. Signing in with Google proves the email. |
+| `404.011.001` | `AlertsOffError` | `PUT /api/push/subscription` while the server has no VAPID keys (.scratch/push-alerts/spec.md). The Settings card is hidden then, so it is only seen by a stale page. |
+| `422.011.002` | `UnknownPushServiceError` | A push subscription whose endpoint is not https on a known push service (FCM, Mozilla, Apple, Windows). Nothing is stored. |

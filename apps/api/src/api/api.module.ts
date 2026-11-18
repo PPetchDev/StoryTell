@@ -12,6 +12,7 @@ import { MemoryApiModule } from './memory/memory.module.js';
 import { StorySoFarApiModule } from './story-so-far/story-so-far.module.js';
 import { PeopleApiModule } from './people/people.module.js';
 import { PersonaApiModule } from './persona/persona.module.js';
+import { PushApiModule } from './push/push.module.js';
 import { SavedReplyApiModule } from './saved-reply/saved-reply.module.js';
 import { ReplaceRuleApiModule } from './replace-rule/replace-rule.module.js';
 import { ReferenceImageApiModule } from './reference-image/reference-image.module.js';
@@ -46,6 +47,7 @@ import { VoiceApiModule } from './voice/voice.module.js';
         ReplaceRuleApiModule,
         SnapshotApiModule,
         BackupApiModule,
+        PushApiModule,
     ],
     controllers: [HealthApiController],
 })

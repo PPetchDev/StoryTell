@@ -58,7 +58,19 @@ export abstract class AppConfig {
      * (.scratch/accounts/spec.md: "Supabase sign-in").
      */
     abstract readonly supabaseEmailsConfirmed: boolean;
+    /** Reply alerts' Web Push keys (.scratch/push-alerts/spec.md). Unset: alerts are off and hidden. */
+    abstract readonly vapid: VapidConfig | undefined;
 }
+
+/** The VAPID pair as `web-push generate-vapid-keys` prints it (base64url), and the contact the push service sees. */
+export interface VapidConfig {
+    readonly publicKey: string;
+    readonly privateKey: string;
+    readonly subject: string;
+}
+
+/** .scratch/push-alerts/spec.md: "Keys and config". */
+export const DEFAULT_VAPID_SUBJECT = 'https://storytell.invalid';
 
 /** Spec: "Sign-in". A shorter password is refused at start-up. */
 export const LOGIN_PASSWORD_MIN = 12;
@@ -105,6 +117,33 @@ function readTextHosts(env: NodeJS.ProcessEnv): TextHost[] {
 }
 
 export class ConfigError extends Error {}
+
+/** A base64url string's decoded length, or -1 when it isn't base64url. */
+function base64UrlBytes(text: string): number {
+    if (!/^[A-Za-z0-9_-]+$/.test(text)) return -1;
+    return Buffer.from(text, 'base64url').length;
+}
+
+/**
+ * VAPID_PUBLIC_KEY + VAPID_PRIVATE_KEY (+ VAPID_SUBJECT). Neither: alerts are off. Half a pair or a
+ * malformed key fails start-up, so a typo never leaves alerts silently off.
+ */
+function readVapid(env: NodeJS.ProcessEnv): VapidConfig | undefined {
+    const publicKey = env.VAPID_PUBLIC_KEY?.trim() || undefined;
+    const privateKey = env.VAPID_PRIVATE_KEY?.trim() || undefined;
+    if (publicKey === undefined && privateKey === undefined) return undefined;
+    if (publicKey === undefined || privateKey === undefined) {
+        throw new ConfigError('VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY go together: set both, or neither to turn reply alerts off.');
+    }
+    // An uncompressed P-256 point, and a P-256 private scalar.
+    if (base64UrlBytes(publicKey) !== 65) throw new ConfigError('VAPID_PUBLIC_KEY must be the base64url public key `web-push generate-vapid-keys` prints.');
+    if (base64UrlBytes(privateKey) !== 32) throw new ConfigError('VAPID_PRIVATE_KEY must be the base64url private key `web-push generate-vapid-keys` prints.');
+    const subject = env.VAPID_SUBJECT?.trim() || DEFAULT_VAPID_SUBJECT;
+    if (!/^(mailto:\S+|https:\/\/\S+)$/.test(subject)) {
+        throw new ConfigError(`VAPID_SUBJECT must be a mailto: or https: address; got "${subject}"`);
+    }
+    return { publicKey, privateKey, subject };
+}
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     const missing = ['PORT', 'DATABASE_URL', 'IMAGE_DIR'].filter((name) => !env[name]);
@@ -174,6 +213,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
         ownerEmail: env.OWNER_EMAIL || undefined,
         supabaseAnonKey: env.SUPABASE_ANON_KEY || undefined,
         supabaseEmailsConfirmed: env.SUPABASE_EMAILS_CONFIRMED === 'true',
+        vapid: readVapid(env),
         databaseUrl: env.DATABASE_URL!,
         imageDir,
         speechDir,
