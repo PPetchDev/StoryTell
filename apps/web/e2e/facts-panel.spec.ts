@@ -133,5 +133,6 @@ test('the Facts panel shows the Judge’s facts, and the user edits, adds and de
         expect(trailing).not.toContain("Mira's sister");
     } finally {
         await request.delete('/api/testing/fake-gateway');
+        await request.delete(`/api/stories/${storyId}`);
     }
 });
