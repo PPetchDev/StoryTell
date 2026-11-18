@@ -1,10 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsBoolean, IsInt, IsObject, IsOptional, IsString, MaxLength, Min, ValidateIf } from 'class-validator';
+import { IsArray, IsBoolean, IsIn, IsInt, IsObject, IsOptional, IsString, MaxLength, Min, ValidateIf } from 'class-validator';
 
 import type { ChatFields } from '../../../manager/chat/chat.service.js';
 import { CUE_MAX } from '../../../manager/chat/turn/prompt.js';
 import { NOW_MAX } from '../../../manager/chat/details/now-notes.js';
 import { FACT_TEXT_MAX, FACT_TOPIC_MAX } from '../../../manager/chat/details/facts.js';
+import { ITEM_ENDS, ITEM_HOLDER_MAX, ITEM_HOW_MAX, ITEM_NAME_MAX, ItemEnd } from '../../../manager/chat/details/items.js';
 import { WRITE_FOR_ME_DRAFT_MAX } from '../../../manager/chat/write-for-me/write-for-me-prompt.js';
 
 const TITLE_MAX = 200;
@@ -144,6 +145,39 @@ export class SetFactRequestBodyDTO {
     @IsString()
     @MaxLength(FACT_TEXT_MAX)
     fact: string;
+}
+
+/** The user's own Item (.scratch/story-items/spec.md). */
+export class SetItemRequestBodyDTO {
+    @ApiProperty({ maxLength: ITEM_NAME_MAX, description: 'The Item, in a few words ("the brass key"). Matched loosely to a listed one, which keeps its wording.' })
+    @IsString()
+    @MaxLength(ITEM_NAME_MAX)
+    name: string;
+
+    @ApiPropertyOptional({
+        maxLength: ITEM_HOLDER_MAX,
+        description: "Who has it: `{user}` (or \"you\") for the user, a Character's name, or anyone or anywhere else in a few words. Needed while it is held.",
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(ITEM_HOLDER_MAX)
+    holder?: string;
+
+    @ApiPropertyOptional({ maxLength: ITEM_HOW_MAX, description: 'How it came to them ("given by Nara"), or how it ended.' })
+    @IsOptional()
+    @IsString()
+    @MaxLength(ITEM_HOW_MAX)
+    how?: string;
+
+    @ApiPropertyOptional({ enum: ITEM_ENDS, nullable: true, description: 'How it ended; null or left out while it is still held.' })
+    @IsOptional()
+    @IsIn([...ITEM_ENDS, null])
+    end?: ItemEnd | null;
+
+    @ApiPropertyOptional({ description: 'Deletes the Item; the rest is ignored.' })
+    @IsOptional()
+    @IsBoolean()
+    remove?: boolean;
 }
 
 /** .scratch/authors-note/spec.md: about 250 tokens, so the note never crowds the story out of the prompt. */

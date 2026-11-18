@@ -19,6 +19,7 @@ import { SuddenEventStepKind } from '../../../model/ledger/entities/sudden-event
 import { applyDetails, currentDetails, judgeDetailsSection } from '../details/details.js';
 import { applyFacts, factsState, judgeFactsSection } from '../details/facts.js';
 import { applyNow, currentNowNotes, judgeNowSection } from '../details/now-notes.js';
+import { applyItems, itemsState, judgeItemsSection, readJudgedItemsFrom, withItemsJudge } from '../details/items.js';
 import { applyEnding, ENDING_SUGGEST_AFTER_REPLIES, endingState, judgeEndingSection } from '../ending/ending.js';
 import { AUTHOR_MODEL } from '../../../model/chat/entities/message.entity.js';
 import { Attempt, BackgroundRuns } from '../background-runs.js';
@@ -178,6 +179,9 @@ export class JudgeManagerService {
             const facts = factsBefore.facts.map(({ topic, fact }) => ({ topic, fact }));
             // The Now notes before this reply (.scratch/growing-cards/spec.md), read the same way; the user's own have no Message.
             const nowNotes = currentNowNotes(state.detailChanges.filter((change) => change.messageId !== message.id));
+            // The Items before this reply (.scratch/story-items/spec.md), read the same way, with the names the user deleted.
+            const itemsBefore = itemsState(state.detailChanges.filter((change) => change.messageId !== message.id));
+            const items = itemsBefore.items.map(({ name, holder, how, end }) => ({ name, holder, how, end }));
             // The Chat's Ending before this reply (.scratch/endings/spec.md), read the same way: only one not yet reached is asked about.
             const endings = endingState(
                 story.endings ?? [],
@@ -195,7 +199,8 @@ export class JudgeManagerService {
             // Lines are tagged only where a tag can show (.scratch/expressions/spec.md): otherwise the prompt is as before.
             const tagLines = story.characters.some((character) => (character.expressions ?? []).length > 0);
             const offering = rollOffering(story, chat, index);
-            const prompt = withAiEvents(buildJudgePrompt({
+            // Items go on before the made-up events (.scratch/story-items/spec.md): their shape on every call, their section last but for a new event's.
+            const prompt = withAiEvents(withItemsJudge(buildJudgePrompt({
                 cast: story.characters.map((character) => ({
                     name: character.name,
                     personality: character.personality,
@@ -238,7 +243,7 @@ export class JudgeManagerService {
                 factsSection: judgeFactsSection(facts),
                 nowSection: judgeNowSection(nowNotes, detailsCast),
                 rollOfferSection: offering.section,
-            }), aiEvents);
+            }), judgeItemsSection(items)), aiEvents);
 
             const result = await this.gateway.completeText({
                 kind: 'judge',
@@ -285,7 +290,12 @@ export class JudgeManagerService {
             );
             for (const reason of proposed.rejected) this.logger.log(`Chat ${chat.id}, Message ${message.id}: judge item dropped: ${reason}`);
             const noted = applyNow({ current: nowNotes, cast: detailsCast, sittingOut, identityName }, judgement.now ?? []);
-            for (const reason of [...applied.rejected, ...stepped.rejected, ...detailed.rejected, ...noted.rejected, ...ended.rejected, ...facted.rejected]) {
+            // The Judge extracts the Item changes; the code decides what is taken (.scratch/story-items/spec.md).
+            const itemed = applyItems(
+                { current: items, identityName, cast: detailsCast.map((member) => member.name), userText: userText ?? '', clearedByUser: itemsBefore.clearedByUser },
+                readJudgedItemsFrom(result.text),
+            );
+            for (const reason of [...applied.rejected, ...stepped.rejected, ...detailed.rejected, ...noted.rejected, ...ended.rejected, ...facted.rejected, ...itemed.rejected]) {
                 this.logger.log(`Chat ${chat.id}, Message ${message.id}: judge item dropped: ${reason}`);
             }
             if (applied.passedBy !== null && applied.scene) {
@@ -296,7 +306,7 @@ export class JudgeManagerService {
             // Written with the rest of the judgement, in its one transaction, never after it. Without
             // Expressions the parts are not touched, so the record is exactly as before.
             const emotions = tagLines ? emotionsOfParts(message.parts, judgement.expressions) : undefined;
-            await this.ledger.record(chat.id, message.id, { ...applied, suddenEvent: stepped.step, details: [...detailed.changes, ...facted.changes, ...noted.changes], ending: ended.reached, ...(emotions ? { emotions } : {}), ...(proposed.event ? { newEvent: proposed.event } : {}), rollOffer: offered.offer });
+            await this.ledger.record(chat.id, message.id, { ...applied, suddenEvent: stepped.step, details: [...detailed.changes, ...facted.changes, ...noted.changes, ...itemed.changes], ending: ended.reached, ...(emotions ? { emotions } : {}), ...(proposed.event ? { newEvent: proposed.event } : {}), rollOffer: offered.offer });
             return { ok: true };
         } catch (error) {
             const reason = error instanceof AppError ? error.message : `Unexpected error: ${String(error)}`;

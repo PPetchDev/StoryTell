@@ -246,7 +246,8 @@ describe('Roll offers and Stats: through the HTTP API', () => {
         const offered = await send(storyId, chat.id);
         const judge = lastJudge();
         expect(judge.messages[0].content).toBe(before.messages[0].content);
-        expect(judge.messages[0].content).toContain('"roll_offer":null}');
+        // The Items shape follows it on every call (.scratch/story-items/spec.md).
+        expect(judge.messages[0].content).toContain('"roll_offer":null,\n "items":');
         expect(judge.messages[1].content).toContain('# Roll offer\n');
         expect(judge.messages[1].content).toContain('Their Stats: Strength +2, Charm +1.');
         // Other sections may join as the Chat grows (an Ending suggestion); the offer's own tokens are there.

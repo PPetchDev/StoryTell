@@ -15,6 +15,7 @@ import { detailsReminder, PromptDetails } from '../details/details.js';
 import { nowLayer, PromptNowNote } from '../details/now-notes.js';
 import { EPILOGUE_MIN_TOKENS, epilogueFinalInstruction, epilogueInstruction, PromptEpilogue } from '../ending/ending.js';
 import { factsBlock, PromptFacts } from '../details/facts.js';
+import { ChatItem, itemsBlock } from '../details/items.js';
 import { repeatedPhrases, repeatedPhrasesLine } from '../speech/repeated-phrases.js';
 import { estimateTokens } from './prompt-tokens.js';
 
@@ -253,6 +254,11 @@ export interface TurnPromptInput {
      * in the trailing blocks after the Author's note. None, null or left out sends no block.
      */
     facts?: PromptFacts | null;
+    /**
+     * The Chat's Items (.scratch/story-items/spec.md), held and gone, read in the trailing blocks
+     * right after the Established facts. None, null or left out sends no block.
+     */
+    items?: ChatItem[] | null;
 }
 
 export interface TurnPrompt {
@@ -798,12 +804,13 @@ export function buildTurnPrompt(input: TurnPromptInput): TurnPrompt {
             [identity, ...input.story.characters.map((character) => character.name)],
         ),
     );
-    // One order (.scratch/sillytavern-gaps/integration.md): Lore, Documents, Author's note, Established facts, Where things stand, Sudden event, Roll, Nudge, Cue, Repeated phrases, the final instruction.
+    // One order (.scratch/sillytavern-gaps/integration.md): Lore, Documents, Author's note, Established facts, Items, Where things stand, Sudden event, Roll, Nudge, Cue, Repeated phrases, the final instruction.
     const finalInstruction = joinBlocks([
         lore,
         documentsBlock(input.documentPassages ?? []),
         authorsNoteBlock(input.authorsNote, identity),
         factsBlock(input.facts),
+        itemsBlock(input.items, identity),
         // With none of the turn's own lines, exactly the reminder and the final instruction as before.
         [
             stateReminder(input),

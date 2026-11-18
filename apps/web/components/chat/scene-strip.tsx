@@ -44,6 +44,10 @@ interface SceneStripProps {
     factCount?: number;
     /** Opens the Facts panel; without it, the strip has no Facts row. */
     onOpenFacts?(): void;
+    /** How many Items are held now (.scratch/story-items/spec.md). */
+    itemCount?: number;
+    /** Opens the Items sheet; without it, the strip has no Items row. */
+    onOpenItems?(): void;
     /** Opens the Chapters, with Move on (.scratch/scene-chapters/spec.md); left out where the Story has no Scenes. */
     onOpenChapters?(): void;
     /** The Role's Stats (CONTEXT.md, "Stat"), shown once opened; empty without. */
@@ -71,7 +75,8 @@ const STRIP_ICON = 'mr-1 inline-block shrink-0 align-[-0.2em]';
  * The Chat re-reads until each turn's background calls settle, so a Scene or time the judge moved
  * on to shows then. A tap opens it to read the goal whole and closes it again; its own ✕ hides it,
  * and ⋯ brings it back (audit M30: a tap used to hide it, with the goal cut off and no way to read it).
- * Opened, its last row opens the Chat's Established facts (.scratch/facts-panel/spec.md).
+ * Opened, its last rows open the Chat's Established facts (.scratch/facts-panel/spec.md) and its
+ * Items (.scratch/story-items/spec.md).
  */
 export function SceneStrip({
     current,
@@ -83,6 +88,8 @@ export function SceneStrip({
     characters = [],
     factCount = 0,
     onOpenFacts,
+    itemCount = 0,
+    onOpenItems,
     onOpenChapters,
     stats = [],
     onHide,
@@ -206,6 +213,21 @@ export function SceneStrip({
                 >
                     <span>
                         <span className="font-semibold text-text">Established facts</span> · {factCount === 0 ? 'none yet' : factCount}
+                    </span>
+                    <ChevronRightIcon size={16} className="shrink-0" />
+                </button>
+            )}
+            {/* And the Chat's Items, who holds what, in a sheet of their own (.scratch/story-items/spec.md). */}
+            {open && onOpenItems && (
+                <button
+                    type="button"
+                    className="bare-button flex min-h-11 basis-full items-center justify-between gap-2 border-t border-line px-2 text-left text-sm text-muted cursor-pointer focus-ring-inset"
+                    aria-haspopup="dialog"
+                    onClick={onOpenItems}
+                    data-open-items
+                >
+                    <span>
+                        <span className="font-semibold text-text">Items</span> · {itemCount === 0 ? 'none yet' : itemCount}
                     </span>
                     <ChevronRightIcon size={16} className="shrink-0" />
                 </button>

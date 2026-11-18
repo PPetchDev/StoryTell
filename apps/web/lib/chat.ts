@@ -226,6 +226,8 @@ export interface Chat extends ChatSummary {
     nowNotes?: Array<{ characterId: number; note: string }>;
     /** The Chat's Established facts (.scratch/facts-panel/spec.md), in the order their topics were first set; `byUser` for the user's own telling. */
     facts?: ChatFact[];
+    /** The Chat's Items (.scratch/story-items/spec.md), held and gone, in the order first recorded; `holder` is `{user}` for the user. */
+    items?: ChatItem[];
     /** Entries are being written by themselves right now: the Chat screen re-reads until they are done. */
     diaryWriting: boolean;
     /** Each Character's newest Diary entry: a new one is shown as a toast. */
@@ -446,6 +448,39 @@ export const FACT_TOPIC_MAX = 60;
 export const FACT_TEXT_MAX = 120;
 export const FACTS_MAX = 40;
 
+/** How an Item ended (CONTEXT.md, "Item"). */
+export type ItemEnd = 'used' | 'lost' | 'destroyed';
+
+/** One Item of a Chat (CONTEXT.md, .scratch/story-items/spec.md). */
+export interface ChatItem {
+    name: string;
+    /** Who has it, or had it last: `{user}` for the user, a Character's name, or anyone or anywhere else. */
+    holder: string;
+    /** How it came to them, or how it ended; may be empty. */
+    how: string;
+    /** Null while it is held. */
+    end: ItemEnd | null;
+    /** The current record is the user's own, set in the Items sheet. */
+    byUser: boolean;
+}
+
+/** How the user is stored as a holder (mirrors USER_HOLDER in apps/api/src/manager/chat/details/items.ts). */
+export const USER_HOLDER = '{user}';
+/** The limits of an Item (mirror ITEM_NAME_MAX, ITEM_HOLDER_MAX, ITEM_HOW_MAX and ITEMS_MAX in items.ts). */
+export const ITEM_NAME_MAX = 60;
+export const ITEM_HOLDER_MAX = 60;
+export const ITEM_HOW_MAX = 80;
+export const ITEMS_MAX = 30;
+
+/** What the user sends to set an Item; `remove` deletes it. */
+export interface ItemChange {
+    name: string;
+    holder?: string;
+    how?: string;
+    end?: ItemEnd | null;
+    remove?: boolean;
+}
+
 /** The longest Cue the API takes (mirrors CUE_MAX in apps/api/src/manager/chat/turn/prompt.ts). */
 export const CUE_MAX = 300;
 
@@ -519,6 +554,8 @@ export const chatApi = {
     /** Sets the user's own Established fact for a topic (.scratch/facts-panel/spec.md); an empty fact deletes it. */
     setFact: (storyId: number, chatId: number, topic: string, fact: string) =>
         apiSend<Chat>('PUT', `/stories/${storyId}/chats/${chatId}/facts`, { topic, fact }),
+    /** Sets, ends or deletes the user's own Item (.scratch/story-items/spec.md). */
+    setItem: (storyId: number, chatId: number, change: ItemChange) => apiSend<Chat>('PUT', `/stories/${storyId}/chats/${chatId}/items`, change),
     /** Replaces who is sitting out, read from the next turn on; an empty list brings everyone back. */
     setSittingOut: (storyId: number, chatId: number, characterIds: number[]) =>
         apiSend<Chat>('PUT', `/stories/${storyId}/chats/${chatId}/sitting-out`, { characterIds }),

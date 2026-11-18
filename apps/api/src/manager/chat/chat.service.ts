@@ -22,6 +22,9 @@ import {
     StoryNotPlayableError,
     TurnInProgressError,
     FactWithoutTopicError,
+    ItemWithoutHolderError,
+    ItemWithoutNameError,
+    TooManyItemsError,
     TooManyFactsError,
 } from '../../errors/chat.errors.js';
 import { OutOfCreditError } from '../../errors/model-gateway.errors.js';
@@ -125,6 +128,7 @@ import { eventReady, GAUGE_RULES, promptSuddenEvent, SuddenEventView, suddenEven
 import { chatEventState, EventProposalView, eventProposalView, shownProposal } from './sudden-event/ai-events.js';
 import { currentDetails, promptDetails } from './details/details.js';
 import { FACTS_MAX, factsState, promptFacts, userFactChange } from './details/facts.js';
+import { currentItems, ItemEnd, ITEMS_MAX, itemsState, userItemChange } from './details/items.js';
 import { castNowNotes, currentNowNotes, tidyNow } from './details/now-notes.js';
 import type { PromptNowNote } from './details/now-notes.js';
 
@@ -198,6 +202,8 @@ export interface ChatDetail extends ChatSummary {
      * first set; `byUser` when the current telling is the user's own.
      */
     facts: Array<{ topic: string; fact: string; byUser: boolean }>;
+    /** The Chat's Items (.scratch/story-items/spec.md), held and gone, in the order first recorded; `holder` is `{user}` for the user. */
+    items: Array<{ name: string; holder: string; how: string; end: ItemEnd | null; byUser: boolean }>;
     /** The worn identity's name, under which the next User Message shows. */
     identityName: string;
     /** The worn Persona; null while the Chat wears its Story's Role. */
@@ -1081,6 +1087,25 @@ export class ChatManagerService {
     }
 
     /**
+     * The user's own Item (.scratch/story-items/spec.md): added, changed or deleted in the Items sheet.
+     * A record with no Message, so no rewind takes it away. Like the facts, it takes no turn lock.
+     */
+    async setItem(
+        storyId: number,
+        chatId: number,
+        given: { name: string; holder?: string; how?: string; end?: ItemEnd | null; remove?: boolean },
+    ): Promise<ChatDetail> {
+        const { story, chat } = await this.load(storyId, chatId);
+        const context = { identityName: wornIdentity(story, chat).name, cast: story.characters.map((character) => character.name) };
+        const change = userItemChange(itemsState(await this.ledger.detailChangesOf(chat.id)).items, given, context);
+        if (change === 'no-name') throw new ItemWithoutNameError();
+        if (change === 'no-holder') throw new ItemWithoutHolderError();
+        if (change === 'full') throw new TooManyItemsError(ITEMS_MAX);
+        if (change !== 'unchanged') await this.ledger.setUserItem(chat.id, change.value);
+        return this.getChat(storyId, chatId);
+    }
+
+    /**
      * .scratch/speaker-controls/spec.md, "Sitting out": replaces the whole set of Characters kept
      * out of this Chat's turns. An id outside the Story's cast is refused. Like the Author's note
      * it takes no turn lock and waits for no background call: a turn already being written
@@ -1643,6 +1668,8 @@ export class ChatManagerService {
             details: detailsFor(story, state),
             // The facts, and the slips of the newest reply before this one (.scratch/story-quality/spec.md).
             facts: promptFacts(state.detailChanges, newestAiMessage(chat)?.id ?? null),
+            // Who holds what (.scratch/story-items/spec.md), after the facts.
+            items: currentItems(state.detailChanges),
             lore: promptLore(story),
             // The one selection, once per turn, at the reply's point: the user's new Message is before it.
             chosenLore: chosenLore(selectLoreAt(promptLore(story), promptHistory(chat.messages))),
@@ -1794,6 +1821,7 @@ export class ChatManagerService {
             timeOfDay: chat.timeOfDay,
             details: detailsFor(story, state),
             facts: promptFacts(state.detailChanges, newest?.id ?? null),
+            items: currentItems(state.detailChanges),
             lore: promptLore(story),
             hasDocuments: hasDocumentPassages(story),
             // A Story that may make up events (.scratch/ai-events/spec.md) keeps the same room for the block.
@@ -1932,6 +1960,7 @@ export class ChatManagerService {
             }),
             nowNotes: castNowNotes(currentNowNotes(detailChanges), story.characters).map(({ characterId, note }) => ({ characterId, note })),
             facts: factsState(detailChanges).facts,
+            items: itemsState(detailChanges).items,
             identityName: identity.name,
             personaId: identity.personaId,
             roleName: fillPlaceholders(story.role.name, story.openingQuestions, chat.openingAnswers),

@@ -17,6 +17,8 @@ export const DETAIL_MAX: Record<DetailKind, number> = {
     [DetailKind.Slip]: 190,
     // A Now note (.scratch/growing-cards/spec.md): about three short sentences; see now-notes.ts.
     [DetailKind.Now]: 300,
+    // Items keep their own limits (items.ts); this only bounds a record, which is JSON.
+    [DetailKind.Item]: 400,
 };
 
 /** A recorded change, oldest first in a list. */

@@ -349,6 +349,14 @@ export class LedgerModelService {
         await this.detailChanges.save(this.detailChanges.create({ chatId, kind: DetailKind.Fact, characterId: null, value, messageId: null }));
     }
 
+    /**
+     * The user's own Item (.scratch/story-items/spec.md), its JSON value, or a removal: a detail record
+     * tied to no Message, like the user's fact, so no rewind takes it away.
+     */
+    async setUserItem(chatId: number, value: string): Promise<void> {
+        await this.detailChanges.save(this.detailChanges.create({ chatId, kind: DetailKind.Item, characterId: null, value, messageId: null }));
+    }
+
     /** The Sudden events the Chat made up (.scratch/ai-events/spec.md), every proposal, oldest first. */
     chatSuddenEventsOf(chatId: number): Promise<SuddenEventEntity[]> {
         return this.dataSource.getRepository(SuddenEventEntity).find({ where: { chatId }, order: { id: 'ASC' } });

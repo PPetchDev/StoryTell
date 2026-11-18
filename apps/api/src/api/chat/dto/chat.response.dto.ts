@@ -327,6 +327,24 @@ export class ChatFactDTO {
     byUser: boolean;
 }
 
+/** One Item of the Chat (.scratch/story-items/spec.md). */
+export class ChatItemDTO {
+    @ApiProperty({ description: 'The Item, in a few words.' })
+    name: string;
+
+    @ApiProperty({ description: "Who has it, or had it last: `{user}` for the user, a Character's name, or anyone or anywhere else." })
+    holder: string;
+
+    @ApiProperty({ description: 'How it came to them, or how it ended; may be empty.' })
+    how: string;
+
+    @ApiProperty({ enum: ['used', 'lost', 'destroyed'], nullable: true, type: String, description: 'How it ended; null while it is held.' })
+    end: 'used' | 'lost' | 'destroyed' | null;
+
+    @ApiProperty({ description: "The current record is the user's own, set in the Items sheet." })
+    byUser: boolean;
+}
+
 export class MessageDTO {
     @ApiProperty()
     id: number;
@@ -530,6 +548,9 @@ export class ChatResponseBodyDTO extends ChatSummaryDTO implements Omit<ChatDeta
 
     @ApiProperty({ type: () => ChatFactDTO, isArray: true, description: 'The Established facts, in the order their topics were first set.' })
     facts: ChatFactDTO[];
+
+    @ApiProperty({ type: () => ChatItemDTO, isArray: true, description: 'The Items, held and gone, in the order they were first recorded.' })
+    items: ChatItemDTO[];
 
     @ApiProperty({ description: 'The worn identity, under which the next User Message shows.' })
     identityName: string;

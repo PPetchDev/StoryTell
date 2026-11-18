@@ -26,6 +26,11 @@ export enum DetailKind {
      * (.scratch/growing-cards/spec.md); an empty value clears it.
      */
     Now = 'now',
+    /**
+     * One of the Chat's Items (.scratch/story-items/spec.md), as JSON `{name, holder, how, end}`;
+     * `{name, removed: true}` is the user deleting it. The newest record of a name wins.
+     */
+    Item = 'item',
 }
 
 /**

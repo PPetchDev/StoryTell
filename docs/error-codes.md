@@ -126,6 +126,9 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | `404.004.091` | `ChapterNotFoundError` | No Chapter with that id in this Chat (`PUT …/chapters/:chapterId`, `POST …/chapters/:chapterId/write`): taken back with its Scene advance, or another Chat's. Nothing changes. |
 | `422.004.092` | `EmptyChapterError` | A Chapter summary saved with nothing but whitespace. Nothing changes. |
 | `409.004.093` | `ChapterNotFailedError` | Try again (`POST …/chapters/:chapterId/write`) on a Chapter whose summary did not fail: written, being written, waiting, or with no Messages. No call. |
+| `422.004.140` | `ItemWithoutNameError` | An Item set (`PUT /api/stories/:storyId/chats/:chatId/items`) with a name of no letters or digits (`.scratch/story-items/spec.md`). Nothing is written. |
+| `422.004.141` | `ItemWithoutHolderError` | An Item set as held (no `end`) with no holder. Nothing is written. |
+| `422.004.142` | `TooManyItemsError` | A new held Item, or a gone one set held again, when the Chat already holds 30. A change to a held one, or marking one gone, is always taken. Nothing is written. |
 | `502.005.001` | `UnreadableDraftError` | The model's draft or rewrite could not be read (no JSON object, or no text). Nothing saved. Show with Retry. |
 | `502.005.002` | `InvalidDraftError` | The draft does not fit a Story (0 or 7 Characters, a Style value outside its set, a required field empty, a bad StartingBond). Nothing saved. Show with Retry. |
 | `422.005.003` | `EmptyIdeaError` | A draft was asked for with a blank idea. |
