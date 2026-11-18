@@ -377,6 +377,13 @@ interface ChatComposerProps {
     rollStat?: RollStat | null;
     /** The Roll offer band (.scratch/judge-rolls/spec.md), above what is set for the next turn; nothing while none is pending. */
     rollOfferBand?: ReactNode;
+    /**
+     * Watch runs (.scratch/watch-mode/spec.md): the box and Send stay free, since a send stops Watch;
+     * ▶, Suggest, Write, the Cue and the Roll wait.
+     */
+    watching?: boolean;
+    /** Watch's band: how far it has got and Stop, or how it ended; nothing without one. */
+    watchBand?: ReactNode;
 }
 
 /**
@@ -408,6 +415,8 @@ export function ChatComposer({
     onRoll,
     rollStat = null,
     rollOfferBand,
+    watching = false,
+    watchBand,
 }: ChatComposerProps) {
     const box = useAutoGrow(draft);
     const boxId = useId();
@@ -576,6 +585,7 @@ export function ChatComposer({
                     {characterRow?.(writingForMe || dictating)}
                 </div>
                 {rollOfferBand}
+                {watchBand}
                 {/*
                  * What is set for the next turn, on one row (docs/ui-audit-2026-11-16.md M2): the Cue and the Roll each
                  * had a band, 104px between them on a 360px phone. The Cue gives way and the Roll keeps its few words.
@@ -666,7 +676,7 @@ export function ChatComposer({
                         title="Suggest replies"
                         aria-pressed={suggestions.shown.status !== 'closed'}
                         aria-busy={suggestions.shown.status === 'loading'}
-                        disabled={writing || busy || blocked || writingForMe || dictating}
+                        disabled={writing || busy || blocked || writingForMe || dictating || watching}
                         onClick={() => {
                             writer.dismiss();
                             tray.setOpen(false);
@@ -686,7 +696,7 @@ export function ChatComposer({
                         title="Write for me"
                         aria-pressed={writingForMe}
                         aria-busy={writingForMe}
-                        disabled={writing || busy || blocked || dictating}
+                        disabled={writing || busy || blocked || dictating || watching}
                         onClick={() => {
                             suggestions.close();
                             void writer.toggle();
@@ -748,7 +758,7 @@ export function ChatComposer({
                         aria-label="Cue the Narrator"
                         title="Cue the Narrator for the next reply"
                         aria-pressed={cue !== null}
-                        disabled={writing || busy || blocked || writingForMe || dictating}
+                        disabled={writing || busy || blocked || writingForMe || dictating || watching}
                         onClick={onCue}
                     >
                         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -792,7 +802,7 @@ export function ChatComposer({
                             aria-label="Roll the dice for this message"
                             title={`Roll the dice for this message (${chat.rollTarget} or more succeeds)`}
                             aria-pressed={roll}
-                            disabled={writing || busy || blocked || writingForMe || dictating}
+                            disabled={writing || busy || blocked || writingForMe || dictating || watching}
                             onPointerDown={keepFocus}
                             onClick={() => onRoll(!roll)}
                         >
@@ -819,7 +829,7 @@ export function ChatComposer({
                                 className={SEND_BUTTON}
                                 aria-label="Continue"
                                 title="Let the story go on"
-                                disabled={writing || busy || blocked || chat.awaitingReply || writingForMe || dictating}
+                                disabled={writing || busy || blocked || chat.awaitingReply || writingForMe || dictating || watching}
                                 onPointerDown={keepFocus}
                                 onClick={() => {
                                     suggestions.close();

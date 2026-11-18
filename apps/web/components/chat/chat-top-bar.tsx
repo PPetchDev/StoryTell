@@ -414,6 +414,10 @@ interface ChatTopBarProps {
     onEndStory(): void;
     /** Whether an Epilogue can be asked for now: not blocked, no Message waiting for its reply, and the newest reply is not one. */
     canEndStory: boolean;
+    /** Opens the Watch sheet (.scratch/watch-mode/spec.md); left out, the menu has no Watch. */
+    onWatch?(): void;
+    /** Whether Watch can start now: as a Continue, with no Sudden event under way and none running. */
+    canWatch?: boolean;
     /** Counts the asks for "Who's in this Chat" from outside the menu; each new one opens it. */
     whoRequest?: number;
     /** The Visual novel view is on (.scratch/chat-looks/spec.md); the toggle sits between the title and ⋯. */
@@ -454,6 +458,8 @@ export function ChatTopBar({
     onReset,
     onEndStory,
     canEndStory,
+    onWatch,
+    canWatch = false,
     whoRequest = 0,
     novel = false,
     onToggleNovel,
@@ -719,6 +725,12 @@ export function ChatTopBar({
                                 </button>
                             </section>
                             <div className="border-t border-line pt-1">
+                                {/* .scratch/watch-mode/spec.md: the story plays on by itself for a few replies. */}
+                                {onWatch && (
+                                    <MenuButton onClick={choose(onWatch)} disabled={busy || !canWatch}>
+                                        <MenuText label="Watch the story" sub="The Characters play on while you watch" />
+                                    </MenuButton>
+                                )}
                                 <MenuButton onClick={choose(() => setEnding(true))} disabled={busy || !canEndStory}>
                                     <MenuText label="End the story" sub="The Narrator writes an epilogue from here" />
                                 </MenuButton>

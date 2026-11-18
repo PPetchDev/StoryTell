@@ -64,6 +64,15 @@ export function snapshotAlertBody(chatTitle: string): string {
     return cut(`Snapshot ready · ${chatTitle}`);
 }
 
+/** How a Watch ended, as its alert words it (.scratch/watch-mode/spec.md, "Push alert"). */
+export type WatchAlertOutcome = 'finished' | 'needs_you' | 'stopped';
+
+/** "Watch done · Chat 2", "Watch stopped: the story needs you · Chat 2" or "Watch stopped · Chat 2". */
+export function watchAlertBody(outcome: WatchAlertOutcome, chatTitle: string): string {
+    const head = outcome === 'finished' ? 'Watch done' : outcome === 'needs_you' ? 'Watch stopped: the story needs you' : 'Watch stopped';
+    return cut(`${head} · ${chatTitle}`);
+}
+
 function chatPayload(storyId: number, chatId: number, body: string): PushPayload {
     return { title: 'Storytell', body, url: `/stories/${storyId}/chats/${chatId}`, tag: `chat-${chatId}` };
 }
@@ -108,6 +117,11 @@ export class PushAlertsManagerService {
     /** A Snapshot is stored. Returns at once. */
     snapshotReady(alert: SnapshotAlert): void {
         this.alert(chatPayload(alert.storyId, alert.chatId, snapshotAlertBody(alert.chatTitle)));
+    }
+
+    /** A Watch ended by itself (never on the user's Stop). Returns at once. */
+    watchEnded(alert: SnapshotAlert & { outcome: WatchAlertOutcome }): void {
+        this.alert(chatPayload(alert.storyId, alert.chatId, watchAlertBody(alert.outcome, alert.chatTitle)));
     }
 
     /** Resolves once every alert started so far is sent or given up: for tests. */

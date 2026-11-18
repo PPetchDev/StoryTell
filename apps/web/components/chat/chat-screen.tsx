@@ -46,6 +46,7 @@ import { COLUMN } from '@/components/chat/chat-classes';
 import { applyReplaceRules, onMineRules } from '@/lib/replace-rules';
 import { ReadAloudProvider, useReadAloudPlayer } from './read-aloud';
 import { ShownTextProvider } from './shown-text';
+import { useWatch, WatchBand, WatchSheet } from './watch';
 
 /**
  * A "Memory added" toast (spec: story 83), one per Memory the AI added in the latest turn; or a
@@ -148,6 +149,10 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
     /** Stops the turn being written. */
     const stopRef = useRef<AbortController | null>(null);
     const [busy, setBusy] = useState(false);
+    /** Watch (.scratch/watch-mode/spec.md): the story playing on by itself, run by the API; each reply it adds re-reads the Chat. */
+    const watch = useWatch(initial.storyId, initial.id, setChat, (next) => readNewReply(next));
+    const watching = watch.running;
+    const [watchSheet, setWatchSheet] = useState(false);
     /**
      * The Character nudged for the next turn (.scratch/speaker-controls/spec.md, "Nudge"): sent with
      * the next send, Continue, Retry, Again or User Message edit, never stored, gone on leaving.
@@ -344,7 +349,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
     /** The reply ↺ Again would write again now: the newest Message, when a model wrote it. The Cue sheet offers it. */
     const newestMessage = chat.messages.at(-1);
     const againTarget =
-        newestMessage && newestMessage.kind === 'ai' && !isOpening(newestMessage) && !blocked && !writing && !busy ? newestMessage.id : null;
+        newestMessage && newestMessage.kind === 'ai' && !isOpening(newestMessage) && !blocked && !writing && !busy && !watching ? newestMessage.id : null;
     // A Character set sitting out can't stay nudged (.scratch/speaker-controls/spec.md).
     useEffect(() => {
         if (nudge !== null && chat.sittingOut.includes(nudge)) setNudge(null);
@@ -512,6 +517,8 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
             return;
         }
         setDraft('');
+        // A send stops Watch: the API stops it before the send runs (.scratch/watch-mode/spec.md), so here it is only let go.
+        if (watching) watch.detach();
         // Inside the tap, so iOS lets the reply play by itself later.
         player.unlock();
         // The Roll rides on this send and no other; a send the API never stored arms it again with the draft.
@@ -532,7 +539,9 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
 
     // An Epilogue can be asked for like a Continue, but not right after one: Again writes that one anew.
     const newestIsEpilogue = newestMessage?.kind === 'ai' && newestMessage.epilogue;
-    const canEndStory = !writing && !busy && !blocked && !chat.awaitingReply && !newestIsEpilogue;
+    const canEndStory = !writing && !busy && !watching && !blocked && !chat.awaitingReply && !newestIsEpilogue;
+    // Watch starts as a Continue would, and not while a Sudden event is under way: the user must play it.
+    const canWatch = !writing && !busy && !watching && !blocked && !chat.awaitingReply && editing === null && chat.suddenEvent?.status !== 'active';
     // Why it can't be, when the reason lasts (audit L8); a turn in flight only makes it wait.
     const epilogueWhyNot = !chat.playable
         ? 'The epilogue waits: the Story has empty fields.'
@@ -550,7 +559,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
 
     /** ▶ (spec: "Continue"): a turn with no User Message. A failed one stores nothing, so ▶ again is the way on. */
     const continueStory = () => {
-        if (writing || busy || blocked || chat.awaitingReply) return;
+        if (writing || busy || watching || blocked || chat.awaitingReply) return;
         player.unlock();
         void runTurn((stream) => chatApi.continue(chat.storyId, chat.id, stream, { nudge, cue }));
     };
@@ -562,7 +571,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
      * re-read Chat shows it again; the Memory and Snapshots re-read either way.
      */
     const again = (messageId: number, withCue: string | null = cue) => {
-        if (writing || busy || blocked) return;
+        if (writing || busy || watching || blocked) return;
         stopReading(messageId);
         player.unlock();
         setReplacing(messageId);
@@ -580,7 +589,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
 
     /** ‹ n/m › or a swipe: shows another Reply version, with the rollback notice like an edit. */
     const chooseVersion = (messageId: number, version: number) => {
-        if (writing || busy) return;
+        if (writing || busy || watching) return;
         stopReading(messageId);
         askNovel('newest-reply');
         void runWrite(async () => refreshMemory(noteRollback(await chatApi.chooseVersion(chat.storyId, chat.id, messageId, version))));
@@ -673,7 +682,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                 characters={characters}
                 portraits={portraits}
                 error={error}
-                busy={writing || busy || editing !== null}
+                busy={writing || busy || watching || editing !== null}
                 stripHidden={stripHidden}
                 onShowStrip={() => setSceneStripHidden(false)}
                 onOpenChapters={scenes.length > 0 ? () => setChaptersOpen(true) : undefined}
@@ -694,6 +703,8 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                 }
                 onEndStory={writeEpilogue}
                 canEndStory={canEndStory}
+                onWatch={() => setWatchSheet(true)}
+                canWatch={canWatch}
                 onReset={() => {
                     player.stop();
                     askNovel('opening');
@@ -811,12 +822,12 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                     messages={chat.messages}
                     cast={cast}
                     pending={pending}
-                    writing={writing}
-                    replySoFar={replySoFar}
+                    writing={writing || watching}
+                    replySoFar={writing ? replySoFar : watch.replySoFar}
                     replacing={replacing}
                     snapshots={snaps.state}
                     busy={busy}
-                    canAct={!writing && !busy && editing === null}
+                    canAct={!writing && !busy && !watching && editing === null}
                     blocked={blocked}
                     request={novelRequest}
                     onAgain={again}
@@ -835,10 +846,10 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                 cast={cast}
                 portraits={portraits}
                 pending={pending}
-                writing={writing}
-                replySoFar={replySoFar}
+                writing={writing || watching}
+                replySoFar={writing ? replySoFar : watch.replySoFar}
                 editing={editing}
-                canEdit={!writing && !busy && editing === null}
+                canEdit={!writing && !busy && !watching && editing === null}
                 blocked={blocked}
                 snapshots={snaps.state}
                 replacing={replacing}
@@ -892,7 +903,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                 rollStat={roll ? rollStat : null}
                 rollOfferBand={
                     // The Judge's Roll offer (.scratch/judge-rolls/spec.md): gone once taken, while a reply is written, or with a failed turn.
-                    chat.rollOffer && !roll && !writing && !chat.awaitingReply ? (
+                    chat.rollOffer && !roll && !writing && !watching && !chat.awaitingReply ? (
                         <RollOfferBand
                             offer={chat.rollOffer}
                             target={chat.rollTarget}
@@ -910,6 +921,8 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                         />
                     ) : null
                 }
+                watching={watching}
+                watchBand={<WatchBand control={watch} />}
                 characterRow={(writingForMe) => (
                     <CharacterRow
                         characters={characters}
@@ -934,6 +947,18 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                         announce(moved.currentScene ? `Moved on to ${moved.currentScene.name}.` : 'Moved on into free play.');
                     }}
                     onClose={() => setChaptersOpen(false)}
+                />
+            )}
+            {watchSheet && (
+                <WatchSheet
+                    storyId={chat.storyId}
+                    chatId={chat.id}
+                    identityName={chat.identityName}
+                    onStart={(replies) => {
+                        player.unlock();
+                        return watch.start(replies);
+                    }}
+                    onClose={() => setWatchSheet(false)}
                 />
             )}
             {cueSheet && (

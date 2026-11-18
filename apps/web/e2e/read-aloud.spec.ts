@@ -342,16 +342,17 @@ test.describe('Read replies aloud', () => {
     test('with it on, a send plays the new reply once it settles, and opening the Chat again plays nothing', async ({ page, request }) => {
         const { storyId, chatId } = await createChat(request);
         await page.goto(`/stories/${storyId}/chats/${chatId}`);
-        // The switch is the last of the menu's settings, after Who's in this Chat; then End the story (.scratch/endings/spec.md) and Reset.
+        // The switch is the last of the menu's settings, after Who's in this Chat; then Watch (.scratch/watch-mode/spec.md), End the story (.scratch/endings/spec.md) and Reset.
         await page.getByRole('button', { name: 'Chat menu' }).tap();
         const rows = page.getByRole('dialog', { name: 'Chat menu' }).locator('button, a');
         const labels = await rows.evaluateAll((items) => items.map((item) => item.textContent ?? ''));
         const at = labels.findIndex((label) => label.startsWith('Read replies aloud'));
         expect(labels[at - 1]).toMatch(/^Who's in this Chat/);
-        expect(labels.slice(at + 1).map((label) => label.replace(/^(Suggest an ending|Characters keep diaries|Characters think for themselves|End the story|Reset Chat).*$/, '$1'))).toEqual([
+        expect(labels.slice(at + 1).map((label) => label.replace(/^(Suggest an ending|Characters keep diaries|Characters think for themselves|Watch the story|End the story|Reset Chat).*$/, '$1'))).toEqual([
             'Suggest an ending',
             'Characters keep diaries',
             'Characters think for themselves',
+            'Watch the story',
             'End the story',
             'Reset Chat',
         ]);

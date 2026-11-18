@@ -25,6 +25,7 @@ import {
     TooManyFactsError,
 } from '../../errors/chat.errors.js';
 import { OutOfCreditError } from '../../errors/model-gateway.errors.js';
+import { WatchNeedsYouError } from '../../errors/watch.errors.js';
 import { SpendCap } from '../../service/model-gateway/spend-cap.js';
 import { PersonaNotFoundError } from '../../errors/persona.errors.js';
 import { CharacterNotFoundError, StoryNotFoundError } from '../../errors/story.errors.js';
@@ -356,6 +357,9 @@ export interface ChatDashboard {
     lastPosition: number;
 }
 
+/** How many of a Chat's latest replies Watch's cost estimate averages (.scratch/watch-mode/spec.md). */
+export const WATCH_ESTIMATE_REPLIES = 5;
+
 /** How many Reply versions the newest AI Message keeps, the shown one included (spec: .scratch/swipe/spec.md). */
 export const MAX_REPLY_VERSIONS = 5;
 
@@ -397,6 +401,8 @@ export class ChatManagerService {
     private readonly startAfterTurn = new Map<number, () => void>();
     /** Each Chat's Diary entries being written by themselves after a reply (.scratch/diary/spec.md); play never waits on them. */
     private readonly diaryRuns = new Map<number, Promise<void>>();
+    /** Each Chat's newest reply's Judge and Memory extraction, settled together: what Watch waits on between replies. */
+    private readonly replyCalls = new Map<number, Promise<unknown>>();
 
     constructor(
         private readonly chatModel: ChatModelService,
@@ -864,6 +870,10 @@ export class ChatManagerService {
         // Spec: "Story so far". Once both are done, so it measures the Memory they leave; never awaited.
         // The Characters' own Diary entries then too: they need the Judge's word on the Scene and the Ending.
         const settled = Promise.allSettled([judged, extracted]);
+        this.replyCalls.set(chatId, settled);
+        void settled.finally(() => {
+            if (this.replyCalls.get(chatId) === settled) this.replyCalls.delete(chatId);
+        });
         // Registered now, not once both are done: the Chat says entries may be on the way from the moment the
         // reply's calls start, so a screen reading it between the two never stops looking too soon.
         const diaries = this.writeDiariesAfter(story, chatId, messageId, settled);
@@ -889,6 +899,78 @@ export class ChatManagerService {
         await this.storySoFar.idle(chatId);
         while (this.diaryRuns.has(chatId)) await this.diaryRuns.get(chatId);
         await this.chapters.idle(chatId);
+    }
+
+    /**
+     * Resolves once the newest reply's Judge and Memory extraction are done or failed, their
+     * automatic retry included (.scratch/watch-mode/spec.md, "One step"): not the Story so far or
+     * the Diary entries, which play never waits on.
+     */
+    async replyCallsSettled(chatId: number): Promise<void> {
+        while (this.replyCalls.has(chatId)) await this.replyCalls.get(chatId);
+    }
+
+    /** Throws as every Chat endpoint does when the Chat isn't the current Account's, in this Story. */
+    async requireChat(storyId: number, chatId: number): Promise<void> {
+        await this.load(storyId, chatId);
+    }
+
+    /**
+     * .scratch/watch-mode/spec.md, "Starting": what a Continue checks before anything is written,
+     * plus a Sudden event under way, which the user must play. Waits for nothing.
+     */
+    async assertCanWatch(storyId: number, chatId: number): Promise<void> {
+        const { story, chat } = await this.load(storyId, chatId);
+        if (awaitingReply(chat)) throw new AwaitingReplyError();
+        this.requirePlayable(story);
+        if (await this.textCreditOut()) throw new OutOfCreditError('text');
+        await this.spendCap.assertUnderCap();
+        if (this.inFlight.has(chat.id)) throw new TurnInProgressError();
+        if ((await this.detail(story, chat)).suddenEvent?.status === 'active') throw new WatchNeedsYouError();
+    }
+
+    /**
+     * One reply of Watch (.scratch/watch-mode/spec.md, "One step"): a Continue under the same gate,
+     * written with the watch instruction, with no reply alert of its own. A Stop while the gate
+     * waited stores nothing.
+     */
+    async watchStep(storyId: number, chatId: number, stream: TurnStream): Promise<ChatDetail> {
+        const { story, chat: loaded } = await this.load(storyId, chatId);
+        if (awaitingReply(loaded)) throw new AwaitingReplyError();
+        const chat = await this.requireSendable(story, loaded);
+
+        return this.writingTurn(chat.id, async () => {
+            if (stream.signal.aborted) throw new TurnStoppedError();
+            await this.writeTurn(story, chat, stream, undefined, null, null, false, true);
+            return this.getChat(storyId, chatId);
+        });
+    }
+
+    /**
+     * Whether the story needs the user after the reply Watch just wrote (.scratch/watch-mode/spec.md,
+     * "Stopping"): an Ending reached at it, a Sudden event under way, one the story proposes, or a
+     * Roll offer. Read once the reply's Judge is done.
+     */
+    async watchNeedsUser(storyId: number, chatId: number): Promise<'ending' | 'sudden_event' | 'event_proposal' | 'roll_offer' | null> {
+        const { story, chat } = await this.load(storyId, chatId);
+        const view = await this.detail(story, chat);
+        const newest = newestAiMessage(chat);
+        if (view.ending && newest && view.ending.messageId === newest.id) return 'ending';
+        if (view.suddenEvent?.status === 'active') return 'sudden_event';
+        if (view.eventProposal) return 'event_proposal';
+        if (view.rollOffer) return 'roll_offer';
+        return null;
+    }
+
+    /**
+     * What a reply of this Chat costs, for Watch's estimate (.scratch/watch-mode/spec.md): the mean
+     * of the Cost view's cost of its last few replies that have any; null with none yet.
+     */
+    async replyCostEstimate(storyId: number, chatId: number): Promise<number | null> {
+        const { chat } = await this.load(storyId, chatId);
+        const costs = (await this.usageModel.costsOfChat(chat.id)).filter((cost) => cost.costUsd > 0).slice(-WATCH_ESTIMATE_REPLIES);
+        if (costs.length === 0) return null;
+        return costs.reduce((sum, cost) => sum + cost.costUsd, 0) / costs.length;
     }
 
     /**
@@ -1583,6 +1665,8 @@ export class ChatManagerService {
         nudge: string | null = null,
         cue: string | null = null,
         epilogue = false,
+        /** A step of Watch (.scratch/watch-mode/spec.md): the watch instruction, and no reply alert. */
+        watch = false,
     ): Promise<void> {
         // An Epilogue written again (Regenerate) is written as one again.
         const asEpilogue = epilogue || replacing?.epilogue === true;
@@ -1660,6 +1744,7 @@ export class ChatManagerService {
             roll: userText !== null ? rollOf(chat.messages[chat.messages.length - 1]) : null,
             epilogue: asEpilogue ? promptEpilogue(endingState(story.endings ?? [], state.endingsReached)) : null,
             thoughts: thoughts.map((thought) => ({ characterName: thought.name, text: thought.text })),
+            watch,
         });
         if (prompt.trimmed > 0) {
             this.logger.log(`Chat ${chat.id}: left out the ${prompt.trimmed} oldest Messages to fit the prompt budget`);
@@ -1717,7 +1802,8 @@ export class ChatManagerService {
         stream?.onParts(parts);
         await this.chatModel.touchPlayed(chat.id);
         // .scratch/push-alerts/spec.md: the user's devices are told the reply is ready (a visible app shows nothing).
-        this.pushAlerts.replyReady({ storyId: story.id, chatId: chat.id, chatTitle: chat.title, speakerName: firstSpeakerName(parts) });
+        // A step of Watch sends none: Watch sends one when it ends (.scratch/watch-mode/spec.md, "Push alert").
+        if (!watch) this.pushAlerts.replyReady({ storyId: story.id, chatId: chat.id, chatTitle: chat.title, speakerName: firstSpeakerName(parts) });
         // Started once the turn's answer has been read (see `writingTurn`).
         this.startAfterTurn.set(chat.id, () => this.startBackground(story, chat.id, aiMessageId));
     }
