@@ -296,6 +296,21 @@ const copyThaiReadings: CopyStep = async ({ manager, sourceChatId, through, mess
         [sourceChatId, olds, news, through],
     );
 };
+/**
+ * Bookmarks (.scratch/chat-search/spec.md): those of the Messages the Branch keeps, to their new
+ * ids. After the copy the two Chats' Bookmarks are their own.
+ */
+const copyBookmarks: CopyStep = async ({ manager, sourceChatId, through, messageIds }) => {
+    const [olds, news] = oldAndNewIds(messageIds);
+    await manager.query(
+        `INSERT INTO "message_bookmark" ("message_id", "created_at")
+         SELECT m."new_id", b."created_at"
+         FROM "message_bookmark" b JOIN "message" s ON s."id" = b."message_id"
+         JOIN unnest($2::int[], $3::int[]) AS m("old_id", "new_id") ON m."old_id" = b."message_id"
+         WHERE s."chat_id" = $1 AND s."position" <= $4 ORDER BY b."id"`,
+        [sourceChatId, olds, news, through],
+    );
+};
 /** Character Thoughts (.scratch/character-minds/spec.md): copied with the Messages the Branch keeps, to their new ids. */
 const copyThoughts: CopyStep = async ({ manager, sourceChatId, through, messageIds }) => {
     const [olds, news] = oldAndNewIds(messageIds);
@@ -392,7 +407,7 @@ const remapMemoriesUsed: CopyStep = async ({ manager, chatId, memoryIds, beliefI
 };
 
 /** In order: Messages before anything that points at them, Memories before their changes and the Beliefs that contradict them. */
-const COPY_STEPS: CopyStep[] = [copyMessages, copyMessageParts, copyThaiReadings, copyThoughts, copyMemories, copyBeliefs, remapMemoriesUsed, copyLedger, copySittingOut];
+const COPY_STEPS: CopyStep[] = [copyMessages, copyMessageParts, copyThaiReadings, copyBookmarks, copyThoughts, copyMemories, copyBeliefs, remapMemoriesUsed, copyLedger, copySittingOut];
 
 /** `count` fresh ids from `table`'s id sequence, ascending. */
 async function reserveIds(manager: EntityManager, table: string, count: number): Promise<number[]> {

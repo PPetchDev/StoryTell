@@ -85,6 +85,16 @@ export const BranchIcon = icon(
         <path d="M6 7v10M18 9c0 5-6 4-11.2 8.5" />
     </>,
 );
+/** 🔍 Search a Chat (.scratch/chat-search/spec.md). */
+export const SearchIcon = icon(
+    'SearchIcon',
+    <>
+        <circle cx="10.5" cy="10.5" r="6" />
+        <path d="M15 15l5 5" />
+    </>,
+);
+/** 🔖 A Bookmark; pass `fill="currentColor"` for a marked one. */
+export const BookmarkIcon = icon('BookmarkIcon', <path d="M6.5 4h11v16.5L12 16.5l-5.5 4z" />);
 /** ⋯ More. */
 export const MoreIcon = icon(
     'MoreIcon',
