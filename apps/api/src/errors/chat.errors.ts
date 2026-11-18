@@ -230,3 +230,33 @@ export class TooManyFactsError extends AppError {
         super('422.004.032', `This Chat already holds ${max} facts. Delete one to add another.`);
     }
 }
+
+// Move on, and Chapters (.scratch/scene-chapters/spec.md). Numbered from 090, clear of the codes other features add after 030.
+
+/** A Move on to the Scene the Chat is already on, to free play from free play, to a Scene not in the Story, or in a Story with no Scenes. Nothing changes. */
+export class NotAMoveError extends AppError {
+    constructor() {
+        super('422.004.090', 'Choose another Scene to move on to.');
+    }
+}
+
+/** No Chapter with that id in this Chat: taken back with its Scene advance, or another Chat's. */
+export class ChapterNotFoundError extends AppError {
+    constructor() {
+        super('404.004.091', 'Chapter not found in this Chat.');
+    }
+}
+
+/** A Chapter summary saved with nothing but whitespace. Nothing changes. */
+export class EmptyChapterError extends AppError {
+    constructor() {
+        super('422.004.092', 'Write something to save.');
+    }
+}
+
+/** Try again on a Chapter whose summary did not fail: written, being written, or with no Messages. No call. */
+export class ChapterNotFailedError extends AppError {
+    constructor() {
+        super('409.004.093', 'This Chapter has nothing to try again.');
+    }
+}

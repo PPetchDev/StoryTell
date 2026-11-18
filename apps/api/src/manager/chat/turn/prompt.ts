@@ -62,6 +62,11 @@ export interface PromptScene {
      * `LINGERING_REPLIES` the line draws the Scene toward its end. Left out, the line is as before.
      */
     replies?: number;
+    /**
+     * The user's Move on brought the Chat to this Scene and no reply has been written in it yet
+     * (.scratch/scene-chapters/spec.md): the line asks the reply to carry the story there.
+     */
+    chosenByUser?: boolean;
 }
 
 export interface PromptStory {
@@ -443,7 +448,11 @@ function sceneLayer(scene: PromptScene | null, identity: string): string {
             ? ` It also waits for these feelings, which must grow on their own: ${scene.gates.join('; ')}.`
             : `\nThis Scene moves on once these feelings have grown: ${scene.gates.join('; ')}. Let them grow naturally through the story; never force them.`
         : '';
-    return `${PROMPT_LAYERS.scene}: ${scene.name}\n${scene.situation}${moveOn}${gates}`;
+    // The user's Move on brought the story here (.scratch/scene-chapters/spec.md): the reply carries it in.
+    const chosen = scene.chosenByUser
+        ? `\n${identity} has chosen to move the story on to this Scene. Let this reply bring the story there: bridge any time or distance it needs in a line or two of narration, then begin the Scene. Never write what ${identity} says or does.`
+        : '';
+    return `${PROMPT_LAYERS.scene}: ${scene.name}\n${scene.situation}${chosen}${moveOn}${gates}`;
 }
 
 /**

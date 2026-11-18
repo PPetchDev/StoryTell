@@ -324,6 +324,8 @@ export interface SceneAdvance {
     fromSceneName: string;
     toSceneName: string | null;
     event: string;
+    /** The Judge, or the user's Move on (.scratch/scene-chapters/spec.md). */
+    movedBy: 'judge' | 'user';
     messageId: number;
     createdAt: string;
 }

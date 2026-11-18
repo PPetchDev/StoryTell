@@ -120,6 +120,10 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | `422.004.031` | `FactWithoutTopicError` | An Established fact set (`PUT /api/stories/:storyId/chats/:chatId/facts`) with a topic of no letters or digits (`.scratch/facts-panel/spec.md`). Nothing is written. |
 | `422.004.032` | `TooManyFactsError` | A new Established fact set when the Chat already holds 40. A change to a listed fact is always taken. Nothing is written. |
 | `404.004.028` | `DiaryEntryNotFoundError` | No Diary entry with that id in this Chat (`DELETE /api/stories/:storyId/chats/:chatId/diary/:entryId`): one already deleted, taken back with its Message, or another Chat's. Nothing changes. |
+| `422.004.090` | `NotAMoveError` | A Move on (`POST /api/stories/:storyId/chats/:chatId/scene`) to the Scene the Chat is already on, to free play from free play, to a Scene that isn't the Story's, or in a Story with no Scenes (`.scratch/scene-chapters/spec.md`). Nothing changes. A Move on during a turn answers `409.004.004`; while the newest reply's background calls are still saving `409.004.007`; after one failed `409.004.008`. |
+| `404.004.091` | `ChapterNotFoundError` | No Chapter with that id in this Chat (`PUT …/chapters/:chapterId`, `POST …/chapters/:chapterId/write`): taken back with its Scene advance, or another Chat's. Nothing changes. |
+| `422.004.092` | `EmptyChapterError` | A Chapter summary saved with nothing but whitespace. Nothing changes. |
+| `409.004.093` | `ChapterNotFailedError` | Try again (`POST …/chapters/:chapterId/write`) on a Chapter whose summary did not fail: written, being written, waiting, or with no Messages. No call. |
 | `502.005.001` | `UnreadableDraftError` | The model's draft or rewrite could not be read (no JSON object, or no text). Nothing saved. Show with Retry. |
 | `502.005.002` | `InvalidDraftError` | The draft does not fit a Story (0 or 7 Characters, a Style value outside its set, a required field empty, a bad StartingBond). Nothing saved. Show with Retry. |
 | `422.005.003` | `EmptyIdeaError` | A draft was asked for with a blank idea. |

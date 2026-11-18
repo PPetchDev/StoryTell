@@ -237,3 +237,11 @@ export const LockIcon = icon(
         <path d="M8 11V8a4 4 0 0 1 8 0v3" />
     </>,
 );
+/** 📖 Chapters: an open book. */
+export const ChaptersIcon = icon(
+    'ChaptersIcon',
+    <>
+        <path d="M12 6.5C10.3 5.2 7.8 4.5 4 4.5v13c3.8 0 6.3.7 8 2 1.7-1.3 4.2-2 8-2v-13c-3.8 0-6.3.7-8 2z" />
+        <path d="M12 6.5v13" />
+    </>,
+);

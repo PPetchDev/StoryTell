@@ -221,8 +221,11 @@ const copyLedger: CopyStep = async ({ manager, sourceChatId, chatId, messageIds 
         params,
     );
     await manager.query(
-        `INSERT INTO "scene_advance" ("chat_id", "from_scene_id", "from_scene_name", "to_scene_id", "to_scene_name", "event", "message_id", "created_at")
-         SELECT $1, s."from_scene_id", s."from_scene_name", s."to_scene_id", s."to_scene_name", s."event", msg."new_id", s."created_at"
+        // With who moved it and its Chapter (.scratch/scene-chapters/spec.md): the rollback drops those after N.
+        `INSERT INTO "scene_advance" ("chat_id", "from_scene_id", "from_scene_name", "to_scene_id", "to_scene_name", "event", "message_id", "created_at",
+                "moved_by", "chapter_summary", "chapter_by", "chapter_failed", "chapter_updated_at")
+         SELECT $1, s."from_scene_id", s."from_scene_name", s."to_scene_id", s."to_scene_name", s."event", msg."new_id", s."created_at",
+                s."moved_by", s."chapter_summary", s."chapter_by", s."chapter_failed", s."chapter_updated_at"
          FROM "scene_advance" s JOIN ${remap} WHERE s."chat_id" = $2 ORDER BY s."id"`,
         params,
     );

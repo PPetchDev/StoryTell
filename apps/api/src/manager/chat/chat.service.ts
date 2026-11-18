@@ -75,6 +75,8 @@ import { choiceMemories, chooseForChat, memoriesInPlayOf, memoryRoomTokens, pres
 import { ChoiceBelief, ContextQueryVector, MemoryChoice, memorySearchLogLine } from './memory/memory-choice.js';
 import { beliefResponses, choiceBeliefs } from './memory/beliefs.js';
 import { promptStorySoFar, StorySoFarManagerService } from './story-so-far/story-so-far.service.js';
+import { ChaptersManagerService } from './chapters/chapters.service.js';
+import { sceneMove } from './chapters/chapters.js';
 import { SuggestedRepliesManagerService } from './suggestions/suggested-replies.service.js';
 import { DiaryManagerService } from './diary/diary.service.js';
 import { ThoughtsManagerService } from './thoughts/thoughts.service.js';
@@ -404,6 +406,7 @@ export class ChatManagerService {
         private readonly thinker: ThoughtsManagerService,
         private readonly speechRepair: SpeechRepairManagerService,
         private readonly storySoFar: StorySoFarManagerService,
+        private readonly chapters: ChaptersManagerService,
         private readonly documentSearch: DocumentSearchManagerService,
         private readonly usageModel: UsageRecordModelService,
         private readonly gateway: ModelGateway,
@@ -463,6 +466,32 @@ export class ChatManagerService {
         await this.copyOpening(story, chat.id);
         await this.seedLedger(story, chat.id);
         return this.getChat(storyId, chat.id);
+    }
+
+    /**
+     * Move on (.scratch/scene-chapters/spec.md): the user ends the current Scene, to `toSceneId` or into
+     * free play (null). A Scene advance against the Chat's newest AI Message, as the Judge's are, so
+     * taking that Message back takes it back. Refused during a turn, and while the newest reply's
+     * background calls are pending (waited for first) or failed: a Judge run after the move would
+     * judge that reply against the new Scene. The Chapter it ends is then written in the background.
+     */
+    async moveOn(storyId: number, chatId: number, toSceneId: number | null): Promise<ChatDetail> {
+        const { story, chat: loaded } = await this.load(storyId, chatId);
+        sceneMove(story.scenes, loaded.currentSceneId, toSceneId);
+        if (this.inFlight.has(loaded.id)) throw new TurnInProgressError();
+        const settled = await this.settleBackground(loaded);
+        if (settled.pending) throw new BackgroundStillSavingError();
+        if (settled.failed.length > 0) throw new BackgroundFailedError(settled.failed);
+        await this.writingTurn(loaded.id, async () => {
+            // Read again inside the lock: the Judge may have moved the Scene on while it was waited for.
+            const chat = await this.reload(loaded.id);
+            const at = newestAiMessage(chat);
+            if (!at) throw new MessageNotFoundError();
+            await this.ledger.moveScene(chat.id, at.id, sceneMove(story.scenes, chat.currentSceneId, toSceneId));
+            this.logger.log(`Chat ${chat.id}: the user moved the story on to ${toSceneId === null ? 'free play' : `Scene ${toSceneId}`}`);
+        });
+        this.chapters.start(story, loaded.id);
+        return this.getChat(storyId, chatId);
     }
 
     /**
@@ -822,6 +851,8 @@ export class ChatManagerService {
         const diaries = this.writeDiariesAfter(story, chatId, messageId, settled);
         const chain = settled.then(() => {
             this.storySoFar.start(story, chatId, (chat) => this.promptLayersFor(story, chat));
+            // A Scene the Judge moved on ends a Chapter (.scratch/scene-chapters/spec.md); never awaited.
+            this.chapters.start(story, chatId);
             return diaries;
         });
         this.background.set(chatId, chain);
@@ -839,6 +870,7 @@ export class ChatManagerService {
         while (this.background.has(chatId)) await this.background.get(chatId);
         await this.storySoFar.idle(chatId);
         while (this.diaryRuns.has(chatId)) await this.diaryRuns.get(chatId);
+        await this.chapters.idle(chatId);
     }
 
     /**
@@ -1905,12 +1937,16 @@ function promptScene(story: StoryEntity, chat: ChatEntity, state: LedgerState, i
     if (!scene) return null;
     const nameOf = (characterId: number | null): string =>
         characterId === null ? identityName : (story.characters.find((character) => character.id === characterId)?.name ?? 'someone');
+    const replies = repliesInScene({ currentSceneId: scene.id, messages: chat.messages, sceneAdvances: state.sceneAdvances }) ?? 0;
+    const latest = state.sceneAdvances[state.sceneAdvances.length - 1];
     return {
         name: scene.name,
         situation: scene.situation,
         moveOnCondition: scene.moveOnCondition,
         gates: (scene.gates ?? []).map((gate) => bondGateInWords(nameOf(gate.fromCharacterId), nameOf(gate.toCharacterId), gate.axis, gate.atLeast)),
-        replies: repliesInScene({ currentSceneId: scene.id, messages: chat.messages, sceneAdvances: state.sceneAdvances }) ?? 0,
+        replies,
+        // The user's Move on brought the Chat here and no reply has been written in it (.scratch/scene-chapters/spec.md).
+        chosenByUser: replies === 0 && latest?.movedBy === 'user' && latest.toSceneId === scene.id,
     };
 }
 

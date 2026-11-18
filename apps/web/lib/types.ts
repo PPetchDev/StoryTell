@@ -68,6 +68,7 @@ export type CallKind =
     | 'snapshot_prompt'
     | 'suggested_replies'
     | 'story_summary'
+    | 'chapter_summary'
     | 'write_for_me'
     | 'thai_reading'
     | 'diary_entry'
@@ -96,6 +97,7 @@ export const CALL_KIND_LABEL: Record<CallKind, string> = {
     snapshot_prompt: 'Snapshot descriptions',
     suggested_replies: 'Suggested replies',
     story_summary: 'Story so far',
+    chapter_summary: 'Chapter summaries',
     write_for_me: 'Write for me',
     thai_reading: 'Thai readings',
     diary_entry: 'Diary entries',

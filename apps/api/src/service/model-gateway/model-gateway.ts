@@ -64,6 +64,7 @@ export type TextCallKind =
     | 'snapshot_prompt'
     | 'suggested_replies'
     | 'story_summary'
+    | 'chapter_summary'
     | 'write_for_me'
     | 'thai_reading'
     | 'diary_entry'

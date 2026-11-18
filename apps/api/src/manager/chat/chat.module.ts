@@ -27,11 +27,12 @@ import { SuggestedRepliesManagerService } from './suggestions/suggested-replies.
 import { WriteForMeManagerService } from './write-for-me/write-for-me.service.js';
 import { ThaiReadingManagerService } from './thai-reading/thai-reading.service.js';
 import { StorySoFarManagerService } from './story-so-far/story-so-far.service.js';
+import { ChaptersManagerService } from './chapters/chapters.service.js';
 import { ChatTranscriptManagerService } from './transcript.service.js';
 
 @Module({
     imports: [ChatModelModule, BranchModelModule, StoryModelModule, SettingsModelModule, LedgerModelModule, MemoryModelModule, PersonaModelModule, SnapshotModelModule, DocumentModelModule, SavedReplyModelModule, ReplaceRuleModelModule, ReadAloudManagerModule, UsageRecordModelModule],
-    providers: [ChatManagerService, DocumentSearchManagerService, JudgeManagerService, BeliefManagerService, MemoryEmbeddingManagerService, MemoryExtractionManagerService, MemoryManagerService, SuggestedRepliesManagerService, WriteForMeManagerService, ThaiReadingManagerService, DiaryManagerService, ThoughtsManagerService, SpeechRepairManagerService, StorySoFarManagerService, ChatTranscriptManagerService],
-    exports: [ChatManagerService, MemoryManagerService, BeliefManagerService, StorySoFarManagerService, ChatTranscriptManagerService],
+    providers: [ChatManagerService, DocumentSearchManagerService, JudgeManagerService, BeliefManagerService, MemoryEmbeddingManagerService, MemoryExtractionManagerService, MemoryManagerService, SuggestedRepliesManagerService, WriteForMeManagerService, ThaiReadingManagerService, DiaryManagerService, ThoughtsManagerService, SpeechRepairManagerService, StorySoFarManagerService, ChaptersManagerService, ChatTranscriptManagerService],
+    exports: [ChatManagerService, MemoryManagerService, BeliefManagerService, StorySoFarManagerService, ChaptersManagerService, ChatTranscriptManagerService],
 })
 export class ChatManagerModule {}

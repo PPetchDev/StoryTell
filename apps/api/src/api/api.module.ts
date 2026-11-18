@@ -10,6 +10,7 @@ import { HealthApiController } from './health/health.controller.js';
 import { ImageApiModule } from './image/image.module.js';
 import { MemoryApiModule } from './memory/memory.module.js';
 import { StorySoFarApiModule } from './story-so-far/story-so-far.module.js';
+import { ChaptersApiModule } from './chapters/chapters.module.js';
 import { PeopleApiModule } from './people/people.module.js';
 import { PersonaApiModule } from './persona/persona.module.js';
 import { PushApiModule } from './push/push.module.js';
@@ -36,6 +37,7 @@ import { VoiceApiModule } from './voice/voice.module.js';
         ChatApiModule,
         MemoryApiModule,
         StorySoFarApiModule,
+        ChaptersApiModule,
         SettingsApiModule,
         UsageApiModule,
         VoiceApiModule,

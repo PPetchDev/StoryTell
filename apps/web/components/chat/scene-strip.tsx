@@ -6,6 +6,7 @@ import { COLUMN, SHORTEST_HIDDEN } from '@/components/chat/chat-classes';
 import {
     AfternoonIcon,
     ChevronRightIcon,
+    ChaptersIcon,
     CloseIcon,
     DawnIcon,
     EveningIcon,
@@ -42,6 +43,8 @@ interface SceneStripProps {
     factCount?: number;
     /** Opens the Facts panel; without it, the strip has no Facts row. */
     onOpenFacts?(): void;
+    /** Opens the Chapters, with Move on (.scratch/scene-chapters/spec.md); left out where the Story has no Scenes. */
+    onOpenChapters?(): void;
     onHide(): void;
 }
 
@@ -77,6 +80,7 @@ export function SceneStrip({
     characters = [],
     factCount = 0,
     onOpenFacts,
+    onOpenChapters,
     onHide,
 }: SceneStripProps) {
     const [open, setOpen] = useState(false);
@@ -158,6 +162,18 @@ export function SceneStrip({
                         </span>
                     ))}
             </button>
+            {onOpenChapters && (
+                <button
+                    type="button"
+                    className="bare-button grid size-11 shrink-0 cursor-pointer place-items-center text-muted press focus-ring-inset"
+                    aria-label="Chapters"
+                    title="Chapters, and Move on"
+                    aria-haspopup="dialog"
+                    onClick={onOpenChapters}
+                >
+                    <ChaptersIcon size={20} />
+                </button>
+            )}
             <button
                 type="button"
                 className="bare-button grid size-11 shrink-0 cursor-pointer place-items-center text-muted press focus-ring-inset"

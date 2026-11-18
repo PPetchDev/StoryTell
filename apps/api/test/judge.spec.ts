@@ -427,6 +427,7 @@ ${NOW_RULE}`);
                     fromSceneName: 'Arrival',
                     toSceneName: 'The lamp',
                     event: 'Mira told Ash to come up.',
+                    movedBy: 'judge',
                     messageId: reply.id,
                     createdAt: expect.any(String),
                 },
