@@ -252,8 +252,9 @@ describe('Established facts: what stands, and what the Judge says (pure)', () =>
         const input = { cast: [], identityName: 'Petch', bonds: [], arcs: [], scene: null, recent: [], userText: 'Hi', aiText: '@Nara: Nine summers.' };
         const without = buildJudgePrompt(input);
         const withFacts = buildJudgePrompt({ ...input, factsSection: section });
-        // With the section, the reply shape names the two fields, with and without the Expression rule (spec, "Real-model check").
-        const shape = ',\n "facts":[{"topic":"...","fact":"..."}],\n "slips":[{"topic":"...","said":"..."}]}\nEmpty arrays when nothing changed.';
+        // With the section, the reply shape names the two fields, with and without the Expression rule (spec, "Real-model check"),
+        // and then the Roll offer's (.scratch/judge-rolls/spec.md), which goes on the same system message.
+        const shape = ',\n "facts":[{"topic":"...","fact":"..."}],\n "slips":[{"topic":"...","said":"..."}],\n "roll_offer":null}\nEmpty arrays when nothing changed.';
         expect(without.messages[0].content).not.toContain('"facts"');
         expect(withFacts.messages[0].content).toBe(without.messages[0].content.replace(/\}\nEmpty arrays when nothing changed\.$/, shape));
         const parts = [{ kind: 'speech' as const, characterId: 1, speakerName: 'Nara', text: 'Nine summers.' }];

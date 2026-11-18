@@ -75,6 +75,18 @@ export interface MessageRoll {
     value: number;
     target: number;
     outcome: 'critical_success' | 'success' | 'failure' | 'critical_failure';
+    /** The Stat it was made for and the number it added (.scratch/judge-rolls/spec.md); left out without one. */
+    stat?: { name: string; bonus: number };
+}
+
+/** A Roll offer as stored on the AI Message the Judge made it on (.scratch/judge-rolls/spec.md). */
+export interface StoredRollOffer {
+    /** One short question to the user: what is at stake. */
+    stakes: string;
+    /** The Role's Stat that applies, as named when the offer was made; null for none. */
+    stat: string | null;
+    /** The user waved it away; it still counts for the gap between offers. */
+    dismissed: boolean;
 }
 
 /** Where the shown Reply version stands among the newest AI Message's versions: the n and m of ‹ n/m ›. */
@@ -154,6 +166,20 @@ export class MessageEntity {
 
     @Column({ name: 'roll_target', type: 'smallint', nullable: true })
     rollTarget: number | null;
+
+    /** The Stat the Roll was made for, as the Role named it then, and its number (.scratch/judge-rolls/spec.md). Both NULL without one. */
+    @Column({ name: 'roll_stat', type: 'text', nullable: true })
+    rollStat: string | null;
+
+    @Column({ name: 'roll_bonus', type: 'smallint', nullable: true })
+    rollBonus: number | null;
+
+    /**
+     * The Roll offer the Judge left on this AI Message (.scratch/judge-rolls/spec.md); NULL without
+     * one. Each judgement of the Message writes it again, and a rewind clears it.
+     */
+    @Column({ name: 'roll_offer', type: 'jsonb', nullable: true })
+    rollOffer: StoredRollOffer | null;
 
     /**
      * An AI Message written as the story's Epilogue (.scratch/endings/spec.md). It stays with the
@@ -243,8 +269,11 @@ export class MessageEntity {
     /** The Message's Roll with its outcome: a 20 and a 1 are critical, otherwise reaching the number succeeds. */
     rollResponse(): MessageRoll | null {
         if (this.roll === null || this.roll === undefined || this.rollTarget === null || this.rollTarget === undefined) return null;
-        const outcome = this.roll >= 20 ? 'critical_success' : this.roll <= 1 ? 'critical_failure' : this.roll >= this.rollTarget ? 'success' : 'failure';
-        return { value: this.roll, target: this.rollTarget, outcome };
+        // A Stat adds to the throw (.scratch/judge-rolls/spec.md); a natural 20 and 1 stay critical.
+        const stat = this.rollStat !== null && this.rollStat !== undefined ? { name: this.rollStat, bonus: this.rollBonus ?? 0 } : null;
+        const total = this.roll + (stat?.bonus ?? 0);
+        const outcome = this.roll >= 20 ? 'critical_success' : this.roll <= 1 ? 'critical_failure' : total >= this.rollTarget ? 'success' : 'failure';
+        return { value: this.roll, target: this.rollTarget, outcome, ...(stat ? { stat } : {}) };
     }
 
     /** An AI Message needs its parts loaded (ChatModelService.findWithMessages). */

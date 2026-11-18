@@ -20,6 +20,7 @@ import { BackgroundCallResponse, BackgroundStatus, MemoriesUsed, MessageRoll, Re
 import { GaugeDirection } from '../../../model/story/entities/sudden-event.entity.js';
 import type { SuddenEventView } from '../../../manager/chat/sudden-event/sudden-event.js';
 import type { EndingView } from '../../../manager/chat/ending/ending.js';
+import type { RollOfferView } from '../../../manager/chat/roll-offer/roll-offer.js';
 import { BeliefDTO } from '../../memory/dto/belief.response.dto.js';
 import { BondLevels } from '../../../model/ledger/bond-axes.js';
 import { BondChangeResponse } from '../../../model/ledger/entities/bond-change.entity.js';
@@ -185,6 +186,15 @@ export class ReplyVersionsDTO implements ReplyVersionsResponse {
     count: number;
 }
 
+/** A Stat added to a Roll, or the one a Roll offer names (.scratch/judge-rolls/spec.md). */
+export class RollStatDTO {
+    @ApiProperty({ description: "The Stat's name." })
+    name: string;
+
+    @ApiProperty({ description: 'What it adds to the throw, -3 to 5.' })
+    bonus: number;
+}
+
 /** A User Message's Roll (.scratch/roll/spec.md). */
 export class MessageRollDTO implements MessageRoll {
     @ApiProperty({ description: 'What the d20 showed, 1 to 20.' })
@@ -195,6 +205,18 @@ export class MessageRollDTO implements MessageRoll {
 
     @ApiProperty({ enum: ['critical_success', 'success', 'failure', 'critical_failure'], description: 'A 20 and a 1 are critical; otherwise reaching the number succeeds.' })
     outcome: MessageRoll['outcome'];
+
+    @ApiPropertyOptional({ type: () => RollStatDTO, description: 'The Stat it was made for and the number it added (.scratch/judge-rolls/spec.md); left out without one.' })
+    stat?: RollStatDTO;
+}
+
+/** The Roll the Judge offers for the next Message (.scratch/judge-rolls/spec.md). */
+export class RollOfferDTO implements RollOfferView {
+    @ApiProperty({ description: 'One short question to the user: what is at stake.' })
+    stakes: string;
+
+    @ApiProperty({ type: () => RollStatDTO, nullable: true, description: "The Role's Stat that applies, with its number now; null for none." })
+    stat: RollStatDTO | null;
 }
 
 /** The Chat's Sudden event as the Chat screen shows it (.scratch/sudden-events/spec.md). */
@@ -432,6 +454,14 @@ export class ChatResponseBodyDTO extends ChatSummaryDTO implements Omit<ChatDeta
 
     @ApiProperty({ description: "The number a Roll sent now must reach, from the Story's Difficulty." })
     rollTarget: number;
+
+    @ApiProperty({
+        type: () => RollOfferDTO,
+        nullable: true,
+        description:
+            "The Roll the Judge offers for the next Message (.scratch/judge-rolls/spec.md): on the newest Message when that is an AI Message, not dismissed, and the Story's offers are on; null otherwise.",
+    })
+    rollOffer: RollOfferDTO | null;
 
     @ApiProperty({ type: String, nullable: true, description: 'Where the story is now; null until the story makes it clear.' })
     place: string | null;

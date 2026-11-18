@@ -7,6 +7,7 @@ import {
     AfternoonIcon,
     CloseIcon,
     DawnIcon,
+    DiceIcon,
     EveningIcon,
     IconProps,
     MorningIcon,
@@ -19,8 +20,8 @@ import {
     WeatherIcon,
 } from '@/components/icons';
 import { bondGateInWords } from '@/lib/bonds';
-import { Chat, TimeOfDay } from '@/lib/chat';
-import { Scene } from '@/lib/story';
+import { Chat, signedStat, TimeOfDay } from '@/lib/chat';
+import { RoleStat, Scene } from '@/lib/story';
 
 interface SceneStripProps {
     /** The Chat's current Scene; null in free play. */
@@ -37,6 +38,8 @@ interface SceneStripProps {
     scenes: Scene[];
     /** The Story's Characters, to name a Scene's Bond gates; empty while the Story can't be read. */
     characters?: readonly { id: number; name: string }[];
+    /** The Role's Stats (CONTEXT.md, "Stat"), shown once opened; empty without. */
+    stats?: readonly RoleStat[];
     onHide(): void;
 }
 
@@ -61,7 +64,7 @@ const STRIP_ICON = 'mr-1 inline-block shrink-0 align-[-0.2em]';
  * on to shows then. A tap opens it to read the goal whole and closes it again; its own ✕ hides it,
  * and ⋯ brings it back (audit M30: a tap used to hide it, with the goal cut off and no way to read it).
  */
-export function SceneStrip({ current, timeOfDay, place = null, weather = null, outfits = [], scenes, characters = [], onHide }: SceneStripProps) {
+export function SceneStrip({ current, timeOfDay, place = null, weather = null, outfits = [], scenes, characters = [], stats = [], onHide }: SceneStripProps) {
     const [open, setOpen] = useState(false);
     const scene = current ? scenes.find((candidate) => candidate.id === current.id) : undefined;
     const goal = scene?.situation ?? '';
@@ -140,6 +143,14 @@ export function SceneStrip({ current, timeOfDay, place = null, weather = null, o
                             {entry.outfit}
                         </span>
                     ))}
+                {/* What the user's part is good at (.scratch/judge-rolls/spec.md), once opened: one line, wrapping. */}
+                {open && stats.length > 0 && (
+                    <span className="min-w-0 flex-[1_0_100%] [overflow-wrap:anywhere]" data-stats>
+                        <DiceIcon size={14} className={STRIP_ICON} />
+                        <span className="font-semibold text-text">Your Stats</span>{' '}
+                        {stats.map((stat) => `${stat.name} ${signedStat(stat.value)}`).join(' · ')}
+                    </span>
+                )}
             </button>
             <button
                 type="button"

@@ -7,7 +7,7 @@ import { COLUMN, ICON_BUTTON, LABEL_CAPS, PANEL_NOTE, SEND_BUTTON, TOOL_CHIP } f
 import { useConnection } from '@/components/connection';
 import { CloseIcon, DiceIcon, PencilIcon, PlayIcon, StopIcon, UndoIcon } from '@/components/icons';
 import { ApiUnreachableError } from '@/lib/api';
-import { backgroundNotice, Chat, chatApi, SuggestedReply } from '@/lib/chat';
+import { backgroundNotice, Chat, chatApi, SuggestedReply, RollStat, signedStat } from '@/lib/chat';
 import { insertSavedReply, SavedReply, TraySavedReply } from '@/lib/saved-replies';
 import { SCROLL_FADES, useScrollFade } from '@/lib/scroll-fade';
 import { DictateButton, dictationNote, hasDictationStatus, RecordingBar, useDictation } from './dictation';
@@ -373,6 +373,10 @@ interface ChatComposerProps {
     /** Whether the next Message is sent with a Roll (CONTEXT.md, "Roll"). */
     roll: boolean;
     onRoll(next: boolean): void;
+    /** The Stat the armed Roll adds, from a Roll offer taken (.scratch/judge-rolls/spec.md); null or left out for none. */
+    rollStat?: RollStat | null;
+    /** The Roll offer band (.scratch/judge-rolls/spec.md), above what is set for the next turn; nothing while none is pending. */
+    rollOfferBand?: ReactNode;
 }
 
 /**
@@ -402,6 +406,8 @@ export function ChatComposer({
     onClearCue,
     roll,
     onRoll,
+    rollStat = null,
+    rollOfferBand,
 }: ChatComposerProps) {
     const box = useAutoGrow(draft);
     const boxId = useId();
@@ -569,6 +575,7 @@ export function ChatComposer({
                 <div className="empty:hidden" data-band="characters">
                     {characterRow?.(writingForMe || dictating)}
                 </div>
+                {rollOfferBand}
                 {/*
                  * What is set for the next turn, on one row (docs/ui-audit-2026-11-16.md M2): the Cue and the Roll each
                  * had a band, 104px between them on a 360px phone. The Cue gives way and the Roll keeps its few words.
@@ -600,7 +607,12 @@ export function ChatComposer({
                                 <DiceIcon size={16} className="shrink-0 text-rewrite-text" />
                                 <span className="min-w-0 truncate">
                                     <span className="font-semibold text-rewrite-text">Roll</span> {chat.rollTarget}
-                                    {cue !== null ? (
+                                    {rollStat ? (
+                                        // From a Roll offer taken (.scratch/judge-rolls/spec.md): what its Stat adds, in place of the words.
+                                        <>
+                                            <span className="sr-only"> or more succeeds,</span> · {signedStat(rollStat.bonus)} {rollStat.name}
+                                        </>
+                                    ) : cue !== null ? (
                                         <>
                                             <span aria-hidden="true">+</span>
                                             <span className="sr-only"> or more succeeds</span>

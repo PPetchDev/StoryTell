@@ -71,7 +71,7 @@ describe('Story authoring', () => {
         const story = await createStory('First Light');
 
         expect(story.title).toBe('First Light');
-        expect(story.role).toEqual({ id: expect.any(Number), name: '', description: '' });
+        expect(story.role).toEqual({ id: expect.any(Number), name: '', description: '', stats: [] });
         expect(story.style).toEqual({
             pov: 'second',
             tense: 'past',

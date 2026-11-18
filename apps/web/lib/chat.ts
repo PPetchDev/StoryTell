@@ -80,6 +80,27 @@ export interface MessageRoll {
     value: number;
     target: number;
     outcome: RollOutcome;
+    /** The Role's Stat it was made for and the number it added (CONTEXT.md, "Stat"); left out without one. */
+    stat?: RollStat;
+}
+
+/** A Stat added to a Roll, or the one a Roll offer names, with its number. */
+export interface RollStat {
+    name: string;
+    bonus: number;
+}
+
+/** The Roll the Judge offers for the next Message (CONTEXT.md, "Roll offer"; .scratch/judge-rolls/spec.md). */
+export interface RollOffer {
+    /** One short question to the user: what is at stake. */
+    stakes: string;
+    /** The Role's Stat that applies, with its number now; null for none. */
+    stat: RollStat | null;
+}
+
+/** "+2" or "-1": how a Stat's number reads beside its name. */
+export function signedStat(value: number): string {
+    return value < 0 ? `${value}` : `+${value}`;
 }
 
 export const ROLL_OUTCOME_LABELS: Record<RollOutcome, string> = {
@@ -182,6 +203,8 @@ export interface Chat extends ChatSummary {
     diaryLatest: Array<{ characterId: number; entryId: number }>;
     /** The number a Roll sent now must reach, from the Story's Difficulty. */
     rollTarget: number;
+    /** The Roll the Judge offers for the next Message; null when none is pending (.scratch/judge-rolls/spec.md). Left out by an older API. */
+    rollOffer?: RollOffer | null;
     /** Where the story is now (CONTEXT.md, "Place"); null until the story makes it clear. */
     place: string | null;
     /** The weather in the story now; null until the story shows it. */
@@ -385,6 +408,8 @@ export interface TurnExtras {
     cue?: string | null;
     /** A send only (CONTEXT.md, "Roll"): the app throws the dice for what this Message attempts. */
     roll?: boolean;
+    /** With `roll`: the Role's Stat the Roll is made for, from a Roll offer taken (.scratch/judge-rolls/spec.md). */
+    rollStat?: string | null;
 }
 
 /**
@@ -445,7 +470,7 @@ export const chatApi = {
         apiSend<Chat>('PUT', `/stories/${storyId}/chats/${chatId}/sitting-out`, { characterIds }),
     remove: (storyId: number, chatId: number) => apiSend<void>('DELETE', `/stories/${storyId}/chats/${chatId}`),
     send: (storyId: number, chatId: number, text: string, stream?: TurnStream, extras?: TurnExtras) =>
-        turn<Chat>('POST', `/stories/${storyId}/chats/${chatId}/messages`, withExtras(extras?.roll ? { text, roll: true } : { text }, extras), stream),
+        turn<Chat>('POST', `/stories/${storyId}/chats/${chatId}/messages`, withExtras(extras?.roll ? { text, roll: true, ...(extras.rollStat ? { rollStat: extras.rollStat } : {}) } : { text }, extras), stream),
     retry: (storyId: number, chatId: number, stream?: TurnStream, extras?: TurnExtras) =>
         turn<Chat>('POST', `/stories/${storyId}/chats/${chatId}/retry`, withExtras(undefined, extras), stream),
     /** Lets the story go on without a line from the user: the Narrator writes the next reply. */
@@ -455,6 +480,8 @@ export const chatApi = {
     epilogue: (storyId: number, chatId: number, stream?: TurnStream) => turn<Chat>('POST', `/stories/${storyId}/chats/${chatId}/epilogue`, undefined, stream),
     /** "Not yet": takes the Chat's suggested Ending away, and the AI suggests no more in this Chat. */
     dismissEnding: (storyId: number, chatId: number) => apiSend<Chat>('DELETE', `/stories/${storyId}/chats/${chatId}/ending`),
+    /** "Not now" on a Roll offer (.scratch/judge-rolls/spec.md): it goes, and still counts for the gap between offers. */
+    dismissRollOffer: (storyId: number, chatId: number) => apiSend<Chat>('DELETE', `/stories/${storyId}/chats/${chatId}/roll-offer`),
     /** Three things the user might write next, as the worn identity. Nothing is stored. */
     suggest: (storyId: number, chatId: number) =>
         apiSend<{ suggestions: SuggestedReply[] }>('POST', `/stories/${storyId}/chats/${chatId}/suggestions`),

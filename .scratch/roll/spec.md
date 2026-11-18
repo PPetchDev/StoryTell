@@ -43,6 +43,6 @@ A **Roll**: the user arms the dice for the Message they are about to send. The a
 ## Out of Scope
 
 - Bonuses, stats, skills, advantage, or dice other than one d20.
-- The Narrator or the Judge asking for a Roll ("offered at key moments"): only the user arms one.
+- The Narrator or the Judge asking for a Roll ("offered at key moments"): only the user arms one. (Stats and the Judge's Roll offers came later: [Spec: Roll offers and Stats](../judge-rolls/spec.md).)
 - Adding or changing a Roll on a Message already sent.
 - The Roll in the Transcript, and in the Judge's or Memory extraction's prompts: they read the reply, which already shows the outcome.

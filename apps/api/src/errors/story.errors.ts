@@ -222,3 +222,10 @@ export class InvalidBondGateError extends AppError {
         super('422.003.024', `That Bond gate can't be set: ${reason}`);
     }
 }
+
+/** A Role's Stats that break a rule (.scratch/judge-rolls/spec.md): too many, a bad name, a repeat, or a number out of range. */
+export class InvalidStatsError extends AppError {
+    constructor(reason: string) {
+        super('422.003.040', reason);
+    }
+}

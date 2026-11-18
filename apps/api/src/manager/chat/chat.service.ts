@@ -109,7 +109,8 @@ import { TurnMemoryRecord } from '../../model/chat/chat.service.js';
 import { CastName, historyPartsText, ParseOptions, parseReply, partsToText, releasedText, ReplyPart, withoutEchoedUserText } from './turn/reply-parser.js';
 import { TurnStoppedError, TurnStream } from './turn/turn-stream.js';
 import { Dice } from '../../service/dice/dice.js';
-import { Roll, ROLL_SIDES, ROLL_TARGETS } from './roll.js';
+import { Roll, ROLL_SIDES, ROLL_TARGETS, RollStat } from './roll.js';
+import { pendingRollOffer, RollOfferView, statNamed } from './roll-offer/roll-offer.js';
 import { endingName, endingReady, endingState, EndingView, endingView, promptEpilogue } from './ending/ending.js';
 import { eventReady, eventState, promptSuddenEvent, SuddenEventView, suddenEventView } from './sudden-event/sudden-event.js';
 import { currentDetails, promptDetails } from './details/details.js';
@@ -162,6 +163,8 @@ export interface ChatDetail extends ChatSummary {
     ending: EndingView | null;
     /** The number a Roll sent now must reach (.scratch/roll/spec.md), from the Story's Difficulty. */
     rollTarget: number;
+    /** The Roll the Judge offers for the next Message (.scratch/judge-rolls/spec.md); null when none is pending. */
+    rollOffer: RollOfferView | null;
     /** Where the story is now (.scratch/info-box/spec.md); null until the story makes it clear. */
     place: string | null;
     /** The weather in the story now; null until the story shows it. */
@@ -1024,6 +1027,17 @@ export class ChatManagerService {
         await this.readAloud.sweep();
     }
 
+    /**
+     * Dismisses the Chat's pending Roll offer (.scratch/judge-rolls/spec.md): marked on its Message,
+     * so it still counts for the gap. With none pending, the Chat as it is.
+     */
+    async dismissRollOffer(storyId: number, chatId: number): Promise<ChatDetail> {
+        const { chat } = await this.load(storyId, chatId);
+        const newest = chat.messages.at(-1);
+        if (newest?.kind === MessageKind.Ai) await this.chatModel.dismissRollOffer(newest);
+        return this.getChat(storyId, chatId);
+    }
+
     /** Spec: "Send flow". */
     async send(
         storyId: number,
@@ -1034,6 +1048,8 @@ export class ChatManagerService {
         cue?: string | null,
         /** .scratch/roll/spec.md: throw the dice for what this Message attempts. */
         withRoll = false,
+        /** .scratch/judge-rolls/spec.md: the Role's Stat the Roll is made for; one it doesn't have adds nothing. */
+        rollStat: string | null = null,
     ): Promise<ChatDetail> {
         if (text.trim() === '') throw new EmptyMessageError();
         const { story, chat: loaded } = await this.load(storyId, chatId);
@@ -1044,7 +1060,7 @@ export class ChatManagerService {
             // Stopped while the gate waited: nothing is stored, and the client keeps the text.
             if (stream?.signal.aborted) throw new TurnStoppedError();
             // The Roll is thrown here, once, and kept on the Message: a Retry, an edit or Again reads the same one.
-            const roll: Roll | null = withRoll ? { value: this.dice.roll(ROLL_SIDES), target: ROLL_TARGETS[story.difficulty] } : null;
+            const roll: Roll | null = withRoll ? { value: this.dice.roll(ROLL_SIDES), target: ROLL_TARGETS[story.difficulty], stat: rollStatOf(story, rollStat) } : null;
             const userMessage = await this.chatModel.addUserMessage(
                 chat.id,
                 chat.messages.length,
@@ -1775,6 +1791,7 @@ export class ChatManagerService {
             suddenEvent: suddenEventView(eventState(story.suddenEvents ?? [], eventSteps), newestAiMessage(chat)?.id ?? null),
             ending: endingView(endingState(story.endings ?? [], endingsReached)),
             rollTarget: ROLL_TARGETS[story.difficulty],
+            rollOffer: pendingRollOffer({ rollOffers: story.rollOffers ?? true, stats: story.role.stats ?? [] }, chat.messages.at(-1)),
             place: details.place,
             weather: details.weather,
             // In cast order, by id: a Character gone from the cast is left out.
@@ -2050,7 +2067,15 @@ function detailsFor(story: StoryEntity, state: LedgerState) {
 /** A User Message's Roll as the prompt reads it; null without one. */
 function rollOf(message: MessageEntity | undefined): Roll | null {
     if (!message || message.roll === null || message.roll === undefined || message.rollTarget === null || message.rollTarget === undefined) return null;
-    return { value: message.roll, target: message.rollTarget };
+    // The Stat stays with the Roll (.scratch/judge-rolls/spec.md), so a Retry, an edit or Again reads the same total.
+    const stat = message.rollStat !== null && message.rollStat !== undefined ? { name: message.rollStat, bonus: message.rollBonus ?? 0 } : null;
+    return { value: message.roll, target: message.rollTarget, stat };
+}
+
+/** The Role's Stat a Roll is made for, with its number now (.scratch/judge-rolls/spec.md); null for none or one the Role doesn't have. */
+function rollStatOf(story: StoryEntity, name: string | null): RollStat | null {
+    const stat = statNamed(story.role.stats ?? [], name);
+    return stat ? { name: stat.name, bonus: stat.value } : null;
 }
 
 /** The Cue a turn was sent with (CONTEXT.md, "Cue"), trimmed; null for none or a blank one. Never stored. */

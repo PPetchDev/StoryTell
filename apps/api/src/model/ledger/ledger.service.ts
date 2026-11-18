@@ -124,6 +124,11 @@ export interface MessageChanges {
      * Left out, the parts are not touched.
      */
     emotions?: PartEmotion[];
+    /**
+     * The Roll offer the judgement made (.scratch/judge-rolls/spec.md), written on the Message: null
+     * for none, which clears an earlier one. Left out, the Message keeps what it has.
+     */
+    rollOffer?: { stakes: string; stat: string | null } | null;
 }
 
 /**
@@ -390,7 +395,11 @@ export class LedgerModelService {
             await manager.update(
                 MessageEntity,
                 { id: messageId },
-                { judgeStatus: BackgroundStatus.Done, judgeError: null },
+                {
+                    judgeStatus: BackgroundStatus.Done,
+                    judgeError: null,
+                    ...(changes.rollOffer !== undefined ? { rollOffer: changes.rollOffer ? { ...changes.rollOffer, dismissed: false } : null } : {}),
+                },
             );
         });
     }
@@ -524,6 +533,8 @@ export class LedgerModelService {
             await manager.delete(EndingReachedEntity, { messageId: In(ids) });
             // A Diary entry tells the story up to its Message: it goes with it (.scratch/diary/spec.md). Not counted.
             await manager.delete(DiaryEntryEntity, { messageId: In(ids) });
+            // A Roll offer goes with the judgement that made it (.scratch/judge-rolls/spec.md), so it never shows on a new reply. Not counted.
+            await manager.update(MessageEntity, { id: In(ids) }, { rollOffer: null });
             const arcs = newestFirst(await manager.find(ArcStepEntity, { where: { messageId: In(ids) } }));
             for (const arc of arcs) {
                 await manager.delete(ArcStepEntity, { id: arc.id });

@@ -56,7 +56,21 @@ export interface Role {
     id: number;
     name: string;
     description: string;
+    /** Its Stats (CONTEXT.md, "Stat"), in the author's order; left out by an older API. */
+    stats?: RoleStat[];
 }
+
+/** One of the Role's Stats: a name and the number it adds to a Roll made for it. */
+export interface RoleStat {
+    name: string;
+    value: number;
+}
+
+/** The Role's Stats' limits (mirrors apps/api/src/manager/chat/roll-offer/roll-offer.ts). */
+export const MAX_STATS = 6;
+export const STAT_NAME_MAX = 24;
+export const STAT_MIN = -3;
+export const STAT_MAX = 5;
 
 /** A square of the Reference image, in fractions of the image's width: left edge, top edge, side. */
 export interface PortraitCrop {
@@ -306,13 +320,15 @@ export interface Story {
     narrationVoice: string | null;
     /** What sits behind its Chats' Messages (.scratch/chat-looks/spec.md, "Backdrop"). */
     backdrop: Backdrop;
+    /** Whether the Judge may offer a Roll at a key moment (.scratch/judge-rolls/spec.md); left out by an older API, which means on. */
+    rollOffers?: boolean;
     playable: boolean;
     missing: MissingField[];
     createdAt: string;
     updatedAt: string;
 }
 
-export type StoryFields = Partial<Pick<Story, 'title' | 'setting' | 'opening' | 'narrationVoice' | 'backdrop'> & Style>;
+export type StoryFields = Partial<Pick<Story, 'title' | 'setting' | 'opening' | 'narrationVoice' | 'backdrop' | 'rollOffers'> & Style>;
 export type CharacterFields = Partial<Omit<Character, 'id' | 'referenceImagePath' | 'portraitCrop' | 'expressions'>>;
 export type SceneFields = Partial<Omit<Scene, 'id' | 'gates'>>;
 export type SuddenEventFields = Partial<Omit<SuddenEvent, 'id'>>;

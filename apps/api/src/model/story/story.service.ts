@@ -160,11 +160,13 @@ export class StoryModelService {
                     imageStyle,
                     narrationVoice,
                     backdrop,
+                    // The switch for Roll offers (.scratch/judge-rolls/spec.md).
+                    rollOffers: source.rollOffers ?? true,
                     userId: this.accounts.currentId(),
                 }),
             );
             await manager.save(
-                manager.create(RoleEntity, { storyId: story.id, name: source.role.name, description: source.role.description }),
+                manager.create(RoleEntity, { storyId: story.id, name: source.role.name, description: source.role.description, stats: source.role.stats ?? [] }),
             );
             const characterIds = new Map<number, number>();
             for (const character of source.characters) {
@@ -269,10 +271,10 @@ export class StoryModelService {
      * writer, and a whole-entity save from an older read would put an older Cover back.
      */
     async saveStory(story: StoryEntity): Promise<void> {
-        const { title, setting, opening, pov, tense, replyLength, pacing, balance, difficulty, imageStyle, narrationVoice, backdrop } = story;
+        const { title, setting, opening, pov, tense, replyLength, pacing, balance, difficulty, imageStyle, narrationVoice, backdrop, rollOffers } = story;
         await this.stories.update(
             { id: story.id },
-            { title, setting, opening, pov, tense, replyLength, pacing, balance, difficulty, imageStyle, narrationVoice, backdrop, updatedAt: () => 'now()' },
+            { title, setting, opening, pov, tense, replyLength, pacing, balance, difficulty, imageStyle, narrationVoice, backdrop, rollOffers, updatedAt: () => 'now()' },
         );
     }
 

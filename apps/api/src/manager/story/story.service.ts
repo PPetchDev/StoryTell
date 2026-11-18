@@ -25,6 +25,9 @@ import {
     SuddenEventLimitError,
     SuddenEventNotFoundError,
 } from '../../errors/story.errors.js';
+import { InvalidStatsError } from '../../errors/story.errors.js';
+import { statsProblem } from '../chat/roll-offer/roll-offer.js';
+import { RoleStat } from '../../model/story/entities/role.entity.js';
 import { cleanPatterns, compileLorePattern } from '../chat/lore/lore-pattern.js';
 import { ImageNotFoundError, SnapshotNotFoundError, UnsupportedImageError } from '../../errors/image.errors.js';
 import { ChatModelService } from '../../model/chat/chat.service.js';
@@ -108,11 +111,15 @@ export interface StoryFields {
     /** A voice id from the voice list, or null for the default. */
     narrationVoice?: string | null;
     backdrop?: Backdrop;
+    /** Whether the Judge may offer a Roll (.scratch/judge-rolls/spec.md). */
+    rollOffers?: boolean;
 }
 
 export interface RoleFields {
     name?: string;
     description?: string;
+    /** The whole list of Stats (.scratch/judge-rolls/spec.md), replacing the one before. */
+    stats?: RoleStat[];
 }
 
 export interface CharacterFields {
@@ -332,6 +339,7 @@ export class StoryManagerService {
             'imageStyle',
             'narrationVoice',
             'backdrop',
+            'rollOffers',
         ]);
         await this.storyModel.saveStory(story);
         return this.reload(storyId);
@@ -497,6 +505,13 @@ export class StoryManagerService {
 
     async updateRole(storyId: number, fields: RoleFields): Promise<StoryDetail> {
         const story = await this.load(storyId);
+        if (fields.stats !== undefined) {
+            // Names kept as the author wrote them, without spaces around (.scratch/judge-rolls/spec.md).
+            const stats = fields.stats.map((stat) => ({ name: stat.name.trim(), value: stat.value }));
+            const problem = statsProblem(stats);
+            if (problem) throw new InvalidStatsError(problem);
+            story.role.stats = stats;
+        }
         assignSent(story.role, fields, ['name', 'description']);
         await this.storyModel.saveRole(story.role);
         return this.saved(storyId);

@@ -115,8 +115,16 @@ A few words from the user to the Narrator for the next reply only ("make her ang
 _Avoid_: Instruction, direction, hint, OOC, prompt
 
 **Roll**:
-A d20 the app throws for one Message the user sends, when they ask for it, to decide whether what they attempt in it works: it succeeds on the number the Story's Difficulty sets or more, and a 20 and a 1 are critical. The Roll stays with its Message, so every reply written to that Message reads the same one; the Narrator writes the outcome and never names the dice.
+A d20 the app throws for one Message the user sends, when they ask for it, to decide whether what they attempt in it works: it succeeds on the number the Story's Difficulty sets or more, and a natural 20 and 1 are critical. A Roll made for one of the Role's Stats adds that Stat to the throw. The Roll stays with its Message, so every reply written to that Message reads the same one; the Narrator writes the outcome and never names the dice.
 _Avoid_: Dice event, check, skill check, save, RNG
+
+**Roll offer**:
+The Judge offering the user a Roll at a key moment of the latest exchange (a risky act, persuading someone who resists, a chase), saying what is at stake and which Stat applies. The user takes it, which arms a Roll with that Stat for their next Message, or waves it away. Offers are rare: several replies apart, never on a reply to a Roll, never in an intimate moment, and only in a Story whose author left them on.
+_Avoid_: Check request, prompt, challenge, skill check
+
+**Stat**:
+Something the Story's Role is good or bad at, named by the author with a whole number from -3 to 5 ("Strength +2", "Charm -1"), at most six per Role. It adds to a Roll made for it and shows in the Scene strip; it never changes in play.
+_Avoid_: Attribute, skill, ability score, trait
 
 **Sitting out**:
 A Character the user keeps out of a Chat's turns until bringing them back; the Narrator doesn't write them, but their Memories and Bonds stay as they were.
