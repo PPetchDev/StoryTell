@@ -3,7 +3,7 @@ import path from 'node:path';
 import { DataSource } from 'typeorm';
 
 import { ProviderOutageError } from '../src/errors/model-gateway.errors.js';
-import { lightOf, outfitPrompt, placePrompt, relightPrompt, StageManagerService, stageKey } from '../src/manager/chat/stage/stage.service.js';
+import { lightOf, outfitPrompt, placePrompt, relightPrompt, sameOutfitKey, StageManagerService, stageKey, wornOnly } from '../src/manager/chat/stage/stage.service.js';
 import { startTestApp, TestApp } from './harness/test-app.js';
 
 // .scratch/dressed-stage/spec.md: places and outfits drawn as the Chat reaches them.
@@ -49,6 +49,21 @@ describe('The dressed stage: the prompts', () => {
         expect(prompt).toContain('A camp on the endless steppe.');
         expect(relightPrompt('evening')).toContain('Keep the same place, layout, objects, camera and art style exactly');
         expect(relightPrompt('evening')).toContain('warm evening light');
+    });
+
+    it('keeps only what is worn: never what is held, a pose or a place', () => {
+        expect(wornOnly('clay jugs in hand, saucer in one hand')).toBe('');
+        expect(wornOnly('mantle, copper rings on horns, clay cup in hands')).toBe('mantle, copper rings on horns');
+        expect(wornOnly('linen, tail swaying, standing by the cart')).toBe('linen');
+        expect(wornOnly('light linen shift, copper bracelet, hair down')).toBe('light linen shift, copper bracelet, hair down');
+    });
+
+    it('takes an outfit said in other words as the one already drawn, and a new one as new', () => {
+        const drawn = ['light linen shift, ties done at throat, copper bracelet, hair down'];
+        expect(sameOutfitKey('light linen shift, ties loose at throat, copper bracelet, hair down', drawn)).toBe(drawn[0]);
+        expect(sameOutfitKey('light linen shift, ties at throat being fastened, copper bracelet, hair down', drawn)).toBe(drawn[0]);
+        expect(sameOutfitKey('a silk robe, barefoot', drawn)).toBe('a silk robe, barefoot');
+        expect(sameOutfitKey('Light Linen Shift', [])).toBe('light linen shift');
     });
 
     it('dresses the same adult in the outfit, keeping the pose, and leaves the card\'s clothing out', () => {
@@ -192,6 +207,28 @@ describe('The dressed stage (HTTP)', () => {
         // The failed outfit is not tried again within half an hour.
         expect(t.gateway.imageCalls().filter((call) => call.kind === 'outfit_sprite')).toHaveLength(1);
         expect(naraId).toBeGreaterThan(0);
+    });
+
+    it('draws only who speaks in the newest reply, and nothing more once the switch is off, even mid-run', async () => {
+        const { storyId } = await createStory();
+        const chatId = (await t.http.post(`/api/stories/${storyId}/chats`).expect(201)).body.id as number;
+        await t.http.patch(`/api/stories/${storyId}/chats/${chatId}`).send({ dressStage: true }).expect(200);
+        // A Kai who stands there in a coat but says nothing is not drawn.
+        await t.http.post(`/api/stories/${storyId}/characters`).send({ name: 'Kai', appearance: 'Wiry.', personality: 'Quiet.', voice: 'Short.' }).expect(201);
+        // The place takes a while; the switch goes off meanwhile.
+        t.gateway.scriptImage('place_picture', { image: { bytes: jpeg('tent'), mimeType: 'image/jpeg' }, delayMs: 400 });
+        t.gateway.scriptText('turn', { text: '@Nara: You came back.', model: 'glm-5.3' });
+        t.gateway.scriptText('judge', judgement({ details: { place: 'the tent', outfits: [{ character: 'Nara', outfit: 'a silk robe' }, { character: 'Kai', outfit: 'an oilskin coat' }] } }));
+        t.gateway.scriptText('memory_extraction', NO_OPS);
+        await t.http.post(`/api/stories/${storyId}/chats/${chatId}/messages`).send({ text: 'Hello.' }).expect(201);
+        const deadline = Date.now() + 5_000;
+        while (!t.gateway.imageCalls().some((call) => call.kind === 'place_picture')) {
+            if (Date.now() > deadline) throw new Error('the place was never asked for');
+            await new Promise((resolve) => setTimeout(resolve, 10));
+        }
+        await t.http.patch(`/api/stories/${storyId}/chats/${chatId}`).send({ dressStage: false }).expect(200);
+        await stage.idle(chatId);
+        expect(t.gateway.imageCalls().map((call) => call.kind)).toEqual(['place_picture']);
     });
 
     it('stops for the day once the Chat\'s stage spent a dollar', async () => {

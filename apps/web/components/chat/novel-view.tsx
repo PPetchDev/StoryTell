@@ -2,7 +2,7 @@
 
 import { CSSProperties, KeyboardEvent, MouseEvent, PointerEvent, ReactNode, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
-import { useCastCharacter, useCharacterProfile } from '@/components/chat/character-profile';
+import { useCastCharacter, useCastLookup, useCharacterProfile } from '@/components/chat/character-profile';
 import { ACTION, ACTION_ICON, COLUMN } from '@/components/chat/chat-classes';
 import { VersionSwitch, WritingLine } from '@/components/chat/chat-thread';
 import { RollLine, withActions } from '@/components/chat/message-body';
@@ -13,7 +13,7 @@ import { initialOf } from '@/components/portrait/character-portrait';
 import { snapshotAlt } from '@/components/snapshot/snapshot-viewer';
 import { Cast, characterColour } from '@/lib/character-colour';
 import { ChatStage, isOpening, Message, MessagePart } from '@/lib/chat';
-import { linePicture, outfitPicture } from '@/lib/expressions';
+import { linePicture, outfitPicture, stageSrc } from '@/lib/expressions';
 import { referenceImageUrl } from '@/lib/story';
 import { firstStepOf, isLive, novelSteps, NovelStep, openingStep, readingStep, stepIndex } from '@/lib/novel-steps';
 import { ChatSnapshots, Snapshot, snapshotImageUrl } from '@/lib/snapshot';
@@ -121,6 +121,18 @@ export function NovelView(props: NovelViewProps) {
 
     const { onPosition } = props;
     useEffect(() => onPosition(step?.messageId ?? null), [step?.messageId, onPosition]);
+
+    // The next lines' pictures load while this one shows, so a step never opens on an empty stage.
+    const castLookup = useCastLookup();
+    const { stage } = props;
+    useEffect(() => {
+        for (const ahead of steps.slice(index + 1, index + 4)) {
+            if (ahead.kind !== 'speech') continue;
+            const sprites = stage?.outfits.find((outfit) => outfit.characterId === ahead.characterId)?.sprites;
+            const picture = outfitPicture(sprites, ahead.emotion) ?? linePicture(castLookup(ahead.characterId), ahead.emotion);
+            if (picture.whole) new Image().src = stageSrc(picture.whole, picture.cutout);
+        }
+    }, [index, steps, stage, castLookup]);
 
     // --- Playing: a turn started in this tab ------------------------------------------------------
     /** Moves to the reply once, when its first step arrives: a turn started here (Send, Continue, Retry) is followed to its start. */
@@ -320,7 +332,7 @@ export function NovelView(props: NovelViewProps) {
                                 <img
                                     key={props.stage.placePicturePath}
                                     className="pointer-events-none absolute inset-0 size-full object-cover motion-safe:animate-fade-in"
-                                    src={referenceImageUrl(props.stage.placePicturePath)}
+                                    src={stageSrc(referenceImageUrl(props.stage.placePicturePath), true)}
                                     alt=""
                                     aria-hidden="true"
                                     data-stage-place=""
@@ -388,7 +400,7 @@ function SpeakerPicture({ step, cast, sprites }: { step: Extract<NovelStep, { ki
             // eslint-disable-next-line @next/next/no-img-element -- served by the API from the image folder
             <img
                 className="stage-figure block h-[128%] w-auto max-w-none select-none"
-                src={whole}
+                src={stageSrc(whole, true)}
                 alt={step.speakerName}
                 data-stage-picture=""
                 data-stage-cutout=""

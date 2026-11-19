@@ -31,6 +31,45 @@ export function stageKey(text: string): string {
     return text.toLowerCase().replace(/\s+/g, ' ').trim().slice(0, 200);
 }
 
+/** A piece of an outfit the Judge wrote that is not worn: held, carried, a pose or a place. */
+const NOT_WORN = /\b(in (?:her |his |their |one |both )?hands?|holding|holds|carrying|carries|clutching|standing|sitting|kneeling|lying|swaying|catching|by the|at the|near the|beside)\b/i;
+
+/**
+ * The worn part of an outfit as the Judge wrote it (.scratch/dressed-stage/spec.md, "Fixes after
+ * the live test"): its comma-separated pieces without what is held or done ("clay jugs in hand",
+ * "tail swaying"). Empty when nothing is worn.
+ */
+export function wornOnly(outfit: string): string {
+    return outfit
+        .split(/[,;]/)
+        .map((piece) => piece.trim())
+        .filter((piece) => piece !== '' && !NOT_WORN.test(piece))
+        .join(', ');
+}
+
+/** Words that say how a garment is worn just now, not what it is: "ties loose" and "ties done" are one outfit. */
+const PASSING = new Set(['a', 'an', 'the', 'and', 'with', 'of', 'at', 'on', 'in', 'to', 'her', 'his', 'their', 'is', 'being', 'now', 'still', 'just', 'half', 'partly', 'slightly', 'loose', 'loosened', 'done', 'undone', 'open', 'opened', 'closed', 'fastened', 'unfastened', 'tied', 'untied', 'tight', 'rumpled', 'messy', 'mussed', 'askew', 'up', 'down']);
+
+function garmentWords(outfit: string): Set<string> {
+    return new Set(outfit.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((word) => word.length > 1 && !PASSING.has(word)));
+}
+
+/**
+ * The outfit key to draw or show for a Character's outfit: an outfit already drawn in the Chat when
+ * this one is the same in other words (its garment words two-thirds alike), else its own key. So
+ * "ties loose at throat" and "ties done at throat" share one drawing.
+ */
+export function sameOutfitKey(outfit: string, drawn: readonly string[]): string {
+    const words = garmentWords(outfit);
+    for (const key of drawn) {
+        const other = garmentWords(key);
+        const shared = [...words].filter((word) => other.has(word)).length;
+        const all = new Set([...words, ...other]).size;
+        if (all > 0 && shared / all >= 2 / 3) return key;
+    }
+    return stageKey(outfit);
+}
+
 const LIGHT_WORDS: Record<StageLight, string> = {
     day: 'clear daylight',
     evening: 'warm evening light at dusk, the first lamps glowing',
@@ -116,12 +155,18 @@ export class StageManagerService implements OnApplicationBootstrap {
         const details = currentDetails(await this.ledger.detailChangesOf(chatId));
         if (details.place && !(await this.drawPlace(story, chat, details.place, lightOf(chat.timeOfDay)))) return;
 
+        // Only who speaks in the newest reply, most lines first: the stage shows a Character only
+        // when they speak, so one who stays silent is drawn when they first do.
         const newest = [...chat.messages].reverse().find((message) => message.kind === MessageKind.Ai);
-        for (const { characterId, outfit } of details.outfits) {
+        const lines = new Map<number, number>();
+        for (const part of newest?.parts ?? []) if (part.characterId !== null) lines.set(part.characterId, (lines.get(part.characterId) ?? 0) + 1);
+        const speakers = details.outfits.filter(({ characterId }) => lines.has(characterId)).sort((a, b) => lines.get(b.characterId)! - lines.get(a.characterId)!);
+        for (const { characterId, outfit } of speakers) {
             const character = story.characters.find((one) => one.id === characterId);
-            if (!character?.referenceImagePath) continue;
-            const key = stageKey(outfit);
-            if (!(await this.drawOutfit(story, chat, character, outfit, key))) return;
+            const worn = wornOnly(outfit);
+            if (!character?.referenceImagePath || worn === '') continue;
+            const key = sameOutfitKey(worn, await this.stage.outfitKeys(chat.id, characterId));
+            if (!(await this.drawOutfit(story, chat, character, worn, key))) return;
             const emotions = new Set(
                 (newest?.parts ?? [])
                     .filter((part) => part.characterId === characterId && part.emotion && isExpressionEmotion(part.emotion))
@@ -131,8 +176,9 @@ export class StageManagerService implements OnApplicationBootstrap {
         }
     }
 
-    /** False when the stage may not draw more today, or the Venice pool is out. */
+    /** False when the switch was turned off meanwhile, the stage may not draw more today, or the Venice pool is out. */
     private async mayDraw(chatId: number): Promise<boolean> {
+        if (!(await this.chatModel.findOne(chatId))?.dressStage) return false;
         if ((await this.stage.spentToday(chatId)) >= STAGE_DAILY_CAP_USD) return false;
         const remaining = (await this.gateway.remainingCredit()).image.remainingUsd;
         return remaining === null || remaining > 0;
@@ -243,7 +289,9 @@ export async function chatStage(
     }
     const outfits: ChatStage['outfits'] = [];
     for (const { characterId, outfit } of details.outfits) {
-        const sprites: OutfitSpriteEntity[] = await stage.readySprites(chat.id, characterId, stageKey(outfit));
+        const worn = wornOnly(outfit);
+        if (worn === '') continue;
+        const sprites: OutfitSpriteEntity[] = await stage.readySprites(chat.id, characterId, sameOutfitKey(worn, await stage.outfitKeys(chat.id, characterId)));
         if (!sprites.some((sprite) => sprite.emotion === 'neutral')) continue;
         outfits.push({
             characterId,

@@ -91,16 +91,16 @@ test('Dress the stage draws the place behind the stage and Nara in her outfit, p
     await page.getByRole('button', { name: 'Visual novel view' }).click();
     const root = page.getByRole('region', { name: 'Visual novel view' });
     const box = root.getByRole('region', { name: 'Shown line' });
-    await expect(root.locator('[data-stage-place]')).toHaveAttribute('src', `/api/images/${stage.placePicturePath}`);
+    await expect(root.locator('[data-stage-place]')).toHaveAttribute('src', `/api/images/${stage.placePicturePath}?w=640`);
     await expect(box.locator('[data-line]')).toContainText('The lamp gutters.');
     await root.getByRole('button', { name: 'Next', exact: true }).click();
     await expect(box.locator('[data-line]')).toContainText('You came back.');
     const desire = stage.outfits[0].sprites.find((sprite: { emotion: string }) => sprite.emotion === 'desire');
     const plain = stage.outfits[0].sprites.find((sprite: { emotion: string }) => sprite.emotion === 'neutral');
-    await expect(root.locator('[data-stage-cutout]')).toHaveAttribute('src', `/api/images/${desire.imagePath}`);
+    await expect(root.locator('[data-stage-cutout]')).toHaveAttribute('src', `/api/images/${desire.imagePath}?w=640`);
     await root.getByRole('button', { name: 'Next', exact: true }).click();
     await expect(box.locator('[data-line]')).toContainText('Sit with me.');
-    await expect(root.locator('[data-stage-cutout]')).toHaveAttribute('src', `/api/images/${plain.imagePath}`);
+    await expect(root.locator('[data-stage-cutout]')).toHaveAttribute('src', `/api/images/${plain.imagePath}?w=640`);
 
     for (const width of [360, 320]) {
         await page.setViewportSize({ width, height: 740 });

@@ -63,6 +63,12 @@ export class StageModelService {
         return (inserted as { id: number }[])[0]?.id ?? null;
     }
 
+    /** The outfits a Character has a plain drawing of in a Chat, or one being made, newest first. */
+    async outfitKeys(chatId: number, characterId: number): Promise<string[]> {
+        const rows = await this.sprites.find({ where: { chatId, characterId, emotion: 'neutral' }, order: { id: 'DESC' } });
+        return rows.filter((row) => row.status !== 'failed').map((row) => row.outfitKey);
+    }
+
     /** The drawn sprites of one Character's outfit in a Chat. */
     readySprites(chatId: number, characterId: number, outfitKey: string): Promise<OutfitSpriteEntity[]> {
         return this.sprites.find({ where: { chatId, characterId, outfitKey, status: 'ready' }, order: { id: 'ASC' } });

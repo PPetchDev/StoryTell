@@ -88,3 +88,17 @@ A per-Chat switch, **Dress the stage**, in the Chat menu. It is off by default, 
 - A per-step stage history.
 - Weather in the place picture.
 - Drawing a Character's outfits ahead of the story.
+
+## Fixes after the live test (2026-11-19)
+
+The first real run, on Chat 2 (place, Tavri ×6, Dulcie, Nara ×2, Morra: $0.76), found five problems, now fixed:
+
+1. **Slow pictures.** A cut-out PNG was about 730 KB, so a new line opened on an empty stage for a moment.
+   - The stage now asks for the API's 640px WebP (`?w=640`), which keeps the transparency and is about 65 KB. The place picture uses it too.
+   - The next three lines' pictures load ahead.
+2. **The switch didn't stop a run.** Turning it off now stops the run before its next drawing: `mayDraw` reads the switch each time.
+3. **Things held were taken as clothes.** The Judge wrote "clay jugs in hand, saucer in one hand" as Dulcie's outfit.
+   - The Details rule now says an outfit is what is worn (clothes, shoes, jewellery), never what is held or carried, or where a Character is or what they do.
+   - `wornOnly` drops such pieces from an outfit before it is drawn. An outfit with nothing worn left isn't drawn.
+4. **The main Character came last.** Only the Characters who speak in the newest reply are drawn, most lines first. One who stays silent is drawn when they first speak.
+5. **Rewordings were drawn again.** "Ties loose at throat" and "ties done at throat" are now the same outfit: `sameOutfitKey` reuses an outfit already drawn in the Chat when two-thirds of its garment words match, after leaving out the words about how a garment is worn just now.

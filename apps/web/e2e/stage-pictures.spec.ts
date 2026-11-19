@@ -88,7 +88,7 @@ test('an intimate line stands cut out on the stage from the knees up, moving wit
     await expect(box.locator('[data-line]')).toContainText('She leans closer.');
     await root.getByRole('button', { name: 'Next', exact: true }).click();
     await expect(box.locator('[data-line]')).toContainText('You came back.');
-    await expect(figure).toHaveAttribute('src', `/api/images/${nara.expressions[0].cutoutPath}`);
+    await expect(figure).toHaveAttribute('src', `/api/images/${nara.expressions[0].cutoutPath}?w=640`);
     await expect(figure).toHaveAttribute('data-emotion', 'desire');
 
     // Knee-up: the figure is taller than the stage, its top at the stage's top, cut off below.
@@ -104,7 +104,7 @@ test('an intimate line stands cut out on the stage from the knees up, moving wit
     // either: the Reference image's cut-out.
     await root.getByRole('button', { name: 'Next', exact: true }).click();
     await expect(box.locator('[data-line]')).toContainText('I hoped you would.');
-    await expect(figure).toHaveAttribute('src', `/api/images/${nara.referenceCutoutPath}`);
+    await expect(figure).toHaveAttribute('src', `/api/images/${nara.referenceCutoutPath}?w=640`);
     await expect(figure).toHaveAttribute('data-emotion', 'passion');
 
     for (const width of [360, 320]) {

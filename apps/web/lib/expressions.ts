@@ -109,6 +109,15 @@ export function linePicture(character: PictureSource | null | undefined, emotion
     return { round: { kind: 'initial' }, whole: null, cutout: false };
 }
 
+/**
+ * The URL the stage shows a picture at (.scratch/dressed-stage/spec.md, "Known limits" fixed): a
+ * cut-out or a place as the API's 640px WebP, about a tenth of the full PNG, which on a phone is
+ * all the stage can show; a whole picture without a cut-out as it is.
+ */
+export function stageSrc(src: string, small: boolean): string {
+    return small ? `${src}${src.includes('?') ? '&' : '?'}w=640` : src;
+}
+
 /** The Expression for an emotion; for an intimate one without its own picture, the nearest everyday one's. */
 function expressionFor(character: PictureSource, emotion: ExpressionEmotion): Expression | undefined {
     const own = character.expressions.find((one) => one.emotion === emotion);

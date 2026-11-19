@@ -145,6 +145,12 @@ export function useOpenProfile(): ((characterId: number) => void) | null {
  * A Character of the cast, for the picture beside their lines (lib/expressions.ts, `linePicture`);
  * undefined outside a Chat and for a speaker with no Character in the cast.
  */
+/** Finds any cast Character by id, for looking ahead (the novel view's preload); undefined outside a profile provider. */
+export function useCastLookup(): (characterId: number | null) => Character | undefined {
+    const profiles = useContext(ProfileContext);
+    return useCallback((characterId: number | null) => (profiles && characterId !== null ? profiles.character(characterId) : undefined), [profiles]);
+}
+
 export function useCastCharacter(characterId: number | null): Character | undefined {
     const profiles = useContext(ProfileContext);
     return profiles && characterId !== null ? profiles.character(characterId) : undefined;
