@@ -6,7 +6,7 @@ import { PromptMessage } from '../../../service/model-gateway/model-gateway.js';
 import { exchangeUserLine } from '../exchange.js';
 import { PASSED_BY_REPLIES } from '../scene-replies.js';
 import { JudgedSuddenEvent, readJudgedSuddenEvent } from '../sudden-event/sudden-event.js';
-import { DETAILS_EXTRA_TOKENS, JudgedDetails, readJudgedDetails } from '../details/details.js';
+import { DETAILS_EXTRA_TOKENS, DETAILS_SHAPE, JudgedDetails, readJudgedDetails } from '../details/details.js';
 import { ENDING_EXTRA_TOKENS, JudgedEnding, readJudgedEnding } from '../ending/ending.js';
 import { FACTS_EXTRA_TOKENS, JudgedFacts, readJudgedFacts } from '../details/facts.js';
 import { JudgedNow, NOW_EXTRA_TOKENS, readJudgedNow } from '../details/now-notes.js';
@@ -505,8 +505,9 @@ export function buildJudgePrompt(input: JudgePromptInput & RollOfferJudgeInput &
     return {
         messages: prompt.messages.map((message) => {
             if (message.role === 'system') {
-                const content = ROLL_OFFER_SYSTEMS.get(message.content) ?? message.content;
-                return { ...message, content: input.secretsShape ? withSecretsShape(content) : content };
+                const offered = ROLL_OFFER_SYSTEMS.get(message.content) ?? message.content;
+                const content = input.secretsShape ? withSecretsShape(offered) : offered;
+                return { ...message, content: input.detailsSection ? withDetailsShape(content) : content };
             }
             return sections.length > 0 && message.role === 'user' ? { ...message, content: [message.content, ...sections].join('\n\n') } : message;
         }),
@@ -540,6 +541,13 @@ export interface SecretsJudgeInput {
     secretsShape?: boolean;
     /** The "# Secrets that may come out" section (`judgeSecretsSection`), sent only with the shape and only when a Secret is on offer. It goes last. */
     secretsSection?: string | null;
+}
+
+/** The reply shape with `details` (DETAILS_SHAPE), whenever the details section is sent: every judgement on live. */
+function withDetailsShape(system: string): string {
+    const shaped = system.replace(/\}\nEmpty arrays when nothing changed\.$/, `,\n ${DETAILS_SHAPE}}\nEmpty arrays when nothing changed.`);
+    if (shaped === system) throw new Error('judge prompt: the reply shape no longer ends as expected');
+    return shaped;
 }
 
 /**

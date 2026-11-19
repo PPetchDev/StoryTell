@@ -187,14 +187,14 @@ describe('Memory: extraction, the record, the prompt layer and rollback', () => 
 - Kai
 The user plays Ash: write {user} wherever a Memory refers to them.
 
-# Characters present in this exchange
-Mira
-
 # Current Memories (id: [known by] text)
 ${firstMemory.id}: - [known by Mira] {user} knocked on the lighthouse door.
 
 # Active Beliefs (id: who believes what)
 (none)
+
+# Characters present in this exchange
+Mira
 
 # LATEST EXCHANGE (extract from this)
 Ash: I take them off.

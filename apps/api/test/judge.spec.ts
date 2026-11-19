@@ -331,7 +331,7 @@ describe('The Bond, Arc and Scene judge, the ledger and the dashboard', () => {
             expect(lastAi(played).judge).toEqual({ status: 'done', error: null });
             const calls = t.gateway.textCalls('judge');
             expect(calls).toHaveLength(1);
-            expect(calls[0]).toMatchObject({ kind: 'judge', json: true, maxTokens: 1300, servedFor: { storyId: story.id, chatId: chat.id } });
+            expect(calls[0]).toMatchObject({ kind: 'judge', json: true, maxTokens: 1340, servedFor: { storyId: story.id, chatId: chat.id } });
             expect(calls[0].messages.map((message) => message.role)).toEqual(['system', 'user']);
             expect(calls[0].messages[0].content).toContain('At most one change per Bond per turn.');
             expect(calls[0].messages[1].content).toBe(`# Cast

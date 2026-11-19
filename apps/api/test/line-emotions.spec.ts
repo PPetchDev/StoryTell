@@ -134,7 +134,7 @@ describe('The Judge tags each line a Character speaks', () => {
         expect(calls).toHaveLength(1);
         expect(calls[0].messages[1].content).toContain('[1] @Mira: Better.\n\n[2] @Kai: She means thank you.\n\n[3] @Mira: I do not.');
         expect(calls[0].messages[0].content).toContain('Expression rule:');
-        expect(calls[0].maxTokens).toBe(1500); // 700, 200 for the line tags, 180 for the Place, weather and outfits, 160 for the Established facts, 120 for the Now notes and 140 for the Items
+        expect(calls[0].maxTokens).toBe(1540); // 700, 200 for the line tags, 220 for the Place, weather and outfits, 160 for the Established facts, 120 for the Now notes and 140 for the Items
         // A turn also asks each Character in the moment for a Thought (.scratch/character-minds/spec.md, tested in character-minds.spec.ts); this test is about the other calls.
         expect(t.gateway.textCalls().map((call) => call.kind).filter((kind) => kind !== 'character_thought').sort()).toEqual(['judge', 'memory_extraction', 'turn']);
     });
@@ -179,7 +179,7 @@ describe('The Judge tags each line a Character speaks', () => {
         expect(call.messages[0].content).not.toContain('Expression');
         expect(call.messages[0].content).not.toContain('"expressions"');
         expect(call.messages[1].content).toContain('Mira watches the boots.\n\n@Mira: Better.\n\n@Kai: She means thank you.\n\n@Mira: I do not.');
-        expect(call.maxTokens).toBe(1300); // 700, the 180 the Place, weather, outfits and goals answer takes, 160 for the Established facts, 120 for the Now notes and 140 for the Items
+        expect(call.maxTokens).toBe(1340); // 700, the 220 the Place, weather, outfits and goals answer takes, 160 for the Established facts, 120 for the Now notes and 140 for the Items
         expect(emotions(lastAi(played))).toEqual([null, null, null, null]);
         // Speech always answers the field, null while untagged; narration has none.
         expect(lastAi(played).parts!.slice(0, 2)).toEqual([

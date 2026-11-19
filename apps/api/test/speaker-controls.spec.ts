@@ -358,7 +358,8 @@ describe('Sitting out: the API', () => {
         // The send reads the Opening, where Mira spoke: she is in the plain Chat's exchange, never in the other's.
         expect(trailing(plainTurns[0])).toContain('In the latest exchange: Mira, Kai.');
         expect(trailing(awayTurns[0])).toContain(`In the latest exchange: Kai. Sitting out: Mira. ${SENTENCE}`);
-        const withoutExchange = (text: string) => text.replace(/In the latest exchange: [^.]*\. /, '');
+        // Mira's Voice is in the plain Chat's reminder only: someone sitting out isn't in the exchange (.scratch/cache-and-voices/spec.md).
+        const withoutExchange = (text: string) => text.replace(/In the latest exchange: [^.]*\. /, '').replace(/(How each of them talks[^\n]*\n(?:- [^\n]*\n)*?)- Mira: [^\n]*\n/, '$1');
         awayTurns.forEach((turn, i) => {
             expect(trailing(turn)).toContain(`Sitting out: Mira. ${SENTENCE}`);
             expect(withoutExchange(trailing(turn)).replace(`Sitting out: Mira. ${SENTENCE} `, '')).toBe(withoutExchange(trailing(plainTurns[i])));

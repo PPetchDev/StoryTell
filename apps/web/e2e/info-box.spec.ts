@@ -82,7 +82,7 @@ test('the Scene strip shows the Place once the story has one; opened, the Weathe
         await composer.getByRole('button', { name: 'Continue' }).tap();
         await expect(page.getByRole('article', { name: 'AI reply' }).last()).toContainText('before the stair floods');
         expect(await lastTurnTrailing(request)).toContain(
-            'Place: the lamp room. Weather: a rising storm. In the latest exchange: Mira. Wearing now: Mira, an oilskin coat over her nightdress.',
+            'Place: the lamp room. Weather: a rising storm. Where the newest replies show the story has since moved somewhere else or the weather has turned, follow the replies, not these. In the latest exchange: Mira. Wearing now: Mira, an oilskin coat over her nightdress.',
         );
         await expect(strip).toHaveAccessibleName(/Place: the quay/);
 

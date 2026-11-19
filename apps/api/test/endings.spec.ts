@@ -69,8 +69,8 @@ describe('Endings: the state, the Judge and the Epilogue (pure)', () => {
         const without = buildJudgePrompt(input);
         expect(buildJudgePrompt({ ...input, endingSection: null })).toEqual(without);
         const withSection = buildJudgePrompt({ ...input, endingSection: section, detailsSection: '# Place, weather and outfits' });
-        // The system message, and with it the cached prefix, never changes.
-        expect(withSection.messages[0].content).toBe(without.messages[0].content);
+        // The Ending section never changes the system message, and with it the cached prefix (the details section adds its shape, with or without it).
+        expect(withSection.messages[0].content).toBe(buildJudgePrompt({ ...input, detailsSection: '# Place, weather and outfits' }).messages[0].content);
         expect(withSection.messages[1].content).toBe(`${without.messages[1].content}\n\n${section}\n\n# Place, weather and outfits`);
         expect(buildJudgePrompt({ ...input, endingSection: section }).maxTokens).toBe(without.maxTokens + 80);
     });

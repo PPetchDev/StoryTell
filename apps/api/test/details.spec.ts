@@ -80,7 +80,7 @@ describe('Details: what the Judge is asked and how its answer is applied (pure)'
             CAST,
         );
         expect(section).toContain(
-            '# Place, weather, outfits and goals\nPlace: the lamp room\nWeather: not yet known\nWearing: Mira: an oilskin coat; Kai: not yet known\nGoals: Mira: none yet; Kai: climb the gallery\nDetails rule: add "details": {"place": "...", "weather": "...", "outfits": [{"character": "Name", "outfit": "..."}]}',
+            '# Place, weather, outfits and goals\nPlace: the lamp room\nWeather: not yet known\nWearing: Mira: an oilskin coat; Kai: not yet known\nGoals: Mira: none yet; Kai: climb the gallery\nDetails rule: give "details" in your JSON every time. "where": first, in a few words of the story\'s own',
         );
         // A Chat long under way has aims no single exchange gave: one is asked for where a Character has none (2026-11-16: none was ever set otherwise).
         expect(section).toContain(
@@ -88,15 +88,18 @@ describe('Details: what the Judge is asked and how its answer is applied (pure)'
         );
         expect(section).toContain("never for the user's own character");
         expect(section).toContain('Most characters in a story want something: when one in the latest exchange still has none, give theirs now.');
-        expect(section).toContain('giving only what the latest exchange changed or first made clear');
+        expect(section).toContain('give only what the latest exchange changed or first made clear');
         expect(section).toContain('never guess');
 
         const input = JUDGE_FIXTURE_INPUTS[0];
         const without = buildJudgePrompt(input);
         const withSection = buildJudgePrompt({ ...input, detailsSection: section });
         expect(buildJudgePrompt({ ...input, detailsSection: null })).toEqual(without);
-        // The system message, and with it the cached prefix, never changes; the section is the last thing read.
-        expect(withSection.messages[0].content).toBe(without.messages[0].content);
+        // The reply shape names `details` whenever the section is sent (every judgement on live, so the
+        // system message is still the same from call to call); the section is the last thing read.
+        expect(withSection.messages[0].content).toBe(
+            without.messages[0].content.replace(/\}\nEmpty arrays when nothing changed\.$/, ',\n "details":{"where":"...","place":"same","weather":null,"outfits":[],"goals":[]}}\nEmpty arrays when nothing changed.'),
+        );
         expect(withSection.messages[1].content).toBe(`${without.messages[1].content}\n\n${section}`);
         expect(withSection.maxTokens).toBeGreaterThan(without.maxTokens);
     });
@@ -217,7 +220,7 @@ describe('Details: what the Narrator and the Snapshot writer are told (pure)', (
 
     it('states the Place and the Weather after the Time, and the Outfits of those in the latest exchange only', () => {
         expect(stateReminder({ ...reminderInput, timeOfDay: 'night', details })).toMatch(
-            /^Where things stand: Scene: Arrival\. Time: night\. Place: the lamp room\. Weather: a storm\. In the latest exchange: Mira\. Wearing now: Mira, an oilskin coat\. Keep them dressed so until the story changes it\. Narrate in /,
+            /^Where things stand: Scene: Arrival\. Time: night\. Place: the lamp room\. Weather: a storm\. Where the newest replies show the story has since moved somewhere else or the weather has turned, follow the replies, not these\. In the latest exchange: Mira\. Wearing now: Mira, an oilskin coat\. Keep them dressed so until the story changes it\. Narrate in /,
         );
         expect(detailsReminder(details, ['Mira', 'Kai']).wearing).toBe('Wearing now: Mira, an oilskin coat; Kai, a jersey. Keep them dressed so until the story changes it.');
         // Someone sitting out is not in the exchange, so their Outfit is not restated.
@@ -227,7 +230,7 @@ describe('Details: what the Narrator and the Snapshot writer are told (pure)', (
     it('adds nothing for what is not known: the reminder equals one built without them', () => {
         expect(stateReminder({ ...reminderInput, details: { place: null, weather: null, outfits: [] } })).toBe(stateReminder(reminderInput));
         expect(stateReminder({ ...reminderInput, details: null })).toBe(stateReminder(reminderInput));
-        expect(stateReminder({ ...reminderInput, details: { place: 'the quay', weather: null, outfits: [] } })).toContain('Scene: Arrival. Place: the quay. In the latest exchange: Mira.');
+        expect(stateReminder({ ...reminderInput, details: { place: 'the quay', weather: null, outfits: [] } })).toContain('Scene: Arrival. Place: the quay. Where the newest replies show the story has since moved somewhere else or the weather has turned, follow the replies, not these. In the latest exchange: Mira.');
     });
 
     const snapshotInput: SnapshotPromptInput = {
@@ -361,7 +364,7 @@ describe('Details: the judge, the ledger and the Chat (HTTP)', () => {
 
         // No `details`, and the same values again: nothing changes.
         expect(await play(storyId, chat.id, 'Two.')).toMatchObject({ place: 'The lamp room', weather: 'a rising storm' });
-        expect(trailing()).toContain('Place: The lamp room. Weather: a rising storm. In the latest exchange: Mira, Kai. Wearing now: Mira, an oilskin coat over her nightdress. Keep them dressed so');
+        expect(trailing()).toContain('Place: The lamp room. Weather: a rising storm. Where the newest replies show the story has since moved somewhere else or the weather has turned, follow the replies, not these. In the latest exchange: Mira, Kai. Wearing now: Mira, an oilskin coat over her nightdress. Keep them dressed so');
         expect(judged()).toContain('Place: The lamp room\nWeather: a rising storm\nWearing: Mira: an oilskin coat over her nightdress; Kai: not yet known');
         const same = await play(storyId, chat.id, 'Three.', judgement({ place: 'the lamp room', outfits: [{ character: 'Kai', outfit: 'a patched jersey' }, { character: 'Nobody', outfit: 'a hat' }] }));
         expect(same).toMatchObject({

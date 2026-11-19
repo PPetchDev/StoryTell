@@ -16,7 +16,7 @@ import { repliesInScene } from '../scene-replies.js';
 import { applySuddenEvent, judgeSuddenEventSection } from '../sudden-event/sudden-event.js';
 import { aiEventOffered, chatEventState, readNewEventFrom, takeNewEvent, withAiEvents } from '../sudden-event/ai-events.js';
 import { SuddenEventStepKind } from '../../../model/ledger/entities/sudden-event-step.entity.js';
-import { applyDetails, currentDetails, judgeDetailsSection } from '../details/details.js';
+import { applyDetails, currentDetails, judgeDetailsSection, placeAge } from '../details/details.js';
 import { applyFacts, factsState, judgeFactsSection } from '../details/facts.js';
 import { applyNow, currentNowNotes, judgeNowSection } from '../details/now-notes.js';
 import { applyItems, itemsState, judgeItemsSection, readJudgedItemsFrom, withItemsJudge } from '../details/items.js';
@@ -174,7 +174,10 @@ export class JudgeManagerService {
                 }),
             };
             // The Place, the Weather and the Outfits before this reply (.scratch/info-box/spec.md), read as the Sudden events are.
-            const details = currentDetails(state.detailChanges.filter((change) => change.messageId !== message.id));
+            const detailsBefore = state.detailChanges.filter((change) => change.messageId !== message.id);
+            const details = currentDetails(detailsBefore);
+            // How long ago the Place was noted, up to the judged reply (.scratch/cache-and-voices/spec.md).
+            const ageOfPlace = placeAge(detailsBefore, chat.messages.slice(0, index + 1).map((written) => written.id));
             const detailsCast = story.characters.map((character) => ({ id: character.id, name: character.name }));
             // The Chat's Established facts before this reply (.scratch/story-quality/spec.md), read the same way.
             // With the topics the user deleted, which stay deleted (.scratch/facts-panel/spec.md).
@@ -249,7 +252,7 @@ export class JudgeManagerService {
                 aiText: partsToText(replyParts),
                 ...(tagLines ? { expressionParts: replyParts } : {}),
                 suddenEventSection: eventsJudged ? judgeSuddenEventSection(events) : null,
-                detailsSection: judgeDetailsSection(details, detailsCast),
+                detailsSection: judgeDetailsSection(details, detailsCast, ageOfPlace),
                 endingSection: judgeEndingSection(endings),
                 factsSection: judgeFactsSection(facts),
                 nowSection: judgeNowSection(nowNotes, detailsCast),

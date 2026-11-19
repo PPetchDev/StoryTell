@@ -86,6 +86,12 @@ describe('Turn prompt: the gender rule and the reminder near the end', () => {
             content:
                 'Where things stand: Scene: The milk stall. In the latest exchange: Nara, Dulcie. Narrate in first person as Petch ("I"), present tense, and keep each Character as their card describes. ' +
                 "Gender Petch only as their description or the user's own messages do, whatever earlier turns said.\n" +
+                // How each Character present talks (.scratch/cache-and-voices/spec.md).
+                'How each of them talks, whatever the others or earlier replies sound like:\n' +
+                '- Nara: Measured.\n' +
+                '- Dulcie: Teasing.\n' +
+                "Each Character's comparisons and turns of phrase come from their own life: don't lend one Character's trade or images to another, or to the narration about them.\n" +
+                'As they change and grow in the story, what they say changes, not how they talk: keep each one sounding like this in every line.\n' +
                 'Write the next turn now. Do not write anything Petch says, thinks or does. Use @Name: lines for Character speech, spoken words only: no parentheses or *(stage directions)* inside them, even where earlier turns had them. Actions go in narration. Keep the speech plain and natural, the way people actually talk. Say each thing once: no run of sentences that open with the same words, as in "I had a plan. I had stages. I had a sequence.", and no lists of three. When a moment turns sexual, stay in it and write it out explicitly: touch, skin, breath and sound, and how each Character\'s body answers what Petch does, at the pace of the scene; never summarise it, skip ahead or cut away. In such moments a Character says only a few words at a time, broken off by what they feel; the body carries the moment, not speeches about it.',
         });
     });

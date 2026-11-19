@@ -85,18 +85,20 @@ export function buildExtractionPrompt(input: ExtractionPromptInput): { messages:
     const memories =
         input.memories.map((memory) => `${memory.id}: ${memoryLine(memory, memory.locked ? ' [locked]' : '')}`).join('\n') ||
         '(none yet)';
+    // What changes little from turn to turn comes first, so the host's prompt cache keeps it: the
+    // Memory list changes only where the last extraction touched it (.scratch/cache-and-voices/spec.md).
     const user = `# Cast
 ${input.cast.map((name) => `- ${name}`).join('\n')}
 The user plays ${input.identityName}: write {user} wherever a Memory refers to them.
-
-# Characters present in this exchange
-${input.present.join(', ') || '(none)'}
 
 # Current Memories (id: [known by] text)
 ${memories}
 
 # Active Beliefs (id: who believes what)
 ${input.beliefs.map(beliefLineForExtraction).join('\n') || '(none)'}
+
+# Characters present in this exchange
+${input.present.join(', ') || '(none)'}
 
 # LATEST EXCHANGE (extract from this)
 ${exchangeUserLine(input.identityName, input.userText)}

@@ -17,7 +17,7 @@ import { EPILOGUE_MIN_TOKENS, epilogueFinalInstruction, epilogueInstruction, Pro
 import { factsBlock, PromptFacts } from '../details/facts.js';
 import { ChatItem, itemsBlock } from '../details/items.js';
 import { CardSecret, cardSecretLines, secretsBlock, StorySecret } from '../secrets/secrets.js';
-import { repeatedPhrases, repeatedPhrasesLine } from '../speech/repeated-phrases.js';
+import { repeatedGestures, repeatedGesturesLine, repeatedPhrases, repeatedPhrasesLine } from '../speech/repeated-phrases.js';
 import { estimateTokens } from './prompt-tokens.js';
 
 /**
@@ -285,8 +285,12 @@ export interface TurnPrompt {
     memoriesLeftOut: number;
 }
 
-/** Spec: "about 16k tokens, tunable". */
-export const TURN_PROMPT_TOKEN_BUDGET = 16_000;
+/**
+ * Spec: "about 16k tokens, tunable"; 22k since .scratch/cache-and-voices/spec.md. The reserves and
+ * trailing blocks added since had left the history about 2-3k tokens, so the Story so far covered
+ * all but the newest exchange every 3-5 turns, and every rewrite broke the cache.
+ */
+export const TURN_PROMPT_TOKEN_BUDGET = 22_000;
 
 /** Spec: "medium ≈ 150–350 words, tunable". */
 export const REPLY_LENGTH_WORDS: Record<ReplyLength, { min: number; max: number; maxTokens: number }> = {
@@ -707,6 +711,9 @@ export function turnFinalInstruction(identity: string): string {
     return `Write the next turn now. Do not write anything ${identity} says, thinks or does. Use @Name: lines for Character speech, spoken words only: no parentheses or *(stage directions)* inside them, even where earlier turns had them. Actions go in narration. Keep the speech plain and natural, the way people actually talk. Say each thing once: no run of sentences that open with the same words, as in "I had a plan. I had stages. I had a sequence.", and no lists of three. When a moment turns sexual, stay in it and write it out explicitly: touch, skin, breath and sound, and how each Character's body answers what ${identity} does, at the pace of the scene; never summarise it, skip ahead or cut away. In such moments a Character says only a few words at a time, broken off by what they feel; the body carries the moment, not speeches about it.`;
 }
 
+/** Said after the Place and Weather in "Where things stand": where the newest replies have moved on, they win. */
+export const DETAILS_LAG_SENTENCE = 'Where the newest replies show the story has since moved somewhere else or the weather has turned, follow the replies, not these.';
+
 /**
  * A short restatement of where things stand, read last, just before the final instruction:
  * the Scene, the Time of day, who was in the latest exchange, and the point of view. Instructions
@@ -723,6 +730,10 @@ export function stateReminder(
     if (input.timeOfDay) lines.push(`Time: ${input.timeOfDay}.`);
     const details = detailsReminder(input.details, present);
     lines.push(...details.where);
+    // The Place and Weather are as the Judge last noted them, which can lag the story: on live Chat 2
+    // the story went into the tent while the Place still said "under the tree", and the replies put
+    // everyone back on the grass (.scratch/cache-and-voices/spec.md). The replies are the truth.
+    if (details.where.length > 0) lines.push(DETAILS_LAG_SENTENCE);
     if (present.length > 0) lines.push(`In the latest exchange: ${present.join(', ')}.`);
     if (details.wearing) lines.push(details.wearing);
     if (details.goals) lines.push(details.goals);
@@ -731,7 +742,35 @@ export function stateReminder(
     const changed = (input.nowNotes ?? []).length > 0 ? ', with what has changed in this Chat' : '';
     lines.push(`Narrate in ${povAndTense(input.story, input.identity.name)}, and keep each Character as their card describes${changed}.`);
     lines.push(`Gender ${input.identity.name} only as their description or the user's own messages do, whatever earlier turns said.`);
-    return `Where things stand: ${lines.join(' ')}`;
+    const voices = voicesReminder(input.story.characters, present);
+    return voices ? `Where things stand: ${lines.join(' ')}\n${voices}` : `Where things stand: ${lines.join(' ')}`;
+}
+
+/**
+ * How each Character in the latest exchange talks, from their card's Voice, read last beside the
+ * final instruction (.scratch/cache-and-voices/spec.md). On live Chat 2 the newest replies outweighed
+ * the card at the top: Tavri, "the only one who stammers", took on Nara's clipped register, and
+ * Nara's trade images ("buyer", "stock") spread to everyone. The card's Example lines ride along:
+ * replayed on the real model, the Voice alone didn't bring Tavri's halting back, and a model copies
+ * examples more than it follows descriptions. Null when no one present has a Voice.
+ */
+export function voicesReminder(
+    characters: ReadonlyArray<Pick<PromptCharacter, 'name' | 'voice'> & Partial<Pick<PromptCharacter, 'exampleLines'>>>,
+    present: readonly string[],
+): string | null {
+    const voiced = characters.filter((character) => present.includes(character.name) && character.voice.trim() !== '');
+    if (voiced.length === 0) return null;
+    const examples = (lines: readonly string[] | undefined) => {
+        const kept = (lines ?? []).map((line) => line.trim()).filter((line) => line !== '');
+        return kept.length > 0 ? ` As in: ${kept.map((line) => `"${line}"`).join(' ')}` : '';
+    };
+    return [
+        "How each of them talks, whatever the others or earlier replies sound like:",
+        ...voiced.map((character) => `- ${character.name}: ${character.voice.trim()}${examples(character.exampleLines)}`),
+        "Each Character's comparisons and turns of phrase come from their own life: don't lend one Character's trade or images to another, or to the narration about them.",
+        // Replayed, Tavri's halting came and went with her Arc ("her voice is steadier"): growing changes what she says, not how.
+        'As they change and grow in the story, what they say changes, not how they talk: keep each one sounding like this in every line.',
+    ].join('\n');
 }
 
 /**
@@ -818,13 +857,14 @@ export function buildTurnPrompt(input: TurnPromptInput): TurnPrompt {
         input.userText ?? (epilogue ? epilogueInstruction(identity, epilogue) : input.watch ? watchInstruction(identity) : continueInstruction(identity));
     const layers = promptLayers(input);
     const lore = loreBlock(input.chosenLore ?? []);
-    // Phrases the last few replies keep reusing (.scratch/story-quality/spec.md), named just before the final instruction.
-    const repeats = repeatedPhrasesLine(
-        repeatedPhrases(
-            input.history.filter((message) => message.role === 'assistant').map((message) => message.text),
-            [identity, ...input.story.characters.map((character) => character.name)],
-        ),
+    // Phrases the last few replies keep reusing (.scratch/story-quality/spec.md), and gestures they keep
+    // coming back to in other words (.scratch/cache-and-voices/spec.md), named just before the final instruction.
+    const replies = input.history.filter((message) => message.role === 'assistant').map((message) => message.text);
+    const names = [identity, ...input.story.characters.map((character) => character.name)];
+    const repeatLines = [repeatedPhrasesLine(repeatedPhrases(replies, names)), repeatedGesturesLine(repeatedGestures(replies, names))].filter(
+        (line): line is string => line !== null,
     );
+    const repeats = repeatLines.length > 0 ? repeatLines.join('\n') : null;
     // One order (.scratch/sillytavern-gaps/integration.md): Lore, Documents, Author's note, Established facts, Items, Secrets, Where things stand, Sudden event, Roll, Nudge, Cue, Repeated phrases, the final instruction.
     const finalInstruction = joinBlocks([
         lore,

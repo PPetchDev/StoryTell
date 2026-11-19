@@ -144,5 +144,113 @@ export function repeatedPhrasesLine(phrases: readonly string[]): string | null {
     return `Already used in recent replies, so not again in this one: ${phrases.map((phrase) => `"${phrase}"`).join('; ')}. Find a fresh way, or leave it out.`;
 }
 
-/** What the Story so far trigger reserves for the line, which it can't know in advance. */
-export const REPEATS_RESERVE_TOKENS = 80;
+/**
+ * Gestures the recent replies keep coming back to in other words (.scratch/cache-and-voices/spec.md):
+ * "her tail tightens on my wrist", "her tail is coiling slow around my wrist" share no run of words,
+ * but both are the tail and the wrist. A pair of words counts when it shares a sentence of narration
+ * in `GESTURE_MIN_REPLIES` of the last `GESTURE_WINDOW` replies, and one of the two is a body part:
+ * without that, what came back on live Chat 2 was the story's own running material ("four jugs a
+ * day", the tent flap, a saucer), which a story should be free to return to.
+ */
+export const GESTURE_WINDOW = 6;
+export const GESTURE_MIN_REPLIES = 3;
+export const GESTURE_MAX = 3;
+
+/** Plural and verb endings off, so "ears", "eyes", "tightens" and "tightened" meet "ear", "eye", "tighten". */
+function stem(word: string): string {
+    const base = word.replace(/'s$/, '');
+    if (base.length <= 3) return base;
+    if (/ies$/.test(base)) return base.slice(0, -3) + 'y';
+    if (/(s|x|ch|sh)es$/.test(base)) return base.slice(0, -2);
+    if (/ing$/.test(base) && base.length > 5) return base.slice(0, -3).replace(/([^s])\1$/, '$1');
+    if (/ed$/.test(base) && base.length > 4) return base.slice(0, -2).replace(/([^s])\1$/, '$1');
+    if (/[^s]s$/.test(base)) return base.slice(0, -1);
+    return base;
+}
+
+/** Parts of a body a gesture is told through. */
+const BODY = new Set(
+    `tail tuft ear eye hand finger fingertip palm wrist arm elbow shoulder neck throat jaw chin cheek lip mouth tongue
+    tooth teeth nose brow forehead hair horn skin breath knee thigh hip waist spine chest breast belly ankle foot feet
+    toe face pulse knuckle collarbone lap`
+        .split(/\s+/)
+        .map(stem),
+);
+
+/** Words that say how often or how far, not what a body does: "once" and "gone" sat beside every tail and ear on live. */
+const GESTURE_PLAIN = new Set(['once', 'twice', 'gone', 'almost', 'enough', 'quite', 'already', 'ever', 'never']);
+
+/** The pairs of words that share a sentence of narration in `text`, by stem, each with the words as written. */
+function gesturePairs(text: string, plain: (key: string) => boolean): Map<string, [string, string]> {
+    const pairs = new Map<string, [string, string]>();
+    const narration = text
+        .split('\n')
+        .filter((line) => !/^@[^:\n]+:/.test(line.trim()))
+        .join('\n')
+        .replace(/\*\([^)]*\)\*/g, ' ');
+    for (const sentence of narration.split(/[.!?…;:—–\n]+/)) {
+        const words = new Map<string, string>();
+        for (const raw of sentence.replace(/’/g, "'").split(/[^A-Za-z']+/)) {
+            const word = raw.replace(/^'+|'+$/g, '');
+            const key = word.toLowerCase();
+            if (key.length < 3 || plain(key) || plain(key.replace(/'s$/, ''))) continue;
+            const stemmed = stem(key);
+            if (!words.has(stemmed)) words.set(stemmed, word.replace(/'s$/i, ''));
+        }
+        const stems = [...words.keys()].sort();
+        for (let a = 0; a < stems.length; a++) {
+            for (let b = a + 1; b < stems.length; b++) {
+                if (!BODY.has(stems[a]) && !BODY.has(stems[b])) continue;
+                pairs.set(`${stems[a]}+${stems[b]}`, [words.get(stems[a])!, words.get(stems[b])!]);
+            }
+        }
+    }
+    return pairs;
+}
+
+/**
+ * The gestures repeated across `replies` (oldest first), most often first, each as its two words
+ * as the newest reply wrote them; none, empty. Two pairs sharing a word are one gesture ("ears
+ * swivel forward" is ear+swivel, ear+forward and forward+swivel): only the commoner is named.
+ */
+export function repeatedGestures(replies: readonly string[], names: readonly string[] = []): Array<[string, string]> {
+    const recent = replies.slice(-GESTURE_WINDOW);
+    if (recent.length < GESTURE_MIN_REPLIES) return [];
+    const nameWords = new Set(names.flatMap((name) => name.toLowerCase().split(/\s+/)));
+    const plain = (key: string) => COMMON_WORDS.has(key) || GESTURE_PLAIN.has(key) || nameWords.has(key) || /^\d+$/.test(key);
+    const seen = new Map<string, { replies: number; newest: number; words: [string, string] }>();
+    recent.forEach((reply, at) => {
+        for (const [key, words] of gesturePairs(reply, plain)) {
+            const entry = seen.get(key);
+            seen.set(key, { replies: (entry?.replies ?? 0) + 1, newest: at, words });
+        }
+    });
+    const ranked = [...seen.entries()]
+        .filter(([, entry]) => entry.replies >= GESTURE_MIN_REPLIES)
+        .sort(([, a], [, b]) => b.replies - a.replies || b.newest - a.newest);
+    const kept: Array<[string, string]> = [];
+    const used = new Set<string>();
+    for (const [key, entry] of ranked) {
+        const stems = key.split('+');
+        if (stems.some((part) => used.has(part))) continue;
+        for (const part of stems) used.add(part);
+        kept.push(entry.words);
+        if (kept.length === GESTURE_MAX) break;
+    }
+    return kept;
+}
+
+/**
+ * The line beside the repeated phrases naming the repeated gestures; null with none. It names held
+ * poses too: replayed on the real model, "not in this one" stopped the tail tightening on the wrist
+ * again but not "her tail stays looped around my wrist" in every reply, and "not even as still held"
+ * still let "her tail stays where it is, wrapped warm around my wrist" through once
+ * (.scratch/cache-and-voices/spec.md). So the words themselves are named as not to be written together.
+ */
+export function repeatedGesturesLine(gestures: ReadonlyArray<readonly [string, string]>): string | null {
+    if (gestures.length === 0) return null;
+    return `Gestures and poses already in several recent replies: ${gestures.map(([a, b]) => `${a} and ${b}`).join('; ')}. Leave them out of this reply entirely: don't write those words together, not even to say a pose is kept. Show the feeling another way, or leave it out.`;
+}
+
+/** What the Story so far trigger reserves for the two lines, which it can't know in advance. */
+export const REPEATS_RESERVE_TOKENS = 160;

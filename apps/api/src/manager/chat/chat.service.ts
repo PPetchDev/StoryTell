@@ -130,7 +130,8 @@ import { pendingRollOffer, RollOfferView, statNamed } from './roll-offer/roll-of
 import { endingName, endingReady, endingState, EndingView, endingView, promptEpilogue } from './ending/ending.js';
 import { eventReady, GAUGE_RULES, promptSuddenEvent, SuddenEventView, suddenEventView } from './sudden-event/sudden-event.js';
 import { chatEventState, EventProposalView, eventProposalView, shownProposal } from './sudden-event/ai-events.js';
-import { currentDetails, promptDetails } from './details/details.js';
+import { currentDetails, placeAge, promptDetails } from './details/details.js';
+import { DetailKind } from '../../model/ledger/entities/detail-change.entity.js';
 import { FACTS_MAX, factsState, promptFacts, userFactChange } from './details/facts.js';
 import { currentItems, ItemEnd, ITEMS_MAX, itemsState, userItemChange } from './details/items.js';
 import { secretsState, StorySecret, storySecrets } from './secrets/secrets.js';
@@ -1930,7 +1931,7 @@ export class ChatManagerService {
             diaries: promptDiaries(story, chat, entries),
             storySoFar: promptStorySoFar(chat),
             timeOfDay: chat.timeOfDay,
-            details: detailsFor(story, state),
+            details: detailsFor(story, chat, state),
             // The facts, and the slips of the newest reply before this one (.scratch/story-quality/spec.md).
             facts: promptFacts(state.detailChanges, newestAiMessage(chat)?.id ?? null),
             // Who holds what (.scratch/story-items/spec.md), after the facts.
@@ -2088,7 +2089,7 @@ export class ChatManagerService {
             diaries: promptDiaries(story, chat, entries),
             storySoFar: promptStorySoFar(chat),
             timeOfDay: chat.timeOfDay,
-            details: detailsFor(story, state),
+            details: detailsFor(story, chat, state),
             facts: promptFacts(state.detailChanges, newest?.id ?? null),
             items: currentItems(state.detailChanges),
             secrets: promptSecrets(story, chat, state),
@@ -2514,9 +2515,13 @@ function withThaiReadings(
  * null for none. Checked before anything is stored: an id outside the cast is
  * `CharacterNotFoundError`, a Character sitting out is `NudgeSittingOutError`.
  */
-/** The Chat's Place, Weather and Outfits as the prompts name them (.scratch/info-box/spec.md). */
-function detailsFor(story: StoryEntity, state: LedgerState) {
-    return promptDetails(currentDetails(state.detailChanges), story.characters);
+/** The Chat's Place, Weather and Outfits as the prompts name them (.scratch/info-box/spec.md), with how long ago the Place was noted (.scratch/cache-and-voices/spec.md). */
+function detailsFor(story: StoryEntity, chat: ChatEntity, state: LedgerState) {
+    return {
+        ...promptDetails(currentDetails(state.detailChanges), story.characters),
+        placeAge: placeAge(state.detailChanges, chat.messages.map((message) => message.id)),
+        weatherAge: placeAge(state.detailChanges, chat.messages.map((message) => message.id), DetailKind.Weather),
+    };
 }
 
 /** A User Message's Roll as the prompt reads it; null without one. */

@@ -64,6 +64,37 @@ export function currentDetails(records: readonly DetailRecord[]): ChatDetails {
     };
 }
 
+/**
+ * A Place or Weather noted this many Messages ago or more is old (.scratch/cache-and-voices/spec.md):
+ * the Judge is shown its age, and the Narrator isn't told it at all and reads where things are from
+ * the replies it has word for word. On live Chat 2 the Place said "under the tree" 85 Messages after
+ * it was noted, the story long since in the tent. Replayed, the Judge kept answering "same" for it
+ * until the age gave it a reason to look, and with the Place in the reminder, even marked as old,
+ * the first reply could still put the tail "against the grass".
+ */
+export const PLACE_AGE_SHOWN = 20;
+
+/**
+ * How many of `messageIds` (oldest first, ending with the newest Message the prompt is for) come
+ * after the one the newest record of `kind` (the Place by default) was made on; null with none, or
+ * one made on no Message of these.
+ */
+export function placeAge(
+    records: ReadonlyArray<{ kind: DetailKind; messageId: number | null }>,
+    messageIds: readonly number[],
+    kind: DetailKind.Place | DetailKind.Weather = DetailKind.Place,
+): number | null {
+    const noted = records.filter((record) => record.kind === kind).at(-1);
+    if (!noted || noted.messageId === null) return null;
+    const at = messageIds.indexOf(noted.messageId);
+    return at < 0 ? null : messageIds.length - 1 - at;
+}
+
+/** "the lamp room", or with its age once it is old enough: "the lamp room (last noted 85 messages ago)". */
+function placeWithAge(place: string, age: number | null | undefined): string {
+    return age != null && age >= PLACE_AGE_SHOWN ? `${place} (last noted ${age} messages ago)` : place;
+}
+
 /** What the Judge answered, read loosely; null when it said nothing readable. */
 export interface JudgedDetails {
     place: string | null;
@@ -74,6 +105,21 @@ export interface JudgedDetails {
 }
 
 const text = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
+
+/** The Judge's answer for a Place that hasn't changed. */
+const SAME_PLACE = /^(same|unchanged|no change)[.!]?$/i;
+
+/**
+ * The `details` field on the Judge's reply shape, sent whenever the details section is. On live
+ * Chat 2 (2026-11-19) the Judge, on DeepSeek V4 Flash, gave no details in 30 judgements in a row
+ * while the story moved into the tent, so the Place stayed "under the tree" and the reminder put
+ * the Characters back on the grass. A field only the user message asks for is mostly not returned
+ * (.scratch/story-quality/spec.md, "Real-model check"); the Place is asked every time, "same" or
+ * the new one, so the Judge has to look (.scratch/cache-and-voices/spec.md). "where" comes first,
+ * the story's own words about where everyone is: replayed with the Place alone, the Judge answered
+ * "same" for "under the tree" while the story sat on the felt inside the tent.
+ */
+export const DETAILS_SHAPE = '"details":{"where":"...","place":"same","weather":null,"outfits":[],"goals":[]}';
 
 /** Reads the judgement's `details` object: strings only, anything else is left out. */
 export function readJudgedDetails(value: unknown): JudgedDetails | null {
@@ -91,7 +137,8 @@ export function readJudgedDetails(value: unknown): JudgedDetails | null {
         const goal = entry.goal === null ? '' : typeof entry.goal === 'string' ? entry.goal.trim() : null;
         return text(entry.character) && goal !== null ? [{ character: text(entry.character), goal }] : [];
     });
-    const place = text(fields.place) || null;
+    // "same" says the story hasn't moved (the reply shape asks for the Place every time).
+    const place = SAME_PLACE.test(text(fields.place)) ? null : text(fields.place) || null;
     const weather = text(fields.weather) || null;
     return place === null && weather === null && outfits.length === 0 && goals.length === 0 ? null : { place, weather, outfits, goals };
 }
@@ -105,22 +152,22 @@ export interface DetailsCastMember {
  * The Judge's section about the Place, the Weather and the Outfits: what each is now, then the
  * rule and the JSON field, so the system message never changes. Read after the latest exchange.
  */
-export function judgeDetailsSection(details: ChatDetails, cast: readonly DetailsCastMember[]): string {
+export function judgeDetailsSection(details: ChatDetails, cast: readonly DetailsCastMember[], age: number | null = null): string {
     const wearing = cast.map((member) => `${member.name}: ${details.outfits.find((entry) => entry.characterId === member.id)?.outfit ?? 'not yet known'}`);
     const after = cast.map((member) => `${member.name}: ${details.goals.find((entry) => entry.characterId === member.id)?.goal ?? 'none yet'}`);
     return [
         '# Place, weather, outfits and goals',
-        `Place: ${details.place ?? 'not yet known'}`,
+        `Place: ${details.place ? placeWithAge(details.place, age) : 'not yet known'}`,
         `Weather: ${details.weather ?? 'not yet known'}`,
         `Wearing: ${wearing.join('; ') || '(no Characters)'}`,
         `Goals: ${after.join('; ') || '(no Characters)'}`,
-        'Details rule: add "details": {"place": "...", "weather": "...", "outfits": [{"character": "Name", "outfit": "..."}]} to your JSON, giving only what the latest exchange changed or first made clear; leave the rest out, and leave "details" out when nothing did. "place": where the story is at the end of the exchange, in a few words ("the lamp room"). "weather": a few words, only as the story shows it. "outfit": what that Character is wearing now (clothes, shoes, jewellery and anything else worn), in one short phrase, when they change, put something on or take something off, or when the story first describes it; never what they hold or carry, where they are or what they do. Read them from the story; never guess.',
+        'Details rule: give "details" in your JSON every time. "where": first, in a few words of the story\'s own, what the latest exchange and the recent story show about where everyone is at its end ("Inside the tent… seated on the felt"); the Place above may be out of date. "place": answer it every time, from "where": "same" when the story is still at the Place above, or else where it is now, in a few words ("inside the tent", "the lamp room"); going inside or out, into another room or to another spot is a move. For the rest, give only what the latest exchange changed or first made clear: "weather" null, "outfits" and "goals" empty, when it did not. "weather": a few words, only as the story shows it. "outfit": what that Character is wearing now (clothes, shoes, jewellery and anything else worn), in one short phrase, when they change, put something on or take something off, or when the story first describes it; never what they hold or carry, where they are or what they do. Read them from the story; never guess.',
         'Goals rule: add "goals": [{"character": "Name", "goal": "..."}] inside "details" for a Character in the latest exchange who has none yet ("none yet" above) once the story so far shows what they want, and for any Character the latest exchange gave a new aim, or saw reach or give up the one they had ("goal": ""). "goal": what that Character is after now, in one short phrase from their side ("get the ledger to Kessel unseen", "win back Nara\'s trust"), drawn from what the story shows they want and from who they are. Most characters in a story want something: when one in the latest exchange still has none, give theirs now. Only for the Characters listed above, never for the user\'s own character; leave the rest out.',
     ].join('\n');
 }
 
 /** What answering about them adds to the judge's token cap. */
-export const DETAILS_EXTRA_TOKENS = 180;
+export const DETAILS_EXTRA_TOKENS = 220;
 
 /** A change to record against the judged Message. */
 export interface NewDetail {
@@ -220,7 +267,13 @@ export interface PromptDetails {
     outfits: Array<{ name: string; outfit: string }>;
     /** Each Character's Goal under their name, in cast order; left out by older callers. */
     goals?: Array<{ name: string; goal: string }>;
+    /** How many Messages ago the Place was noted (`placeAge`); an old one is left out of the reminder. Left out, it counts as new. */
+    placeAge?: number | null;
+    /** The same for the Weather. */
+    weatherAge?: number | null;
 }
+
+const isOld = (age: number | null | undefined): boolean => age != null && age >= PLACE_AGE_SHOWN;
 
 /** The Chat's details with each Outfit under its Character's name, in cast order; a Character gone from the cast is left out. */
 export function promptDetails(details: ChatDetails, cast: readonly DetailsCastMember[]): PromptDetails {
@@ -248,8 +301,9 @@ export function detailsReminder(
 ): { where: string[]; wearing: string | null; goals: string | null } {
     if (!details) return { where: [], wearing: null, goals: null };
     const where: string[] = [];
-    if (details.place) where.push(`Place: ${details.place}.`);
-    if (details.weather) where.push(`Weather: ${details.weather}.`);
+    // An old Place or Weather is left out: the replies show where things are now (.scratch/cache-and-voices/spec.md).
+    if (details.place && !isOld(details.placeAge)) where.push(`Place: ${details.place}.`);
+    if (details.weather && !isOld(details.weatherAge)) where.push(`Weather: ${details.weather}.`);
     const outfits = details.outfits.filter((entry) => present.includes(entry.name));
     const wearing =
         outfits.length > 0
