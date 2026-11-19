@@ -547,7 +547,7 @@ export function ChatTopBar({
                             <path d="M7.5 14c.6-2.4 2.3-3.8 4.5-3.8s3.9 1.4 4.5 3.8" fill="none" />
                             <rect x="3" y="15" width="18" height="6" rx="1.5" />
                         </svg>
-                        <span>Novel</span>
+                        <span className={novel ? 'sr-only' : undefined}>Novel</span>
                     </button>
                 )}
                 <button

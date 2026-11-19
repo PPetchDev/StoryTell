@@ -3,7 +3,7 @@ import path from 'node:path';
 import { DataSource } from 'typeorm';
 
 import { ProviderOutageError } from '../src/errors/model-gateway.errors.js';
-import { lightOf, outfitPrompt, placePrompt, relightPrompt, sameOutfitKey, StageManagerService, stageKey, wornOnly } from '../src/manager/chat/stage/stage.service.js';
+import { isUsualOutfit, lightOf, outfitPrompt, placePrompt, relightPrompt, sameOutfitKey, StageManagerService, stageKey, wornOnly } from '../src/manager/chat/stage/stage.service.js';
 import { startTestApp, TestApp } from './harness/test-app.js';
 
 // .scratch/dressed-stage/spec.md: places and outfits drawn as the Chat reaches them.
@@ -49,6 +49,17 @@ describe('The dressed stage: the prompts', () => {
         expect(prompt).toContain('A camp on the endless steppe.');
         expect(relightPrompt('evening')).toContain('Keep the same place, layout, objects, camera and art style exactly');
         expect(relightPrompt('evening')).toContain('warm evening light');
+    });
+
+    it('knows a Character\x27s usual clothes from their Appearance, and anything else as another outfit', () => {
+        const nara = 'Tall, warm brown skin, long straight dark hair with blunt bangs, two rounded bovine ears. Wears tribal linen with a white fur collar, copper bangles and beaded hair cuffs. Wear leather shoe.';
+        expect(isUsualOutfit('linen', nara)).toBe(true);
+        expect(isUsualOutfit('linen, hair down', nara)).toBe(true);
+        expect(isUsualOutfit('tribal linen, white fur collar, copper bangles', nara)).toBe(true);
+        expect(isUsualOutfit('light linen shift, ties done at throat, copper bracelet, hair down', nara)).toBe(false);
+        expect(isUsualOutfit('a silk robe', nara)).toBe(false);
+        const morra = 'Long sweeping horns hung with copper rings. Wears a crescent-stamped mantle of undyed wool with a white fur collar.';
+        expect(isUsualOutfit('mantle, copper rings on horns', morra)).toBe(true);
     });
 
     it('keeps only what is worn: never what is held, a pose or a place', () => {
@@ -229,6 +240,33 @@ describe('The dressed stage (HTTP)', () => {
         await t.http.patch(`/api/stories/${storyId}/chats/${chatId}`).send({ dressStage: false }).expect(200);
         await stage.idle(chatId);
         expect(t.gateway.imageCalls().map((call) => call.kind)).toEqual(['place_picture']);
+    });
+
+    it('draws nothing for a Character back in their usual clothes, and answers each line\x27s outfit and place as they were', async () => {
+        const { storyId, naraId } = await createStory();
+        const chatId = (await t.http.post(`/api/stories/${storyId}/chats`).expect(201)).body.id as number;
+        await t.http.patch(`/api/stories/${storyId}/chats/${chatId}`).send({ dressStage: true }).expect(200);
+        t.gateway.scriptImage('place_picture', { image: { bytes: jpeg('tent'), mimeType: 'image/jpeg' } });
+        t.gateway.scriptImage('outfit_sprite', { image: { bytes: jpeg('robe'), mimeType: 'image/jpeg' } });
+
+        // Her usual clothes (the card says "Tall, dark hair."): nothing to draw.
+        const first = await play(storyId, chatId, judgement({ details: { place: 'the tent', outfits: [{ character: 'Nara', outfit: 'tall, dark hair' }] } }));
+        expect(t.gateway.imageCalls().map((call) => call.kind)).toEqual(['place_picture']);
+        // Then a robe, drawn; then back in her own clothes.
+        const second = await play(storyId, chatId, judgement({ details: { outfits: [{ character: 'Nara', outfit: 'a silk robe' }] } }));
+        const third = await play(storyId, chatId, judgement({ details: { outfits: [{ character: 'Nara', outfit: 'dark hair' }] } }));
+        expect(t.gateway.imageCalls().filter((call) => call.kind === 'outfit_sprite')).toHaveLength(1);
+
+        const history = third.stage as unknown as { places: { messageId: number; imagePath: string | null }[]; outfitChanges: { messageId: number; characterId: number; usual: boolean; sprites: unknown[] }[]; outfits: unknown[] };
+        const ai = (chat: Chat) => chat.messages.filter((message) => message.kind === 'ai').at(-1) as unknown as { id: number };
+        expect(history.places).toEqual([{ messageId: ai(first).id, imagePath: expect.stringMatching(/^stage\//) }]);
+        expect(history.outfitChanges.map((change) => [change.messageId, change.characterId, change.usual, change.sprites.length])).toEqual([
+            [ai(first).id, naraId, true, 0],
+            [ai(second).id, naraId, false, 1],
+            [ai(third).id, naraId, true, 0],
+        ]);
+        // Now, in her own clothes: no drawn outfit on the stage.
+        expect(history.outfits).toEqual([]);
     });
 
     it('stops for the day once the Chat\'s stage spent a dollar', async () => {

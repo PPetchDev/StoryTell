@@ -745,6 +745,10 @@ export interface ChatStage {
     placePicturePath: string | null;
     /** Each Character in an outfit drawn for this Chat, with its drawn emotions. */
     outfits: { characterId: number; sprites: StageSprite[] }[];
+    /** The place at each change, oldest first, by the Message that made it (null picture: none drawn). */
+    places?: { messageId: number | null; imagePath: string | null }[];
+    /** Each Character's outfit at each change, oldest first: usual (their Expressions) or what is drawn. */
+    outfitChanges?: { messageId: number | null; characterId: number; usual: boolean; sprites: StageSprite[] }[];
     /** How many drawings are under way. */
     drawing: number;
 }

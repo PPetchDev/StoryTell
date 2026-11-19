@@ -142,8 +142,9 @@ test.describe('stored Messages', () => {
         await expect(vn.text).toHaveText('The wind drops all at once.');
         await expect(vn.speaker).toHaveCount(0);
         await expect(vn.picture).toHaveCount(0);
-        // The composer stays under the stage.
-        await expect(page.getByRole('form', { name: 'Composer' })).toBeVisible();
+        // The composer is put away while reading (.scratch/novel-reading/spec.md); ✎ is on the stage.
+        await expect(page.locator('form[aria-label="Composer"]')).toBeHidden();
+        await expect(vn.root.getByRole('button', { name: 'Write a message' })).toBeVisible();
 
         // A tap anywhere on the stage goes on: long narration steps per paragraph.
         await vn.root.locator('[data-stage]').click({ position: { x: 40, y: 40 } });
@@ -199,7 +200,8 @@ test.describe('stored Messages', () => {
         await expect(view(page).root).toHaveCount(0);
     });
 
-    test('a tap on the large picture opens the Character profile, and the menu and Memory drawer work from the view', async ({ page, request }) => {
+    // .scratch/novel-reading/spec.md: the name in the box opens the profile; the picture steps on, as the rest of the stage does.
+    test('a tap on the speaker\x27s name opens the Character profile, and the menu and Memory drawer work from the view', async ({ page, request }) => {
         const { storyId, chatId } = await storyWithReply(page, request);
         await page.goto(`/stories/${storyId}/chats/${chatId}`);
         await toggle(page);
@@ -216,6 +218,52 @@ test.describe('stored Messages', () => {
         await page.getByRole('button', { name: 'Chat menu' }).click();
         await page.getByRole('dialog', { name: 'Chat menu' }).getByRole('button', { name: /^Memory/ }).click();
         await expect(page.getByRole('dialog', { name: 'Memory' })).toBeVisible();
+    });
+
+    // .scratch/novel-reading/spec.md: the story has the screen while reading.
+    test('reading: the composer is put away until ✎, its tools as icons; the box lies over the stage; a tap on the picture steps', async ({ page, request }) => {
+        const { storyId, chatId } = await storyWithReply(page, request);
+        await page.setViewportSize({ width: 360, height: 780 });
+        await page.goto(`/stories/${storyId}/chats/${chatId}`);
+        await toggle(page);
+        const vn = view(page);
+        // Put away while reading, and no Scene strip: the story has the screen.
+        const composer = page.locator('form[aria-label="Composer"]');
+        await expect(composer).toBeHidden();
+        await expect(page.getByRole('button', { name: /^Scene:/ })).toHaveCount(0);
+        // ✎ brings it out, ready to write, its tools as icons that keep their names.
+        await vn.root.getByRole('button', { name: 'Write a message' }).click();
+        await expect(composer).toBeVisible();
+        await expect(composer.getByRole('textbox')).toBeFocused();
+        const suggest = composer.getByRole('toolbar', { name: 'Composer tools' }).getByRole('button', { name: 'Suggest replies' });
+        await expect(suggest).toBeVisible();
+        expect(await suggest.locator('span').evaluate((span) => span.getBoundingClientRect().width)).toBeLessThanOrEqual(1);
+        await expect(vn.root.getByRole('button', { name: 'Write a message' })).toHaveCount(0);
+        // A draft keeps it out even when hidden is asked for; an empty one goes.
+        await composer.getByRole('textbox').fill('A draft.');
+        await composer.getByRole('button', { name: 'Hide the composer' }).click();
+        await expect(composer).toBeVisible();
+        await composer.getByRole('textbox').fill('');
+        await expect(composer).toBeHidden();
+        await expect(vn.root.getByRole('button', { name: 'Write a message' })).toBeVisible();
+
+        // The box lies over the foot of the stage, inside it.
+        const sizes = await page.evaluate(() => {
+            const stage = document.querySelector('[data-stage]')!.getBoundingClientRect();
+            const box = document.querySelector('[data-novel-box]')!.getBoundingClientRect();
+            return { stageBottom: stage.bottom, boxBottom: box.bottom, boxTop: box.top, stageTop: stage.top };
+        });
+        expect(sizes.boxBottom).toBeLessThanOrEqual(sizes.stageBottom + 1);
+        expect(sizes.boxTop).toBeGreaterThan(sizes.stageTop + 100);
+
+        // A speaker's picture steps on when tapped.
+        await vn.next.click();
+        await vn.next.click();
+        await expect(vn.speaker).toHaveText('Mira');
+        await vn.picture.click({ force: true });
+        await expect(vn.text).toHaveText('Mind the third step.');
+        await expect(page.getByRole('dialog', { name: 'Mira' })).toHaveCount(0);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     });
 
     test("an On AI Messages Replace rule shows its words in the box, and one that removes a narration paragraph removes that step", async ({
@@ -358,12 +406,18 @@ test.describe('while playing', () => {
     }
 
     const composer = (page: Page) => page.getByRole('form', { name: 'Composer' });
+    /** Brings out the composer, put away while reading (.scratch/novel-reading/spec.md), if it is away. */
+    async function openComposer(page: Page) {
+        const write = view(page).root.getByRole('button', { name: 'Write a message' });
+        if (await write.isVisible()) await write.click();
+    }
 
     test('a send shows the line, then the reply as it streams; Next past what has arrived shows the writing dots, then the next part; the place holds as it settles', async ({
         page,
         request,
     }) => {
         await playableChat(page, request);
+        await view(page).root.getByRole('button', { name: 'Write a message' }).click();
         // Written slowly: a few letters every quarter second.
         await scriptTurns(request, { text: STREAMED, model: 'glm-5.3', pieceSize: 4, pieceDelayMs: 250 });
         const vn = view(page);
@@ -403,6 +457,7 @@ test.describe('while playing', () => {
         );
         const vn = view(page);
 
+        await openComposer(page);
         await composer(page).getByRole('button', { name: 'Continue' }).click();
         await expect(vn.text).toHaveText('The wind drops.');
         await expect(composer(page).getByRole('button', { name: 'Stop' })).toHaveCount(0);
@@ -414,6 +469,9 @@ test.describe('while playing', () => {
         await expect(vn.text).toHaveText('Up, then.');
         await expect(actions.getByRole('button', { name: 'Snapshot' })).toBeVisible();
         await expect(actions.getByRole('button', { name: 'Edit in thread' })).toBeVisible();
+        // Icons only, keeping their names (.scratch/novel-reading/spec.md), on one row that needs no scroll.
+        expect((await actions.innerText()).trim()).toBe('');
+        expect(await actions.evaluate((row) => row.scrollWidth <= row.clientWidth)).toBe(true);
 
         await actions.getByRole('button', { name: 'Again' }).click();
         await expect(vn.text).toHaveText('Thunder rolls.');
@@ -431,6 +489,7 @@ test.describe('while playing', () => {
         await playableChat(page, request);
         await scriptTurns(request, { text: 'The wind drops.\n\n@Mira: Up, then.', model: 'glm-5.3' });
         const vn = view(page);
+        await openComposer(page);
         await composer(page).getByRole('button', { name: 'Continue' }).click();
         await expect(vn.text).toHaveText('The wind drops.');
         await expect(composer(page).getByRole('button', { name: 'Stop' })).toHaveCount(0);
@@ -554,6 +613,7 @@ test.describe('with Read aloud', () => {
         await page.goto(`/stories/${storyId}/chats/${chatId}`);
         await toggle(page);
         const vn = view(page);
+        await vn.root.getByRole('button', { name: 'Write a message' }).click();
         await page.getByRole('form', { name: 'Composer' }).getByRole('textbox', { name: 'Write as Ash' }).fill('Evening.');
         await page.getByRole('form', { name: 'Composer' }).getByRole('button', { name: 'Send' }).click();
 

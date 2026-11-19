@@ -206,6 +206,8 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
     /** Stops the reading when it is this Message's: ↺ Again, an edit or another version changes its words. */
     /** The Visual novel view (.scratch/chat-looks/spec.md): this device's choice, the moves the screen asks of it, and where it is. */
     const novel = useChatView() === 'novel';
+    /** In the novel view the composer is put away for reading until ✎ brings it out (.scratch/novel-reading/spec.md). */
+    const [writeOpen, setWriteOpen] = useState(false);
     const [novelRequest, setNovelRequest] = useState<NovelRequest | null>(null);
     const askNovel = (kind: NovelRequest['kind']) => setNovelRequest((current) => ({ kind, nonce: (current?.nonce ?? 0) + 1 }));
     const novelAtRef = useRef<number | null>(null);
@@ -733,7 +735,8 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                 novelToggleRef={novelToggleRef}
                 onOpenFind={() => setFind((current) => ({ ...current, open: true }))}
             />
-            {!stripHidden && (
+            {/* The novel view keeps the screen for the story; the Chat menu still opens the Chapters. */}
+            {!stripHidden && !novel && (
                 <SceneStrip
                     current={chat.currentScene}
                     timeOfDay={chat.timeOfDay}
@@ -864,6 +867,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                     onOpenSnapshot={setViewing}
                     onPosition={onNovelPosition}
                     stage={chat.stage ?? null}
+                    onWrite={writeOpen ? undefined : () => setWriteOpen(true)}
                 />
             ) : (
             <ChatThread
@@ -908,7 +912,11 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                 snapshotError={snaps.error}
                 failedSnapshots={failedJobs.length}
                 onDraft={setDraft}
-                onSend={send}
+                onSend={(...args: Parameters<typeof send>) => {
+                    // Sent: back to reading the reply.
+                    if (novel) setWriteOpen(false);
+                    return send(...args);
+                }}
                 onContinue={continueStory}
                 onStop={stopTurn}
                 onRetry={() => {
@@ -949,6 +957,9 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                 }
                 watching={watching}
                 watchBand={<WatchBand control={watch} />}
+                compact={novel}
+                tucked={novel && !writeOpen}
+                onTuck={() => setWriteOpen(false)}
                 characterRow={(writingForMe) => (
                     <CharacterRow
                         characters={characters}

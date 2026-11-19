@@ -3,18 +3,19 @@
 import { CSSProperties, KeyboardEvent, MouseEvent, PointerEvent, ReactNode, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { useCastCharacter, useCastLookup, useCharacterProfile } from '@/components/chat/character-profile';
-import { ACTION, ACTION_ICON, COLUMN } from '@/components/chat/chat-classes';
+import { COLUMN } from '@/components/chat/chat-classes';
 import { VersionSwitch, WritingLine } from '@/components/chat/chat-thread';
 import { RollLine, withActions } from '@/components/chat/message-body';
 import { ReadAloudControls, useReadAloud } from '@/components/chat/read-aloud';
 import { useShownText } from '@/components/chat/shown-text';
-import { CameraIcon, ChevronLeftIcon, ChevronRightIcon, PencilIcon, PlayIcon, UndoIcon } from '@/components/icons';
+import { CameraIcon, ChevronLeftIcon, ChevronRightIcon, PencilIcon, PlayIcon, ThreadIcon, UndoIcon } from '@/components/icons';
 import { initialOf } from '@/components/portrait/character-portrait';
 import { snapshotAlt } from '@/components/snapshot/snapshot-viewer';
 import { Cast, characterColour } from '@/lib/character-colour';
 import { ChatStage, isOpening, Message, MessagePart } from '@/lib/chat';
 import { linePicture, outfitPicture, stageSrc } from '@/lib/expressions';
 import { referenceImageUrl } from '@/lib/story';
+import { stageAt } from '@/lib/stage';
 import { firstStepOf, isLive, novelSteps, NovelStep, openingStep, readingStep, stepIndex } from '@/lib/novel-steps';
 import { ChatSnapshots, Snapshot, snapshotImageUrl } from '@/lib/snapshot';
 import type { SpeechItem } from '@/lib/read-aloud';
@@ -32,6 +33,16 @@ const STAGE = [
 ].join(' ');
 
 /** Back and Next, the view's own controls: 44px tall and 80px wide (audit H29). */
+/** A round arrow in the novel box: 44px, quiet, disabled faint. */
+/**
+ * A tool in the box (↺ Again, 📷 Snapshot, ▶ Read aloud, ☰ Edit in thread): a round 44px icon, its name
+ * for screen readers and as a title (.scratch/novel-reading/spec.md: icons only, so the row fits a
+ * 360px phone without scrolling).
+ */
+const BOX_TOOL =
+    'bare-button grid size-11 shrink-0 place-items-center rounded-full border border-field-line bg-surface text-text cursor-pointer press focus-ring disabled:cursor-not-allowed disabled:border-line disabled:text-faint';
+const ROUND_NAV = 'bare-button inline-flex size-11 shrink-0 items-center justify-center rounded-full text-muted cursor-pointer press focus-ring disabled:opacity-35 disabled:cursor-default';
+
 const NAV_BUTTON = [
     'bare-button inline-flex min-h-11 min-w-20 items-center justify-center gap-1 rounded-full px-3',
     'text-md font-semibold text-muted',
@@ -75,6 +86,8 @@ interface NovelViewProps {
     onPosition(messageId: number | null): void;
     /** The dressed stage (.scratch/dressed-stage/spec.md): the place behind, and the outfits; null with it off. */
     stage?: ChatStage | null;
+    /** Brings the composer out while it is put away for reading (.scratch/novel-reading/spec.md); left out while it is out. */
+    onWrite?(): void;
 }
 
 /** Taps on these do their own thing and never step. */
@@ -125,14 +138,17 @@ export function NovelView(props: NovelViewProps) {
     // The next lines' pictures load while this one shows, so a step never opens on an empty stage.
     const castLookup = useCastLookup();
     const { stage } = props;
+    // Each line shows the place and the clothes of its own moment (.scratch/dressed-stage/spec.md).
+    const messageIds = useMemo(() => messages.map((message) => message.id), [messages]);
+    const moment = useMemo(() => stageAt(stage, messageIds, step?.messageId ?? null), [stage, messageIds, step?.messageId]);
     useEffect(() => {
         for (const ahead of steps.slice(index + 1, index + 4)) {
             if (ahead.kind !== 'speech') continue;
-            const sprites = stage?.outfits.find((outfit) => outfit.characterId === ahead.characterId)?.sprites;
+            const sprites = stageAt(stage, messageIds, ahead.messageId).sprites(ahead.characterId);
             const picture = outfitPicture(sprites, ahead.emotion) ?? linePicture(castLookup(ahead.characterId), ahead.emotion);
             if (picture.whole) new Image().src = stageSrc(picture.whole, picture.cutout);
         }
-    }, [index, steps, stage, castLookup]);
+    }, [index, steps, stage, messageIds, castLookup]);
 
     // --- Playing: a turn started in this tab ------------------------------------------------------
     /** Moves to the reply once, when its first step arrives: a turn started here (Send, Continue, Retry) is followed to its start. */
@@ -283,6 +299,17 @@ export function NovelView(props: NovelViewProps) {
             </button>
         </div>
     );
+    // In the box (.scratch/novel-reading/spec.md): a round 44px arrow each, either side of the tools, so the words get the room.
+    const backButton = (
+        <button type="button" className={ROUND_NAV} aria-label="Back" onClick={back} disabled={index <= 0 && !waiting}>
+            <ChevronLeftIcon size={20} />
+        </button>
+    );
+    const nextButton = (
+        <button type="button" className={ROUND_NAV} aria-label="Next" onClick={next} disabled={index >= steps.length - 1 && !writing}>
+            <ChevronRightIcon size={20} />
+        </button>
+    );
 
     return (
         <section className="flex min-h-0 flex-1 flex-col" style={storySize} aria-label="Visual novel view">
@@ -302,8 +329,20 @@ export function NovelView(props: NovelViewProps) {
                 onClick={onClick}
                 onKeyDown={onKeyDown}
             >
+                {props.onWrite && (
+                    // The composer is put away while reading; ✎ brings it out (.scratch/novel-reading/spec.md).
+                    <button
+                        type="button"
+                        className="absolute top-4 right-2 z-raised inline-flex size-11 items-center justify-center rounded-full border border-line bg-surface/85 text-text shadow-md backdrop-blur-sm press focus-ring"
+                        aria-label="Write a message"
+                        title="Write a message"
+                        onClick={props.onWrite}
+                    >
+                        <PencilIcon size={20} />
+                    </button>
+                )}
                 {(pendingJobs > 0 || failedJobs > 0) && (
-                    <div className="absolute top-2 right-0 z-raised flex flex-col items-end gap-1">
+                    <div className={`absolute right-0 z-raised flex flex-col items-end gap-1 ${props.onWrite ? 'top-17' : 'top-2'}`}>
                         {pendingJobs > 0 && (
                             <p className={`${CHIP} border-line bg-surface text-muted`} role="status">
                                 Drawing a Snapshot…
@@ -325,14 +364,15 @@ export function NovelView(props: NovelViewProps) {
                     </>
                 ) : (
                     <>
-                        <div className="relative flex min-h-0 flex-1 items-end justify-center">
-                            {props.stage?.placePicturePath && (
+                        {/* The whole stage, the box over its foot (.scratch/novel-reading/spec.md): the picture is as tall as the screen allows. */}
+                        <div className="absolute inset-x-0 top-2 bottom-0 flex items-end justify-center overflow-hidden rounded-t-xl">
+                            {moment.placePicturePath && (
                                 // The place, drawn with no one in it, behind whoever speaks (.scratch/dressed-stage/spec.md).
                                 // eslint-disable-next-line @next/next/no-img-element -- served by the API from the image folder
                                 <img
-                                    key={props.stage.placePicturePath}
+                                    key={moment.placePicturePath}
                                     className="pointer-events-none absolute inset-0 size-full object-cover motion-safe:animate-fade-in"
-                                    src={stageSrc(referenceImageUrl(props.stage.placePicturePath), true)}
+                                    src={stageSrc(referenceImageUrl(moment.placePicturePath), true)}
                                     alt=""
                                     aria-hidden="true"
                                     data-stage-place=""
@@ -344,12 +384,15 @@ export function NovelView(props: NovelViewProps) {
                                     key={step.key}
                                     step={step}
                                     cast={props.cast}
-                                    sprites={props.stage?.outfits.find((outfit) => outfit.characterId === step.characterId)?.sprites}
+                                    sprites={moment.sprites(step.characterId)}
                                 />
                             )}
                         </div>
                         {step && (
-                            <div className="mt-2 flex max-h-[40%] min-h-0 cursor-auto flex-col gap-1.5 rounded-xl border border-line bg-surface px-3.5 pt-3 pb-2 select-text lg:max-h-[30%]">
+                            <div
+                                className="relative z-raised mt-auto mb-1 flex max-h-[58%] min-h-0 cursor-auto flex-col gap-1 rounded-xl border border-line bg-surface/90 px-3.5 pt-3 pb-1.5 shadow-lg backdrop-blur-sm select-text lg:max-h-[40%]"
+                                data-novel-box=""
+                            >
                                 {/* Quiet while the words on show are still streaming in, so a screen reader isn't read every piece (audit M24). */}
                                 <section className="min-h-0 overflow-y-auto overscroll-contain" aria-label="Shown line" aria-live={isLive(step) ? 'off' : 'polite'}>
                                     {waiting ? (
@@ -362,20 +405,26 @@ export function NovelView(props: NovelViewProps) {
                                         />
                                     )}
                                 </section>
-                                {!waiting && (
-                                    <StepTools
-                                        step={step}
-                                        withRow={withRow}
-                                        newestAi={withRow ? newestAi! : null}
-                                        isLast={newestAi === last}
-                                        blocked={blocked}
-                                        onAgain={props.onAgain}
-                                        onVersion={props.onVersion}
-                                        onSnapshot={props.onSnapshot}
-                                        onEditInThread={props.onEditInThread}
-                                    />
-                                )}
-                                {nav}
+                                {/* One row: Back, the step's tools, Next (.scratch/novel-reading/spec.md). */}
+                                <div className="flex items-center gap-1">
+                                    {backButton}
+                                    <div className="min-w-0 flex-1">
+                                        {!waiting && (
+                                            <StepTools
+                                                step={step}
+                                                withRow={withRow}
+                                                newestAi={withRow ? newestAi! : null}
+                                                isLast={newestAi === last}
+                                                blocked={blocked}
+                                                onAgain={props.onAgain}
+                                                onVersion={props.onVersion}
+                                                onSnapshot={props.onSnapshot}
+                                                onEditInThread={props.onEditInThread}
+                                            />
+                                        )}
+                                    </div>
+                                    {nextButton}
+                                </div>
                             </div>
                         )}
                     </>
@@ -388,7 +437,6 @@ export function NovelView(props: NovelViewProps) {
 /** The large picture of a speech step: the whole Expression or Reference image, else a large initial on their colour. */
 function SpeakerPicture({ step, cast, sprites }: { step: Extract<NovelStep, { kind: 'speech' }>; cast: Cast; sprites?: ChatStage['outfits'][number]['sprites'] }) {
     const character = useCastCharacter(step.characterId);
-    const openProfile = useCharacterProfile(step.characterId);
     // The outfit the Chat has them in, when the stage is dressed; else their Expressions.
     const { whole, cutout } = outfitPicture(sprites, step.emotion) ?? linePicture(character, step.emotion);
     const colour = characterColour(step.characterId, cast);
@@ -408,17 +456,7 @@ function SpeakerPicture({ step, cast, sprites }: { step: Extract<NovelStep, { ki
                 draggable={false}
             />
         );
-        return (
-            <div className="absolute inset-0 flex justify-center overflow-hidden">
-                {openProfile ? (
-                    <button type="button" className="bare-button block h-full cursor-pointer focus-ring" aria-label={`Profile of ${step.speakerName}`} onClick={openProfile}>
-                        {figure}
-                    </button>
-                ) : (
-                    figure
-                )}
-            </div>
-        );
+        return <div className="absolute inset-0 flex justify-center overflow-hidden">{figure}</div>;
     }
     const picture = whole ? (
         // eslint-disable-next-line @next/next/no-img-element -- served by the API from the image folder
@@ -428,16 +466,13 @@ function SpeakerPicture({ step, cast, sprites }: { step: Extract<NovelStep, { ki
             {initialOf(step.speakerName)}
         </span>
     );
-    if (!openProfile) return picture;
-    return (
-        <button type="button" className="bare-button flex h-full max-w-full cursor-pointer items-end justify-center focus-ring" aria-label={`Profile of ${step.speakerName}`} onClick={openProfile}>
-            {picture}
-        </button>
-    );
+    return picture;
 }
 
 /** The box's words: the speaker's name in their colour (the worn name for the user's line, none for narration), then the text. */
 function StepText({ step, cast, epilogue = false }: { step: Exclude<NovelStep, { kind: 'snapshot' }>; cast: Cast; epilogue?: boolean }) {
+    // A Character's name opens their profile; the picture above steps on, as the rest of the stage does.
+    const openProfile = useCharacterProfile(step.kind === 'speech' ? step.characterId : null);
     // The thread marks an Epilogue's reply; so does each of its steps here (docs/ui-audit-2026-11-16.md L6).
     const label = epilogue ? (
         <p className="mt-0 mb-1 text-xs font-bold tracking-widest text-muted uppercase" data-epilogue-label>
@@ -460,7 +495,13 @@ function StepText({ step, cast, epilogue = false }: { step: Exclude<NovelStep, {
         <>
             {label}
             <p className="mt-0 mb-1 text-md font-bold" style={{ color: colour }} data-speaker="">
-                {name}
+                {openProfile ? (
+                    <button type="button" className="bare-button cursor-pointer font-bold underline decoration-dotted underline-offset-4 focus-ring" aria-label={`Profile of ${name}`} onClick={openProfile}>
+                        {name}
+                    </button>
+                ) : (
+                    name
+                )}
             </p>
             <p className={STEP_TEXT} data-line="">
                 {withActions(step.text)}
@@ -502,7 +543,9 @@ function StepTools({ step, withRow, newestAi, isLast, blocked, onAgain, onVersio
             ) : (
                 <button
                     type="button"
-                    className={ACTION}
+                    className={BOX_TOOL}
+                    aria-label="Read aloud"
+                    title="Read aloud"
                     onClick={() => {
                         // From the item of the step on show (its part, and for narration its paragraph).
                         const from = (items: SpeechItem[]) =>
@@ -513,8 +556,7 @@ function StepTools({ step, withRow, newestAi, isLast, blocked, onAgain, onVersio
                         player.unlock();
                     }}
                 >
-                    <PlayIcon size={16} className={ACTION_ICON} />
-                    Read aloud
+                    <PlayIcon size={20} />
                 </button>
             );
     }
@@ -524,22 +566,20 @@ function StepTools({ step, withRow, newestAi, isLast, blocked, onAgain, onVersio
     const versions = isLast ? newestAi.versions : null;
     const again = isLast && !isOpening(newestAi) && !blocked;
     return (
-        <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Message actions">
+        // One row that scrolls sideways (.scratch/novel-reading/spec.md): wrapped, the newest reply's tools took three rows of the box.
+        <div className="flex flex-nowrap items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&>*]:shrink-0 [&::-webkit-scrollbar]:hidden" role="group" aria-label="Message actions">
             {versions && <VersionSwitch versions={versions} onVersion={(version) => onVersion(newestAi.id, version)} />}
             {again && (
-                <button type="button" className={ACTION} onClick={() => onAgain(newestAi.id)}>
-                    <UndoIcon size={16} className={ACTION_ICON} />
-                    Again
+                <button type="button" className={BOX_TOOL} aria-label="Again" title="Again" onClick={() => onAgain(newestAi.id)}>
+                    <UndoIcon size={20} />
                 </button>
             )}
-            <button type="button" className={ACTION} onClick={onSnapshot}>
-                <CameraIcon size={16} className={ACTION_ICON} />
-                Snapshot
+            <button type="button" className={BOX_TOOL} aria-label="Snapshot" title="Snapshot" onClick={onSnapshot}>
+                <CameraIcon size={20} />
             </button>
             {read}
-            <button type="button" className={ACTION} onClick={() => onEditInThread(newestAi.id)}>
-                <PencilIcon size={16} className={ACTION_ICON} />
-                Edit in thread
+            <button type="button" className={BOX_TOOL} aria-label="Edit in thread" title="Edit in thread" onClick={() => onEditInThread(newestAi.id)}>
+                <ThreadIcon size={20} />
             </button>
         </div>
     );

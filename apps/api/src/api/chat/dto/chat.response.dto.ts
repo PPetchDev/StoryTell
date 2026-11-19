@@ -322,6 +322,14 @@ export class ChatStageDTO {
     @ApiProperty({ type: [StageOutfitDTO], description: 'Each Character in an outfit drawn for this Chat, with its drawn emotions.' })
     outfits: StageOutfitDTO[];
 
+    @ApiProperty({ description: 'The place at each change, oldest first, by the Message that made it, with its picture or null.' })
+    places: { messageId: number | null; imagePath: string | null }[];
+
+    @ApiProperty({
+        description: "Each Character's outfit at each change, oldest first: `usual` for their own clothes (their Expressions show), else what is drawn of it.",
+    })
+    outfitChanges: { messageId: number | null; characterId: number; usual: boolean; sprites: StageSpriteDTO[] }[];
+
     @ApiProperty({ description: 'How many drawings are under way.' })
     drawing: number;
 }

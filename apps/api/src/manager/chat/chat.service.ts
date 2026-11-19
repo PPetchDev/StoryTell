@@ -2266,7 +2266,7 @@ export class ChatManagerService {
             autoDiary: chat.autoDiary,
             characterThoughts: chat.characterThoughts,
             dressStage: chat.dressStage,
-            stage: await chatStage(this.stageModel, story, chat, details),
+            stage: await chatStage(this.stageModel, story, chat, details, detailChanges),
             diaryWriting: this.diaryRuns.has(chat.id),
             diaryLatest: story.characters.flatMap((character) => {
                 const entryId = newestEntry.get(character.id);

@@ -5,7 +5,7 @@ import { FormEvent, ReactNode, RefObject, useEffect, useId, useLayoutEffect, use
 
 import { COLUMN, ICON_BUTTON, LABEL_CAPS, PANEL_NOTE, SEND_BUTTON, TOOL_CHIP } from '@/components/chat/chat-classes';
 import { useConnection } from '@/components/connection';
-import { CloseIcon, DiceIcon, PencilIcon, PlayIcon, StopIcon, UndoIcon } from '@/components/icons';
+import { CloseIcon, DiceIcon, PencilIcon, PlayIcon, StopIcon, UndoIcon, ChevronDownIcon } from '@/components/icons';
 import { ApiUnreachableError } from '@/lib/api';
 import { backgroundNotice, Chat, chatApi, SuggestedReply, RollStat, signedStat } from '@/lib/chat';
 import { insertSavedReply, SavedReply, TraySavedReply } from '@/lib/saved-replies';
@@ -365,6 +365,18 @@ interface ChatComposerProps {
     onRetryBackground(): void;
     /** The composer's second band: the Character row (Nudge), or nothing. */
     characterRow?: (writingForMe: boolean) => ReactNode;
+    /**
+     * Reading in the Visual novel view (.scratch/novel-reading/spec.md): its tools and the Character
+     * row show as icons only.
+     */
+    compact?: boolean;
+    /**
+     * Put away while reading: the whole composer is out of sight until the user asks for it (the
+     * stage's ✎), unless something is under way in it (a draft, a panel, a Cue or Roll, Write for me,
+     * Dictation). `onTuck` puts it away again.
+     */
+    tucked?: boolean;
+    onTuck?(): void;
     /** The Cue set for the next reply (CONTEXT.md, "Cue"), or null. */
     cue: string | null;
     /** Opens the Cue sheet. */
@@ -408,6 +420,9 @@ export function ChatComposer({
     onRetry,
     onRetryBackground,
     characterRow,
+    compact = false,
+    tucked = false,
+    onTuck,
     cue,
     onCue,
     onClearCue,
@@ -419,6 +434,14 @@ export function ChatComposer({
     watchBand,
 }: ChatComposerProps) {
     const box = useAutoGrow(draft);
+    /** Focus is in the composer (the box or one of its tools): the user is writing. */
+    const [focusWithin, setFocusWithin] = useState(false);
+    // Asked for from the novel view: the box takes the focus, ready to write.
+    const wasTucked = useRef(tucked);
+    useEffect(() => {
+        if (wasTucked.current && !tucked) box.current?.focus();
+        wasTucked.current = tucked;
+    }, [tucked, box]);
     const boxId = useId();
     const suggestions = useSuggestedReplies(chat);
     const tray = useSavedRepliesTray(chat);
@@ -534,12 +557,21 @@ export function ChatComposer({
             </p>
         ) : null;
 
+    // Put away while reading in the novel view, unless something is under way in it.
+    const underWay = draft.trim() !== '' || panel !== 'suggestions' || suggestions.shown.status !== 'closed' || cue !== null || roll || writingForMe || dictating;
+    const away = tucked && !underWay;
     return (
         <footer
             ref={footerRef}
-            className={`shrink-0 border-t border-line bg-bg pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] ${COLUMN}`}
+            className={`shrink-0 ${away ? 'pb-[env(safe-area-inset-bottom)]' : 'border-t border-line pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]'} bg-bg ${COLUMN}`}
+            data-tucked={away ? '' : undefined}
             onFocus={(event) => {
                 ownsFocus.current = footerRef.current?.contains(event.target as Node) ?? false;
+                setFocusWithin(true);
+            }}
+            onBlur={(event) => {
+                // Still writing while focus moves to another of its own controls.
+                if (!footerRef.current?.contains(event.relatedTarget as Node | null)) setFocusWithin(false);
             }}
         >
             <Status>{rollback && <p className="notice border-rollback-line bg-rollback-surface">{rollback}</p>}</Status>
@@ -565,7 +597,7 @@ export function ChatComposer({
                 </p>
             )}
             {/* Integration, "The composer, top to bottom": panel · Character row · tool row · box row. */}
-            <form className="flex flex-col gap-1" onSubmit={send} aria-label="Composer">
+            <form className={`flex flex-col gap-1 ${compact ? 'composer-icons' : ''}`} onSubmit={send} aria-label="Composer" hidden={away}>
                 {/* Band 1, the panel: one thing at a time. Its status line is a region of its own, there throughout. */}
                 <Status>{panelStatus && <p className={PANEL_NOTE}>{panelStatus}</p>}</Status>
                 {panelAlert}
@@ -773,6 +805,12 @@ export function ChatComposer({
                     <RecordingBar dictation={dictation} />
                 ) : (
                     <div className="flex items-end gap-2">
+                        {compact && onTuck && (
+                            // Back to reading (.scratch/novel-reading/spec.md).
+                            <button type="button" className={ICON_BUTTON} aria-label="Hide the composer" title="Hide the composer" onClick={onTuck}>
+                                <ChevronDownIcon size={20} />
+                            </button>
+                        )}
                         <textarea
                             ref={box}
                             id={boxId}

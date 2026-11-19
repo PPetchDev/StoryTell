@@ -1074,4 +1074,21 @@
             transform: translateX(0.2%);
         }
     }
+
+    /*
+     * The composer in the Visual novel view (.scratch/novel-reading/spec.md): its tools and the
+     * Character row as icons only. Each keeps its name for screen readers (aria-label) and as a title.
+     */
+    .composer-icons [role='toolbar'] > button > span,
+    .composer-icons [data-band='characters'] button > span:last-child {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
+    .composer-icons [data-band='characters'] button {
+        padding-right: 0.25rem;
+    }
 }

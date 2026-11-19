@@ -73,6 +73,8 @@ export const ChevronDownIcon = icon('ChevronDownIcon', <path d="M6 9l6 6 6-6" />
 export const CloseIcon = icon('CloseIcon', <path d="M6 6l12 12M18 6L6 18" />);
 /** ✎ Edit. */
 export const PencilIcon = icon('PencilIcon', <path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16zM13.5 6.5l4 4" />);
+/** ☰ The thread: lines of a Chat, as Edit in thread opens it. */
+export const ThreadIcon = icon('ThreadIcon', <path d="M4 6h16M4 12h16M4 18h10" />);
 /** ↺ Reset, regenerate, undo. */
 export const UndoIcon = icon('UndoIcon', <path d="M4 5v5h5M4.6 14.5A8 8 0 1 0 6.3 6.3L4 10" />);
 /** ⑂ Branch. */

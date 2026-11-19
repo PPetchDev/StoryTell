@@ -102,3 +102,15 @@ The first real run, on Chat 2 (place, Tavri ×6, Dulcie, Nara ×2, Morra: $0.76)
    - `wornOnly` drops such pieces from an outfit before it is drawn. An outfit with nothing worn left isn't drawn.
 4. **The main Character came last.** Only the Characters who speak in the newest reply are drawn, most lines first. One who stays silent is drawn when they first speak.
 5. **Rewordings were drawn again.** "Ties loose at throat" and "ties done at throat" are now the same outfit: `sameOutfitKey` reuses an outfit already drawn in the Chat when two-thirds of its garment words match, after leaving out the words about how a garment is worn just now.
+
+## The usual outfit, and each line at its moment (2026-11-19)
+
+The user saw Nara in her linen shift on a line from before she took her over-tunic off. Asked to switch the stage off to see her own clothes, they said, rightly, that a reader should never have to change a Character's clothes. Now:
+
+- **The usual outfit.** `isUsualOutfit` takes an outfit as the Character's own clothes when three in four of its garment words are in their Appearance ("linen", "mantle, copper rings on horns"). Then the stage shows their Expressions, the pictures the author made, and nothing is drawn. A Character back in their own clothes looks as they did, by itself.
+- **Each line at its moment.**
+  - The Chat's stage now also answers the history: every place change (`places`) and every outfit change (`outfitChanges`: usual, or what is drawn of it), each by the Message that made it.
+  - The novel view shows each line with the place and the clothes at or before its Message (`stageAt` in `apps/web/lib/stage.ts`). Stepping back before Nara undressed shows her in her own clothes again.
+  - A line not stored yet is at the newest moment.
+  - An outfit not drawn (one only seen in the past, or still drawing) shows the Expressions.
+- The "Known limits" line about the current outfit on every step no longer holds.

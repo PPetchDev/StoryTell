@@ -55,6 +55,20 @@ function garmentWords(outfit: string): Set<string> {
 }
 
 /**
+ * Whether an outfit is the Character's usual one, the clothes their card describes
+ * (.scratch/dressed-stage/spec.md, "The usual outfit"): three in four of its garment words are in
+ * their Appearance. Then the stage shows their Expressions, with nothing drawn, so a Character back
+ * in their own clothes looks as the author made them, and the reader never has to switch anything.
+ */
+export function isUsualOutfit(outfit: string, appearance: string): boolean {
+    const words = garmentWords(outfit);
+    if (words.size === 0) return true;
+    const card = garmentWords(appearance);
+    const known = [...words].filter((word) => card.has(word) || card.has(word.replace(/s$/, '')) || card.has(`${word}s`)).length;
+    return known / words.size >= 3 / 4;
+}
+
+/**
  * The outfit key to draw or show for a Character's outfit: an outfit already drawn in the Chat when
  * this one is the same in other words (its garment words two-thirds alike), else its own key. So
  * "ties loose at throat" and "ties done at throat" share one drawing.
@@ -164,7 +178,8 @@ export class StageManagerService implements OnApplicationBootstrap {
         for (const { characterId, outfit } of speakers) {
             const character = story.characters.find((one) => one.id === characterId);
             const worn = wornOnly(outfit);
-            if (!character?.referenceImagePath || worn === '') continue;
+            // Their usual clothes show their Expressions: nothing to draw.
+            if (!character?.referenceImagePath || worn === '' || isUsualOutfit(worn, character.appearance)) continue;
             const key = sameOutfitKey(worn, await this.stage.outfitKeys(chat.id, characterId));
             if (!(await this.drawOutfit(story, chat, character, worn, key))) return;
             const emotions = new Set(
@@ -264,12 +279,29 @@ export class StageManagerService implements OnApplicationBootstrap {
     }
 }
 
+export interface StageSpriteView {
+    emotion: string;
+    imagePath: string;
+    cutOut: boolean;
+}
+
 /** The stage a Chat answers (.scratch/dressed-stage/spec.md): the place picture and each Character's outfit sprites. */
 export interface ChatStage {
     /** The place the Chat is in, in its light, or in another light until that one is drawn; null for none yet. */
     placePicturePath: string | null;
     /** Per Character in an outfit with a plain drawing: each drawn emotion's picture. */
-    outfits: { characterId: number; sprites: { emotion: string; imagePath: string; cutOut: boolean }[] }[];
+    outfits: { characterId: number; sprites: StageSpriteView[] }[];
+    /**
+     * The story's place at each change, oldest first, by the Message that made it: so a line shows the
+     * place it was in then. `imagePath` is its picture, null while none is drawn.
+     */
+    places: { messageId: number | null; imagePath: string | null }[];
+    /**
+     * Each Character's outfit at each change, oldest first, by the Message that made it: so a line shows
+     * the Character as they were dressed then. `usual` is their own clothes (their Expressions show);
+     * `sprites` is what is drawn of any other outfit, empty while nothing is.
+     */
+    outfitChanges: { messageId: number | null; characterId: number; usual: boolean; sprites: StageSpriteView[] }[];
     /** How many drawings are under way, so the page can look again. */
     drawing: number;
 }
@@ -280,6 +312,7 @@ export async function chatStage(
     story: StoryEntity,
     chat: ChatEntity,
     details: { place: string | null; outfits: { characterId: number; outfit: string }[] },
+    records: readonly { kind: string; characterId: number | null; value: string; messageId: number | null }[] = [],
 ): Promise<ChatStage | null> {
     if (!chat.dressStage) return null;
     let placePicturePath: string | null = null;
@@ -288,9 +321,10 @@ export async function chatStage(
         placePicturePath = (await stage.readyPlace(story.id, key, lightOf(chat.timeOfDay))) ?? (await stage.readyPlaces(story.id, key))[0]?.imagePath ?? null;
     }
     const outfits: ChatStage['outfits'] = [];
+    const appearance = new Map(story.characters.map((character) => [character.id, character.appearance]));
     for (const { characterId, outfit } of details.outfits) {
         const worn = wornOnly(outfit);
-        if (worn === '') continue;
+        if (worn === '' || isUsualOutfit(worn, appearance.get(characterId) ?? '')) continue;
         const sprites: OutfitSpriteEntity[] = await stage.readySprites(chat.id, characterId, sameOutfitKey(worn, await stage.outfitKeys(chat.id, characterId)));
         if (!sprites.some((sprite) => sprite.emotion === 'neutral')) continue;
         outfits.push({
@@ -298,5 +332,34 @@ export async function chatStage(
             sprites: sprites.filter((sprite) => sprite.imagePath).map((sprite) => ({ emotion: sprite.emotion, imagePath: sprite.imagePath!, cutOut: sprite.cutOut })),
         });
     }
-    return { placePicturePath, outfits, drawing: await stage.drawingFor(story.id, chat.id) };
+
+    // The history, so each line shows the place and the clothes of its moment.
+    const places: ChatStage['places'] = [];
+    const outfitChanges: ChatStage['outfitChanges'] = [];
+    const placePaths = new Map<string, string | null>();
+    const keys = new Map<number, string[]>();
+    for (const record of records) {
+        if (record.kind === 'place') {
+            const key = stageKey(record.value);
+            if (!placePaths.has(key)) {
+                placePaths.set(key, (await stage.readyPlace(story.id, key, lightOf(chat.timeOfDay))) ?? (await stage.readyPlaces(story.id, key))[0]?.imagePath ?? null);
+            }
+            places.push({ messageId: record.messageId, imagePath: placePaths.get(key)! });
+        } else if (record.kind === 'outfit' && record.characterId !== null) {
+            const worn = wornOnly(record.value);
+            // Held things and poses alone say nothing about clothes: the outfit before stands.
+            if (worn === '') continue;
+            const usual = isUsualOutfit(worn, appearance.get(record.characterId) ?? '');
+            let sprites: StageSpriteView[] = [];
+            if (!usual) {
+                if (!keys.has(record.characterId)) keys.set(record.characterId, await stage.outfitKeys(chat.id, record.characterId));
+                const rows = await stage.readySprites(chat.id, record.characterId, sameOutfitKey(worn, keys.get(record.characterId)!));
+                if (rows.some((row) => row.emotion === 'neutral')) {
+                    sprites = rows.filter((row) => row.imagePath).map((row) => ({ emotion: row.emotion, imagePath: row.imagePath!, cutOut: row.cutOut }));
+                }
+            }
+            outfitChanges.push({ messageId: record.messageId, characterId: record.characterId, usual, sprites });
+        }
+    }
+    return { placePicturePath, outfits, places, outfitChanges, drawing: await stage.drawingFor(story.id, chat.id) };
 }
