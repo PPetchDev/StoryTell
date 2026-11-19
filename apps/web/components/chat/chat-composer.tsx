@@ -688,15 +688,15 @@ export function ChatComposer({
                     </label>
                 )}
                 {/*
-                 * Band 3: the tools as 44px chips with a word each (audit H28; docs/ui-audit-2026-11-13.md M3).
-                 * Always one row: the chips spread across a phone's width, and on one too narrow for them
-                 * all (under about 345px) the row scrolls sideways and fades at the end that hides more,
-                 * like the Character row. It never wraps: a second row took 48px from the Chat on a 360px
-                 * phone. Who the box writes as is its placeholder and name (L14); the label stays for screen readers.
+                 * Band 3: the tools, icons in 36px rings with 44px to tap (audit H28; docs/ui-audit-2026-11-13.md M3).
+                 * Always one row, from the left with 8px between, like the Character row above, so the two
+                 * rows' rings stand in the same columns (the user, 2026-11-19: spread across, they stood
+                 * crooked under the portraits). It never wraps: a second row took 48px from the Chat on a 360px
+                 * phone; on a phone too narrow for it the row scrolls sideways and fades at the end that hides more. Who the box writes as is its placeholder and name (L14); the label stays for screen readers.
                  */}
                 <div
                     ref={toolRow}
-                    className={`flex min-w-0 flex-nowrap items-center justify-between overflow-x-auto [scrollbar-width:none] sm:justify-start sm:gap-1 [&::-webkit-scrollbar]:hidden ${SCROLL_FADES[toolFade]}`}
+                    className={`flex min-w-0 flex-nowrap items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${SCROLL_FADES[toolFade]}`}
                     role="toolbar"
                     aria-label="Composer tools"
                     data-fade={toolFade}

@@ -20,6 +20,15 @@ const CHIP = [
     'disabled:cursor-not-allowed disabled:text-faint',
 ].join(' ');
 
+/**
+ * A Character's chip, a portrait only (its name for screen readers and as a title): a 36px ring in a
+ * 44px tap area like the composer's tools, the portrait in its middle, so the two rows line up.
+ */
+const PORTRAIT_CHIP = [
+    'bare-button icon-ring inline-flex size-11 shrink-0 items-center justify-center rounded-full',
+    'cursor-pointer press focus-ring-inset disabled:cursor-not-allowed',
+].join(' ');
+
 interface CharacterRowProps {
     characters: readonly { id: number; name: string }[];
     cast: Cast;
@@ -62,7 +71,7 @@ export function CharacterRow({ characters, cast, portraits, sittingOut, nudge, d
                         <button
                             key={character.id}
                             type="button"
-                            className={`${CHIP} pr-3 pl-1 text-text`}
+                            className={PORTRAIT_CHIP}
                             aria-pressed={pressed}
                             title={pressed ? `Take back the nudge on ${character.name}` : `Nudge ${character.name} to speak next`}
                             disabled={disabled}
@@ -74,7 +83,7 @@ export function CharacterRow({ characters, cast, portraits, sittingOut, nudge, d
                                 portrait={portraits[character.id]}
                                 className="size-7 rounded-full object-cover text-xs"
                             />
-                            <span>{character.name}</span>
+                            <span className="sr-only">{character.name}</span>
                         </button>
                     );
                 })}

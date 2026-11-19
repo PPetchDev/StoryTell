@@ -134,6 +134,34 @@ for (const width of [320, 360, 390, 412]) {
                 expect(place.width).toBeGreaterThanOrEqual(44);
             }
 
+            // The Character row's portraits sit in the middle of their rings, and the tools stand under
+            // them in the same columns (the user, 2026-11-19: off-centre portraits, crooked rows).
+            const chips = await composer
+                .getByRole('group', { name: 'Nudge a Character' })
+                .getByRole('button', { name: /^(Mira|Dulcie|Tavri|Morra)$/ })
+                .evaluateAll((items) =>
+                    items.map((item) => {
+                        const rect = item.getBoundingClientRect();
+                        const portrait = item.firstElementChild!.getBoundingClientRect();
+                        return {
+                            centre: rect.left + rect.width / 2,
+                            width: rect.width,
+                            height: rect.height,
+                            off: portrait.left + portrait.width / 2 - (rect.left + rect.width / 2),
+                            offDown: portrait.top + portrait.height / 2 - (rect.top + rect.height / 2),
+                        };
+                    }),
+                );
+            expect(chips).toHaveLength(4);
+            for (const [column, chip] of chips.entries()) {
+                expect(chip.width).toBe(44);
+                expect(chip.height).toBe(44);
+                expect(Math.abs(chip.off)).toBeLessThanOrEqual(0.5);
+                expect(Math.abs(chip.offDown)).toBeLessThanOrEqual(0.5);
+                const tool = places[column];
+                expect(Math.abs(tool.left + tool.width / 2 - chip.centre)).toBeLessThanOrEqual(0.5);
+            }
+
             // The empty box is one line with its whole placeholder on it, and has no scrollbar.
             const text = composer.getByRole('textbox', { name: 'Write as Petch' });
             expect((await box(text)).height).toBeLessThanOrEqual(46);

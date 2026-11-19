@@ -1079,8 +1079,7 @@
      * The composer, in every view (.scratch/novel-reading/spec.md): its tools and the Character row
      * as icons only. Each keeps its name for screen readers (aria-label) and as a title.
      */
-    .composer-icons [role='toolbar'] > button > span,
-    .composer-icons [data-band='characters'] button > span:last-child {
+    .composer-icons [role='toolbar'] > button > span {
         position: absolute;
         width: 1px;
         height: 1px;
@@ -1088,14 +1087,11 @@
         clip-path: inset(50%);
         white-space: nowrap;
     }
-    .composer-icons [data-band='characters'] button {
-        padding-right: 0.25rem;
-    }
 
     /*
      * A round, outlined icon button drawn smaller than its tap area (the user, 2026-11-19: smaller,
      * still plain to read): a 36px ring in a button that stays 44px to tap (audit H27, H28). The Visual
-     * novel view's box tools and arrows, and the composer's tools.
+     * novel view's box tools and arrows, the composer's tools and its Character row's portraits.
      */
     .icon-ring,
     .composer-icons [role='toolbar'] > button {
