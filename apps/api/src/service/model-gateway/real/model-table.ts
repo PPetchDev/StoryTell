@@ -62,6 +62,16 @@ export const TEXT_MODELS: Record<TextModel, TextModelSpec> = {
     },
 };
 
+/**
+ * Where a background call goes when its host stays busy (a 429 or 503 through every retry): the
+ * same model, DeepSeek V4 Flash, on DeepInfra's priority endpoint, served ahead of the standard one
+ * at 1.5 times its price. It was DeepSeek V4 Pro on the same host until 2026-11-19, 13-20 times the
+ * price: on live that day 21 busy background calls cost $0.54 on Pro, where Flash would have cost
+ * about $0.03. Still DeepInfra, whose terms are the ones checked (docs/research/text-llm-for-adult-roleplay.md);
+ * OpenRouter takes the endpoint's tag in `provider.only` (tried on 2026-11-19, billed at the priority price).
+ */
+export const BACKGROUND_BUSY_MODEL: TextModelSpec = { ...TEXT_MODELS['deepseek-v4-flash'], host: 'deepinfra/fp8/priority' };
+
 /** An embedding model, pinned to one OpenRouter host like the text models. */
 export interface EmbeddingModelSpec {
     /** The OpenRouter model id. */

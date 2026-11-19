@@ -8,7 +8,6 @@ import {
     ProviderOutageError,
 } from '../../../errors/model-gateway.errors.js';
 import {
-    BACKGROUND_FALLBACK_MODEL,
     BACKGROUND_MODEL,
     CallKind,
     CreditBalance,
@@ -47,6 +46,7 @@ import {
 } from '../model-gateway.js';
 import {
     backgroundSamplers,
+    BACKGROUND_BUSY_MODEL,
     drawnSize,
     imageListPrice,
     EMBEDDING_MODELS,
@@ -150,15 +150,15 @@ export class RealModelGateway extends ModelGateway {
 
     /**
      * A text call, on the first host of the chain that answers it (`onHosts`). A background call
-     * whose model's host stays busy through every retry goes once more to BACKGROUND_FALLBACK_MODEL
-     * on the same host; the result and its UsageRecord name the model that answered. Play calls
-     * never switch model on their own.
+     * whose model's host stays busy through every retry goes once more to the same model on
+     * BACKGROUND_BUSY_MODEL's endpoint; its UsageRecord names that endpoint. Play calls never move
+     * on their own.
      */
     async completeText(request: TextCompletionRequest): Promise<TextCompletionResult> {
         const { modelName: asked, chat } = await this.textCall(request);
         const { result: answer, host } = await this.onHosts(request.kind, this.deps.textHosts, (host) => this.chatOn(host, request, asked, chat));
-        const { modelName, result } = answer;
-        await this.recordText(request, modelName, result, host);
+        const { modelName, result, endpoint } = answer;
+        await this.recordText(request, modelName, result, host, endpoint);
         return {
             text: result.text,
             model: modelName,
@@ -167,23 +167,21 @@ export class RealModelGateway extends ModelGateway {
         };
     }
 
-    /** One host's answer to a text call, with the busy background model's one fallback on that host. */
+    /** One host's answer to a text call, with the busy background model's one move to its priority endpoint. */
     private async chatOn(
         host: TextHost,
         request: TextCompletionRequest,
         modelName: TextModel,
         chat: OpenRouterChatRequest,
-    ): Promise<{ modelName: TextModel; result: OpenRouterChatResult }> {
+    ): Promise<{ modelName: TextModel; result: OpenRouterChatResult; endpoint?: string }> {
         try {
             return { modelName, result: await host.client.chat(chat) };
         } catch (error) {
-            // A host with its own model (the free one) has no other model to send it to.
+            // A host with its own model (the free one) has no other endpoint to send it to.
             if (!(error instanceof ProviderBusyError) || modelName !== BACKGROUND_MODEL || host.ownModel) throw forUser(error, modelName);
-            this.logger.warn(
-                `${request.kind} on ${BACKGROUND_MODEL} stayed busy (${error.message}); sending it to ${BACKGROUND_FALLBACK_MODEL}.`,
-            );
-            const fallback = BACKGROUND_FALLBACK_MODEL;
-            return { modelName: fallback, result: await host.client.chat({ ...chat, model: TEXT_MODELS[fallback] }) };
+            const endpoint = BACKGROUND_BUSY_MODEL.host;
+            this.logger.warn(`${request.kind} on ${BACKGROUND_MODEL} stayed busy (${error.message}); sending it to ${endpoint}.`);
+            return { modelName, result: await host.client.chat({ ...chat, model: BACKGROUND_BUSY_MODEL }), endpoint };
         }
     }
 
@@ -334,12 +332,12 @@ export class RealModelGateway extends ModelGateway {
     }
 
     /** One text-pool UsageRecord for what a call billed, naming the host (and its own model, if it has one) that answered. */
-    private recordText(request: TextCompletionRequest, modelName: TextModel, bill: TextBill, host: TextHost): Promise<void> {
+    private recordText(request: TextCompletionRequest, modelName: TextModel, bill: TextBill, host: TextHost, endpoint?: string): Promise<void> {
         return this.deps.usage.record({
             kind: request.kind,
             pool: 'text',
             model: host.ownModel ?? modelName,
-            host: host.recordedHost ?? TEXT_MODELS[modelName].host,
+            host: host.recordedHost ?? endpoint ?? TEXT_MODELS[modelName].host,
             promptTokens: bill.promptTokens,
             completionTokens: bill.completionTokens,
             cachedTokens: bill.cachedTokens ?? null,

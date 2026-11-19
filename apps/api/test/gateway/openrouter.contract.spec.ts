@@ -285,7 +285,7 @@ describe('OpenRouter contract', () => {
                     fixture: 'openrouter/error-overloaded-relayed.json',
                 }));
 
-            it('goes once more to DeepSeek V4 Pro on the same host, and records that model', async () => {
+            it("goes once more to the same model on DeepInfra's priority endpoint, and records that endpoint", async () => {
                 const net = recordedFetch([...busy(), { fixture: 'openrouter/chat-json.json' }]);
                 const { gateway, records } = gatewayUnderTest(net.fetch);
 
@@ -296,14 +296,15 @@ describe('OpenRouter contract', () => {
                     expect(request.body.model).toBe('deepseek/deepseek-v4-flash');
                 }
                 expect(net.requests[MAX_RETRIES + 1].body).toMatchObject({
-                    model: 'deepseek/deepseek-v4-pro',
-                    provider: { only: ['deepinfra'], allow_fallbacks: false },
+                    model: 'deepseek/deepseek-v4-flash',
+                    provider: { only: ['deepinfra/fp8/priority'], allow_fallbacks: false },
                     reasoning: { enabled: false },
                     response_format: { type: 'json_object' },
+                    temperature: 0.3,
                 });
-                expect(result.model).toBe('deepseek-v4-pro');
+                expect(result.model).toBe('deepseek-v4-flash');
                 expect(records).toEqual([
-                    expect.objectContaining({ kind: 'judge', model: 'deepseek-v4-pro', host: 'deepinfra' }),
+                    expect.objectContaining({ kind: 'judge', model: 'deepseek-v4-flash', host: 'deepinfra/fp8/priority' }),
                 ]);
             });
 

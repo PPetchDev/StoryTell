@@ -231,3 +231,15 @@ The last round passes. What it took, on top of the two fixes above:
 **Left as is:** a few phrases came back within the last round ("the lamplight catches the pale tufts", "her tail uncurls from her ankle and settles on the felt beside her"). The repeated-phrase check names runs like these from the next turn on.
 
 **Spend for this QC:** $0.48 across the four replays. The whole of today's replays came to $0.77.
+
+## Then: why turns cost more after the deploy (2026-11-19, evening)
+
+Asked: "ทำไมรอบหลังๆ cost มันแพงขึ้น?" (why have the last rounds cost more?). Then: "แก้ทั้งสองเรื่องเลย ส่วนเรื่อง flash เปลี่ยน provider เอา" (fix both; for Flash, change provider).
+
+- **Busy Flash went to Pro.** When DeepInfra's Flash stayed busy through every retry, a background call went to DeepSeek V4 Pro, 13-20 times the price. On live that day 21 such calls (Judge, Memory extraction, Story so far, Character thoughts) cost $0.54 where Flash would have cost about $0.03; one Message's background came to $0.29.
+  - **Now:** the same model, Flash, on DeepInfra's priority endpoint (`deepinfra/fp8/priority`, 1.5 times the standard price). OpenRouter takes the endpoint's tag in `provider.only`; tried with one tiny call, billed at the priority price. If that is busy too, the call fails and the background retry tries again about 20 seconds later.
+  - **Why not another provider:** of the hosts serving Flash on OpenRouter, only DeepInfra's terms are checked for adult fiction (docs/research/text-llm-for-adult-roleplay.md). Mancer's terms forbid content that "is obscene, lewd, or offensive", the same reason GMICloud was dropped; Baidu, StreamLake, Wafer, AtlasCloud, SiliconFlow and Parasail are unchecked. The UsageRecord names the endpoint, so a busy spell shows on the Usage page.
+- **The turn's cache.** After the deploy, 7 of 11 live turns read nothing from cache (before: 17 of 55), and the warm ones read about 5,600 tokens.
+  - Three Continue turns were replayed with every request written to a file. Each turn's prompt matched the one before word for word up to its closing message (about 7,700-8,000 tokens): the standing part and the history hold still, as meant. The replay's three turns read nothing from cache anyway, while DeepInfra was busy (its Flash calls went to Pro in the same minutes). So the misses are the host's, not the prompt's.
+  - What every turn pays uncached is the closing message, about 7,400 tokens: Memory 2,900, Lore 1,000, Arcs 640, Feelings 630, "How each of them talks" 600, Scene 500. The voices block is the deploy's addition (about $0.0008 a turn on Pro); it stays, as QC needed it.
+  - No change to the prompt. Replay cost: $0.157 (the replay build still had the Pro fallback, and DeepInfra was busy).
