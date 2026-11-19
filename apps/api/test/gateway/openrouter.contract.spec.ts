@@ -5,6 +5,7 @@ import {
     UnparseableOutputError,
 } from '../../src/errors/model-gateway.errors.js';
 import { MAX_RETRIES } from '../../src/service/model-gateway/real/http.js';
+import { PLAY_BUSY_WAIT_MS } from '../../src/service/model-gateway/real/model-table.js';
 import { gatewayUnderTest } from '../harness/gateway-under-test.js';
 import { recordedFetch, unreachableFetch } from '../harness/recorded-fetch.js';
 
@@ -262,8 +263,9 @@ describe('OpenRouter contract', () => {
         ])(
             'reports a 429 that outlasts the retries (%s) as an outage, never as credit',
             async (name, message) => {
+                // GLM-5.3 has no busy fallback: it waits and asks once more, then fails.
                 const net = recordedFetch(
-                    Array.from({ length: MAX_RETRIES + 1 }, () => ({ status: 429, fixture: name })),
+                    Array.from({ length: 2 * (MAX_RETRIES + 1) }, () => ({ status: 429, fixture: name })),
                 );
                 const { gateway, sleeps, records } = gatewayUnderTest(net.fetch);
 
@@ -272,8 +274,9 @@ describe('OpenRouter contract', () => {
                 await expect(failure).rejects.toBeInstanceOf(ProviderOutageError);
                 await expect(failure).rejects.not.toBeInstanceOf(OutOfCreditError);
                 await expect(failure).rejects.toMatchObject({ code: '502.001.001', message });
-                expect(net.requests).toHaveLength(MAX_RETRIES + 1);
-                expect(sleeps).toHaveLength(MAX_RETRIES);
+                expect(net.requests).toHaveLength(2 * (MAX_RETRIES + 1));
+                expect(sleeps).toHaveLength(2 * MAX_RETRIES + 1);
+                expect(sleeps[MAX_RETRIES]).toBe(PLAY_BUSY_WAIT_MS);
                 expect(records).toEqual([]);
             },
         );
@@ -331,13 +334,93 @@ describe('OpenRouter contract', () => {
                 expect(net.requests).toHaveLength(1);
             });
 
-            it('never switches a play call: the turn fails on its own model', async () => {
-                const net = recordedFetch(busy());
+            it('a busy GLM-5.3 turn waits and asks once more, then fails on its own model', async () => {
+                const net = recordedFetch([...busy(), ...busy()]);
                 const { gateway } = gatewayUnderTest(net.fetch, { settings: { playModel: 'glm-5.3' } });
 
                 await expect(gateway.completeText({ kind: 'turn', messages })).rejects.toBeInstanceOf(ProviderOutageError);
-                expect(net.requests).toHaveLength(MAX_RETRIES + 1);
+                expect(net.requests).toHaveLength(2 * (MAX_RETRIES + 1));
+                for (const request of net.requests) expect(request.body.model).toBe('z-ai/glm-5.3');
                 expect(net.pending()).toBe(0);
+            });
+        });
+
+        describe('a play call whose model stays busy', () => {
+            const busy = () =>
+                Array.from({ length: MAX_RETRIES + 1 }, () => ({
+                    status: 429,
+                    fixture: 'openrouter/error-overloaded-relayed.json',
+                }));
+
+            it('waits and asks V4 Pro once more, at no extra cost, and keeps it when it answers', async () => {
+                const net = recordedFetch([...busy(), { fixture: 'openrouter/chat-success.json' }]);
+                const { gateway, sleeps, records } = gatewayUnderTest(net.fetch, { settings: { playModel: 'deepseek-v4-pro' } });
+
+                const result = await gateway.completeText({ kind: 'turn', messages });
+
+                expect(net.requests).toHaveLength(MAX_RETRIES + 2);
+                for (const request of net.requests) expect(request.body).toMatchObject({ model: 'deepseek/deepseek-v4-pro', provider: { only: ['deepinfra'] } });
+                expect(sleeps).toContain(PLAY_BUSY_WAIT_MS);
+                expect(result.model).toBe('deepseek-v4-pro');
+                expect(records).toEqual([expect.objectContaining({ kind: 'turn', model: 'deepseek-v4-pro', host: 'deepinfra' })]);
+            });
+
+            it("still busy after the wait, goes once to GLM-5.3 with GLM-5.3's own Sampling, and names it", async () => {
+                const net = recordedFetch([...busy(), ...busy(), { fixture: 'openrouter/chat-success.json' }]);
+                const { gateway, records } = gatewayUnderTest(net.fetch, {
+                    settings: {
+                        playModel: 'deepseek-v4-pro',
+                        samplers: { 'deepseek-v4-pro': { temperature: 0.85 }, 'glm-5.3': { temperature: 0.7 } },
+                    },
+                });
+
+                const result = await gateway.completeText({ kind: 'turn', messages, stop: ['\n@You:'] });
+
+                expect(net.requests).toHaveLength(2 * (MAX_RETRIES + 1) + 1);
+                expect(net.requests[0].body).toMatchObject({ model: 'deepseek/deepseek-v4-pro', temperature: 0.85 });
+                expect(net.requests.at(-1)!.body).toMatchObject({
+                    model: 'z-ai/glm-5.3',
+                    provider: { only: ['deepinfra'], allow_fallbacks: false },
+                    reasoning: { effort: 'minimal' },
+                    stop: ['\n@You:'],
+                    temperature: 0.7,
+                });
+                expect(result.model).toBe('glm-5.3');
+                expect(records).toEqual([expect.objectContaining({ kind: 'turn', model: 'glm-5.3', host: 'deepinfra' })]);
+            });
+
+            it('streams a busy V4 Pro turn from GLM-5.3, and the result names GLM-5.3', async () => {
+                const net = recordedFetch([...busy(), ...busy(), { sse: 'openrouter/stream-turn.sse' }]);
+                const { gateway, records } = gatewayUnderTest(net.fetch, { settings: { playModel: 'deepseek-v4-pro' } });
+                const pieces: string[] = [];
+
+                const result = await gateway.streamText(
+                    { kind: 'turn', messages },
+                    { onText: (piece) => pieces.push(piece), signal: new AbortController().signal },
+                );
+
+                expect(net.requests.at(-1)!.body).toMatchObject({ model: 'z-ai/glm-5.3', stream: true });
+                expect(pieces.join('')).toBe('The keeper nods once and goes back to the lens.');
+                expect(result.model).toBe('glm-5.3');
+                expect(records).toEqual([expect.objectContaining({ kind: 'turn', model: 'glm-5.3' })]);
+            });
+
+            it('fails as an outage when GLM-5.3 is busy too', async () => {
+                const net = recordedFetch([...busy(), ...busy(), ...busy()]);
+                const { gateway, records } = gatewayUnderTest(net.fetch, { settings: { playModel: 'deepseek-v4-pro' } });
+
+                await expect(gateway.completeText({ kind: 'turn', messages })).rejects.toMatchObject({ code: '502.001.001' });
+                expect(net.requests).toHaveLength(3 * (MAX_RETRIES + 1));
+                expect(records).toEqual([]);
+            });
+
+            it('does not wait or move on for any other failure', async () => {
+                const net = recordedFetch([{ status: 500, json: { error: { code: 500, message: 'Internal error' } } }]);
+                const { gateway, sleeps } = gatewayUnderTest(net.fetch, { settings: { playModel: 'deepseek-v4-pro' } });
+
+                await expect(gateway.completeText({ kind: 'turn', messages })).rejects.toBeInstanceOf(ProviderOutageError);
+                expect(net.requests).toHaveLength(1);
+                expect(sleeps).toEqual([]);
             });
         });
 
@@ -358,9 +441,9 @@ describe('OpenRouter contract', () => {
             expect(sleeps).toEqual([]);
         });
 
-        it('gives up after the retries and reports an outage', async () => {
+        it('gives up after the retries, the wait and its second ask, and reports an outage', async () => {
             const net = recordedFetch(
-                Array.from({ length: MAX_RETRIES + 1 }, () => ({
+                Array.from({ length: 2 * (MAX_RETRIES + 1) }, () => ({
                     status: 503,
                     json: { error: { code: 503, message: 'No available provider' } },
                 })),
@@ -370,8 +453,8 @@ describe('OpenRouter contract', () => {
             await expect(gateway.completeText({ kind: 'turn', messages })).rejects.toBeInstanceOf(
                 ProviderOutageError,
             );
-            expect(net.requests).toHaveLength(MAX_RETRIES + 1);
-            expect(sleeps).toHaveLength(MAX_RETRIES);
+            expect(net.requests).toHaveLength(2 * (MAX_RETRIES + 1));
+            expect(sleeps).toHaveLength(2 * MAX_RETRIES + 1);
             expect(net.pending()).toBe(0);
         });
     });

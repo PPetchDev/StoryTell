@@ -2,6 +2,7 @@ import {
     EmbeddingModel,
     ImageCallKind,
     ImageModel,
+    PlayModel,
     PlayModelFacts,
     REFERENCE_IMAGE_MODEL,
     SNAPSHOT_MODEL_PRICES,
@@ -71,6 +72,22 @@ export const TEXT_MODELS: Record<TextModel, TextModelSpec> = {
  * OpenRouter takes the endpoint's tag in `provider.only` (tried on 2026-11-19, billed at the priority price).
  */
 export const BACKGROUND_BUSY_MODEL: TextModelSpec = { ...TEXT_MODELS['deepseek-v4-flash'], host: 'deepinfra/fp8/priority' };
+
+/**
+ * A play call whose model stays busy through every retry (a 429 or 503: DeepInfra rate-limited V4 Pro
+ * upstream on live, 2026-11-19, and the turn failed) is asked once more after this wait, at no extra
+ * cost, before it moves on.
+ */
+export const PLAY_BUSY_WAIT_MS = 8_000;
+
+/**
+ * Where a play call goes when its model is still busy after the wait: another play model on
+ * DeepInfra, the host whose terms are checked, for that one call. GLM-5.3 costs less than V4 Pro
+ * ($0.5625 / $2.50 per million against $1.30 / $2.60); V4 Pro on the priority endpoint would have
+ * cost 1.5 times as much, which the user turned down (2026-11-19). The AI Message records the model
+ * that wrote it, so the Drift notice shows the change. GLM-5.3 has none: its busy call fails as before.
+ */
+export const PLAY_BUSY_FALLBACK: Partial<Record<PlayModel, PlayModel>> = { 'deepseek-v4-pro': 'glm-5.3' };
 
 /** An embedding model, pinned to one OpenRouter host like the text models. */
 export interface EmbeddingModelSpec {

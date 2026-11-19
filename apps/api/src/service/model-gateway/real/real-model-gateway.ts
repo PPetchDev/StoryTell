@@ -48,6 +48,8 @@ import {
     backgroundSamplers,
     BACKGROUND_BUSY_MODEL,
     drawnSize,
+    PLAY_BUSY_FALLBACK,
+    PLAY_BUSY_WAIT_MS,
     imageListPrice,
     EMBEDDING_MODELS,
     IMAGE_MODELS,
@@ -151,12 +153,17 @@ export class RealModelGateway extends ModelGateway {
     /**
      * A text call, on the first host of the chain that answers it (`onHosts`). A background call
      * whose model's host stays busy through every retry goes once more to the same model on
-     * BACKGROUND_BUSY_MODEL's endpoint; its UsageRecord names that endpoint. Play calls never move
-     * on their own.
+     * BACKGROUND_BUSY_MODEL's endpoint; its UsageRecord names that endpoint. A busy play call waits
+     * and asks once more, then moves to its PLAY_BUSY_FALLBACK model (`onBusyPlay`); the result names
+     * the model that answered.
      */
     async completeText(request: TextCompletionRequest): Promise<TextCompletionResult> {
-        const { modelName: asked, chat } = await this.textCall(request);
-        const { result: answer, host } = await this.onHosts(request.kind, this.deps.textHosts, (host) => this.chatOn(host, request, asked, chat));
+        const { modelName: asked, chat, settings } = await this.textCall(request);
+        const { result: answer, host } = await this.onHosts(request.kind, this.deps.textHosts, (host) =>
+            settings
+                ? this.onBusyPlay(host, request, asked, chat, settings, (sent) => host.client.chat(sent))
+                : this.chatOn(host, request, asked, chat),
+        );
         const { modelName, result, endpoint } = answer;
         await this.recordText(request, modelName, result, host, endpoint);
         return {
@@ -182,6 +189,44 @@ export class RealModelGateway extends ModelGateway {
             const endpoint = BACKGROUND_BUSY_MODEL.host;
             this.logger.warn(`${request.kind} on ${BACKGROUND_MODEL} stayed busy (${error.message}); sending it to ${endpoint}.`);
             return { modelName, result: await host.client.chat({ ...chat, model: BACKGROUND_BUSY_MODEL }), endpoint };
+        }
+    }
+
+    /**
+     * A play call on one host, and what it does when its model stays busy through the client's retries:
+     * it waits PLAY_BUSY_WAIT_MS and asks once more, at no extra cost, then goes once to its
+     * PLAY_BUSY_FALLBACK model with that model's own Sampling. Only on OpenRouter, where the model
+     * table pins DeepInfra; `mayRetry` stops it once a stream has begun or was stopped.
+     */
+    private async onBusyPlay<T>(
+        host: TextHost,
+        request: TextCompletionRequest,
+        modelName: TextModel,
+        chat: OpenRouterChatRequest,
+        settings: GatewayModelSettings,
+        send: (chat: OpenRouterChatRequest) => Promise<T>,
+        mayRetry: () => boolean = () => true,
+    ): Promise<{ modelName: TextModel; result: T; endpoint?: string }> {
+        try {
+            return { modelName, result: await send(chat) };
+        } catch (error) {
+            const movable = error instanceof ProviderBusyError && isPlayModel(modelName) && host.recordedHost === undefined && !host.ownModel;
+            if (!movable || !mayRetry()) throw forUser(error, modelName);
+            this.logger.warn(`${request.kind} on ${modelName} stayed busy (${error.message}); asking again in ${PLAY_BUSY_WAIT_MS / 1000} s.`);
+            await this.sleep(PLAY_BUSY_WAIT_MS);
+            if (!mayRetry()) throw forUser(error, modelName);
+            try {
+                return { modelName, result: await send(chat) };
+            } catch (again) {
+                const fallback = PLAY_BUSY_FALLBACK[modelName as PlayModel];
+                if (!(again instanceof ProviderBusyError) || !fallback || !mayRetry()) throw forUser(again, modelName);
+                this.logger.warn(`${request.kind} on ${modelName} is still busy (${again.message}); sending it to ${fallback}.`);
+                try {
+                    return { modelName: fallback, result: await send(this.playChat(request, fallback, settings)) };
+                } catch (fallbackError) {
+                    throw forUser(fallbackError, fallback);
+                }
+            }
         }
     }
 
@@ -274,7 +319,7 @@ export class RealModelGateway extends ModelGateway {
      * for it; nor is one stopped on Venice, which has no such lookup, or on the free model.
      */
     async streamText(request: TextCompletionRequest, stream: TextStream): Promise<TextStreamResult> {
-        const { modelName, chat } = await this.textCall(request);
+        const { modelName: asked, chat, settings } = await this.textCall(request);
         let streamed = false;
         const watched: TextStream = {
             ...stream,
@@ -283,15 +328,22 @@ export class RealModelGateway extends ModelGateway {
                 stream.onText(piece);
             },
         };
-        const { result, host } = await this.onHosts(
+        const mayMoveOn = () => !streamed && !stream.signal.aborted;
+        const { result: answer, host } = await this.onHosts(
             request.kind,
             this.deps.textHosts,
             (host) =>
-                host.client.chatStream(chat, watched).catch((error: unknown) => {
-                    throw forUser(error, modelName);
-                }),
-            () => !streamed && !stream.signal.aborted,
+                settings
+                    ? this.onBusyPlay(host, request, asked, chat, settings, (sent) => host.client.chatStream(sent, watched), mayMoveOn)
+                    : host.client.chatStream(chat, watched).then(
+                          (result) => ({ modelName: asked, result }),
+                          (error: unknown) => {
+                              throw forUser(error, asked);
+                          },
+                      ),
+            mayMoveOn,
         );
+        const { modelName, result } = answer;
         if (!result.stopped) {
             await this.recordText(request, modelName, result, host);
         } else if (result.generationId && host.looksUpStoppedBills) {
@@ -311,8 +363,11 @@ export class RealModelGateway extends ModelGateway {
         };
     }
 
-    /** The model a text call runs on, from its kind and Settings, and the request OpenRouter gets. */
-    private async textCall(request: TextCompletionRequest): Promise<{ modelName: TextModel; chat: OpenRouterChatRequest }> {
+    /**
+     * The model a text call runs on, from its kind and Settings, and the request OpenRouter gets;
+     * with the Settings read for a play call, which its busy fallback needs.
+     */
+    private async textCall(request: TextCompletionRequest): Promise<{ modelName: TextModel; chat: OpenRouterChatRequest; settings?: GatewayModelSettings }> {
         const { messages, maxTokens, json, stop } = request;
         if (!isPlayModelKind(request.kind)) {
             const samplers = backgroundSamplers(request.kind);
@@ -323,12 +378,14 @@ export class RealModelGateway extends ModelGateway {
         }
         const settings = await this.deps.settings.current();
         const modelName = settings.playModel;
-        // Only the current play model's values, and only on a sampled kind.
+        return { modelName, chat: this.playChat(request, modelName, settings), settings };
+    }
+
+    /** A play call's request on one play model: only that model's Sampling values, and only on a sampled kind. */
+    private playChat(request: TextCompletionRequest, modelName: PlayModel, settings: GatewayModelSettings): OpenRouterChatRequest {
+        const { messages, maxTokens, json, stop } = request;
         const samplers = isSampledKind(request.kind) ? settings.samplers[modelName] : undefined;
-        return {
-            modelName,
-            chat: { model: TEXT_MODELS[modelName], messages, maxTokens, json, stop, ...(samplers ? { samplers } : {}) },
-        };
+        return { model: TEXT_MODELS[modelName], messages, maxTokens, json, stop, ...(samplers ? { samplers } : {}) };
     }
 
     /** One text-pool UsageRecord for what a call billed, naming the host (and its own model, if it has one) that answered. */

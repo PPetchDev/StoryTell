@@ -243,3 +243,12 @@ Asked: "ทำไมรอบหลังๆ cost มันแพงขึ้น
   - Three Continue turns were replayed with every request written to a file. Each turn's prompt matched the one before word for word up to its closing message (about 7,700-8,000 tokens): the standing part and the history hold still, as meant. The replay's three turns read nothing from cache anyway, while DeepInfra was busy (its Flash calls went to Pro in the same minutes). So the misses are the host's, not the prompt's.
   - What every turn pays uncached is the closing message, about 7,400 tokens: Memory 2,900, Lore 1,000, Arcs 640, Feelings 630, "How each of them talks" 600, Scene 500. The voices block is the deploy's addition (about $0.0008 a turn on Pro); it stays, as QC needed it.
   - No change to the prompt. Replay cost: $0.157 (the replay build still had the Pro fallback, and DeepInfra was busy).
+
+## Then: a busy turn waits, then GLM-5.3 (2026-11-20)
+
+On live a turn failed: "deepseek/deepseek-v4-pro is temporarily rate-limited upstream" (DeepInfra, a 429 through the three retries, about 7 seconds). V4 Pro on DeepInfra's priority endpoint was offered and turned down as too dear ("ถ้า pro piority มันแพงไปนะเมย์"); the user chose: wait longer at no extra cost, then another model ("ทำตามแผนนี้เลย แล้ว ship").
+
+- A play call (a turn, Suggested replies, Write for me, a Diary entry…) whose model stays busy through the retries waits 8 seconds and asks once more, on the same model, at no extra cost.
+- Still busy, V4 Pro's call goes once to **GLM-5.3** on DeepInfra, with GLM-5.3's own Sampling: cheaper ($0.5625 / $2.50 per million against $1.30 / $2.60), on the host whose terms are checked. The AI Message records GLM-5.3, so the Drift notice shows it; the next turn is V4 Pro again.
+- GLM-5.3 as the play model has no fallback: busy after the wait, its call fails as before. Busy GLM-5.3 after V4 Pro fails too.
+- Only on OpenRouter (pinned DeepInfra), never on Venice or the free host; a stream that has begun or was stopped never moves.
