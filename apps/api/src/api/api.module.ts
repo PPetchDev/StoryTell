@@ -11,6 +11,7 @@ import { ImageApiModule } from './image/image.module.js';
 import { MemoryApiModule } from './memory/memory.module.js';
 import { StorySoFarApiModule } from './story-so-far/story-so-far.module.js';
 import { ChaptersApiModule } from './chapters/chapters.module.js';
+import { LoreSuggestionsApiModule } from './lore-suggestions/lore-suggestions.module.js';
 import { RecapApiModule } from './recap/recap.module.js';
 import { BookApiModule } from './book/book.module.js';
 import { PeopleApiModule } from './people/people.module.js';
@@ -42,6 +43,7 @@ import { VoiceApiModule } from './voice/voice.module.js';
         StorySoFarApiModule,
         ChaptersApiModule,
         RecapApiModule,
+        LoreSuggestionsApiModule,
         BookApiModule,
         SettingsApiModule,
         UsageApiModule,

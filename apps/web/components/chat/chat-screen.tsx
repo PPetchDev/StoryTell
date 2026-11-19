@@ -22,6 +22,7 @@ import { NovelRequest, NovelView } from '@/components/chat/novel-view';
 import { PersonaPictures } from '@/components/chat/persona-pictures';
 import { SceneStrip } from '@/components/chat/scene-strip';
 import { ChaptersSheet } from '@/components/chat/chapters-sheet';
+import { LoreSuggestionsSheet } from '@/components/chat/lore-suggestions-sheet';
 import { RecapCard } from '@/components/chat/recap-card';
 import { RollOfferBand } from '@/components/chat/roll-offer-band';
 import { SuddenEventBanner, suddenEventAnnouncement } from '@/components/chat/sudden-event-banner';
@@ -174,6 +175,8 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
     const [itemsSheet, setItemsSheet] = useState(false);
     /** The Chapters sheet, with Move on (.scratch/scene-chapters/spec.md). */
     const [chaptersOpen, setChaptersOpen] = useState(false);
+    /** Lore from this Chat (.scratch/lore-from-chat/spec.md): its sheet asks as it opens. */
+    const [loreSuggestionsOpen, setLoreSuggestionsOpen] = useState(false);
     /** Counts the asks for "Previously on…" from the Chat menu (.scratch/previously-on/spec.md). */
     const [recapRequest, setRecapRequest] = useState(0);
     /**
@@ -699,6 +702,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                 onShowStrip={() => setSceneStripHidden(false)}
                 onOpenChapters={scenes.length > 0 ? () => setChaptersOpen(true) : undefined}
                 onOpenRecap={() => setRecapRequest((count) => count + 1)}
+                onOpenLoreSuggestions={chat.messages.length > 1 ? () => setLoreSuggestionsOpen(true) : undefined}
                 onSwapIdentity={swapIdentity}
                 onOpenMemory={() => openMemory()}
                 onRename={(title) =>
@@ -974,6 +978,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                 )}
             />
 
+            {loreSuggestionsOpen && <LoreSuggestionsSheet storyId={chat.storyId} chatId={chat.id} onClose={() => setLoreSuggestionsOpen(false)} />}
             {chaptersOpen && (
                 <ChaptersSheet
                     chat={chat}

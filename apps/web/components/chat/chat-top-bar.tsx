@@ -399,6 +399,8 @@ interface ChatTopBarProps {
     onOpenChapters?(): void;
     /** Shows "Previously on…", the recap of where the story stands (.scratch/previously-on/spec.md). */
     onOpenRecap?(): void;
+    /** Opens Lore from this Chat: new Lore entries suggested from what it has established (.scratch/lore-from-chat/spec.md). */
+    onOpenLoreSuggestions?(): void;
     onSwapIdentity(personaId: number | null): void;
     onOpenMemory(): void;
     onRename(title: string): void;
@@ -454,6 +456,7 @@ export function ChatTopBar({
     onShowStrip,
     onOpenChapters,
     onOpenRecap,
+    onOpenLoreSuggestions,
     onSwapIdentity,
     onOpenMemory,
     onRename,
@@ -679,6 +682,11 @@ export function ChatTopBar({
                                 {onOpenRecap && (
                                     <MenuButton onClick={choose(onOpenRecap)}>
                                         <MenuText label="Previously on…" sub="Where the story stands" />
+                                    </MenuButton>
+                                )}
+                                {onOpenLoreSuggestions && (
+                                    <MenuButton onClick={choose(onOpenLoreSuggestions)}>
+                                        <MenuText label="Lore from this Chat" sub="New world details for the Story's Lore" />
                                     </MenuButton>
                                 )}
                                 {onOpenChapters && (

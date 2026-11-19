@@ -72,6 +72,8 @@ export type TextCallKind =
     | 'story_summary'
     | 'chapter_summary'
     | 'previously_on'
+    /** Lore entries suggested from what a Chat has established about the world (.scratch/lore-from-chat/spec.md). */
+    | 'lore_suggestions'
     /** A Book chapter: one Chapter retold as novel prose (.scratch/chat-novel/spec.md). */
     | 'book_chapter'
     | 'write_for_me'

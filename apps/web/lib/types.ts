@@ -70,6 +70,7 @@ export type CallKind =
     | 'story_summary'
     | 'chapter_summary'
     | 'previously_on'
+    | 'lore_suggestions'
     | 'book_chapter'
     | 'write_for_me'
     | 'thai_reading'
@@ -106,6 +107,7 @@ export const CALL_KIND_LABEL: Record<CallKind, string> = {
     story_summary: 'Story so far',
     chapter_summary: 'Chapter summaries',
     previously_on: 'Previously on recaps',
+    lore_suggestions: 'Lore suggestions',
     book_chapter: 'Book chapters',
     write_for_me: 'Write for me',
     thai_reading: 'Thai readings',
