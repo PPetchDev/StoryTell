@@ -4,13 +4,15 @@ import { E2E_API_PORT, E2E_WEB_PORT } from './e2e/harness/ports';
 
 export default defineConfig({
     testDir: './e2e',
+    // A shard of scripts/e2e-shards.mjs writes its own results and report, so shards running at once don't clear each other's.
+    outputDir: process.env.E2E_RESULTS_DIR ?? 'test-results',
     // One shared API that some tests stop and restart, so tests run one at a time.
     workers: 1,
     fullyParallel: false,
     forbidOnly: !!process.env.CI,
     timeout: 60_000,
     expect: { timeout: 15_000 },
-    reporter: [['list'], ['html', { open: 'never' }]],
+    reporter: [['list'], ['html', { open: 'never', outputFolder: process.env.E2E_REPORT_DIR ?? 'playwright-report' }]],
     globalSetup: './e2e/harness/global-setup.ts',
     use: {
         // localhost counts as a secure context, so the service worker and install checks run.
@@ -42,7 +44,7 @@ export default defineConfig({
         env: {
             API_ORIGIN: `http://127.0.0.1:${E2E_API_PORT}`,
             // Its own build folder, so E2E can run while `npm run dev` is up.
-            NEXT_DIST_DIR: '.next-e2e',
+            NEXT_DIST_DIR: process.env.E2E_NEXT_DIR ?? '.next-e2e',
             // Start cold each run; see next.config.ts.
             NEXT_DEV_FS_CACHE: 'off',
         },

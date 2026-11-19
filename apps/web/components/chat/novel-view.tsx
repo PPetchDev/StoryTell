@@ -287,12 +287,29 @@ export function NovelView(props: NovelViewProps) {
     const pendingJobs = snapshots.jobs.filter((job) => job.status === 'pending').length;
     const failedJobs = snapshots.jobs.filter((job) => job.status === 'failed').length;
 
+    /**
+     * ✎ brings the composer out while it is put away for reading (.scratch/novel-reading/spec.md). It
+     * stands just above the box, by the thumb: at the top of the stage the low-credit line and the
+     * toasts lay over it, and their × took the tap.
+     */
+    const writeButton = props.onWrite && (
+        <button
+            type="button"
+            className="inline-flex size-11 shrink-0 items-center justify-center rounded-full border border-line bg-surface/85 text-text shadow-md backdrop-blur-sm press focus-ring"
+            aria-label="Write a message"
+            title="Write a message"
+            onClick={props.onWrite}
+        >
+            <PencilIcon size={20} />
+        </button>
+    );
     const nav = (
         <div className={`flex justify-between gap-2 ${step?.kind === 'snapshot' ? 'mt-1.5' : ''}`}>
             <button type="button" className={NAV_BUTTON} onClick={back} disabled={index <= 0 && !waiting}>
                 <ChevronLeftIcon size={18} />
                 Back
             </button>
+            {writeButton}
             <button type="button" className={NAV_BUTTON} onClick={next} disabled={index >= steps.length - 1 && !writing}>
                 Next
                 <ChevronRightIcon size={18} />
@@ -329,20 +346,8 @@ export function NovelView(props: NovelViewProps) {
                 onClick={onClick}
                 onKeyDown={onKeyDown}
             >
-                {props.onWrite && (
-                    // The composer is put away while reading; ✎ brings it out (.scratch/novel-reading/spec.md).
-                    <button
-                        type="button"
-                        className="absolute top-4 right-2 z-raised inline-flex size-11 items-center justify-center rounded-full border border-line bg-surface/85 text-text shadow-md backdrop-blur-sm press focus-ring"
-                        aria-label="Write a message"
-                        title="Write a message"
-                        onClick={props.onWrite}
-                    >
-                        <PencilIcon size={20} />
-                    </button>
-                )}
                 {(pendingJobs > 0 || failedJobs > 0) && (
-                    <div className={`absolute right-0 z-raised flex flex-col items-end gap-1 ${props.onWrite ? 'top-17' : 'top-2'}`}>
+                    <div className={`absolute right-0 z-raised flex flex-col items-end gap-1 top-2`}>
                         {pendingJobs > 0 && (
                             <p className={`${CHIP} border-line bg-surface text-muted`} role="status">
                                 Drawing a Snapshot…
@@ -393,6 +398,7 @@ export function NovelView(props: NovelViewProps) {
                                 className="relative z-raised mt-auto mb-1 flex max-h-[58%] min-h-0 cursor-auto flex-col gap-1 rounded-xl border border-line bg-surface/90 px-3.5 pt-3 pb-1.5 shadow-lg backdrop-blur-sm select-text lg:max-h-[40%]"
                                 data-novel-box=""
                             >
+                                {writeButton && <div className="absolute right-0 bottom-full mb-2">{writeButton}</div>}
                                 {/* Quiet while the words on show are still streaming in, so a screen reader isn't read every piece (audit M24). */}
                                 <section className="min-h-0 overflow-y-auto overscroll-contain" aria-label="Shown line" aria-live={isLive(step) ? 'off' : 'polite'}>
                                     {waiting ? (

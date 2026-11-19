@@ -57,7 +57,7 @@ async function waitFor(condition: () => Promise<boolean>, what: string): Promise
  * empties that folder first, so building there took the dev API down mid-run ("Cannot find
  * module dist/main"). E2E builds here instead and never touches `dist`.
  */
-export const API_BUILD_DIR = 'dist-e2e';
+export const API_BUILD_DIR = process.env.E2E_API_BUILD_DIR ?? 'dist-e2e';
 
 export function buildApi(): void {
     rmSync(path.join(API_DIR, API_BUILD_DIR), { recursive: true, force: true });

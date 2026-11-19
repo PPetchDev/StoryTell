@@ -255,6 +255,16 @@ test.describe('stored Messages', () => {
         });
         expect(sizes.boxBottom).toBeLessThanOrEqual(sizes.stageBottom + 1);
         expect(sizes.boxTop).toBeGreaterThan(sizes.stageTop + 100);
+        // ✎ stands just above the box, clear of the top of the stage where the low-credit line and the
+        // toasts lie (on live their × sat on it and took the tap), and nothing covers it.
+        const write = await vn.root.getByRole('button', { name: 'Write a message' }).evaluate((button) => {
+            const rect = button.getBoundingClientRect();
+            const hit = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
+            return { top: rect.top, bottom: rect.bottom, own: !!hit && button.contains(hit) };
+        });
+        expect(write.bottom).toBeLessThanOrEqual(sizes.boxTop);
+        expect(write.top).toBeGreaterThan(sizes.stageTop + 100);
+        expect(write.own).toBe(true);
 
         // A speaker's picture steps on when tapped.
         await vn.next.click();
