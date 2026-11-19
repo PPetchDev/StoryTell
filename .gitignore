@@ -17,6 +17,7 @@ next-env.d.ts
 # Test output
 test-results/
 playwright-report/
+e2e-shards/
 
 # From the GitHub repo's initial .gitignore
 coverage/

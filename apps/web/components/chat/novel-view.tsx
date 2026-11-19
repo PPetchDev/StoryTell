@@ -39,9 +39,8 @@ const STAGE = [
  * for screen readers and as a title (.scratch/novel-reading/spec.md: icons only, so the row fits a
  * 360px phone without scrolling).
  */
-const BOX_TOOL =
-    'bare-button grid size-11 shrink-0 place-items-center rounded-full border border-field-line bg-surface text-text cursor-pointer press focus-ring disabled:cursor-not-allowed disabled:border-line disabled:text-faint';
-const ROUND_NAV = 'bare-button inline-flex size-11 shrink-0 items-center justify-center rounded-full text-muted cursor-pointer press focus-ring disabled:opacity-35 disabled:cursor-default';
+const BOX_TOOL = 'bare-button icon-ring grid size-11 shrink-0 place-items-center rounded-full text-text cursor-pointer press focus-ring disabled:cursor-not-allowed disabled:text-faint';
+const ROUND_NAV = 'bare-button icon-ring inline-flex size-11 shrink-0 items-center justify-center rounded-full text-muted cursor-pointer press focus-ring disabled:opacity-35 disabled:cursor-default';
 
 const NAV_BUTTON = [
     'bare-button inline-flex min-h-11 min-w-20 items-center justify-center gap-1 rounded-full px-3',
@@ -319,12 +318,12 @@ export function NovelView(props: NovelViewProps) {
     // In the box (.scratch/novel-reading/spec.md): a round 44px arrow each, either side of the tools, so the words get the room.
     const backButton = (
         <button type="button" className={ROUND_NAV} aria-label="Back" onClick={back} disabled={index <= 0 && !waiting}>
-            <ChevronLeftIcon size={20} />
+            <ChevronLeftIcon size={18} />
         </button>
     );
     const nextButton = (
         <button type="button" className={ROUND_NAV} aria-label="Next" onClick={next} disabled={index >= steps.length - 1 && !writing}>
-            <ChevronRightIcon size={20} />
+            <ChevronRightIcon size={18} />
         </button>
     );
 
@@ -562,7 +561,7 @@ function StepTools({ step, withRow, newestAi, isLast, blocked, onAgain, onVersio
                         player.unlock();
                     }}
                 >
-                    <PlayIcon size={20} />
+                    <PlayIcon size={18} />
                 </button>
             );
     }
@@ -577,15 +576,15 @@ function StepTools({ step, withRow, newestAi, isLast, blocked, onAgain, onVersio
             {versions && <VersionSwitch versions={versions} onVersion={(version) => onVersion(newestAi.id, version)} />}
             {again && (
                 <button type="button" className={BOX_TOOL} aria-label="Again" title="Again" onClick={() => onAgain(newestAi.id)}>
-                    <UndoIcon size={20} />
+                    <UndoIcon size={18} />
                 </button>
             )}
             <button type="button" className={BOX_TOOL} aria-label="Snapshot" title="Snapshot" onClick={onSnapshot}>
-                <CameraIcon size={20} />
+                <CameraIcon size={18} />
             </button>
             {read}
             <button type="button" className={BOX_TOOL} aria-label="Edit in thread" title="Edit in thread" onClick={() => onEditInThread(newestAi.id)}>
-                <ThreadIcon size={20} />
+                <ThreadIcon size={18} />
             </button>
         </div>
     );

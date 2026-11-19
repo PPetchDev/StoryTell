@@ -17,6 +17,13 @@ On the user's 360px phone (screenshot, 2026-11-19), the Visual novel view gave t
   - Out, its tools and the Character row show as icons only; each keeps its name for screen readers and as a title.
   - A ⌄ "Hide the composer" beside the box puts it away again, and so does a send.
   - It stays out, even when hidden is asked for, while there is a draft, a panel is open, a Cue or Roll is set, or Write for me or Dictation is running.
+- **The composer is one card, in every view** (the user, 2026-11-19, with a picture of another app's composer).
+  - The box runs across the card's top at the whole width, so a long draft doesn't wrap every few words.
+  - Under it: ⌄ (novel view only), 🎲 and 🎤 on the left, Send at the right end.
+- **Icons only, as rings smaller than their tap area, in every view.**
+  - The composer's tools and the Character row show icons only; each keeps its name for screen readers and as a title.
+  - The composer's tools and, in the novel view, the box's tools and ‹ › arrows are 36px outlined rings. Each button stays 44px to tap.
+  - A pressed tool fills its ring with the accent.
 - **The box lies over the foot of the stage**, as a visual novel's does.
   - The picture fills the whole stage, so the Character is larger.
   - The box is translucent, grows with its line up to 58% of the stage (40% on a PC), and scrolls only past that.

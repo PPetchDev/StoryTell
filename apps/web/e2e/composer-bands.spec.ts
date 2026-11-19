@@ -56,17 +56,22 @@ test('the composer stacks the panel, the Character row, the tool row and the box
         const boxRow = await box(text);
         expect(toolRow.y + toolRow.height).toBeLessThanOrEqual(boxRow.y + 1);
 
-        // With ⚡ and ✱ out of its row, the box shares it with 🎲 (.scratch/roll/spec.md: a sixth tool
-        // would wrap the tool row on every phone), 🎤 and the send slot, and takes the rest: three
-        // 2.75rem buttons and the gaps leave it a little over half of the phone.
+        // One card (.scratch/novel-reading/spec.md): the box across its top at the whole width, so a long
+        // draft doesn't wrap every few words, and under it 🎲 (.scratch/roll/spec.md) and 🎤, the send slot at the end.
         const dice = composer.getByRole('button', { name: 'Roll the dice for this message' });
         const dictate = composer.getByRole('button', { name: 'Dictate' });
         const send = composer.getByRole('button', { name: 'Continue' });
         const [diceBox, dictateBox, sendBox] = [await box(dice), await box(dictate), await box(send)];
-        expect(boxRow.x + boxRow.width).toBeLessThanOrEqual(diceBox.x);
+        for (const under of [diceBox, dictateBox, sendBox]) expect(under.y).toBeGreaterThanOrEqual(boxRow.y + boxRow.height - 1);
         expect(diceBox.x + diceBox.width).toBeLessThanOrEqual(dictateBox.x);
         expect(dictateBox.x + dictateBox.width).toBeLessThanOrEqual(sendBox.x);
-        expect(boxRow.width).toBeGreaterThan(390 * 0.5);
+        const card = await box(composer.locator('[data-band="box"]'));
+        expect(sendBox.x + sendBox.width).toBeGreaterThan(card.x + card.width - 12);
+        expect(boxRow.width).toBeGreaterThan(card.width - 16);
+        // The tools are icons only, in every view; each keeps its name.
+        const labelWidths = await tools.locator('button > span').evaluateAll((spans) => spans.map((span) => span.getBoundingClientRect().width));
+        expect(labelWidths).toHaveLength(5);
+        for (const width of labelWidths) expect(width).toBeLessThanOrEqual(1);
 
         // A one-Character Story: the Character row is there but takes no height.
         const characters = composer.locator('[data-band="characters"]');

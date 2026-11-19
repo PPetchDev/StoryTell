@@ -333,11 +333,12 @@ const BOX = [
     'min-w-0 flex-1 resize-none overflow-y-auto',
     // One line is 44px tall, a phone's smallest comfortable field; five lines at most.
     'max-h-[calc(5*1.4em_+_1.25rem_+_2px)]',
-    'rounded-2xl border border-field-line bg-surface px-3.5 py-2.5',
+    'order-first basis-full rounded-xl border border-transparent bg-transparent px-2.5 py-2',
     'font-[inherit] text-base leading-[1.4] text-text',
     // The placeholder stays on its one line: the box is sized by its text, so a wrapped placeholder was cut in half.
     'placeholder:overflow-hidden placeholder:text-ellipsis placeholder:whitespace-nowrap',
-    'focus-ring',
+    // The card shows where the focus is (below): a ring round the box alone ran into the card's edge.
+    'outline-none',
 ].join(' ');
 
 interface ChatComposerProps {
@@ -366,8 +367,8 @@ interface ChatComposerProps {
     /** The composer's second band: the Character row (Nudge), or nothing. */
     characterRow?: (writingForMe: boolean) => ReactNode;
     /**
-     * Reading in the Visual novel view (.scratch/novel-reading/spec.md): its tools and the Character
-     * row show as icons only.
+     * Reading in the Visual novel view (.scratch/novel-reading/spec.md): the composer has ⌄ to put it
+     * away (with `onTuck`).
      */
     compact?: boolean;
     /**
@@ -597,7 +598,7 @@ export function ChatComposer({
                 </p>
             )}
             {/* Integration, "The composer, top to bottom": panel · Character row · tool row · box row. */}
-            <form className={`flex flex-col gap-1 ${compact ? 'composer-icons' : ''}`} onSubmit={send} aria-label="Composer" hidden={away}>
+            <form className="composer-icons flex flex-col gap-1" onSubmit={send} aria-label="Composer" hidden={away}>
                 {/* Band 1, the panel: one thing at a time. Its status line is a region of its own, there throughout. */}
                 <Status>{panelStatus && <p className={PANEL_NOTE}>{panelStatus}</p>}</Status>
                 {panelAlert}
@@ -804,7 +805,9 @@ export function ChatComposer({
                 {dictation.recording ? (
                     <RecordingBar dictation={dictation} />
                 ) : (
-                    <div className="flex items-end gap-2">
+                    // One card (the user, 2026-11-19, with a picture of another app's): the box across the top at the
+                    // whole width, so a long draft doesn't wrap every few words, and under it ⌄, 🎲 and 🎤, Send at the end.
+                    <div className="flex flex-wrap items-center gap-x-1 rounded-2xl border border-field-line bg-surface p-1 has-[textarea:focus-visible]:outline-2 has-[textarea:focus-visible]:outline-offset-2 has-[textarea:focus-visible]:outline-accent has-[textarea:focus-visible]:outline-solid" data-band="box">
                         {compact && onTuck && (
                             // Back to reading (.scratch/novel-reading/spec.md).
                             <button type="button" className={ICON_BUTTON} aria-label="Hide the composer" title="Hide the composer" onClick={onTuck}>
@@ -814,6 +817,7 @@ export function ChatComposer({
                         <textarea
                             ref={box}
                             id={boxId}
+                            // The card's top: the card draws the edge.
                             className={BOX}
                             aria-label={`Write as ${chat.identityName}`}
                             placeholder={chat.identityName.length > PLACEHOLDER_NAME_MAX ? 'Write…' : `Write as ${chat.identityName}…`}
@@ -848,6 +852,7 @@ export function ChatComposer({
                         </button>
                         {/* .scratch/dictation/spec.md: only where the browser can record. */}
                         {dictation.supported && <DictateButton ref={micRef} dictation={dictation} disabledReason={micDisabledReason} />}
+                        <span className="flex-1" aria-hidden="true" />
                         {writing ? (
                             // Spec: streaming replies. Ends the reply; the API keeps nothing of it.
                             <button

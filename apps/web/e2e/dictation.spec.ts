@@ -111,8 +111,10 @@ function micTrackStates(page: Page): Promise<string[]> {
 
 /** Records for a little over a second, the shortest a recording is sent. */
 async function recordABit(page: Page, bar: Locator): Promise<void> {
-    await expect(bar.getByRole('timer')).toBeVisible();
-    await page.waitForTimeout(1_300);
+    // A second on the recording's own timer, not on the test's: on a busy machine (the e2e shards) the
+    // recorder can start late, and a fixed wait then made a recording too short to send.
+    await expect(bar.getByRole('timer')).toHaveText(/^0:0[1-9]$/);
+    await page.waitForTimeout(300);
 }
 
 test('🎤 records, and Done appends the Thai it heard to the typed draft; ⚡ and ✍️ wait meanwhile', async ({ page, request }) => {
@@ -307,8 +309,9 @@ test('at 2:00 the recording finishes by itself, as Done does', async ({ page, re
     const { box, mic, bar } = composerParts(page);
     await mic.tap();
     await expect(bar.getByRole('timer')).toBeVisible();
-    // A little real audio, then nearly two minutes on the clock: still recording.
-    await page.waitForTimeout(300);
+    // A little real audio (once the recorder is running: it can start late on a busy machine), then
+    // nearly two minutes on the clock: still recording.
+    await expect(bar.getByRole('timer')).toHaveText(/^0:0[1-9]$/);
     await page.clock.fastForward('01:50');
     await expect(bar.getByRole('timer')).toHaveText(/^1:5\d$/);
     await expect(bar).toBeVisible();

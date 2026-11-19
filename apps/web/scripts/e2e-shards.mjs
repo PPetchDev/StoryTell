@@ -8,8 +8,8 @@
 //   node apps/web/scripts/e2e-shards.mjs e2e/chat.spec.ts --grep Retry   anything else goes to Playwright
 //
 // The API is built once into dist-e2e for every shard. Each shard writes its output to
-// test-results/shard-<n>.log, its results to test-results/shard-<n>/ and its report to
-// playwright-report/shard-<n>/. Ports: web 3301, 3311, …; API 4301, 4311, … (never dev's
+// e2e-shards/shard-<n>.log, its results to e2e-shards/shard-<n>/results/ and its report to
+// e2e-shards/shard-<n>/report/: outside test-results/, which a single run empties. Ports: web 3301, 3311, …; API 4301, 4311, … (never dev's
 // 3001/4001 or live's 3000/4000).
 import { execSync, spawn } from 'node:child_process';
 import { createWriteStream, mkdirSync, readFileSync, rmSync } from 'node:fs';
@@ -39,13 +39,13 @@ console.log('Building the API into dist-e2e…');
 rmSync(path.join(apiDir, 'dist-e2e'), { recursive: true, force: true });
 execSync('npx tsc -p tsconfig.build.json --outDir dist-e2e --incremental false', { cwd: apiDir, stdio: 'inherit' });
 
-mkdirSync(path.join(webDir, 'test-results'), { recursive: true });
+mkdirSync(path.join(webDir, 'e2e-shards'), { recursive: true });
 const runs = [];
 for (let n = 1; n <= shards; n++) {
     const nextDir = `.next-e2e/shard-${n}`;
     // Start cold, as a single run does (playwright.config.ts: a stale dev cache reloads pages in a loop).
     rmSync(path.join(webDir, nextDir), { recursive: true, force: true });
-    const log = path.join(webDir, 'test-results', `shard-${n}.log`);
+    const log = path.join(webDir, 'e2e-shards', `shard-${n}.log`);
     const out = createWriteStream(log);
     const quoted = args.map((arg) => (/[\s"]/.test(arg) ? `"${arg.replace(/"/g, '\\"')}"` : arg));
     const child = spawn(`npx playwright test --shard=${n}/${shards} --reporter=line ${quoted.join(' ')}`, {
@@ -56,8 +56,8 @@ for (let n = 1; n <= shards; n++) {
             E2E_WEB_PORT: String(3301 + (n - 1) * 10),
             E2E_API_PORT: String(4301 + (n - 1) * 10),
             E2E_NEXT_DIR: nextDir,
-            E2E_RESULTS_DIR: `test-results/shard-${n}`,
-            E2E_REPORT_DIR: `playwright-report/shard-${n}`,
+            E2E_RESULTS_DIR: `e2e-shards/shard-${n}/results`,
+            E2E_REPORT_DIR: `e2e-shards/shard-${n}/report`,
             E2E_API_PREBUILT: '1',
         },
     });

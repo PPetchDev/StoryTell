@@ -182,6 +182,8 @@ export function useDictation(storyId: number, chatId: number, draft: string, onD
         kept.current = null;
         asked.current++;
         starting.current = true;
+        // The bar shows while the browser asks for the mic: at 0:00, not the last recording's time.
+        setElapsedMs(0);
         setPhase({ kind: 'starting' });
         let stream: MediaStream;
         try {

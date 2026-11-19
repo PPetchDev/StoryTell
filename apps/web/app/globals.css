@@ -1076,8 +1076,8 @@
     }
 
     /*
-     * The composer in the Visual novel view (.scratch/novel-reading/spec.md): its tools and the
-     * Character row as icons only. Each keeps its name for screen readers (aria-label) and as a title.
+     * The composer, in every view (.scratch/novel-reading/spec.md): its tools and the Character row
+     * as icons only. Each keeps its name for screen readers (aria-label) and as a title.
      */
     .composer-icons [role='toolbar'] > button > span,
     .composer-icons [data-band='characters'] button > span:last-child {
@@ -1090,5 +1090,41 @@
     }
     .composer-icons [data-band='characters'] button {
         padding-right: 0.25rem;
+    }
+
+    /*
+     * A round, outlined icon button drawn smaller than its tap area (the user, 2026-11-19: smaller,
+     * still plain to read): a 36px ring in a button that stays 44px to tap (audit H27, H28). The Visual
+     * novel view's box tools and arrows, and the composer's tools.
+     */
+    .icon-ring,
+    .composer-icons [role='toolbar'] > button {
+        position: relative;
+        isolation: isolate;
+    }
+    .icon-ring::before,
+    .composer-icons [role='toolbar'] > button::before {
+        content: '';
+        position: absolute;
+        inset: 0.25rem;
+        z-index: -1;
+        border: 1px solid var(--color-field-line);
+        border-radius: 9999px;
+        background: var(--color-surface);
+    }
+    .composer-icons [role='toolbar'] > button {
+        width: 2.75rem;
+        justify-content: center;
+        /* The ring shows the pressed and active looks, not the whole 44px. */
+        background-color: transparent !important;
+    }
+    .icon-ring[aria-pressed='true']::before,
+    .composer-icons [role='toolbar'] > button[aria-pressed='true']::before {
+        border-color: var(--color-accent);
+        background: var(--color-accent-soft);
+    }
+    .icon-ring:disabled::before,
+    .composer-icons [role='toolbar'] > button:disabled::before {
+        border-color: var(--color-line);
     }
 }

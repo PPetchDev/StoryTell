@@ -239,6 +239,15 @@ test.describe('stored Messages', () => {
         await expect(suggest).toBeVisible();
         expect(await suggest.locator('span').evaluate((span) => span.getBoundingClientRect().width)).toBeLessThanOrEqual(1);
         await expect(vn.root.getByRole('button', { name: 'Write a message' })).toHaveCount(0);
+        // One card: the box across the top at the whole width, its buttons on a row under it.
+        await composer.getByRole('textbox').fill('A long line that runs on past the width of the box, so that it wraps onto a second line and more.');
+        const tall = await composer.evaluate((form) => {
+            const box = form.querySelector('textarea')!.getBoundingClientRect();
+            const send = form.querySelector('[aria-label="Send"]')!.getBoundingClientRect();
+            return { box: box.width, form: form.getBoundingClientRect().width, sendTop: send.top, boxBottom: box.bottom };
+        });
+        expect(tall.box).toBeGreaterThan(tall.form - 24);
+        expect(tall.sendTop).toBeGreaterThanOrEqual(tall.boxBottom - 1);
         // A draft keeps it out even when hidden is asked for; an empty one goes.
         await composer.getByRole('textbox').fill('A draft.');
         await composer.getByRole('button', { name: 'Hide the composer' }).click();
