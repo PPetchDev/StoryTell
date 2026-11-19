@@ -8,6 +8,7 @@ import {
     SpeechRequest,
     SpeechResult,
     SpeechVoice,
+    DubVoices,
     TextCompletionRequest,
     TextCompletionResult,
     TextStream,
@@ -60,6 +61,10 @@ export class CappedModelGateway extends ModelGateway {
 
     speechVoices(): Promise<SpeechVoice[]> {
         return this.inner.speechVoices();
+    }
+
+    dubVoices(): Promise<DubVoices> {
+        return this.inner.dubVoices();
     }
 
     remainingCredit(): Promise<RemainingCredit> {

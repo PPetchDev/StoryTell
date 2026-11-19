@@ -1,4 +1,5 @@
 import type { StoredMessagePart } from '../../model/chat/entities/message-part.entity.js';
+import type { Emotion } from '../../model/story/emotion.js';
 
 /** The longest item sent in one request: under Venice's 4,096 so a request never runs over. */
 export const MAX_ITEM_CHARACTERS = 4000;
@@ -21,6 +22,12 @@ export interface ReadAloudItem {
     paragraph: number | null;
     voice: string;
     text: string;
+    /**
+     * For the words of a line, who says them and the emotion the Judge tagged the line with; null
+     * for narration and a line's `*…*` actions. A Japanese dub reads words in the speaker's own
+     * expressive voice (.scratch/japanese-dub/spec.md).
+     */
+    speech: { characterId: number | null; emotion: Emotion | null } | null;
 }
 
 /** Narration paragraphs, split as the thread splits them (AiMessageParts). */
@@ -41,9 +48,9 @@ const SENTENCE_END = /[.!?…]["'”’)\]]*\s/g;
  */
 export function readAloudQueue(parts: readonly StoredMessagePart[], voices: ReadAloudVoices): ReadAloudItem[] {
     const queue: ReadAloudItem[] = [];
-    const add = (partIndex: number, paragraph: number | null, voice: string, text: string) => {
+    const add = (partIndex: number, paragraph: number | null, voice: string, text: string, speech: ReadAloudItem['speech'] = null) => {
         for (const piece of fitted(text.trim())) {
-            if (SPEAKABLE.test(piece)) queue.push({ index: queue.length, partIndex, paragraph, voice, text: piece });
+            if (SPEAKABLE.test(piece)) queue.push({ index: queue.length, partIndex, paragraph, voice, text: piece, speech });
         }
     };
 
@@ -60,7 +67,7 @@ export function readAloudQueue(parts: readonly StoredMessagePart[], voices: Read
         part.text.split(ACTION_SPAN).forEach((piece, index) => {
             // Odd pieces are the `*…*` spans the split captured.
             if (index % 2 === 1) add(partIndex, null, voices.narration, piece.slice(1, -1));
-            else add(partIndex, null, lineVoice, piece);
+            else add(partIndex, null, lineVoice, piece, { characterId: part.characterId, emotion: part.emotion ?? null });
         });
     });
     return queue;

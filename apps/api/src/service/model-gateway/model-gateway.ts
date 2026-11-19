@@ -49,6 +49,12 @@ export abstract class ModelGateway {
     /** The English voices speech can be made in. Makes no paid call. */
     abstract speechVoices(): Promise<SpeechVoice[]>;
 
+    /**
+     * A Japanese dub's voices (.scratch/japanese-dub/spec.md): Qwen 3's, for spoken lines, and
+     * Kokoro's Japanese ones, for narration. Makes no paid call.
+     */
+    abstract dubVoices(): Promise<DubVoices>;
+
     abstract remainingCredit(): Promise<RemainingCredit>;
 }
 
@@ -70,6 +76,8 @@ export type TextCallKind =
     | 'book_chapter'
     | 'write_for_me'
     | 'thai_reading'
+    /** A Message's Read aloud queue in Japanese, for a dub (.scratch/japanese-dub/spec.md): a background-model call. */
+    | 'dub_translation'
     | 'diary_entry'
     | 'character_thought'
     | 'speech_repair'
@@ -128,9 +136,18 @@ export type EmbeddingModel = typeof EMBEDDING_MODEL;
 /** The one speech-to-text model: Whisper Large V3 on Venice, the only one there that takes a language. */
 export const TRANSCRIPTION_MODEL = 'whisper-large-v3';
 export type TranscriptionModel = typeof TRANSCRIPTION_MODEL;
-/** The one text-to-speech model: Kokoro on Venice, English voices only. */
+/** The text-to-speech model Read aloud uses: Kokoro on Venice, English voices only. */
 export const SPEECH_MODEL = 'kokoro';
-export type SpeechModel = typeof SPEECH_MODEL;
+/**
+ * The expressive model of a Japanese dub (.scratch/japanese-dub/spec.md): Qwen 3 TTS 1.7B on
+ * Venice, the one there that takes a style prompt, with a native Japanese voice (Ono_Anna).
+ */
+export const DUB_SPEECH_MODEL = 'qwen3';
+export type SpeechModel = typeof SPEECH_MODEL | typeof DUB_SPEECH_MODEL;
+/** A Japanese dub's spoken lines read in this voice when the Character has none of their own. */
+export const DEFAULT_DUB_VOICE = 'Ono_Anna';
+/** A Japanese dub's narration and actions read in this Kokoro voice when the Story has none. */
+export const DEFAULT_DUB_NARRATION_VOICE = 'jf_alpha';
 /** The most characters one speech request may carry (Venice's limit for `input`). */
 export const SPEECH_CHARACTER_LIMIT = 4096;
 /** The voice a Story with no Narration voice is read in. */
@@ -360,9 +377,23 @@ export interface SpeechRequest {
     kind: SpeechCallKind;
     /** At most SPEECH_CHARACTER_LIMIT characters. */
     text: string;
-    /** A voice id from `speechVoices()`. */
+    /** A voice id of the model: from `speechVoices()` for Kokoro, `dubVoices()` for a dub. */
     voice: string;
+    /** Kokoro unless given. */
+    model?: SpeechModel;
+    /** A language hint, as the model names it ("Japanese" for Qwen 3). */
+    language?: string;
+    /** How to say it, for a model that takes a style prompt (Qwen 3): "Playful and teasing." */
+    prompt?: string;
     servedFor?: ServedFor;
+}
+
+/** A Japanese dub's voice ids (.scratch/japanese-dub/spec.md). */
+export interface DubVoices {
+    /** Qwen 3 voices, for a Character's spoken lines. */
+    speech: string[];
+    /** Kokoro's Japanese voices, for narration and actions. */
+    narration: string[];
 }
 
 export interface SpeechResult {

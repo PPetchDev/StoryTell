@@ -150,7 +150,7 @@ export class StoryModelService {
      */
     async duplicate(source: StoryEntity, title: string): Promise<{ storyId: number; characterIds: Map<number, number> }> {
         return this.dataSource.transaction(async (manager) => {
-            const { setting, opening, openingQuestions, pov, tense, replyLength, pacing, balance, difficulty, imageStyle, narrationVoice, backdrop } = source;
+            const { setting, opening, openingQuestions, pov, tense, replyLength, pacing, balance, difficulty, imageStyle, narrationVoice, backdrop, readAloudLanguage, dubNarrationVoice } = source;
             const story = await manager.save(
                 manager.create(StoryEntity, {
                     title,
@@ -165,6 +165,8 @@ export class StoryModelService {
                     difficulty,
                     imageStyle,
                     narrationVoice,
+                    readAloudLanguage,
+                    dubNarrationVoice,
                     backdrop,
                     // The switch for Roll offers (.scratch/judge-rolls/spec.md).
                     rollOffers: source.rollOffers ?? true,
@@ -178,7 +180,7 @@ export class StoryModelService {
             );
             const characterIds = new Map<number, number>();
             for (const character of source.characters) {
-                const { name, appearance, personality, voice, exampleLines, background, secrets, arcDirections, speakingVoice } = character;
+                const { name, appearance, personality, voice, exampleLines, background, secrets, arcDirections, speakingVoice, dubVoice } = character;
                 const copy = await manager.save(
                     manager.create(CharacterEntity, {
                         storyId: story.id,
@@ -192,6 +194,7 @@ export class StoryModelService {
                         secrets,
                         arcDirections,
                         speakingVoice,
+                        dubVoice,
                         referenceImagePath: null,
                         portraitCrop: null,
                     }),
@@ -284,10 +287,10 @@ export class StoryModelService {
      * writer, and a whole-entity save from an older read would put an older Cover back.
      */
     async saveStory(story: StoryEntity): Promise<void> {
-        const { title, setting, opening, pov, tense, replyLength, pacing, balance, difficulty, imageStyle, narrationVoice, backdrop, rollOffers } = story;
+        const { title, setting, opening, pov, tense, replyLength, pacing, balance, difficulty, imageStyle, narrationVoice, backdrop, rollOffers, readAloudLanguage, dubNarrationVoice } = story;
         await this.stories.update(
             { id: story.id },
-            { title, setting, opening, pov, tense, replyLength, pacing, balance, difficulty, imageStyle, narrationVoice, backdrop, rollOffers, updatedAt: () => 'now()' },
+            { title, setting, opening, pov, tense, replyLength, pacing, balance, difficulty, imageStyle, narrationVoice, backdrop, rollOffers, readAloudLanguage, dubNarrationVoice, updatedAt: () => 'now()' },
         );
     }
 

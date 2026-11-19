@@ -53,6 +53,10 @@ export interface VeniceSpeechRequest {
     modelId: string;
     input: string;
     voice: string;
+    /** A language hint, sent only when given. */
+    language?: string;
+    /** A style prompt, sent only when given (Qwen 3 reads it; others ignore it). */
+    prompt?: string;
 }
 
 /** What `GET /models?type=tts` says about one speech model. */
@@ -192,6 +196,8 @@ export class VeniceClient {
                 voice: request.voice,
                 response_format: 'mp3',
                 speed: 1,
+                ...(request.language ? { language: request.language } : {}),
+                ...(request.prompt ? { prompt: request.prompt.slice(0, 500) } : {}),
             }),
         });
         if (!response.ok) throw this.toError(response.status, await readJson(response));

@@ -1,6 +1,8 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
+import { READ_ALOUD_LANGUAGE_LABELS, ReadAloudLanguage } from '@/lib/story';
+import { dubVoiceLabel } from '@/lib/voices';
 import { KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 
@@ -366,6 +368,15 @@ export function StoryEditor({ initial }: { initial: Story }) {
     const setNarrationVoice = (voice: string | null) => {
         setStory((current) => ({ ...current, narrationVoice: voice }));
         queue('story.narrationVoice', () => storyApi.update(storyId, { narrationVoice: voice }), applyStatus);
+    };
+    /** A Japanese dub (.scratch/japanese-dub/spec.md): the language, and its narration voice. */
+    const setReadAloudLanguage = (readAloudLanguage: ReadAloudLanguage) => {
+        setStory((current) => ({ ...current, readAloudLanguage }));
+        queue('story.readAloudLanguage', () => storyApi.update(storyId, { readAloudLanguage }), applyStatus);
+    };
+    const setDubNarrationVoice = (voice: string | null) => {
+        setStory((current) => ({ ...current, dubNarrationVoice: voice }));
+        queue('story.dubNarrationVoice', () => storyApi.update(storyId, { dubNarrationVoice: voice }), applyStatus);
     };
     /** The Role's Stats as one list, and the switch for Roll offers (.scratch/judge-rolls/spec.md). */
     const setRoleStats = (stats: RoleStat[]) => {
@@ -808,6 +819,24 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                         hint={SAMPLE_COST_HINT}
                                     />
                                     <SegmentedField
+                                        label="Read aloud in"
+                                        value={story.readAloudLanguage ?? 'english'}
+                                        options={READ_ALOUD_LANGUAGE_LABELS}
+                                        hint="Japanese dub: the text stays English; it is read in Japanese, each Character's lines with their feeling. About 30 times the cost of English: some 7 cents a reply."
+                                        onChange={setReadAloudLanguage}
+                                    />
+                                    {story.readAloudLanguage === 'japanese' && (
+                                        <VoiceField
+                                            label="Japanese narration voice"
+                                            value={story.dubNarrationVoice ?? null}
+                                            noneLabel={`Default (${dubVoiceLabel(voices?.defaultDubNarrationVoice ?? 'jf_alpha')})`}
+                                            voices={voices}
+                                            options={(voices?.dubNarrationVoices ?? []).map((id) => ({ id, label: dubVoiceLabel(id) }))}
+                                            sampleVoice={story.dubNarrationVoice ?? voices?.defaultDubNarrationVoice ?? 'jf_alpha'}
+                                            onChange={setDubNarrationVoice}
+                                        />
+                                    )}
+                                    <SegmentedField
                                         label="Chat backdrop"
                                         value={story.backdrop}
                                         options={BACKDROP_LABELS}
@@ -897,6 +926,8 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                         voices={voices}
                                         narrationVoice={narrationVoice}
                                         onSpeakingVoice={(voice) => setCharacterField(character.id, 'speakingVoice', voice)}
+                                        dubbed={story.readAloudLanguage === 'japanese'}
+                                        onDubVoice={(voice) => setCharacterField(character.id, 'dubVoice', voice)}
                                         sampleHint={index === 0 ? SAMPLE_COST_HINT : undefined}
                                         onMove={(direction) =>
                                             void commit(

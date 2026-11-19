@@ -64,6 +64,10 @@ export enum Difficulty {
 }
 
 /** What sits behind a Story's Chats (.scratch/chat-looks/spec.md, "Backdrop"). */
+/** The language Read aloud speaks (.scratch/japanese-dub/spec.md). */
+export const READ_ALOUD_LANGUAGES = ['english', 'japanese'] as const;
+export type ReadAloudLanguage = (typeof READ_ALOUD_LANGUAGES)[number];
+
 export enum Backdrop {
     None = 'none',
     Cover = 'cover',
@@ -150,6 +154,10 @@ export interface StoryResponse extends StorySummary {
     cover: StoryCover | null;
     /** The Kokoro voice narration is read aloud in; null for the default (.scratch/read-aloud/spec.md). */
     narrationVoice: string | null;
+    /** The language Read aloud speaks: English as written, or a Japanese dub (.scratch/japanese-dub/spec.md). */
+    readAloudLanguage: ReadAloudLanguage;
+    /** The Kokoro Japanese voice a dub's narration is read in; null for the default. */
+    dubNarrationVoice: string | null;
     /** What sits behind its Chats' Messages (.scratch/chat-looks/spec.md, "Backdrop"). */
     backdrop: Backdrop;
     /** Whether the Judge may offer a Roll at a key moment (.scratch/judge-rolls/spec.md). */
@@ -212,6 +220,14 @@ export class StoryEntity {
     /** A Kokoro voice id; null means DEFAULT_NARRATION_VOICE. */
     @Column({ name: 'narration_voice', type: 'text', nullable: true })
     narrationVoice: string | null;
+
+    /** English as written, or a Japanese dub (.scratch/japanese-dub/spec.md). */
+    @Column({ name: 'read_aloud_language', type: 'text', default: 'english' })
+    readAloudLanguage: ReadAloudLanguage;
+
+    /** A Kokoro Japanese voice id; null means DEFAULT_DUB_NARRATION_VOICE. */
+    @Column({ name: 'dub_narration_voice', type: 'text', nullable: true })
+    dubNarrationVoice: string | null;
 
     @Column({ type: 'enum', enum: Backdrop, enumName: 'story_backdrop_enum', default: Backdrop.None })
     backdrop: Backdrop;
@@ -337,6 +353,8 @@ export class StoryEntity {
             replaceRules: this.replaceRules.map((rule) => rule.toResponse()),
             cover: this.cover(),
             narrationVoice: this.narrationVoice,
+            readAloudLanguage: this.readAloudLanguage ?? 'english',
+            dubNarrationVoice: this.dubNarrationVoice ?? null,
             backdrop: this.backdrop,
             rollOffers: this.rollOffers ?? true,
         };

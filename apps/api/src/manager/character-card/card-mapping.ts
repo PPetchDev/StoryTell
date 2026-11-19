@@ -36,7 +36,7 @@ export interface CardStoryPlan {
     story: Required<Pick<StoryFields, 'title' | 'setting' | 'opening'>> &
         Pick<StoryFields, 'pov' | 'tense' | 'replyLength' | 'pacing' | 'balance' | 'difficulty' | 'imageStyle'> & { narrationVoice: string | null; backdrop: Backdrop };
     role: { name: string; description: string };
-    character: Required<Omit<CharacterFields, 'speakingVoice'>> & { speakingVoice: string | null };
+    character: Required<Omit<CharacterFields, 'speakingVoice' | 'dubVoice'>> & { speakingVoice: string | null };
     lore: CardLoreEntry[];
     /** A Storytell card's Opening questions (.scratch/opening-questions/spec.md); none from any other card. */
     openingQuestions: OpeningQuestion[];

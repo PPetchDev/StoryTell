@@ -1,6 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
 
 import { MissingField } from '../../../manager/story/playable.js';
+import { READ_ALOUD_LANGUAGES } from '../../../model/story/entities/story.entity.js';
+import type { ReadAloudLanguage } from '../../../model/story/entities/story.entity.js';
 import { LatestChat, StoryDetail, StoryListItem } from '../../../manager/story/story.service.js';
 import { DOCUMENT_SOURCES, DocumentSummary } from '../../../model/document/entities/document.entity.js';
 import type { DocumentSource } from '../../../model/document/entities/document.entity.js';
@@ -264,6 +266,9 @@ export class CharacterDTO implements CharacterResponse {
         description: 'The voice their lines are read aloud in; null reads them in the Narration voice. Apart from `voice`.',
     })
     speakingVoice: string | null;
+
+    @ApiProperty({ type: String, nullable: true, description: 'Their voice in a Japanese dub; null for the default (GET /api/voices).' })
+    dubVoice: string | null;
 
     @ApiProperty({ type: [ExpressionDTO], description: 'Their picture per emotion, in the fixed order of the emotions.' })
     expressions: ExpressionDTO[];
@@ -537,6 +542,12 @@ export class StoryResponseBodyDTO implements StoryDetail {
 
     @ApiProperty({ type: String, nullable: true, description: 'The voice narration is read aloud in; null for the default (GET /api/voices).' })
     narrationVoice: string | null;
+
+    @ApiProperty({ enum: READ_ALOUD_LANGUAGES, description: 'The language Read aloud speaks: English as written, or a Japanese dub (.scratch/japanese-dub/spec.md).' })
+    readAloudLanguage: ReadAloudLanguage;
+
+    @ApiProperty({ type: String, nullable: true, description: "A Japanese dub's narration voice; null for the default (GET /api/voices)." })
+    dubNarrationVoice: string | null;
 
     @ApiProperty({ enum: Backdrop, description: "What sits behind the Story's Chats: nothing, the Cover, or the Chat's newest Snapshot." })
     backdrop: Backdrop;

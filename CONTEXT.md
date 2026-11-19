@@ -173,6 +173,10 @@ _Avoid_: Voice input, speech-to-text
 Playing an AI Message as speech: narration in the Story's Narration voice and each Character's lines in their Speaking voice.
 _Avoid_: TTS, narrate, voice playback
 
+**Japanese dub**:
+A Story read aloud in Japanese while its text stays English: each Message translated, a Character's lines said in their own Japanese voice with the feeling the story gives each one, the narration in a Japanese narration voice.
+_Avoid_: Translation mode, Japanese TTS
+
 **Backdrop**:
 The dimmed picture behind a Chat's Messages: the Story's Cover, the Chat's newest Snapshot, or the place the Chat is in when its stage is dressed.
 _Avoid_: Background, wallpaper

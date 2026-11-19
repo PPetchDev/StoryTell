@@ -47,7 +47,15 @@ describe('Voices', () => {
     it('lists the English voices and the default Narration voice without a paid call', async () => {
         const { body } = await t.http.get('/api/voices').expect(200);
 
-        expect(body).toEqual({ voices: FAKE_SPEECH_VOICES, defaultNarrationVoice: 'af_sky' });
+        expect(body).toEqual({
+            voices: FAKE_SPEECH_VOICES,
+            defaultNarrationVoice: 'af_sky',
+            // A Japanese dub's voices (.scratch/japanese-dub/spec.md).
+            dubVoices: ['Ono_Anna', 'Vivian', 'Ryan'],
+            defaultDubVoice: 'Ono_Anna',
+            dubNarrationVoices: ['jf_alpha', 'jm_kumo'],
+            defaultDubNarrationVoice: 'jf_alpha',
+        });
         expect(t.gateway.calls).toEqual([]);
     });
 

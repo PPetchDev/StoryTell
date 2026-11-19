@@ -18,9 +18,9 @@ describe('readAloudQueue', () => {
         const queue = readAloudQueue([narration('The lamp went out.\n\nThe sea kept talking.\n  \n\nRain.')], voices);
 
         expect(queue).toEqual([
-            { index: 0, partIndex: 0, paragraph: 0, voice: 'bm_george', text: 'The lamp went out.' },
-            { index: 1, partIndex: 0, paragraph: 1, voice: 'bm_george', text: 'The sea kept talking.' },
-            { index: 2, partIndex: 0, paragraph: 2, voice: 'bm_george', text: 'Rain.' },
+            { index: 0, partIndex: 0, paragraph: 0, voice: 'bm_george', text: 'The lamp went out.', speech: null },
+            { index: 1, partIndex: 0, paragraph: 1, voice: 'bm_george', text: 'The sea kept talking.', speech: null },
+            { index: 2, partIndex: 0, paragraph: 2, voice: 'bm_george', text: 'Rain.', speech: null },
         ]);
     });
 
@@ -31,11 +31,12 @@ describe('readAloudQueue', () => {
         );
 
         expect(queue).toEqual([
-            { index: 0, partIndex: 0, paragraph: 0, voice: 'bm_george', text: 'Wind.' },
-            { index: 1, partIndex: 1, paragraph: null, voice: 'bm_george', text: 'smiles' },
-            { index: 2, partIndex: 1, paragraph: null, voice: 'bf_emma', text: 'You came back.' },
-            { index: 3, partIndex: 1, paragraph: null, voice: 'bm_george', text: 'sets the lamp down' },
-            { index: 4, partIndex: 1, paragraph: null, voice: 'bf_emma', text: 'Sit.' },
+            { index: 0, partIndex: 0, paragraph: 0, voice: 'bm_george', text: 'Wind.', speech: null },
+            { index: 1, partIndex: 1, paragraph: null, voice: 'bm_george', text: 'smiles', speech: null },
+            // The words carry who says them and the line's emotion, for a dub (.scratch/japanese-dub/spec.md).
+            { index: 2, partIndex: 1, paragraph: null, voice: 'bf_emma', text: 'You came back.', speech: { characterId: 1, emotion: null } },
+            { index: 3, partIndex: 1, paragraph: null, voice: 'bm_george', text: 'sets the lamp down', speech: null },
+            { index: 4, partIndex: 1, paragraph: null, voice: 'bf_emma', text: 'Sit.', speech: { characterId: 1, emotion: null } },
         ]);
     });
 

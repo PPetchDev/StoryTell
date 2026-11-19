@@ -99,6 +99,8 @@ export interface Character {
     referenceCutoutPath?: string | null;
     /** The voice their lines are read aloud in; null reads them in the Narration voice. Apart from `voice`. */
     speakingVoice: string | null;
+    /** Their voice in a Japanese dub (.scratch/japanese-dub/spec.md); null for the default. */
+    dubVoice?: string | null;
     /** Their pictures per emotion, in the fixed order of the emotions (.scratch/expressions/spec.md). */
     expressions: Expression[];
     /** Their Secrets one by one, in order, each with the Bond level it needs or none (.scratch/secret-reveals/spec.md). */
@@ -353,6 +355,10 @@ export interface Story {
     cover: StoryCover | null;
     /** The voice narration is read aloud in; null for the default (.scratch/read-aloud/spec.md). */
     narrationVoice: string | null;
+    /** The language Read aloud speaks: English as written, or a Japanese dub (.scratch/japanese-dub/spec.md). */
+    readAloudLanguage?: ReadAloudLanguage;
+    /** A Japanese dub's narration voice; null for the default. */
+    dubNarrationVoice?: string | null;
     /** What sits behind its Chats' Messages (.scratch/chat-looks/spec.md, "Backdrop"). */
     backdrop: Backdrop;
     /** Whether the Judge may offer a Roll at a key moment (.scratch/judge-rolls/spec.md); left out by an older API, which means on. */
@@ -363,7 +369,11 @@ export interface Story {
     updatedAt: string;
 }
 
-export type StoryFields = Partial<Pick<Story, 'title' | 'setting' | 'opening' | 'narrationVoice' | 'backdrop' | 'rollOffers'> & Style>;
+export type StoryFields = Partial<Pick<Story, 'title' | 'setting' | 'opening' | 'narrationVoice' | 'readAloudLanguage' | 'dubNarrationVoice' | 'backdrop' | 'rollOffers'> & Style>;
+
+/** The language Read aloud speaks (.scratch/japanese-dub/spec.md). */
+export type ReadAloudLanguage = 'english' | 'japanese';
+export const READ_ALOUD_LANGUAGE_LABELS: Record<ReadAloudLanguage, string> = { english: 'English', japanese: 'Japanese dub' };
 export type CharacterFields = Partial<Omit<Character, 'id' | 'referenceImagePath' | 'referenceCutoutPath' | 'portraitCrop' | 'expressions'>>;
 export type SceneFields = Partial<Omit<Scene, 'id' | 'gates'>>;
 export type SuddenEventFields = Partial<Omit<SuddenEvent, 'id'>>;

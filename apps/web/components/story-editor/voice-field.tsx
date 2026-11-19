@@ -25,6 +25,8 @@ interface VoiceFieldProps {
     onChange(voice: string | null): void;
     /** Shown under the field: the cost hint goes under the first sample button on a page. */
     hint?: string;
+    /** A flat list of voices in place of the grouped English ones: a Japanese dub's (.scratch/japanese-dub/spec.md). */
+    options?: Array<{ id: string; label: string }>;
 }
 
 /**
@@ -32,7 +34,7 @@ interface VoiceFieldProps {
  * by accent and gender, and ▶ Sample, which plays the voice's kept sample or makes it once.
  * A sample only ever plays from this tap.
  */
-export function VoiceField({ label, value, noneLabel, voices, sampleVoice, onChange, hint }: VoiceFieldProps) {
+export function VoiceField({ label, value, noneLabel, voices, sampleVoice, onChange, hint, options }: VoiceFieldProps) {
     const id = useId();
     const [state, setState] = useState<'idle' | 'loading' | 'playing'>('idle');
     const [error, setError] = useState<string | null>(null);
@@ -79,7 +81,7 @@ export function VoiceField({ label, value, noneLabel, voices, sampleVoice, onCha
 
     const listed = voices?.voices ?? [];
     // A stored voice Venice no longer lists stays selectable, so the field never shows a wrong choice.
-    const unlisted = value !== null && voices !== null && !listed.some((voice) => voice.id === value);
+    const unlisted = value !== null && voices !== null && !(options ? options.some((option) => option.id === value) : listed.some((voice) => voice.id === value));
 
     return (
         <div className={FIELD}>
@@ -98,8 +100,13 @@ export function VoiceField({ label, value, noneLabel, voices, sampleVoice, onCha
                     onChange={(event) => onChange(event.target.value === NONE ? null : event.target.value)}
                 >
                     <option value={NONE}>{noneLabel}</option>
-                    {unlisted && value !== null && <option value={value}>{voiceName(value, listed)}</option>}
-                    {VOICE_GROUPS.map((group) => {
+                    {unlisted && value !== null && <option value={value}>{options ? value : voiceName(value, listed)}</option>}
+                    {options?.map((option) => (
+                        <option key={option.id} value={option.id}>
+                            {option.label}
+                        </option>
+                    ))}
+                    {!options && VOICE_GROUPS.map((group) => {
                         const inGroup = listed.filter((voice) => voice.accent === group.accent && voice.gender === group.gender);
                         if (inGroup.length === 0) return null;
                         return (

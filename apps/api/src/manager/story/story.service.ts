@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
+import type { ReadAloudLanguage } from '../../model/story/entities/story.entity.js';
 import { StageModelService } from '../../model/stage/stage.service.js';
 
 import {
@@ -116,6 +117,10 @@ export interface StoryFields {
     imageStyle?: string;
     /** A voice id from the voice list, or null for the default. */
     narrationVoice?: string | null;
+    /** English as written, or a Japanese dub (.scratch/japanese-dub/spec.md). */
+    readAloudLanguage?: ReadAloudLanguage;
+    /** A Japanese narration voice from the voice list's dub voices, or null for the default. */
+    dubNarrationVoice?: string | null;
     backdrop?: Backdrop;
     /** Whether the Judge may offer a Roll (.scratch/judge-rolls/spec.md). */
     rollOffers?: boolean;
@@ -139,6 +144,8 @@ export interface CharacterFields {
     arcDirections?: string;
     /** A voice id from the voice list, or null to be read in the Narration voice. */
     speakingVoice?: string | null;
+    /** A Japanese voice from the voice list's dub voices, or null for the default. */
+    dubVoice?: string | null;
 }
 
 /** Its text and its starting levels on the Bond axes (.scratch/bond-axes/spec.md, "Storage"). */
@@ -336,6 +343,7 @@ export class StoryManagerService {
     async updateStory(storyId: number, fields: StoryFields): Promise<StoryDetail> {
         const story = await this.load(storyId);
         await this.voices.requireKnown(fields.narrationVoice);
+        await this.voices.requireKnownDub(fields.dubNarrationVoice, 'narration');
         assignSent(story, fields, [
             'title',
             'setting',
@@ -348,6 +356,8 @@ export class StoryManagerService {
             'difficulty',
             'imageStyle',
             'narrationVoice',
+            'readAloudLanguage',
+            'dubNarrationVoice',
             'backdrop',
             'rollOffers',
         ]);
@@ -573,6 +583,7 @@ export class StoryManagerService {
         const story = await this.load(storyId);
         const character = this.findCharacter(story, characterId);
         await this.voices.requireKnown(fields.speakingVoice);
+        await this.voices.requireKnownDub(fields.dubVoice, 'speech');
         this.assignCharacter(character, fields);
         await this.storyModel.saveCharacter(character);
         // The editor adds a Character blank and its Arc directions are typed afterwards, so the
@@ -1061,6 +1072,7 @@ export class StoryManagerService {
             'secrets',
             'arcDirections',
             'speakingVoice',
+            'dubVoice',
         ]);
     }
 

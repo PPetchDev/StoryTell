@@ -186,7 +186,7 @@ describe('Read aloud', () => {
             expect(first.headers['cache-control']).toBe('no-store');
             expect(Buffer.compare(first.body, FAKE_MP3.bytes)).toBe(0);
             expect(t.gateway.speechCalls()).toEqual([
-                { kind: 'read_aloud', text: 'The lamp went out an hour ago.', voice: 'af_sky', servedFor: { storyId, chatId: chat.id } },
+                { kind: 'read_aloud', text: 'The lamp went out an hour ago.', voice: 'af_sky', model: 'kokoro', servedFor: { storyId, chatId: chat.id } },
             ]);
             expect(await files(opening)).toHaveLength(1);
             expect((await files(opening))[0]).toMatch(/^[0-9a-f]{32}\.mp3$/);

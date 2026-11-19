@@ -10,7 +10,9 @@ import { MessageKind } from '../../model/chat/entities/message.entity.js';
 import { ReplaceRuleModelService } from '../../model/replace-rule/replace-rule.service.js';
 import type { StoryEntity } from '../../model/story/entities/story.entity.js';
 import { StoryModelService } from '../../model/story/story.service.js';
-import { DEFAULT_NARRATION_VOICE, ModelGateway, SPEECH_MODEL } from '../../service/model-gateway/model-gateway.js';
+import { DEFAULT_DUB_NARRATION_VOICE, DEFAULT_DUB_VOICE, DEFAULT_NARRATION_VOICE, DUB_SPEECH_MODEL, ModelGateway, SPEECH_MODEL, SpeechModel } from '../../service/model-gateway/model-gateway.js';
+import { UnparseableOutputError } from '../../errors/model-gateway.errors.js';
+import { buildDubTranslationPrompt, deliveryFor, readDubTranslation } from './dub.js';
 import { venicePoolUsedUp } from '../../service/model-gateway/venice-pool.js';
 import { SpeechStoreService } from '../../store/speech/speech-store.service.js';
 import { applyReplaceRules } from '../replace-rule/apply-replace-rules.js';
@@ -32,6 +34,10 @@ export interface SpeechQueueItem {
 
 interface KeyedItem extends ReadAloudItem {
     key: string;
+    /** How it is said: the model, voice and, for a dub, language and style (.scratch/japanese-dub/spec.md). */
+    say: { model: SpeechModel; voice: string; language?: string; prompt?: string; dub: boolean };
+    /** Who says it, by name, for the dub's translation; null for narration and actions. */
+    speaker: string | null;
 }
 
 /**
@@ -44,6 +50,8 @@ interface KeyedItem extends ReadAloudItem {
 @Injectable()
 export class ReadAloudManagerService implements OnApplicationBootstrap {
     private readonly logger = new Logger(ReadAloudManagerService.name);
+    /** A dub's translations being made, by file, so two items asked at once share one call. */
+    private readonly translations = new Map<string, Promise<string[]>>();
 
     constructor(
         private readonly storyModel: StoryModelService,
@@ -62,11 +70,11 @@ export class ReadAloudManagerService implements OnApplicationBootstrap {
     async queue(storyId: number, chatId: number, messageId: number): Promise<SpeechQueueItem[]> {
         const { shown, folder } = await this.reading(storyId, chatId, messageId);
         const kept = new Set(await this.speechStore.files(folder));
-        return shown.map(({ index, partIndex, paragraph, voice, text, key }) => ({
+        return shown.map(({ index, partIndex, paragraph, say, text, key }) => ({
             index,
             partIndex,
             paragraph,
-            voice,
+            voice: say.voice,
             characters: text.length,
             cached: kept.has(`${key}.mp3`),
         }));
@@ -87,15 +95,51 @@ export class ReadAloudManagerService implements OnApplicationBootstrap {
         if (kept) return kept;
         if (await venicePoolUsedUp(this.gateway)) throw new OutOfCreditError('image');
 
+        // A dub reads the item in Japanese: the whole queue is translated once and kept (.scratch/japanese-dub/spec.md).
+        const text = item.say.dub ? (await this.translated(storyId, chatId, folder, shown))[index] : item.text;
         const { audio } = await this.gateway.synthesizeSpeech({
             kind: 'read_aloud',
-            text: item.text,
-            voice: item.voice,
+            text,
+            voice: item.say.voice,
+            model: item.say.model,
+            ...(item.say.language ? { language: item.say.language } : {}),
+            ...(item.say.prompt ? { prompt: item.say.prompt } : {}),
             servedFor: { storyId, chatId },
         });
         await this.speechStore.write(file, audio.bytes);
         await this.afterWrite(storyId, chatId, messageId, folder);
         return audio.bytes;
+    }
+
+    /**
+     * The queue in Japanese, one line per item, kept beside the audio as `dub-ja-<key>.json`, the
+     * key hashing every item's text and speaker, so an edit or rule change translates again. Made
+     * by one `dub_translation` call; two items asked at once share it.
+     */
+    private async translated(storyId: number, chatId: number, folder: string, shown: readonly KeyedItem[]): Promise<string[]> {
+        const sources = shown.map((item) => ({ text: item.text, speaker: item.speaker }));
+        const key = createHash('sha256').update(JSON.stringify(sources)).digest('hex').slice(0, 32);
+        const file = `${folder}/dub-ja-${key}.json`;
+        const running = this.translations.get(file);
+        if (running) return running;
+        const work = (async () => {
+            const kept = await this.speechStore.read(file);
+            if (kept) {
+                const lines = readDubTranslation(kept.toString('utf8'), shown.length);
+                if (lines) return lines;
+            }
+            const result = await this.gateway.completeText({ kind: 'dub_translation', ...buildDubTranslationPrompt(sources), servedFor: { storyId, chatId } });
+            const lines = readDubTranslation(result.text, shown.length);
+            if (!lines) throw new UnparseableOutputError('The Japanese translation for Read aloud came back unreadable.');
+            await this.speechStore.write(file, Buffer.from(JSON.stringify({ lines }), 'utf8'));
+            return lines;
+        })();
+        this.translations.set(file, work);
+        try {
+            return await work;
+        } finally {
+            this.translations.delete(file);
+        }
     }
 
     /**
@@ -163,11 +207,28 @@ export class ReadAloudManagerService implements OnApplicationBootstrap {
 
         const rules = [...(await this.replaceRuleModel.findByScope(null)), ...story.replaceRules].filter((rule) => rule.onAi);
         const voices = storyVoices(story);
+        const dub = story.readAloudLanguage === 'japanese';
+        const names = new Map(story.characters.map((character) => [character.id, character.name]));
+        const dubVoices = new Map(story.characters.map((character) => [character.id, character.dubVoice ?? DEFAULT_DUB_VOICE]));
         const keyed = (parts: StoredMessagePart[]): KeyedItem[] =>
             readAloudQueue(
                 parts.map((part) => ({ ...part, text: applyReplaceRules(part.text, rules) })),
                 voices,
-            ).map((item) => ({ ...item, key: speechKey(item.voice, item.text) }));
+            ).map((item) => {
+                const speaker = item.speech ? (item.speech.characterId !== null ? (names.get(item.speech.characterId) ?? null) : null) : null;
+                const speakerName = item.speech ? (speaker ?? (parts[item.partIndex] as { speakerName?: string }).speakerName ?? null) : null;
+                if (!dub) return { ...item, say: { model: SPEECH_MODEL, voice: item.voice, dub: false }, speaker: speakerName, key: speechKey(item.voice, item.text) };
+                const say: KeyedItem['say'] = item.speech
+                    ? {
+                          model: DUB_SPEECH_MODEL,
+                          voice: (item.speech.characterId !== null ? dubVoices.get(item.speech.characterId) : undefined) ?? DEFAULT_DUB_VOICE,
+                          language: 'Japanese',
+                          prompt: deliveryFor(item.speech.emotion),
+                          dub: true,
+                      }
+                    : { model: SPEECH_MODEL, voice: story.dubNarrationVoice ?? DEFAULT_DUB_NARRATION_VOICE, dub: true };
+                return { ...item, say, speaker: speakerName, key: dubKey(say, speakerName, item.text) };
+            });
 
         return {
             shown: keyed(message.parts.map((part) => part.toResponse())),
@@ -193,6 +254,17 @@ function storyVoices(story: StoryEntity): ReadAloudVoices {
         narration: story.narrationVoice ?? DEFAULT_NARRATION_VOICE,
         byCharacterId: new Map(story.characters.map((character) => [character.id, character.speakingVoice])),
     };
+}
+
+/**
+ * A dub item's key (.scratch/japanese-dub/spec.md): its English text and speaker, with how it is
+ * said. The Japanese is made from those, so the key is known before any translation.
+ */
+function dubKey(say: KeyedItem['say'], speaker: string | null, text: string): string {
+    return createHash('sha256')
+        .update(`dub-ja|${say.model}|${say.voice}|${say.prompt ?? ''}|${SPEED}|${speaker ?? ''}|${text}`)
+        .digest('hex')
+        .slice(0, 32);
 }
 
 /** The first 32 hex characters of the SHA-256 of `model | voice | speed | text`. */

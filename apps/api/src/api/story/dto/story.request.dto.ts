@@ -1,5 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
+import { READ_ALOUD_LANGUAGES } from '../../../model/story/entities/story.entity.js';
+import type { ReadAloudLanguage } from '../../../model/story/entities/story.entity.js';
 import {
     ArrayMaxSize,
     IsArray,
@@ -110,6 +112,17 @@ export class StoryRequestBodyDTO implements StoryFields {
     @MaxLength(VOICE_ID_MAX)
     narrationVoice?: string | null;
 
+    @ApiPropertyOptional({ enum: READ_ALOUD_LANGUAGES, description: 'The language Read aloud speaks: English as written, or a Japanese dub (.scratch/japanese-dub/spec.md).' })
+    @IsOptional()
+    @IsIn(READ_ALOUD_LANGUAGES)
+    readAloudLanguage?: ReadAloudLanguage;
+
+    @ApiPropertyOptional({ type: String, nullable: true, description: "A Japanese dub's narration voice: an id from GET /api/voices' dubNarrationVoices, or null for the default." })
+    @IsOptional()
+    @IsString()
+    @MaxLength(VOICE_ID_MAX)
+    dubNarrationVoice?: string | null;
+
     @ApiPropertyOptional({ enum: Backdrop, description: "What sits behind the Story's Chats: nothing, the Cover, or the Chat's newest Snapshot." })
     // Optional, but never null: null is not one of the three.
     @ValidateIf((_body, value) => value !== undefined)
@@ -216,6 +229,12 @@ export class CharacterRequestBodyDTO implements CharacterFields {
     @IsString()
     @MaxLength(VOICE_ID_MAX)
     speakingVoice?: string | null;
+
+    @ApiPropertyOptional({ type: String, nullable: true, description: "Their voice in a Japanese dub: an id from GET /api/voices' dubVoices, or null for the default." })
+    @IsOptional()
+    @IsString()
+    @MaxLength(VOICE_ID_MAX)
+    dubVoice?: string | null;
 }
 
 export class CharacterOrderRequestBodyDTO {

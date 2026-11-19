@@ -34,6 +34,8 @@ import {
     SpeechRequest,
     SpeechResult,
     SpeechVoice,
+    DubVoices,
+    DUB_SPEECH_MODEL,
     TextCompletionRequest,
     TextCompletionResult,
     TextStream,
@@ -120,6 +122,9 @@ const GENERATION_LOOKUPS = 5;
  * Settings, sends through the pinned provider client, and writes one UsageRecord per call
  * that was answered (a refused or failed call is not billed, so none is written for it).
  */
+/** Kokoro's Japanese voices on Venice, read on 2026-11-19, for when its list can't be read. */
+const JAPANESE_NARRATION_FALLBACK = ['jf_alpha', 'jf_gongitsune', 'jf_nezumi', 'jf_tebukuro', 'jm_kumo'] as const;
+
 export class RealModelGateway extends ModelGateway {
     private readonly logger = new Logger(RealModelGateway.name);
     private readonly creditCacheMs: number;
@@ -496,7 +501,7 @@ export class RealModelGateway extends ModelGateway {
      * when the models list can't be read), in whole millionths of a dollar.
      */
     async synthesizeSpeech(request: SpeechRequest): Promise<SpeechResult> {
-        const modelName = SPEECH_MODEL;
+        const modelName = request.model ?? SPEECH_MODEL;
         const model = SPEECH_MODELS[modelName];
         const characters = request.text.length;
         if (characters === 0 || characters > model.requestCharacterLimit) {
@@ -504,7 +509,7 @@ export class RealModelGateway extends ModelGateway {
         }
         const listed = await this.deps.venice.speechModel(model.id);
         const priceUsdPerMillion = listed?.priceUsdPerMillion ?? model.fallbackPriceUsdPerMillion;
-        const bytes = await this.deps.venice.speak({ modelId: model.id, input: request.text, voice: request.voice });
+        const bytes = await this.deps.venice.speak({ modelId: model.id, input: request.text, voice: request.voice, language: request.language, prompt: request.prompt });
         const costUsd = Math.round(characters * priceUsdPerMillion) / 1e6;
 
         await this.deps.usage.record({
@@ -529,6 +534,16 @@ export class RealModelGateway extends ModelGateway {
         const model = SPEECH_MODELS[SPEECH_MODEL];
         const ids = (await this.deps.venice.speechModel(model.id))?.voices ?? model.fallbackVoices;
         return ids.flatMap((id) => englishVoice(id) ?? []);
+    }
+
+    /** Qwen 3's voices and Kokoro's Japanese ones as Venice lists them, or the stored ones. */
+    async dubVoices(): Promise<DubVoices> {
+        const qwen = SPEECH_MODELS[DUB_SPEECH_MODEL];
+        const kokoro = SPEECH_MODELS[SPEECH_MODEL];
+        const speech = [...((await this.deps.venice.speechModel(qwen.id))?.voices ?? qwen.fallbackVoices)];
+        const listed = (await this.deps.venice.speechModel(kokoro.id))?.voices ?? [];
+        const japanese = listed.filter((id) => /^j[fm]_[a-z]+$/.test(id));
+        return { speech, narration: japanese.length > 0 ? japanese : [...JAPANESE_NARRATION_FALLBACK] };
     }
 
     async remainingCredit(): Promise<RemainingCredit> {

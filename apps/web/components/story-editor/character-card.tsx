@@ -7,7 +7,7 @@ import { CloseIcon } from '@/components/icons';
 import { CharacterPortrait } from '@/components/portrait/character-portrait';
 import { Portrait } from '@/lib/character-colour';
 import { Character, characterRemovalWarning, CharacterSecretFields, Story, storyApi } from '@/lib/story';
-import { VoiceList } from '@/lib/voices';
+import { VoiceList, dubVoiceLabel } from '@/lib/voices';
 import { ADD_CHARACTER_ID } from './editor-tabs';
 import { useFieldMarks } from './field-marks';
 import { ExportCardButton } from './export-card';
@@ -44,6 +44,9 @@ interface CharacterCardProps {
     voices: VoiceList | null;
     narrationVoice: string;
     onSpeakingVoice(voice: string | null): void;
+    /** A Japanese dub (.scratch/japanese-dub/spec.md): their voice in it, shown while the Story is dubbed. */
+    dubbed?: boolean;
+    onDubVoice?(voice: string | null): void;
     /** The cost hint goes under the first sample button on the page: the first Character's. */
     sampleHint?: string;
     onExampleLines(lines: string[]): void;
@@ -180,6 +183,18 @@ export function CharacterCard(props: CharacterCardProps) {
                 onChange={props.onSpeakingVoice}
                 hint={props.sampleHint ?? 'How their lines sound when read aloud.'}
             />
+            {props.dubbed && props.onDubVoice && (
+                <VoiceField
+                    label="Japanese voice"
+                    value={character.dubVoice ?? null}
+                    noneLabel={`Default (${dubVoiceLabel(props.voices?.defaultDubVoice ?? 'Ono_Anna')})`}
+                    voices={props.voices}
+                    options={(props.voices?.dubVoices ?? []).map((id) => ({ id, label: dubVoiceLabel(id) }))}
+                    sampleVoice={character.dubVoice ?? props.voices?.defaultDubVoice ?? 'Ono_Anna'}
+                    onChange={props.onDubVoice}
+                    hint="Their lines in the Japanese dub, said with each line's feeling."
+                />
+            )}
 
             <fieldset id={linesId} className={[SUBSECTION, 'lg:col-span-2', linesFlashed && FIELD_FLASH].filter(Boolean).join(' ')}>
                 <legend className={SUBSECTION_LEGEND}>Example lines {linesChanged && <ChangedMark />}</legend>

@@ -332,6 +332,14 @@ export const SPEECH_MODELS: Record<SpeechModel, SpeechModelSpec> = {
         ],
         requestCharacterLimit: SPEECH_CHARACTER_LIMIT,
     },
+    // .scratch/japanese-dub/spec.md: `tts-qwen3-1-7b`, $112.50 per million characters as Venice
+    // listed it on 2026-11-19, with these nine voices; Ono_Anna is its native Japanese one.
+    qwen3: {
+        id: 'tts-qwen3-1-7b',
+        fallbackPriceUsdPerMillion: 112.5,
+        fallbackVoices: ['Aiden', 'Dylan', 'Eric', 'Ono_Anna', 'Ryan', 'Serena', 'Sohee', 'Uncle_Fu', 'Vivian'],
+        requestCharacterLimit: SPEECH_CHARACTER_LIMIT,
+    },
 };
 
 /**

@@ -73,6 +73,7 @@ export type CallKind =
     | 'book_chapter'
     | 'write_for_me'
     | 'thai_reading'
+    | 'dub_translation'
     | 'diary_entry'
     | 'character_thought'
     | 'speech_repair'
@@ -108,6 +109,7 @@ export const CALL_KIND_LABEL: Record<CallKind, string> = {
     book_chapter: 'Book chapters',
     write_for_me: 'Write for me',
     thai_reading: 'Thai readings',
+    dub_translation: 'Japanese dub translations',
     diary_entry: 'Diary entries',
     character_thought: 'Character thoughts',
     speech_repair: 'Speech repairs',

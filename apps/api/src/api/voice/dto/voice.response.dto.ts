@@ -24,4 +24,16 @@ export class VoiceListResponseBodyDTO implements VoiceList {
 
     @ApiProperty({ description: 'The voice a Story with no Narration voice is read in.', example: 'af_sky' })
     defaultNarrationVoice: string;
+
+    @ApiProperty({ type: [String], description: "A Japanese dub's voices for spoken lines (Qwen 3, .scratch/japanese-dub/spec.md)." })
+    dubVoices: string[];
+
+    @ApiProperty({ example: 'Ono_Anna' })
+    defaultDubVoice: string;
+
+    @ApiProperty({ type: [String], description: "A Japanese dub's narration voices (Kokoro's Japanese ones)." })
+    dubNarrationVoices: string[];
+
+    @ApiProperty({ example: 'jf_alpha' })
+    defaultDubNarrationVoice: string;
 }

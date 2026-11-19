@@ -17,6 +17,34 @@ export interface VoiceList {
     voices: SpeechVoice[];
     /** The voice a Story with no Narration voice is read in. */
     defaultNarrationVoice: string;
+    /** A Japanese dub's voices for spoken lines (Qwen 3), and its default (.scratch/japanese-dub/spec.md). */
+    dubVoices?: string[];
+    defaultDubVoice?: string;
+    /** A Japanese dub's narration voices (Kokoro's Japanese ones), and its default. */
+    dubNarrationVoices?: string[];
+    defaultDubNarrationVoice?: string;
+}
+
+/** What each of a dub's voices sounds like, as Venice describes them. An unknown one is its id. */
+const DUB_VOICE_LABELS: Record<string, string> = {
+    Ono_Anna: 'Ono Anna — Japanese, female',
+    Vivian: 'Vivian — Chinese, female',
+    Serena: 'Serena — Chinese, female',
+    Sohee: 'Sohee — Korean, female',
+    Aiden: 'Aiden — English, male',
+    Ryan: 'Ryan — English, male',
+    Dylan: 'Dylan — Chinese, male',
+    Eric: 'Eric — Chinese, male',
+    Uncle_Fu: 'Uncle Fu — Chinese, male',
+    jf_alpha: 'Alpha — Japanese, female',
+    jf_gongitsune: 'Gongitsune — Japanese, female',
+    jf_nezumi: 'Nezumi — Japanese, female',
+    jf_tebukuro: 'Tebukuro — Japanese, female',
+    jm_kumo: 'Kumo — Japanese, male',
+};
+
+export function dubVoiceLabel(id: string): string {
+    return DUB_VOICE_LABELS[id] ?? id;
 }
 
 /** The API's default Narration voice, for the moment before the voice list has loaded. */

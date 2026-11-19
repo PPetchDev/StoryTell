@@ -39,6 +39,8 @@ export interface CharacterResponse {
     portraitCrop: PortraitCrop | null;
     /** The Kokoro voice their lines are read aloud in; null reads them in the Narration voice. Apart from `voice`, how they talk on the page. */
     speakingVoice: string | null;
+    /** The Qwen 3 voice their lines are read in when the Story is dubbed in Japanese; null for the default (.scratch/japanese-dub/spec.md). */
+    dubVoice: string | null;
     /** The Reference image with its background taken away, for the Visual novel stage; null until cut out, or once the Reference image changed (.scratch/stage-pictures/spec.md). */
     referenceCutoutPath: string | null;
     /** Their pictures per emotion, in the fixed order of the emotions (.scratch/expressions/spec.md). */
@@ -101,6 +103,10 @@ export class CharacterEntity {
     @Column({ name: 'speaking_voice', type: 'text', nullable: true })
     speakingVoice: string | null;
 
+    /** A Qwen 3 voice id for a Japanese dub; null means DEFAULT_DUB_VOICE. */
+    @Column({ name: 'dub_voice', type: 'text', nullable: true })
+    dubVoice: string | null;
+
     // Loaded only through StoryModelService.findFull(). A save of the Character never touches them
     // (orphanedRowAction 'disable' on the other side), so an autosave holding an older read is safe.
     @OneToMany('CharacterExpressionEntity', 'character')
@@ -128,6 +134,7 @@ export class CharacterEntity {
             referenceImagePath: this.referenceImagePath,
             portraitCrop: this.portraitCrop ? { ...this.portraitCrop } : null,
             speakingVoice: this.speakingVoice,
+            dubVoice: this.dubVoice ?? null,
             referenceCutoutPath: this.referenceCutout && this.referenceCutout.cutFrom === this.referenceImagePath ? this.referenceCutout.imagePath : null,
             expressions: [...(this.expressions ?? [])]
                 .sort((a, b) => EXPRESSION_EMOTIONS.indexOf(a.emotion) - EXPRESSION_EMOTIONS.indexOf(b.emotion))

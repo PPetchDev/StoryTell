@@ -16,6 +16,7 @@ import {
     SpeechRequest,
     SpeechResult,
     SpeechVoice,
+    DubVoices,
     TextCallKind,
     TextCompletionRequest,
     TextCompletionResult,
@@ -335,6 +336,11 @@ export class FakeModelGateway extends ModelGateway {
     }
 
     /** The scripted voices, else FAKE_SPEECH_VOICES. Not recorded as a call: it costs nothing. */
+    /** A dub's voices: three of Qwen 3's and two Japanese Kokoro ones (.scratch/japanese-dub/spec.md). */
+    async dubVoices(): Promise<DubVoices> {
+        return { speech: ['Ono_Anna', 'Vivian', 'Ryan'], narration: ['jf_alpha', 'jm_kumo'] };
+    }
+
     async speechVoices(): Promise<SpeechVoice[]> {
         return structuredClone(this.voices);
     }
