@@ -1,6 +1,29 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Put, Res, StreamableFile } from '@nestjs/common';
-import { ApiCreatedResponse, ApiOkResponse, ApiParam, ApiProduces, ApiTags } from '@nestjs/swagger';
+import {
+    ArgumentsHost,
+    Body,
+    Catch,
+    Controller,
+    Delete,
+    ExceptionFilter,
+    Get,
+    Param,
+    ParseIntPipe,
+    PayloadTooLargeException,
+    Post,
+    Put,
+    Res,
+    StreamableFile,
+    UploadedFile,
+    UseFilters,
+    UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBody, ApiConsumes, ApiCreatedResponse, ApiOkResponse, ApiParam, ApiProduces, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
+
+import { ImageTooLargeError, NoImageFileError, UnsupportedImageError } from '../../errors/image.errors.js';
+import { AppErrorFilter } from '../../filter/app-error.filter.js';
+import { ImageStoreService } from '../../store/image/image-store.service.js';
 
 import { ReferenceImageManagerService } from '../../manager/reference-image/reference-image.service.js';
 import { StoryManagerService } from '../../manager/story/story.service.js';
@@ -10,6 +33,16 @@ import { PickReferenceImageRequestBodyDTO } from './dto/reference-image.request.
 import { GenerateReferenceCandidatesResponseBodyDTO } from './dto/reference-image.response.dto.js';
 
 const Id = (name: string) => Param(name, ParseIntPipe);
+
+const MAX_UPLOAD_MB = 15;
+
+/** Multer's size limit surfaces as Nest's 413; answer it with the typed domain error instead. */
+@Catch(PayloadTooLargeException)
+class UploadTooLargeFilter implements ExceptionFilter {
+    catch(_exception: PayloadTooLargeException, host: ArgumentsHost): void {
+        new AppErrorFilter().catch(new ImageTooLargeError(MAX_UPLOAD_MB), host);
+    }
+}
 
 /**
  * A Character's Reference image (spec: "Reference image"): generate a round of candidates,
@@ -62,6 +95,27 @@ export class ReferenceImageApiController {
         @Body() body: PickReferenceImageRequestBodyDTO,
     ): Promise<StoryResponseBodyDTO> {
         return this.referenceImageManager.pickCandidate(storyId, characterId, body.candidateId);
+    }
+
+    /**
+     * A picture from the author's phone becomes the Reference image (.scratch/reference-upload/spec.md),
+     * replacing the one before, as a picked candidate does. The type is read from the bytes.
+     */
+    @Put('upload')
+    @UseFilters(UploadTooLargeFilter)
+    @UseInterceptors(FileInterceptor('image', { limits: { fileSize: MAX_UPLOAD_MB * 1024 * 1024, files: 1 } }))
+    @ApiConsumes('multipart/form-data')
+    @ApiBody({ schema: { type: 'object', required: ['image'], properties: { image: { type: 'string', format: 'binary', description: 'A PNG, JPEG or WebP of at most 15 MB.' } } } })
+    @ApiOkResponse({ type: StoryResponseBodyDTO, description: 'The uploaded picture is now the Reference image.' })
+    upload(
+        @Id('storyId') storyId: number,
+        @Id('characterId') characterId: number,
+        @UploadedFile() file: { buffer: Buffer } | undefined,
+    ): Promise<StoryResponseBodyDTO> {
+        if (!file) throw new NoImageFileError();
+        const mimeType = ImageStoreService.sniffMimeType(file.buffer);
+        if (!mimeType) throw new UnsupportedImageError();
+        return this.storyManager.replaceReferenceImage(storyId, characterId, { bytes: file.buffer, mimeType });
     }
 
     @Delete()

@@ -599,6 +599,12 @@ export const storyApi = {
     /** Stores the picked candidate as the Character's one Reference image, replacing the old one. */
     pickReferenceImage: (storyId: number, characterId: number, candidateId: string) =>
         apiSend<Story>('PUT', `/stories/${storyId}/characters/${characterId}/reference-image`, { candidateId }),
+    /** Stores a picture from the phone as the Character's Reference image (.scratch/reference-upload/spec.md), replacing the old one. */
+    uploadReferenceImage: (storyId: number, characterId: number, picture: Blob, filename: string) => {
+        const form = new FormData();
+        form.append('image', picture, filename);
+        return apiFetch<Story>(`/stories/${storyId}/characters/${characterId}/reference-image/upload`, { method: 'PUT', body: form });
+    },
     removeReferenceImage: (storyId: number, characterId: number) =>
         apiSend<Story>('DELETE', `/stories/${storyId}/characters/${characterId}/reference-image`),
     setPortraitCrop: (storyId: number, characterId: number, crop: PortraitCrop) =>

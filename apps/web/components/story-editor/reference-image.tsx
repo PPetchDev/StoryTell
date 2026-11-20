@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { ChangeEvent, useEffect, useRef, useState } from 'react';
 
 import { announce } from '@/components/announcer';
 import { useConnection } from '@/components/connection';
 import { PortraitImage } from '@/components/portrait/portrait-image';
 import { ApiError, ApiUnreachableError } from '@/lib/api';
+import { preparedForUpload } from '@/lib/cover';
 import { candidateImageUrl, Character, PortraitCrop, REFERENCE_CANDIDATES, referenceImageUrl, ReferenceCandidate, Story, storyApi } from '@/lib/story';
 import { ConfirmButton } from './fields';
 import { FIELD_HINT } from './fields';
@@ -89,7 +90,9 @@ export function ReferenceImage({ storyId, character, imageStyle, flush, commit }
         hasImage &&
         (madeFrom.appearance.trim() !== character.appearance.trim() || madeFrom.imageStyle.trim() !== imageStyle.trim());
     const offerRegenerate = lookChanged && !offerDismissed && round.kind === 'idle';
-    const busy = round.kind === 'generating' || round.kind === 'picking';
+    const [uploading, setUploading] = useState(false);
+    const [uploadError, setUploadError] = useState<string | null>(null);
+    const busy = round.kind === 'generating' || round.kind === 'picking' || uploading;
 
     const generate = async () => {
         setRound({ kind: 'generating' });
@@ -151,6 +154,31 @@ export function ReferenceImage({ storyId, character, imageStyle, flush, commit }
                 undo: () => void commit(() => storyApi.setPortraitCrop(storyId, character.id, before), (message) => setCropError(message)),
                 focusAfterUndo: () => box.current?.querySelector<HTMLElement>('[data-reset-face]'),
             });
+        });
+    };
+
+    const fileInput = useRef<HTMLInputElement>(null);
+    /** A picture from the phone becomes the Reference image (.scratch/reference-upload/spec.md), made ready as a Cover is. */
+    const upload = (event: ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        // Cleared, so choosing the same file again still counts as a change.
+        event.target.value = '';
+        if (!file) return;
+        setUploading(true);
+        setUploadError(null);
+        setRound({ kind: 'idle' });
+        const lookNow: Look = { appearance: character.appearance, imageStyle };
+        void commit(
+            async () => {
+                const prepared = await preparedForUpload(file);
+                return storyApi.uploadReferenceImage(storyId, character.id, prepared.picture, prepared.filename);
+            },
+            (message) => setUploadError(message),
+        ).then((saved) => {
+            setUploading(false);
+            if (!saved) return;
+            setMadeFrom(lookNow);
+            setOfferDismissed(false);
         });
     };
 
@@ -304,6 +332,12 @@ export function ReferenceImage({ storyId, character, imageStyle, flush, commit }
                 </div>
             )}
 
+            {uploadError && (
+                <p className="field-error" role="alert">
+                    Couldn&apos;t upload the picture: {uploadError}
+                </p>
+            )}
+
             {round.kind === 'error' && (
                 <p className="field-error flex flex-wrap items-center gap-x-3 gap-y-2" role="alert">
                     <span className="min-w-0 flex-1 basis-48">
@@ -333,6 +367,25 @@ export function ReferenceImage({ storyId, character, imageStyle, flush, commit }
                               ? 'Generate a new Reference image'
                               : 'Generate Reference image'}
                     </button>
+                    <button
+                        type="button"
+                        className="button button-quiet"
+                        aria-disabled={busy || undefined}
+                        aria-label={`Upload a picture of ${heading}`}
+                        aria-busy={uploading || undefined}
+                        onClick={busy ? undefined : () => fileInput.current?.click()}
+                    >
+                        {uploading ? 'Uploading…' : 'Upload a picture'}
+                    </button>
+                    <input
+                        ref={fileInput}
+                        className="visually-hidden"
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        aria-label={`Picture file for ${heading}`}
+                        tabIndex={-1}
+                        onChange={upload}
+                    />
                     {hasImage && !busy && (
                         <ConfirmButton
                             label="Remove Reference image"
@@ -345,7 +398,7 @@ export function ReferenceImage({ storyId, character, imageStyle, flush, commit }
                 </div>
             )}
             {character.appearance.trim() === '' && !hasImage && (
-                <p className={`${FIELD_HINT} mt-2`}>Write the Appearance first; the candidates are drawn from it.</p>
+                <p className={`${FIELD_HINT} mt-2`}>Write the Appearance first to generate one, or upload your own picture.</p>
             )}
         </fieldset>
     );
