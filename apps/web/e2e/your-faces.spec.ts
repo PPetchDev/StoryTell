@@ -64,6 +64,20 @@ test("the Role tab has the Role's Expressions: an upload fills its tile, and Dra
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
 
+test('the Role picture shows its face, picked with Pick the face, which stays after a reload', async ({ page, request }) => {
+    const storyId = await storyWithRin(request, page);
+    await page.goto(`/stories/${storyId}?tab=role`);
+    const card = page.getByRole('region', { name: 'Role picture' });
+    await card.getByRole('button', { name: 'Pick the face in the picture of Rin' }).tap();
+    const sheet = page.getByRole('dialog', { name: 'Face in the picture of Rin' });
+    await sheet.getByRole('slider', { name: 'Down' }).press('ArrowRight');
+    await sheet.getByRole('button', { name: 'Use this picture' }).tap();
+    await expect(sheet).toHaveCount(0);
+    await expect.poll(async () => (await (await request.get(`/api/stories/${storyId}`)).json()).role.imageCrop).not.toBeNull();
+    await page.reload();
+    await expect(page.getByRole('region', { name: 'Role picture' }).getByRole('img', { name: 'Picture of Rin' })).toBeVisible();
+});
+
 test("a Persona's card has its Expressions too", async ({ page, request }) => {
     const created = await request.post('/api/personas', { data: { name: 'Rin of the Reef', description: '' } });
     const personaId = (await created.json()).id as number;

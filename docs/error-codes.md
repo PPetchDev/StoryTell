@@ -81,6 +81,7 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | `422.003.021` | `UnknownVoiceError` | A Narration voice, Speaking voice or voice sample (`POST /api/voices/:voiceId/preview`) naming a voice that `GET /api/voices` doesn't list. Nothing changes and no call is made; `null` (the default) is always allowed. |
 | `404.003.022` | `ExpressionNotFoundError` | Setting or resetting the square of, or removing, an Expression the Character does not have for that emotion. An emotion outside the seven (`neutral` included) is a validation error (`400.000.000`). |
 | `409.003.023` | `NoReferenceImageToDrawError` | Drawing an Expression (`POST .../expressions/:emotion/draw`) for a Character with no Reference image. No call is made. Add a Reference image first. |
+| `409.003.040` | `NoPictureToCropError` | A face square set on the Role's picture (`PUT /api/stories/:storyId/role/image/crop`) or a Persona's (`PUT /api/personas/:personaId/image/crop`) with no picture (`.scratch/your-faces/spec.md`). Nothing changes. |
 | `404.003.026` | `SuddenEventNotFoundError` | No Sudden event with that id in this Story (`PATCH`/`DELETE /api/stories/:storyId/sudden-events/:eventId`). Nothing changes. |
 | `422.003.027` | `SuddenEventLimitError` | A ninth Sudden event on one Story. Nothing is added. |
 | `404.003.028` | `EndingNotFoundError` | No Ending with that id in this Story (`PATCH`/`DELETE /api/stories/:storyId/endings/:endingId`, `.scratch/endings/spec.md`). Nothing changes. |

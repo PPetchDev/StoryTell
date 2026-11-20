@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { NoPictureToCropError } from '../../errors/image.errors.js';
 import { randomBytes } from 'node:crypto';
 import type { ReadAloudLanguage } from '../../model/story/entities/story.entity.js';
 import { StageModelService } from '../../model/stage/stage.service.js';
@@ -578,6 +579,8 @@ export class StoryManagerService {
         const previous = story.role.imagePath;
         try {
             story.role.imagePath = relativePath;
+            // A new picture has its own framing: back to the default face square.
+            story.role.imageCrop = null;
             await this.storyModel.saveRole(story.role);
         } catch (error) {
             await this.removeFile(relativePath);
@@ -593,9 +596,19 @@ export class StoryManagerService {
         const previous = story.role.imagePath;
         if (previous) {
             story.role.imagePath = null;
+            story.role.imageCrop = null;
             await this.storyModel.saveRole(story.role);
             await this.removeFile(previous);
         }
+        return this.reload(storyId);
+    }
+
+    /** Sets or resets the face square of the Role's picture (.scratch/your-faces/spec.md); refused without a picture. */
+    async setRoleImageCrop(storyId: number, crop: PortraitCrop | null): Promise<StoryDetail> {
+        const story = await this.load(storyId);
+        if (!story.role.imagePath) throw new NoPictureToCropError();
+        story.role.imageCrop = crop ? { x: crop.x, y: crop.y, size: crop.size } : null;
+        await this.storyModel.saveRole(story.role);
         return this.reload(storyId);
     }
 

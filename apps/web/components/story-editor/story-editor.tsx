@@ -911,10 +911,16 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                 storyId={storyId}
                                 roleName={story.role.name}
                                 imagePath={story.role.imagePath ?? null}
+                                imageCrop={story.role.imageCrop ?? null}
                                 onSaved={(saved) =>
                                     setStory((current) => ({
                                         ...current,
-                                        role: { ...current.role, imagePath: saved.role.imagePath ?? null, expressions: saved.role.expressions ?? [] },
+                                        role: {
+                                            ...current.role,
+                                            imagePath: saved.role.imagePath ?? null,
+                                            imageCrop: saved.role.imageCrop ?? null,
+                                            expressions: saved.role.expressions ?? [],
+                                        },
                                     }))
                                 }
                             />
@@ -928,9 +934,9 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                         name: story.role.name.trim() === '' ? 'your Role' : story.role.name,
                                         expressions: story.role.expressions ?? [],
                                         picturePath: story.role.imagePath ?? null,
-                                        defaultCrop: null,
+                                        defaultCrop: story.role.imageCrop ?? null,
                                         pictureName: 'Role picture',
-                                        squareName: 'the centre square',
+                                        squareName: "the Role picture's face square",
                                         plainName: 'the Role picture',
                                     }}
                                     api={expressionEndpoints<Story>(`/stories/${storyId}/role`)}

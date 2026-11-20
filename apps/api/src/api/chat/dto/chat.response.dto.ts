@@ -30,7 +30,7 @@ import type { SceneMover } from '../../../model/ledger/entities/scene-advance.en
 import { RollbackCounts } from '../../../model/ledger/ledger.service.js';
 import { EXPRESSION_EMOTIONS } from '../../../model/story/emotion.js';
 import type { ExpressionEmotion } from '../../../model/story/emotion.js';
-import { ExpressionDTO, MissingFieldDTO } from '../../story/dto/story.response.dto.js';
+import { ExpressionDTO, MissingFieldDTO, PortraitCropDTO } from '../../story/dto/story.response.dto.js';
 import { TraySavedReplyDTO } from '../../saved-reply/dto/saved-reply.response.dto.js';
 import { ChatReplaceRuleDTO } from '../../replace-rule/dto/replace-rule.response.dto.js';
 
@@ -144,6 +144,9 @@ export class ChatPersonaImageDTO {
 
     @ApiProperty({ description: 'Served by `GET /api/images/{path}`.' })
     imagePath: string;
+
+    @ApiProperty({ type: () => PortraitCropDTO, nullable: true, description: "Its face square (.scratch/your-faces/spec.md); null uses the default." })
+    crop: PortraitCropDTO | null;
 }
 
 /** The Ending a Chat reached, as the Chat screen shows it (.scratch/endings/spec.md). */
@@ -665,6 +668,9 @@ export class ChatResponseBodyDTO extends ChatSummaryDTO implements Omit<ChatDeta
         description: "The Story's Role's picture, shown beside the user's lines written as the Role (.scratch/role-image/spec.md); null without.",
     })
     roleImagePath: string | null;
+
+    @ApiProperty({ type: () => PortraitCropDTO, nullable: true, description: "The Role's picture's face square (.scratch/your-faces/spec.md); null uses the default." })
+    roleImageCrop: PortraitCropDTO | null;
 
     @ApiProperty({ type: () => [ExpressionDTO], description: "The Role's Expressions, for the faces of the user's lines written as the Role (.scratch/your-faces/spec.md)." })
     roleExpressions: ExpressionDTO[];

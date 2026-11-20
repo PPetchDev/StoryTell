@@ -1,3 +1,4 @@
+import type { PortraitCrop } from './story';
 import { apiFetch, apiSend } from './api';
 import { resumableTurn } from './turn-stream';
 import type { Belief } from './memory';
@@ -255,9 +256,11 @@ export interface Chat extends ChatSummary {
     /** The worn Persona; null while the Chat wears its Story's Role. */
     personaId: number | null;
     /** The pictures of the Personas this Chat shows: the worn one and those its User Messages were written as, where they have one. */
-    personaImages: Array<{ personaId: number; imagePath: string }>;
+    personaImages: Array<{ personaId: number; imagePath: string; crop?: PortraitCrop | null }>;
     /** The Role's picture, for your lines written as the Role (.scratch/role-image/spec.md); left out by an older API. */
     roleImagePath?: string | null;
+    /** The Role picture's face square (.scratch/your-faces/spec.md); left out by an older API. */
+    roleImageCrop?: PortraitCrop | null;
     /** The Role's Expressions, for the faces of your lines written as the Role (.scratch/your-faces/spec.md); left out by an older API. */
     roleExpressions?: Expression[];
     /** The Expressions of the Personas in this Chat that have any; left out by an older API. */

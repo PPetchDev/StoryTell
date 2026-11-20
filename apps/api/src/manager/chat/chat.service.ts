@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import type { PortraitCrop } from '../../model/story/entities/character.entity.js';
 import type { ExpressionResponse } from '../../model/story/entities/character-expression.entity.js';
 import type { ExpressionEmotion } from '../../model/story/emotion.js';
 
@@ -244,9 +245,11 @@ export interface ChatDetail extends ChatSummary {
      * The pictures of the Personas in this Chat (.scratch/persona-image/spec.md): the worn one and
      * those its User Messages were written as, where they still exist and have one.
      */
-    personaImages: Array<{ personaId: number; imagePath: string }>;
+    personaImages: Array<{ personaId: number; imagePath: string; crop: PortraitCrop | null }>;
     /** The Role's picture, for the user's lines written as the Role (.scratch/role-image/spec.md). */
     roleImagePath: string | null;
+    /** Its face square (.scratch/your-faces/spec.md); null uses the default. */
+    roleImageCrop: PortraitCrop | null;
     /** The Role's Expressions, for the faces of the user's lines written as the Role (.scratch/your-faces/spec.md). */
     roleExpressions: ExpressionResponse[];
     /** The Expressions of the Personas in this Chat that have any (.scratch/your-faces/spec.md). */
@@ -2251,9 +2254,10 @@ export class ChatManagerService {
             roleName: fillPlaceholders(story.role.name, story.openingQuestions, chat.openingAnswers),
             openingAnswers: chat.openingAnswers ? { ...chat.openingAnswers } : null,
             personaImages: personas.flatMap((persona) =>
-                persona.imagePath && inChat.has(persona.id) ? [{ personaId: persona.id, imagePath: persona.imagePath }] : [],
+                persona.imagePath && inChat.has(persona.id) ? [{ personaId: persona.id, imagePath: persona.imagePath, crop: persona.imageCrop ?? null }] : [],
             ),
             roleImagePath: story.role.imagePath ?? null,
+            roleImageCrop: story.role.imageCrop ?? null,
             roleExpressions: story.role.toResponse().expressions,
             personaExpressions: personas.flatMap((persona) => {
                 const expressions = persona.toResponse().expressions;

@@ -1,3 +1,4 @@
+import { PortraitCropRequestBodyDTO } from '../reference-image/dto/portrait-crop.request.dto.js';
 import {
     ArgumentsHost,
     Body,
@@ -87,6 +88,20 @@ export class PersonaApiController {
     uploadImage(@Id('personaId') personaId: number, @UploadedFile() file: UploadedImage | undefined): Promise<PersonaResponseBodyDTO> {
         if (!file) throw new NoImageFileError();
         return this.personaManager.uploadImage(personaId, file.buffer);
+    }
+
+    /** Its picture's face square (.scratch/your-faces/spec.md); 409.003.040 without a picture. */
+    @Put(':personaId/image/crop')
+    @ApiOkResponse({ type: PersonaResponseBodyDTO })
+    setImageCrop(@Id('personaId') personaId: number, @Body() body: PortraitCropRequestBodyDTO): Promise<PersonaResponseBodyDTO> {
+        return this.personaManager.setImageCrop(personaId, body);
+    }
+
+    /** Back to the default face square. */
+    @Delete(':personaId/image/crop')
+    @ApiOkResponse({ type: PersonaResponseBodyDTO })
+    clearImageCrop(@Id('personaId') personaId: number): Promise<PersonaResponseBodyDTO> {
+        return this.personaManager.setImageCrop(personaId, null);
     }
 
     /** No picture again; the file is deleted. */

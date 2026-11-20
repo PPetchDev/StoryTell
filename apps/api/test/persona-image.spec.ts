@@ -157,7 +157,7 @@ describe('Persona image', () => {
 
         // Worn: named at once, before any Message is written as it.
         const worn = await t.http.put(`${chatPath}/identity`).set('Cookie', owner).send({ personaId: pictured.id }).expect(200);
-        expect(worn.body.personaImages).toEqual([{ personaId: pictured.id, imagePath: edaPath }]);
+        expect(worn.body.personaImages).toEqual([{ personaId: pictured.id, imagePath: edaPath, crop: null }]);
 
         t.gateway.scriptText('turn', { text: '@Mira: Heard.', model: 'glm-5.3' });
         t.gateway.scriptText('judge', '{"bond_changes":[],"arc_steps":[],"scene":{"move_on":false,"reason":"not yet"}}');
@@ -166,10 +166,10 @@ describe('Persona image', () => {
 
         // Another Persona is worn now, one without a picture: the first is still named, for the Message written as it.
         const swapped = await t.http.put(`${chatPath}/identity`).set('Cookie', owner).send({ personaId: plain.id }).expect(200);
-        expect(swapped.body.personaImages).toEqual([{ personaId: pictured.id, imagePath: edaPath }]);
+        expect(swapped.body.personaImages).toEqual([{ personaId: pictured.id, imagePath: edaPath, crop: null }]);
         // Back to the Role: the same, and never a Persona this Chat does not show.
         const role = await t.http.put(`${chatPath}/identity`).set('Cookie', owner).send({ personaId: null }).expect(200);
-        expect(role.body.personaImages).toEqual([{ personaId: pictured.id, imagePath: edaPath }]);
+        expect(role.body.personaImages).toEqual([{ personaId: pictured.id, imagePath: edaPath, crop: null }]);
 
         // Its picture cleared, or the Persona deleted: the Chat names none.
         await t.http.delete(`/api/personas/${pictured.id}/image`).set('Cookie', owner).expect(200);

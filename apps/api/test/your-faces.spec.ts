@@ -229,6 +229,41 @@ describe('Your faces', () => {
         });
     });
 
+    describe("the picture's face square", () => {
+        it('the Role picture keeps the square picked, a new picture goes back to the default, and none is refused without a picture', async () => {
+            const bare = await storyWithRole(false);
+            const refused = await t.http.put(`/api/stories/${bare.id}/role/image/crop`).send({ x: 0.2, y: 0.1, size: 0.5 }).expect(409);
+            expect(refused.body.error.code).toBe('409.003.040');
+
+            const story = await storyWithRole();
+            const cropped = (await t.http.put(`/api/stories/${story.id}/role/image/crop`).send({ x: 0.2, y: 0.1, size: 0.5 }).expect(200)).body as Story & { role: { imageCrop: unknown } };
+            expect(cropped.role.imageCrop).toEqual({ x: 0.2, y: 0.1, size: 0.5 });
+            const reset = (await t.http.delete(`/api/stories/${story.id}/role/image/crop`).expect(200)).body as Story & { role: { imageCrop: unknown } };
+            expect(reset.role.imageCrop).toBeNull();
+
+            await t.http.put(`/api/stories/${story.id}/role/image/crop`).send({ x: 0.3, y: 0, size: 0.4 }).expect(200);
+            const replaced = (await t.http.put(`/api/stories/${story.id}/role/image`).attach('image', png('rin-2'), 'rin2.png').expect(200)).body as Story & { role: { imageCrop: unknown } };
+            expect(replaced.role.imageCrop).toBeNull();
+        });
+
+        it("a Persona picture's square, and the Chat answers both squares", async () => {
+            const persona = (await t.http.post('/api/personas').send({ name: 'Rin' }).expect(201)).body as Persona;
+            await t.http.put(`/api/personas/${persona.id}/image/crop`).send({ x: 0.1, y: 0.1, size: 0.3 }).expect(409);
+            await t.http.put(`/api/personas/${persona.id}/image`).attach('image', png('rin'), 'rin.png').expect(200);
+            const cropped = (await t.http.put(`/api/personas/${persona.id}/image/crop`).send({ x: 0.1, y: 0.1, size: 0.3 }).expect(200)).body as Persona & { imageCrop: unknown };
+            expect(cropped.imageCrop).toEqual({ x: 0.1, y: 0.1, size: 0.3 });
+
+            const story = await storyWithRole();
+            await t.http.put(`/api/stories/${story.id}/role/image/crop`).send({ x: 0.2, y: 0.1, size: 0.5 }).expect(200);
+            await t.http.patch(`/api/stories/${story.id}`).send({ setting: 'A market.', opening: 'The lanterns sway.\n\n@Mira: You came.' }).expect(200);
+            await t.http.post(`/api/stories/${story.id}/characters`).send({ name: 'Mira', appearance: 'Tall.', personality: 'Warm.', voice: 'Quick.' }).expect(201);
+            const chatId = (await t.http.post(`/api/stories/${story.id}/chats`).expect(201)).body.id as number;
+            const chat = (await t.http.get(`/api/stories/${story.id}/chats/${chatId}`).expect(200)).body;
+            expect(chat.roleImageCrop).toEqual({ x: 0.2, y: 0.1, size: 0.5 });
+            await t.http.delete(`/api/personas/${persona.id}`).expect(204);
+        });
+    });
+
     describe('on a Persona', () => {
         it('draws and uploads as the Role does, answers the Persona, and goes with it', async () => {
             const persona = (await t.http.post('/api/personas').send({ name: 'Rin' }).expect(201)).body as Persona;

@@ -2,7 +2,7 @@ import { CSSProperties, ReactNode, useContext, useId } from 'react';
 
 import { MessageTabStop } from '@/components/chat/chat-classes';
 import { useCastCharacter, useCharacterProfile } from '@/components/chat/character-profile';
-import { usePersonaPicture, useYourFace } from '@/components/chat/persona-pictures';
+import { usePersonaPicture, usePersonaPictureCrop, useYourFace } from '@/components/chat/persona-pictures';
 import { PortraitImage } from '@/components/portrait/portrait-image';
 import { CharacterPortrait } from '@/components/portrait/character-portrait';
 import { Cast, characterColour, Portrait, Portraits } from '@/lib/character-colour';
@@ -98,6 +98,7 @@ export function UserLine({
     face?: ExpressionEmotion | null;
 }) {
     const picture = usePersonaPicture(personaId);
+    const pictureCrop = usePersonaPictureCrop(personaId);
     const faced = useYourFace(personaId, face);
     return (
         <div className={`flex items-start justify-end gap-2 ${STORY_SIZE}`}>
@@ -110,12 +111,12 @@ export function UserLine({
             </div>
             {faced ? (
                 <span className="relative shrink-0" data-your-face={faced.emotion} title={EMOTION_LABEL[faced.emotion]}>
-                    <PortraitImage portrait={{ src: referenceImageUrl(faced.imagePath), crop: faced.crop }} className="size-9" />
+                    <PortraitImage portrait={{ src: referenceImageUrl(faced.imagePath), crop: faced.crop ?? pictureCrop }} className="size-9" />
                     <span className="sr-only">{`Face: ${EMOTION_LABEL[faced.emotion]}`}</span>
                 </span>
             ) : picture ? (
-                // eslint-disable-next-line @next/next/no-img-element -- served by the API from the image folder, as a thumbnail
-                <img className={`${AVATAR} bg-surface-raised`} src={personaImageUrl(picture, 320)} alt="" draggable={false} data-persona-picture />
+                // Its face square (.scratch/your-faces/spec.md), so a full-length picture shows the face.
+                <PortraitImage portrait={{ src: personaImageUrl(picture, 320), crop: pictureCrop }} className="size-9 shrink-0" imageData="persona-picture" />
             ) : (
                 <Avatar name={identityName} colour="var(--accent-fill)" light />
             )}

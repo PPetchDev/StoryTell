@@ -1,4 +1,6 @@
 import { randomBytes } from 'node:crypto';
+import type { PortraitCrop } from '../../model/story/entities/character.entity.js';
+import { NoPictureToCropError } from '../../errors/image.errors.js';
 
 import { Injectable, Logger } from '@nestjs/common';
 
@@ -72,6 +74,8 @@ export class PersonaManagerService {
         await this.imageStore.write(relativePath, bytes);
         const previous = persona.imagePath;
         persona.imagePath = relativePath;
+        // A new picture has its own framing: back to the default face square.
+        persona.imageCrop = null;
         try {
             await this.personaModel.save(persona);
         } catch (error) {
@@ -88,9 +92,18 @@ export class PersonaManagerService {
         const previous = persona.imagePath;
         if (!previous) return persona.toResponse();
         persona.imagePath = null;
+        persona.imageCrop = null;
         await this.personaModel.save(persona);
         await this.removeFile(previous);
         return persona.toResponse();
+    }
+
+    /** Sets or resets the face square of its picture (.scratch/your-faces/spec.md); refused without a picture. */
+    async setImageCrop(id: number, crop: PortraitCrop | null): Promise<PersonaResponse> {
+        const persona = await this.find(id);
+        if (!persona.imagePath) throw new NoPictureToCropError();
+        persona.imageCrop = crop ? { x: crop.x, y: crop.y, size: crop.size } : null;
+        return (await this.personaModel.save(persona)).toResponse();
     }
 
     /** A file that will not go is logged and left: the Persona no longer points at it. */

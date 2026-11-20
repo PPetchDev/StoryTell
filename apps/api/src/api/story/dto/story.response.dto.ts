@@ -198,6 +198,9 @@ export class RoleDTO implements RoleResponse {
     })
     imagePath: string | null;
 
+    @ApiProperty({ type: () => PortraitCropDTO, nullable: true, description: "Its picture's face square (.scratch/your-faces/spec.md); null uses the default." })
+    imageCrop: PortraitCropDTO | null;
+
     @ApiProperty({ type: () => [ExpressionDTO], description: 'Its Expressions, drawn from its picture or uploaded (.scratch/your-faces/spec.md); empty without.' })
     expressions: ExpressionDTO[];
 }

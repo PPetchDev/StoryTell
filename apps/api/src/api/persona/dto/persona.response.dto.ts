@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 
 import type { PersonaResponse } from '../../../model/persona/entities/persona.entity.js';
-import { ExpressionDTO } from '../../story/dto/story.response.dto.js';
+import { ExpressionDTO, PortraitCropDTO } from '../../story/dto/story.response.dto.js';
 
 export class PersonaResponseBodyDTO implements PersonaResponse {
     @ApiProperty()
@@ -15,6 +15,9 @@ export class PersonaResponseBodyDTO implements PersonaResponse {
 
     @ApiProperty({ type: String, nullable: true, description: 'Its picture, served by `GET /api/images/{path}`; null without one.' })
     imagePath: string | null;
+
+    @ApiProperty({ type: () => PortraitCropDTO, nullable: true, description: "Its picture's face square (.scratch/your-faces/spec.md); null uses the default." })
+    imageCrop: PortraitCropDTO | null;
 
     @ApiProperty({ type: [ExpressionDTO], description: 'Its Expressions, drawn from its picture or uploaded (.scratch/your-faces/spec.md); empty without.' })
     expressions: ExpressionDTO[];

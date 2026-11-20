@@ -4,6 +4,8 @@ import { ChangeEvent, useRef, useState } from 'react';
 
 import { useConnection } from '@/components/connection';
 import { initialOf } from '@/components/portrait/character-portrait';
+import { PortraitImage } from '@/components/portrait/portrait-image';
+import { PortraitCropper } from '@/components/story-editor/portrait-cropper';
 import { Autosave } from '@/components/story-editor/autosave';
 import { ExpressionSet } from '@/components/story-editor/expressions';
 import { ConfirmButton } from '@/components/story-editor/fields';
@@ -41,9 +43,14 @@ function PersonaCard({ persona, autosave, justCreated, onSaved, onDelete, focusA
     const [pictureError, setPictureError] = useState<string | null>(null);
     /** Its Expressions (.scratch/your-faces/spec.md), as the last write answered them. */
     const [faces, setFaces] = useState(persona.expressions ?? []);
+    /** Its picture's face square, and picking it. */
+    const [crop, setCrop] = useState(persona.imageCrop ?? null);
+    const [cropping, setCropping] = useState(false);
+    const [cropError, setCropError] = useState<string | null>(null);
     const took = (saved: Persona) => {
         setFaces(saved.expressions ?? []);
         setPicture(saved.imagePath);
+        setCrop(saved.imageCrop ?? null);
         onSaved(saved);
     };
     const fileInput = useRef<HTMLInputElement>(null);
@@ -91,13 +98,7 @@ function PersonaCard({ persona, autosave, justCreated, onSaved, onDelete, focusA
         <li id={idPrefix} className="card m-0 grid gap-2" aria-label={persona.name}>
             <div className="flex items-center gap-3">
                 {picture ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- served by the API from the image folder, as a thumbnail
-                    <img
-                        className="size-16 shrink-0 rounded-full bg-surface-raised object-cover"
-                        src={personaImageUrl(picture, 320)}
-                        alt={`Picture of ${persona.name}`}
-                        draggable={false}
-                    />
+                    <PortraitImage portrait={{ src: personaImageUrl(picture, 320), crop }} className="size-16 shrink-0" alt={`Picture of ${persona.name}`} />
                 ) : (
                     <span className="grid size-16 shrink-0 place-items-center rounded-full bg-accent-fill text-2xl leading-none font-bold text-accent-text" aria-hidden="true">
                         {initialOf(name)}
@@ -115,6 +116,17 @@ function PersonaCard({ persona, autosave, justCreated, onSaved, onDelete, focusA
                         >
                             {picture ? 'Change picture' : 'Add a picture'}
                         </button>
+                        {picture && (
+                            <button
+                                type="button"
+                                className="button button-quiet button-small"
+                                disabled={pictureBusy !== null}
+                                aria-label={`Pick the face in the picture of ${persona.name}`}
+                                onClick={() => setCropping(true)}
+                            >
+                                Pick the face
+                            </button>
+                        )}
                         {picture && (
                             <ConfirmButton
                                 label="Remove picture"
@@ -144,6 +156,38 @@ function PersonaCard({ persona, autosave, justCreated, onSaved, onDelete, focusA
             <p className={pictureBusy ? 'm-0 text-md text-muted' : 'sr-only'} role="status">
                 {pictureBusy}
             </p>
+            {cropping && picture && (
+                <PortraitCropper
+                    name={persona.name}
+                    src={personaImageUrl(picture)}
+                    initial={crop}
+                    saving={pictureBusy !== null}
+                    error={cropError}
+                    onSave={(next) => {
+                        setCropError(null);
+                        setPictureBusy('Saving the face…');
+                        personaApi.setImageCrop(persona.id, next).then(
+                            (saved) => {
+                                took(saved);
+                                setCropping(false);
+                                setPictureBusy(null);
+                            },
+                            (caught: unknown) => {
+                                if (caught instanceof ApiUnreachableError) reportUnreachable();
+                                setCropError(caught instanceof ApiError ? caught.message : "Couldn't save the face. Try again.");
+                                setPictureBusy(null);
+                            },
+                        );
+                    }}
+                    onClose={() => {
+                        setCropping(false);
+                        setCropError(null);
+                    }}
+                    sheetLabel={`Face in the picture of ${persona.name}`}
+                    title="Pick the face"
+                    imageAlt={`Picture of ${persona.name}`}
+                />
+            )}
             {pictureError && (
                 <p className="field-error" role="alert">
                     {pictureError}
@@ -187,9 +231,9 @@ function PersonaCard({ persona, autosave, justCreated, onSaved, onDelete, focusA
                     name: name.trim() === '' ? 'this Persona' : name,
                     expressions: faces,
                     picturePath: picture,
-                    defaultCrop: null,
+                    defaultCrop: crop,
                     pictureName: 'picture',
-                    squareName: 'the centre square',
+                    squareName: "the picture's face square",
                     plainName: 'its picture',
                 }}
                 api={expressionEndpoints<Persona>(`/personas/${persona.id}`)}

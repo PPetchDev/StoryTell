@@ -64,6 +64,8 @@ export interface Role {
     sections?: RoleSection[];
     /** Its picture's path (.scratch/role-image/spec.md), shown beside your lines written as the Role; null without, left out by an older API. */
     imagePath?: string | null;
+    /** Its picture's face square (.scratch/your-faces/spec.md); null uses the default, left out by an older API. */
+    imageCrop?: PortraitCrop | null;
     /** Its Expressions, drawn from its picture or uploaded (.scratch/your-faces/spec.md); left out by an older API. */
     expressions?: Expression[];
 }
@@ -658,6 +660,9 @@ export const storyApi = {
         return apiFetch<Story>(`/stories/${storyId}/role/image`, { method: 'PUT', body: form });
     },
     clearRoleImage: (storyId: number) => apiSend<Story>('DELETE', `/stories/${storyId}/role/image`),
+    /** The Role picture's face square (.scratch/your-faces/spec.md); null goes back to the default. */
+    setRoleImageCrop: (storyId: number, crop: PortraitCrop | null) =>
+        crop ? apiSend<Story>('PUT', `/stories/${storyId}/role/image/crop`, crop) : apiSend<Story>('DELETE', `/stories/${storyId}/role/image/crop`),
     setCoverFocus: (storyId: number, focus: CoverFocus) =>
         apiSend<Story>('PUT', `/stories/${storyId}/cover/focus`, focus),
     clearCoverFocus: (storyId: number) => apiSend<Story>('DELETE', `/stories/${storyId}/cover/focus`),

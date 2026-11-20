@@ -2,12 +2,15 @@
 
 import { ChangeEvent, useRef, useState } from 'react';
 
+import { PortraitImage } from '@/components/portrait/portrait-image';
+import { PortraitCropper } from './portrait-cropper';
+
 import { useConnection } from '@/components/connection';
 import { initialOf } from '@/components/portrait/character-portrait';
 import { ApiError, ApiUnreachableError } from '@/lib/api';
 import { preparedForUpload } from '@/lib/cover';
 import { personaImageUrl } from '@/lib/persona';
-import { Story, storyApi } from '@/lib/story';
+import { PortraitCrop, Story, storyApi } from '@/lib/story';
 import { ConfirmButton } from './fields';
 import { EDITOR_CARD, NOTE } from './folding-card';
 
@@ -15,6 +18,8 @@ interface RolePictureProps {
     storyId: number;
     roleName: string;
     imagePath: string | null;
+    /** The picture's face square (.scratch/your-faces/spec.md); null uses the default. */
+    imageCrop?: PortraitCrop | null;
     /** The Story as the API answered, once a picture is saved or removed. */
     onSaved(story: Story): void;
 }
@@ -24,7 +29,10 @@ interface RolePictureProps {
  * made ready in the browser as a Cover is, and saved at once. It shows beside your lines in a Chat
  * written as the Role; no model ever sees it.
  */
-export function RolePicture({ storyId, roleName, imagePath, onSaved }: RolePictureProps) {
+export function RolePicture({ storyId, roleName, imagePath, imageCrop = null, onSaved }: RolePictureProps) {
+    /** Picking the face square (.scratch/your-faces/spec.md): the picture is round, so its face must be in the circle. */
+    const [cropping, setCropping] = useState(false);
+    const [cropError, setCropError] = useState<string | null>(null);
     const { reportUnreachable } = useConnection();
     /** What is happening to the picture, in words, while it is: "Uploading…", "Removing…". */
     const [busy, setBusy] = useState<string | null>(null);
@@ -64,13 +72,7 @@ export function RolePicture({ storyId, roleName, imagePath, onSaved }: RolePictu
             <p className={NOTE}>Optional. Shown beside your lines in a Chat when you play this Role.</p>
             <div className="flex items-center gap-3">
                 {imagePath ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- served by the API from the image folder, as a thumbnail
-                    <img
-                        className="size-16 shrink-0 rounded-full bg-surface-raised object-cover"
-                        src={personaImageUrl(imagePath, 320)}
-                        alt={`Picture of ${name}`}
-                        draggable={false}
-                    />
+                    <PortraitImage portrait={{ src: personaImageUrl(imagePath, 320), crop: imageCrop }} className="size-16 shrink-0" alt={`Picture of ${name}`} />
                 ) : (
                     <span className="grid size-16 shrink-0 place-items-center rounded-full bg-accent-fill text-2xl leading-none font-bold text-accent-text" aria-hidden="true">
                         {initialOf(roleName)}
@@ -87,6 +89,17 @@ export function RolePicture({ storyId, roleName, imagePath, onSaved }: RolePictu
                     >
                         {imagePath ? 'Change picture' : 'Add a picture'}
                     </button>
+                    {imagePath && (
+                        <button
+                            type="button"
+                            className="button button-quiet button-small"
+                            disabled={busy !== null}
+                            aria-label={`Pick the face in the picture of ${name}`}
+                            onClick={() => setCropping(true)}
+                        >
+                            Pick the face
+                        </button>
+                    )}
                     {imagePath && (
                         <ConfirmButton
                             label="Remove picture"
@@ -118,6 +131,38 @@ export function RolePicture({ storyId, roleName, imagePath, onSaved }: RolePictu
                 <p className="field-error mt-2 mb-0" role="alert">
                     {error}
                 </p>
+            )}
+            {cropping && imagePath && (
+                <PortraitCropper
+                    name={name}
+                    src={personaImageUrl(imagePath)}
+                    initial={imageCrop}
+                    saving={busy !== null}
+                    error={cropError}
+                    onSave={(crop) => {
+                        setCropError(null);
+                        setBusy('Saving the face…');
+                        storyApi.setRoleImageCrop(storyId, crop).then(
+                            (saved) => {
+                                onSaved(saved);
+                                setCropping(false);
+                                setBusy(null);
+                            },
+                            (caught: unknown) => {
+                                if (caught instanceof ApiUnreachableError) reportUnreachable();
+                                setCropError(caught instanceof ApiError ? caught.message : "Couldn't save the face. Try again.");
+                                setBusy(null);
+                            },
+                        );
+                    }}
+                    onClose={() => {
+                        setCropping(false);
+                        setCropError(null);
+                    }}
+                    sheetLabel={`Face in the picture of ${name}`}
+                    title="Pick the face"
+                    imageAlt={`Picture of ${name}`}
+                />
             )}
         </section>
     );

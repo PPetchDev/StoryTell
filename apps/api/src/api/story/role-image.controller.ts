@@ -1,5 +1,7 @@
+import { PortraitCropRequestBodyDTO } from '../reference-image/dto/portrait-crop.request.dto.js';
 import {
     ArgumentsHost,
+    Body,
     Catch,
     Controller,
     Delete,
@@ -61,5 +63,17 @@ export class RoleImageApiController {
     @ApiOkResponse({ type: StoryResponseBodyDTO, description: 'The Role has no picture again; its file is deleted.' })
     clear(@Id('storyId') storyId: number): Promise<StoryResponseBodyDTO> {
         return this.storyManager.clearRoleImage(storyId);
+    }
+
+    @Put('crop')
+    @ApiOkResponse({ type: StoryResponseBodyDTO, description: "The picture's face square, in fractions of its width (.scratch/your-faces/spec.md). 409.003.040 without a picture." })
+    setCrop(@Id('storyId') storyId: number, @Body() body: PortraitCropRequestBodyDTO): Promise<StoryResponseBodyDTO> {
+        return this.storyManager.setRoleImageCrop(storyId, body);
+    }
+
+    @Delete('crop')
+    @ApiOkResponse({ type: StoryResponseBodyDTO, description: 'Back to the default face square.' })
+    clearCrop(@Id('storyId') storyId: number): Promise<StoryResponseBodyDTO> {
+        return this.storyManager.setRoleImageCrop(storyId, null);
     }
 }

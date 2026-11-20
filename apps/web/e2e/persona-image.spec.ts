@@ -79,8 +79,9 @@ test("a Persona's picture is added on the Personas page, shows beside the user's
         await expect(beside).toBeVisible();
         await expect.poll(() => beside.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
         expect(await beside.getAttribute('src')).toBe(`/api/images/${imagePath}?w=320`);
-        // Round and the size of a Character's picture beside a line.
-        const box = (await beside.boundingBox())!;
+        // Round and the size of a Character's picture beside a line: the round frame, which shows the picture's
+        // face square (.scratch/your-faces/spec.md), so the whole picture inside it is larger.
+        const box = (await beside.locator('xpath=..').boundingBox())!;
         expect(Math.round(box.width)).toBe(36);
         expect(Math.round(box.height)).toBe(36);
 

@@ -67,3 +67,10 @@ In a Chat, the composer has a **face** button beside 🎲. The user picks a face
 - API: `identity_expression` (one owner per row, the Role or a Persona), `message.face` and `face_by`; Role and Persona Expression routes beside the Character's; Draw all runs keyed by owner; Duplicate copies the Role's, and deleting a Story or a Persona deletes their files. The Judge asks `user_emotion` only when the Message has no picked face and the Role or Persona it was written as has Expressions.
 - Web: the Expressions editor now serves any owner (`ExpressionSet`); the Role tab and each Persona card show it. The composer's face button (after 🎲) opens a sheet of the thirteen faces; the face shows beside the user's line and on the Visual novel stage.
 - Checked: the API suite (one Reach-outs test fails between about 14:00 and 15:00 local time, before and after this work: its "an hour later" lands in quiet hours); e2e in three shards, 388 passed. Not checked on a real model: drawing the Role's faces (Venice credit), and how the Narrator answers a picked face.
+
+## Picking the face (2026-11-20)
+
+Asked with a screenshot of the Role tab's round picture showing Rin's body, not her face: "มันเลือกตำแหน่งหน้าไม่ได้อ่ะ" (it can't pick where the face is).
+
+- The Role picture and a Persona picture have a face square, `image_crop` (fractions of the picture's width, as a Portrait's), set with **Pick the face** and the same cropper as a Character's Portrait. Without one, the round picture shows the default square (top centre), as a Portrait does. A new picture goes back to the default; there is no square without a picture (409.003.040).
+- The square is used wherever the picture is round: the Role tab, the Persona card, beside the user's lines; and it is the default square of the Expressions drawn from that picture.

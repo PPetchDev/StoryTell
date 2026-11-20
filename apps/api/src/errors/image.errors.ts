@@ -87,3 +87,10 @@ export class InvalidThumbnailWidthError extends AppError {
         super('400.002.013', `A thumbnail is ${widths.join(' or ')} pixels wide.`);
     }
 }
+
+/** A face square set on the Role's or a Persona's picture when there is no picture (.scratch/your-faces/spec.md). */
+export class NoPictureToCropError extends AppError {
+    constructor() {
+        super('409.003.040', 'Add a picture first: there is no face to pick without one.');
+    }
+}

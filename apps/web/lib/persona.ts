@@ -1,3 +1,4 @@
+import type { PortraitCrop } from './story';
 import { apiFetch, apiSend } from './api';
 import type { Expression } from './expressions';
 
@@ -9,6 +10,8 @@ export interface Persona {
     description: string;
     /** Its picture (CONTEXT.md, "Persona image"), as a path under `/api/images/`; null without one. */
     imagePath: string | null;
+    /** Its picture's face square (.scratch/your-faces/spec.md); null uses the default, left out by an older API. */
+    imageCrop?: PortraitCrop | null;
     /** Its Expressions, drawn from its picture or uploaded (.scratch/your-faces/spec.md); left out by an older API. */
     expressions?: Expression[];
     createdAt: string;
@@ -38,6 +41,9 @@ export const personaApi = {
         return apiFetch<Persona>(`/personas/${personaId}/image`, { method: 'PUT', body: form });
     },
     clearImage: (personaId: number) => apiSend<Persona>('DELETE', `/personas/${personaId}/image`),
+    /** Its picture's face square (.scratch/your-faces/spec.md); null goes back to the default. */
+    setImageCrop: (personaId: number, crop: PortraitCrop | null) =>
+        crop ? apiSend<Persona>('PUT', `/personas/${personaId}/image/crop`, crop) : apiSend<Persona>('DELETE', `/personas/${personaId}/image/crop`),
     /** Chats wearing it fall back to their Story's Role. */
     remove: (personaId: number) => apiSend<void>('DELETE', `/personas/${personaId}`),
 };
