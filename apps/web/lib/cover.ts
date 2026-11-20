@@ -9,6 +9,8 @@ const MAX_SIDE = 2048;
  * A picture the browser can't decode is sent as it is, and the API says whether it can use it.
  */
 export async function preparedForUpload(file: File): Promise<{ picture: Blob; filename: string }> {
+    // A moving picture (an animated WebP) is sent as it is: a canvas would keep only its first frame.
+    if (await isAnimatedWebp(file)) return { picture: file, filename: file.name };
     try {
         const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
         const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
@@ -29,6 +31,21 @@ export async function preparedForUpload(file: File): Promise<{ picture: Blob; fi
         // Fall through: the original file.
     }
     return { picture: file, filename: file.name };
+}
+
+/** Whether the file is a WebP with more than one frame: its header says WEBP, and it has an ANIM chunk near the start. */
+export async function isAnimatedWebp(file: Blob): Promise<boolean> {
+    try {
+        const head = new Uint8Array(await file.slice(0, 64 * 1024).arrayBuffer());
+        const text = (from: number, to: number) => String.fromCharCode(...head.subarray(from, to));
+        if (text(0, 4) !== 'RIFF' || text(8, 12) !== 'WEBP') return false;
+        for (let i = 12; i + 4 <= head.length; i++) {
+            if (head[i] === 0x41 && text(i, i + 4) === 'ANIM') return true;
+        }
+    } catch {
+        // Not readable: treat it as a still picture.
+    }
+    return false;
 }
 
 /** The focus point a tap at (clientX, clientY) on the picture's box means, kept inside the picture. */

@@ -95,7 +95,12 @@ export class ImageStoreService {
     }
 
     private async makeThumbnail(from: string, to: string, width: ThumbnailWidth): Promise<void> {
-        const bytes = await sharp(from).rotate().resize({ width, withoutEnlargement: true }).webp({ quality: 78 }).toBuffer();
+        // Read whole first, so libvips holds no handle on the file (Windows can't delete an open file).
+        const input = await readFile(from);
+        // A moving picture (an animated WebP Cover) keeps every frame; a still one is turned upright first.
+        const animated = ((await sharp(input).metadata()).pages ?? 1) > 1;
+        const image = animated ? sharp(input, { animated: true }) : sharp(input).rotate();
+        const bytes = await image.resize({ width, withoutEnlargement: true }).webp({ quality: 78 }).toBuffer();
         await mkdir(path.dirname(to), { recursive: true });
         // Written whole under another name first, so a reader never gets half a file.
         const partial = `${to}.${randomBytes(4).toString('hex')}.part`;
