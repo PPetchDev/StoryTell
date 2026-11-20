@@ -58,9 +58,9 @@ describe('Usage', () => {
                 { kind: 'judge', spentUsd: 0.000112, calls: 1 },
             ]);
             expect(body.pools.image).toEqual({
-                spentUsd: 0.04,
+                spentUsd: 0.11,
                 calls: 1,
-                byKind: [{ kind: 'reference_image', spentUsd: 0.04, calls: 1 }],
+                byKind: [{ kind: 'reference_image', spentUsd: 0.11, calls: 1 }],
                 remainingUsd: 6.4,
                 capUsd: 8,
                 lowCreditPercent: 20,
@@ -68,8 +68,8 @@ describe('Usage', () => {
                 host: null,
                 cache: null,
                 // .scratch/cost-view/spec.md: the month by model and by host, for the Owner.
-                byModel: [{ name: 'qwen-image-3', spentUsd: 0.04, calls: 1, cache: null }],
-                byHost: [{ name: 'venice', spentUsd: 0.04, calls: 1, cache: null }],
+                byModel: [{ name: 'seedream-v5-pro', spentUsd: 0.11, calls: 1, cache: null }],
+                byHost: [{ name: 'venice', spentUsd: 0.11, calls: 1, cache: null }],
             });
             // .scratch/prompt-cache/spec.md: both recorded text calls reported their cache, which read nothing.
             expect(body.pools.text.cache).toEqual({ promptTokens: expect.any(Number), cachedTokens: 0 });

@@ -431,10 +431,10 @@ describe('Reference images through the real gateway', () => {
             expect(row).toEqual({
                 kind: 'reference_image',
                 pool: 'image',
-                model: 'qwen-image-3',
+                model: 'seedream-v5-pro',
                 host: 'venice',
                 images: 1,
-                costUsd: '0.040000',
+                costUsd: '0.110000',
                 storyId: story.id,
                 chatId: null,
             });
@@ -442,6 +442,6 @@ describe('Reference images through the real gateway', () => {
 
         const usage = await t.http.get('/api/usage');
         expect(usage.status).toBe(200);
-        expect(usage.body.pools.image).toMatchObject({ spentUsd: 0.12, calls: 3 });
+        expect(usage.body.pools.image).toMatchObject({ spentUsd: 0.33, calls: 3 });
     });
 });

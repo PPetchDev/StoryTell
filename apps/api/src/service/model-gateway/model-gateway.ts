@@ -152,7 +152,14 @@ export const DEFAULT_NARRATION_VOICE = 'af_sky';
 
 export const SNAPSHOT_MODELS = ['seedream-v4-edit', 'seedream-v5-pro-edit', 'qwen-edit-uncensored'] as const;
 export type SnapshotModel = (typeof SNAPSHOT_MODELS)[number];
-export const REFERENCE_IMAGE_MODEL = 'qwen-image-3';
+/** The text-to-image model of the qwen family: the one a qwen-edit-uncensored Snapshot is drawn with when nothing in frame has a Reference image. */
+export const QWEN_TEXT_IMAGE_MODEL = 'qwen-image-3';
+/**
+ * Reference images are drawn with seedream-v5-pro (2K, $0.11), so a Character looks like the
+ * pictures an author makes in the same soft anime style; qwen-image-3 drew them in a flatter,
+ * different style (.scratch/reference-model/spec.md).
+ */
+export const REFERENCE_IMAGE_MODEL = 'seedream-v5-pro';
 /**
  * The edit models need a base image. A Snapshot with no Reference image among its Characters
  * in frame is drawn from text alone (spec: story 42) by the same family's text-to-image model,
@@ -161,9 +168,9 @@ export const REFERENCE_IMAGE_MODEL = 'qwen-image-3';
 export const TEXT_ONLY_SNAPSHOT_MODELS = {
     'seedream-v4-edit': 'seedream-v4',
     'seedream-v5-pro-edit': 'seedream-v5-pro',
-    'qwen-edit-uncensored': REFERENCE_IMAGE_MODEL,
+    'qwen-edit-uncensored': QWEN_TEXT_IMAGE_MODEL,
 } as const satisfies Record<SnapshotModel, string>;
-export type ImageModel = SnapshotModel | typeof REFERENCE_IMAGE_MODEL | (typeof TEXT_ONLY_SNAPSHOT_MODELS)[SnapshotModel];
+export type ImageModel = SnapshotModel | typeof REFERENCE_IMAGE_MODEL | typeof QWEN_TEXT_IMAGE_MODEL | (typeof TEXT_ONLY_SNAPSHOT_MODELS)[SnapshotModel];
 
 /**
  * The sampler values a play model may be sent, in the order Settings shows them. The app's

@@ -243,7 +243,7 @@ Model table (from [Choose the text LLM](issues/05-choose-text-llm.md), corrected
 | Background calls (Bond/Arc/Scene judge, Memory extraction, Snapshot prompt) | DeepSeek V4 Flash | DeepInfra | `reasoning: {enabled: false}`, JSON mode. When DeepInfra stays busy for Flash, the call goes once to DeepSeek V4 Pro on DeepInfra (added 2026-11-06). |
 | Snapshots | `seedream-v4-edit` (default) | Venice | `POST /image/multi-edit` with up to 3 Reference images, `safe_mode: false`, $0.05. `qwen-edit-uncensored` ($0.04) is the manual alternative. Decided by the check in ticket 18; Runware was dropped because of its $20 minimum top-up. |
 | Snapshots with no Reference image in frame | `seedream-v4` (beside `seedream-v4-edit`; `qwen-image-3` beside `qwen-edit-uncensored`) | Venice | `POST /image/generate`, $0.05. The edit models need a base image, so a Snapshot whose in-frame Characters have no Reference image uses the selected edit model's text-to-image sibling. Chosen before the call and recorded as the Snapshot's image model; never a fallback after a failure. Added in ticket 31. |
-| Reference images | `qwen-image-3` | Venice | `POST /image/generate`, `aspect_ratio: "2:3"`, `safe_mode: false`, $0.04. |
+| Reference images | `seedream-v5-pro` (was `qwen-image-3` until 2026-11-20, see `.scratch/reference-model/spec.md`) | Venice | `POST /image/generate`, `aspect_ratio: "2:3"`, `safe_mode: false`, 2K, $0.11. |
 
 Further gateway rules:
 

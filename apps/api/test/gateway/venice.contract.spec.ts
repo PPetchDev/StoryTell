@@ -22,7 +22,7 @@ const edited: RecordedResponse = { bytes: JPEG, contentType: 'image/jpeg' };
 // Spec: Testing Decisions, "Model Gateway contract tests". Fixtures under test/fixtures/venice
 // are synthetic; the image bytes are a bare JPEG header.
 describe('Venice contract', () => {
-    it('draws Reference images with qwen-image-3 at 2:3 and 2K with safe mode off, and records list price', async () => {
+    it('draws Reference images with seedream-v5-pro at 2:3 and 2K with safe mode off, and records list price', async () => {
         const net = recordedFetch([...modelLists, { fixture: 'venice/generate.json' }]);
         const { gateway, records } = gatewayUnderTest(net.fetch);
 
@@ -36,7 +36,7 @@ describe('Venice contract', () => {
         expect(request.url).toBe(`${BASE}/image/generate`);
         expect(request.headers.Authorization).toMatch(/^Bearer /);
         expect(request.body).toEqual({
-            model: 'qwen-image-3',
+            model: 'seedream-v5-pro',
             prompt: 'Full-body portrait of a synthetic test character.',
             aspect_ratio: '2:3',
             format: 'jpeg',
@@ -46,19 +46,19 @@ describe('Venice contract', () => {
             variants: 1,
             resolution: '2K',
         });
-        expect(result.model).toBe('qwen-image-3');
-        expect(result.costUsd).toBe(0.04);
+        expect(result.model).toBe('seedream-v5-pro');
+        expect(result.costUsd).toBe(0.11);
         expect(Buffer.compare(result.image.bytes, FAKE_PNG.bytes)).toBe(0);
         expect(records).toEqual([
             {
                 kind: 'reference_image',
                 pool: 'image',
-                model: 'qwen-image-3',
+                model: 'seedream-v5-pro',
                 host: 'venice',
                 promptTokens: null,
                 completionTokens: null,
                 images: 1,
-                costUsd: 0.04,
+                costUsd: 0.11,
                 storyId: 7,
                 chatId: null,
                 messageId: null,
