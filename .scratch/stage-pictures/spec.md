@@ -33,7 +33,7 @@ The user also wants more feelings for intimate scenes: one "love" covered tender
   - A picture without a cut-out shows as before, whole.
 - **The Story editor.**
   - The six intimate feelings sit under their own heading, "Intimate scenes (18+)".
-  - **Draw all 13** redraws every Expression in turn, with its price, and stops at the first failure.
+  - **Draw all 13** redraws every Expression in turn, with its price, and stops at the first failure. Since 2026-11-20 it runs on the server and draws only what is missing: `.scratch/expression-drawing/spec.md`.
   - Each row says whether it is cut out, and offers **Cut out** when it is not.
 
 ## User Stories

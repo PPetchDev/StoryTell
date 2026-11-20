@@ -16,6 +16,17 @@ export type IntimateEmotion = 'teasing' | 'desire' | 'flustered' | 'longing' | '
 export const EVERYDAY_EMOTIONS: readonly EverydayEmotion[] = ['joy', 'love', 'embarrassment', 'sadness', 'anger', 'fear', 'surprise'];
 export const INTIMATE_EMOTIONS: readonly IntimateEmotion[] = ['teasing', 'desire', 'flustered', 'longing', 'passion', 'afterglow'];
 
+/** How a Character's Draw all run on the server is going (.scratch/expression-drawing/spec.md). */
+export interface ExpressionDrawing {
+    running: boolean;
+    /** What it draws, in order; empty when idle. */
+    emotions: ExpressionEmotion[];
+    drawn: ExpressionEmotion[];
+    current: ExpressionEmotion | null;
+    /** Why it stopped early. */
+    failed: { code: string; message: string } | null;
+}
+
 /** In the order the editor and the Character profile list them. */
 export const EXPRESSION_EMOTIONS: readonly ExpressionEmotion[] = [...EVERYDAY_EMOTIONS, ...INTIMATE_EMOTIONS];
 

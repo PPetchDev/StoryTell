@@ -309,6 +309,10 @@ _Avoid_: Avatar, profile picture, icon
 A Character's picture for one emotion, drawn from their Reference image or uploaded by the author. When a line of theirs carries that emotion it shows in place of their Portrait; without one, the Portrait shows as usual. Six of the thirteen emotions belong to intimate scenes between adults; a line with one of those and no picture for it shows the nearest everyday Expression.
 _Avoid_: Sprite, emote, mood picture
 
+**Draw all**:
+Drawing a Character's Expressions one after another on the server, the ones with no picture or an outdated drawn one, or all thirteen again when every one is there. It goes on when the page is closed or the phone loses its connection, and stops at the first failure.
+_Avoid_: Batch generation, bulk draw
+
 **Dressed stage**:
 A Chat whose novel view follows the story: the place it is in drawn with no one in it behind the stage, and each Character drawn in the outfit the story has them in, for the feelings their lines show. Off until the user turns it on; it draws only what is needed, at most a dollar's worth a day.
 _Avoid_: Dynamic backgrounds, auto-sprites

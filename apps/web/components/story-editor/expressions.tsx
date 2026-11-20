@@ -7,7 +7,7 @@ import { useConnection } from '@/components/connection';
 import { PortraitImage } from '@/components/portrait/portrait-image';
 import { ApiError, apiFetch, ApiUnreachableError } from '@/lib/api';
 import { preparedForUpload } from '@/lib/cover';
-import { EMOTION_LABEL, EVERYDAY_EMOTIONS, Expression, EXPRESSION_EMOTIONS, ExpressionEmotion, INTIMATE_EMOTIONS } from '@/lib/expressions';
+import { EMOTION_LABEL, EVERYDAY_EMOTIONS, Expression, ExpressionDrawing, EXPRESSION_EMOTIONS, ExpressionEmotion, INTIMATE_EMOTIONS } from '@/lib/expressions';
 import { Character, PortraitCrop, referenceImageUrl, Story, storyApi } from '@/lib/story';
 import { SettingsResponse, usd } from '@/lib/types';
 import { ConfirmButton, FIELD_HINT } from './fields';
@@ -77,29 +77,85 @@ export function Expressions({ storyId, character, commit, flush, onDrawn }: Expr
     /** The one emotion whose actions show; the rest are a tile each (docs/ui-audit-2026-11-13.md, H2). */
     const [open, setOpen] = useState<ExpressionEmotion | null>(null);
     const { reportUnreachable } = useConnection();
-    /** Drawing every emotion in turn: which one it is on. */
-    const [drawingAll, setDrawingAll] = useState<string | null>(null);
+    /** The Draw all run on the server, while one is going (.scratch/expression-drawing/spec.md). */
+    const [run, setRun] = useState<ExpressionDrawing | null>(null);
     const [drawAllError, setDrawAllError] = useState<string | null>(null);
     const canDraw = character.referenceImagePath !== null;
+    // Draw all draws only what has no picture or an outdated one; with all thirteen there it redraws them.
+    const missing = EXPRESSION_EMOTIONS.filter((emotion) => byEmotion.get(emotion)?.outdated !== false);
+    const redraw = missing.length === 0;
+    const toDraw = redraw ? EXPRESSION_EMOTIONS.length : missing.length;
     // Each drawing is cut out for the stage too (.scratch/stage-pictures/spec.md): about a cent more.
-    const allPrice = price === null ? null : EXPRESSION_EMOTIONS.length * (price + CUTOUT_PRICE_USD);
+    const allPrice = price === null ? null : toDraw * (price + CUTOUT_PRICE_USD);
+    const allLabel =
+        redraw ? `Redraw all ${toDraw}` : toDraw === EXPRESSION_EMOTIONS.length ? `Draw all ${toDraw}` : `Draw the ${toDraw} missing`;
+    const drawingAll = run?.running
+        ? `Drawing ${run.current ? EMOTION_LABEL[run.current] : '…'}, ${Math.min(run.drawn.length + 1, run.emotions.length)} of ${run.emotions.length}. It goes on if you leave this page.`
+        : null;
 
-    /** Draws all thirteen, one after another, each replacing the one there; stops at the first failure. */
+    /** A run that ended: take in its last pictures and say how it went. */
+    const ended = (last: ExpressionDrawing) => {
+        setRun(null);
+        if (last.failed === null) announce(`Drew ${last.drawn.length} Expressions.`);
+        else if (last.failed.code === OUT_OF_IMAGE_CREDIT) setDrawAllError('Out of image credit, so the rest were not drawn. Play is unaffected.');
+        else setDrawAllError(`Stopped: ${last.failed.message}`);
+    };
+
+    // A run started earlier, from this page or another, shows where it is.
+    useEffect(() => {
+        let live = true;
+        storyApi.expressionDrawing(storyId, character.id).then(
+            (state) => live && state.running && setRun(state),
+            () => {},
+        );
+        return () => {
+            live = false;
+        };
+    }, [storyId, character.id]);
+
+    // Follows a running run: each new picture shows as it lands. A failed check is not an outage: it asks again.
+    const running = run?.running === true;
+    useEffect(() => {
+        if (!running) return;
+        let seen = -1;
+        let live = true;
+        const check = async () => {
+            try {
+                const state = await storyApi.expressionDrawing(storyId, character.id);
+                if (!live) return;
+                if (state.drawn.length !== seen || !state.running) {
+                    seen = state.drawn.length;
+                    const story = await storyApi.get(storyId);
+                    if (live) onDrawn(story);
+                }
+                if (!live) return;
+                if (state.running) setRun(state);
+                else ended(state);
+            } catch {
+                // Offline for a moment: the run goes on on the server; the next check catches up.
+            }
+        };
+        const timer = window.setInterval(() => void check(), 3000);
+        return () => {
+            live = false;
+            window.clearInterval(timer);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- follows the run, not each render's callbacks
+    }, [running, storyId, character.id]);
+
+    /** Starts the run on the server: it draws one after another by itself and stops at the first failure. */
     const drawAll = async () => {
         setDrawAllError(null);
         try {
             await flush();
-            for (const [index, emotion] of EXPRESSION_EMOTIONS.entries()) {
-                setDrawingAll(`Drawing ${EMOTION_LABEL[emotion]}, ${index + 1} of ${EXPRESSION_EMOTIONS.length}…`);
-                onDrawn(await storyApi.drawExpression(storyId, character.id, emotion));
-            }
-            announce(`Drew all ${EXPRESSION_EMOTIONS.length} Expressions.`);
+            const state = await storyApi.startExpressionDrawing(storyId, character.id, redraw);
+            if (state.running) setRun(state);
+            else ended(state);
         } catch (caught) {
             if (caught instanceof ApiUnreachableError) reportUnreachable();
-            else if (caught instanceof ApiError && caught.code === OUT_OF_IMAGE_CREDIT) setDrawAllError('Out of image credit, so the rest were not drawn. Play is unaffected.');
-            else setDrawAllError(`Stopped: ${caught instanceof Error ? caught.message : 'Something went wrong.'}`);
+            else if (caught instanceof ApiError && caught.code === OUT_OF_IMAGE_CREDIT) setDrawAllError('Out of image credit, so none were drawn. Play is unaffected.');
+            else setDrawAllError(`Not started: ${caught instanceof Error ? caught.message : 'Something went wrong.'}`);
         }
-        setDrawingAll(null);
     };
 
     const tiles = (emotions: readonly ExpressionEmotion[]) =>
@@ -131,12 +187,17 @@ export function Expressions({ storyId, character, commit, flush, onDrawn }: Expr
             {canDraw && (
                 <div className="mb-2 flex flex-wrap items-center gap-2">
                     <ConfirmButton
-                        label={`Draw all ${EXPRESSION_EMOTIONS.length}`}
-                        ariaLabel={`Draw all ${EXPRESSION_EMOTIONS.length} Expressions of ${heading}`}
+                        label={allLabel}
+                        ariaLabel={`${allLabel} Expressions of ${heading}`}
                         disabled={drawingAll !== null}
-                        question={`Draw all ${EXPRESSION_EMOTIONS.length} Expressions of ${heading}?`}
-                        warning="Each one replaces the one there, and is cut out to stand on the Backdrop in the novel view."
-                        confirmLabel={allPrice === null ? 'Draw all' : `Draw all · ~${usd(allPrice)}`}
+                        question={`${allLabel} Expressions of ${heading}?`}
+                        warning={
+                            (redraw
+                                ? 'Each one replaces the one there'
+                                : 'Only those with no picture, or one drawn from an older Reference image; uploads stay') +
+                            ', and each is cut out to stand on the Backdrop in the novel view. It goes on if you leave this page.'
+                        }
+                        confirmLabel={allPrice === null ? allLabel : `${allLabel} · ~${usd(allPrice)}`}
                         onConfirm={() => void drawAll()}
                     />
                     {drawingAll && (

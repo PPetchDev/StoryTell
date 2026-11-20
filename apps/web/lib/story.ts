@@ -1,7 +1,7 @@
 import { apiFetch, apiSend } from './api';
 import type { BondAxis, BondLevels } from './bonds';
 import type { MessagePart } from './chat';
-import type { Expression, ExpressionEmotion } from './expressions';
+import type { Expression, ExpressionDrawing, ExpressionEmotion } from './expressions';
 import type { SavedReply } from './saved-replies';
 import type { ReplaceRule } from './replace-rules';
 
@@ -623,6 +623,15 @@ export const storyApi = {
         apiSend<Story>('DELETE', `/stories/${storyId}/characters/${characterId}/expressions/${emotion}/crop`),
     removeExpression: (storyId: number, characterId: number, emotion: ExpressionEmotion) =>
         apiSend<Story>('DELETE', `/stories/${storyId}/characters/${characterId}/expressions/${emotion}`),
+
+    /** Starts Draw all on the server, or answers the run going; it goes on without the page (.scratch/expression-drawing/spec.md). */
+    startExpressionDrawing: (storyId: number, characterId: number, redraw: boolean) =>
+        apiSend<ExpressionDrawing>('POST', `/stories/${storyId}/characters/${characterId}/expression-drawing`, { redraw }),
+    /** The running or last Draw all run of the Character, or an idle one. */
+    expressionDrawing: (storyId: number, characterId: number) =>
+        apiFetch<ExpressionDrawing>(`/stories/${storyId}/characters/${characterId}/expression-drawing`),
+    /** The whole Story as saved, e.g. to take in the Expressions a Draw all run has drawn. */
+    get: (storyId: number) => apiFetch<Story>(`/stories/${storyId}`),
 
     /** Makes a Snapshot of the Gallery, or a Character's Reference image, the Cover; the Cover only points at it. */
     chooseCover: (storyId: number, choice: { snapshotId: number } | { characterId: number }) =>

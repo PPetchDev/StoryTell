@@ -179,7 +179,15 @@ export class ExpressionManagerService {
         return remaining !== null && remaining <= 0;
     }
 
-    protected async findCharacter(storyId: number, characterId: number): Promise<CharacterResponse> {
+    /** The Character when an Expression can be drawn for it now, refused as a drawing is, before any call. */
+    async drawable(storyId: number, characterId: number): Promise<CharacterResponse> {
+        const character = await this.findCharacter(storyId, characterId);
+        if (!character.referenceImagePath) throw new NoReferenceImageToDrawError();
+        if (await this.imageCreditOut()) throw new OutOfCreditError('image');
+        return character;
+    }
+
+    async findCharacter(storyId: number, characterId: number): Promise<CharacterResponse> {
         const story = await this.storyManager.getStory(storyId);
         const character = story.characters.find((other) => other.id === characterId);
         if (!character) throw new CharacterNotFoundError();
