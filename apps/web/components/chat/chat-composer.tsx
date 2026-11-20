@@ -5,7 +5,7 @@ import { FormEvent, ReactNode, RefObject, useEffect, useId, useLayoutEffect, use
 
 import { COLUMN, ICON_BUTTON, LABEL_CAPS, PANEL_NOTE, SEND_BUTTON, TOOL_CHIP } from '@/components/chat/chat-classes';
 import { useConnection } from '@/components/connection';
-import type { Expression, ExpressionEmotion } from '@/lib/expressions';
+import type { Expression, FaceEmotion } from '@/lib/expressions';
 import { FacePicker } from '@/components/chat/face-picker';
 import { CloseIcon, DiceIcon, PencilIcon, PlayIcon, StopIcon, UndoIcon, ChevronDownIcon } from '@/components/icons';
 import { ApiUnreachableError } from '@/lib/api';
@@ -386,8 +386,8 @@ interface ChatComposerProps {
     onCue(): void;
     onClearCue(): void;
     /** The face picked for the next Message (.scratch/your-faces/spec.md), or null. */
-    face?: ExpressionEmotion | null;
-    onFace?(next: ExpressionEmotion | null): void;
+    face?: FaceEmotion | null;
+    onFace?(next: FaceEmotion | null): void;
     /** The worn Role's or Persona's Expressions, for the face picker's pictures. */
     faces?: Expression[];
     /** Whether the next Message is sent with a Roll (CONTEXT.md, "Roll"). */

@@ -1,12 +1,12 @@
 import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn, Unique } from 'typeorm';
 import type { Relation } from 'typeorm';
 
-import type { ExpressionEmotion } from '../emotion.js';
+import type { ExpressionEmotion, FaceEmotion } from '../emotion.js';
 import type { CharacterEntity, PortraitCrop } from './character.entity.js';
 
 /** An Expression as a Character answers it (.scratch/expressions/spec.md, "Storage"). */
 export interface ExpressionResponse {
-    emotion: ExpressionEmotion;
+    emotion: FaceEmotion;
     /** Relative to the image folder; served by `GET /api/images/{path}`. */
     imagePath: string;
     /** Its own square; null uses the Portrait's. */

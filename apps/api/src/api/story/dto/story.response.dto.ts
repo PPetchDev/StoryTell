@@ -6,8 +6,8 @@ import type { ReadAloudLanguage } from '../../../model/story/entities/story.enti
 import { LatestChat, StoryDetail, StoryListItem } from '../../../manager/story/story.service.js';
 import { DOCUMENT_SOURCES, DocumentSummary } from '../../../model/document/entities/document.entity.js';
 import type { DocumentSource } from '../../../model/document/entities/document.entity.js';
-import { EXPRESSION_EMOTIONS } from '../../../model/story/emotion.js';
-import type { ExpressionEmotion } from '../../../model/story/emotion.js';
+import { FACE_EMOTIONS } from '../../../model/story/emotion.js';
+import type { FaceEmotion } from '../../../model/story/emotion.js';
 import { ExpressionResponse } from '../../../model/story/entities/character-expression.entity.js';
 import { CharacterResponse, PortraitCrop } from '../../../model/story/entities/character.entity.js';
 import { RoleResponse, RoleSection, RoleStat } from '../../../model/story/entities/role.entity.js';
@@ -217,8 +217,8 @@ export class PortraitCropDTO implements PortraitCrop {
 }
 
 export class ExpressionDTO implements ExpressionResponse {
-    @ApiProperty({ enum: EXPRESSION_EMOTIONS, description: 'The emotion it shows. "neutral" never has one: the Portrait is the neutral face.' })
-    emotion: ExpressionEmotion;
+    @ApiProperty({ enum: FACE_EMOTIONS, description: 'The emotion it shows. "neutral" never has one: the Portrait is the neutral face.' })
+    emotion: FaceEmotion;
 
     @ApiProperty({ description: 'Relative to the image folder, served at `GET /api/images/{path}`.' })
     imagePath: string;

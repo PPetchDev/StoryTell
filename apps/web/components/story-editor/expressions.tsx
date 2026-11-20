@@ -8,7 +8,7 @@ import { PortraitImage } from '@/components/portrait/portrait-image';
 import { ApiError, apiFetch, ApiUnreachableError } from '@/lib/api';
 import { ExpressionEndpoints, expressionEndpoints } from '@/lib/expression-endpoints';
 import { preparedForUpload } from '@/lib/cover';
-import { EMOTION_LABEL, EVERYDAY_EMOTIONS, Expression, ExpressionDrawing, EXPRESSION_EMOTIONS, ExpressionEmotion, INTIMATE_EMOTIONS } from '@/lib/expressions';
+import { EMOTION_LABEL, EVERYDAY_EMOTIONS, Expression, ExpressionDrawing, EXPRESSION_EMOTIONS, FACE_EMOTIONS, FaceEmotion, INTIMATE_EMOTIONS, YOUR_EVERYDAY_EMOTIONS } from '@/lib/expressions';
 import { Character, PortraitCrop, referenceImageUrl, Story, storyApi } from '@/lib/story';
 import { SettingsResponse, usd } from '@/lib/types';
 import { ConfirmButton, FIELD_HINT } from './fields';
@@ -108,6 +108,8 @@ export interface ExpressionOwner {
     squareName: string;
     /** What a feeling without an Expression shows. */
     plainName: string;
+    /** The Role or a Persona: your faces add Annoyed and Thinking (.scratch/more-faces/spec.md). */
+    yours?: boolean;
 }
 
 interface ExpressionSetProps<T> {
@@ -132,20 +134,22 @@ export function ExpressionSet<T>({ owner, api, commit, flush, onDrawn, reload }:
     const byEmotion = new Map(owner.expressions.map((expression) => [expression.emotion, expression]));
     const price = useDrawPrice();
     /** The one emotion whose actions show; the rest are a tile each (docs/ui-audit-2026-11-13.md, H2). */
-    const [open, setOpen] = useState<ExpressionEmotion | null>(null);
+    const [open, setOpen] = useState<FaceEmotion | null>(null);
     const { reportUnreachable } = useConnection();
     /** The Draw all run on the server, while one is going (.scratch/expression-drawing/spec.md). */
     const [run, setRun] = useState<ExpressionDrawing | null>(null);
     const [drawAllError, setDrawAllError] = useState<string | null>(null);
     const canDraw = owner.picturePath !== null;
-    // Draw all draws only what has no picture or an outdated one; with all thirteen there it redraws them.
-    const missing = EXPRESSION_EMOTIONS.filter((emotion) => byEmotion.get(emotion)?.outdated !== false);
+    const all = owner.yours ? FACE_EMOTIONS : EXPRESSION_EMOTIONS;
+    const everyday = owner.yours ? YOUR_EVERYDAY_EMOTIONS : EVERYDAY_EMOTIONS;
+    // Draw all draws only what has no picture or an outdated one; with all of them there it redraws them.
+    const missing = all.filter((emotion) => byEmotion.get(emotion)?.outdated !== false);
     const redraw = missing.length === 0;
-    const toDraw = redraw ? EXPRESSION_EMOTIONS.length : missing.length;
+    const toDraw = redraw ? all.length : missing.length;
     // Each drawing is cut out for the stage too (.scratch/stage-pictures/spec.md): about a cent more.
     const allPrice = price === null ? null : toDraw * (price + CUTOUT_PRICE_USD);
     const allLabel =
-        redraw ? `Redraw all ${toDraw}` : toDraw === EXPRESSION_EMOTIONS.length ? `Draw all ${toDraw}` : `Draw the ${toDraw} missing`;
+        redraw ? `Redraw all ${toDraw}` : toDraw === all.length ? `Draw all ${toDraw}` : `Draw the ${toDraw} missing`;
     const drawingAll = run?.running
         ? `Drawing ${run.current ? EMOTION_LABEL[run.current] : '…'}, ${Math.min(run.drawn.length + 1, run.emotions.length)} of ${run.emotions.length}. It goes on if you leave this page.`
         : null;
@@ -216,7 +220,7 @@ export function ExpressionSet<T>({ owner, api, commit, flush, onDrawn, reload }:
         }
     };
 
-    const tiles = (emotions: readonly ExpressionEmotion[]) =>
+    const tiles = (emotions: readonly FaceEmotion[]) =>
         emotions.map((emotion) => (
             <ExpressionRow<T>
                 key={emotion}
@@ -271,8 +275,8 @@ export function ExpressionSet<T>({ owner, api, commit, flush, onDrawn, reload }:
                 </p>
             )}
             {/* Dense, so an open feeling's actions take a whole row under it and the tiles after it close the gap. */}
-            <ul className="m-0 mt-2 grid list-none grid-flow-row-dense grid-cols-4 gap-2 p-0 sm:grid-cols-7" aria-label="Everyday feelings">
-                {tiles(EVERYDAY_EMOTIONS)}
+            <ul className={`m-0 mt-2 grid list-none grid-flow-row-dense grid-cols-4 gap-2 p-0 ${owner.yours ? 'sm:grid-cols-9' : 'sm:grid-cols-7'}`} aria-label="Everyday feelings">
+                {tiles(everyday)}
             </ul>
             <h3 className="m-0 mt-4 text-base font-semibold">Intimate scenes (18+)</h3>
             <p className={`${FIELD_HINT} mt-0.5 mb-2`}>Shown only in an intimate moment between adults. Without one, the nearest feeling above shows.</p>
@@ -285,7 +289,7 @@ export function ExpressionSet<T>({ owner, api, commit, flush, onDrawn, reload }:
 
 interface ExpressionRowProps<T> extends Omit<ExpressionSetProps<T>, 'reload'> {
     heading: string;
-    emotion: ExpressionEmotion;
+    emotion: FaceEmotion;
     expression: Expression | undefined;
     price: number | null;
     /** Its actions show, in a row of their own under its tile. */

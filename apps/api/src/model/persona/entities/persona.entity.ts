@@ -2,7 +2,7 @@ import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn, Up
 import type { PortraitCrop } from '../../story/entities/character.entity.js';
 import type { Relation } from 'typeorm';
 
-import { EXPRESSION_EMOTIONS } from '../../story/emotion.js';
+import { FACE_EMOTIONS } from '../../story/emotion.js';
 import type { ExpressionResponse } from '../../story/entities/character-expression.entity.js';
 import type { IdentityExpressionEntity } from '../../your-face/entities/identity-expression.entity.js';
 
@@ -66,7 +66,7 @@ export class PersonaEntity {
             imagePath: this.imagePath ?? null,
             imageCrop: this.imageCrop ? { x: this.imageCrop.x, y: this.imageCrop.y, size: this.imageCrop.size } : null,
             expressions: [...(this.expressions ?? [])]
-                .sort((a, b) => EXPRESSION_EMOTIONS.indexOf(a.emotion) - EXPRESSION_EMOTIONS.indexOf(b.emotion))
+                .sort((a, b) => FACE_EMOTIONS.indexOf(a.emotion) - FACE_EMOTIONS.indexOf(b.emotion))
                 .map((expression) => expression.toResponse(this.imagePath ?? null)),
             createdAt: this.createdAt.toISOString(),
             updatedAt: this.updatedAt.toISOString(),

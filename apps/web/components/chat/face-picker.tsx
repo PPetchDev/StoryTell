@@ -6,13 +6,13 @@ import { ICON_BUTTON } from '@/components/chat/chat-classes';
 import { FaceIcon } from '@/components/icons';
 import { PortraitImage } from '@/components/portrait/portrait-image';
 import { Sheet } from '@/components/sheet/sheet';
-import { EMOTION_LABEL, EVERYDAY_EMOTIONS, Expression, ExpressionEmotion, INTIMATE_EMOTIONS } from '@/lib/expressions';
+import { EMOTION_LABEL, Expression, FaceEmotion, INTIMATE_EMOTIONS, YOUR_EVERYDAY_EMOTIONS } from '@/lib/expressions';
 import { referenceImageUrl } from '@/lib/story';
 
 interface FacePickerProps {
     /** The face picked for the Message about to be sent, or null. */
-    face: ExpressionEmotion | null;
-    onFace(next: ExpressionEmotion | null): void;
+    face: FaceEmotion | null;
+    onFace(next: FaceEmotion | null): void;
     /** The worn Role's or Persona's Expressions: each face shows its picture where it has one. */
     faces: Expression[];
     /** Whose face: the worn identity's name. */
@@ -30,11 +30,11 @@ export function FacePicker({ face, onFace, faces, name, disabled = false, onPoin
     const [open, setOpen] = useState(false);
     const byEmotion = new Map(faces.map((one) => [one.emotion, one]));
     const picked = face ? byEmotion.get(face) : undefined;
-    const choose = (next: ExpressionEmotion | null) => {
+    const choose = (next: FaceEmotion | null) => {
         onFace(next);
         setOpen(false);
     };
-    const tile = (emotion: ExpressionEmotion) => {
+    const tile = (emotion: FaceEmotion) => {
         const expression = byEmotion.get(emotion);
         return (
             <li key={emotion}>
@@ -85,8 +85,8 @@ export function FacePicker({ face, onFace, faces, name, disabled = false, onPoin
                         <button type="button" className="button button-quiet justify-self-start" aria-pressed={face === null} onClick={() => choose(null)}>
                             No face
                         </button>
-                        <ul className="m-0 grid list-none grid-cols-4 gap-2 p-0 sm:grid-cols-7" aria-label="Everyday faces">
-                            {EVERYDAY_EMOTIONS.map(tile)}
+                        <ul className="m-0 grid list-none grid-cols-4 gap-2 p-0 sm:grid-cols-9" aria-label="Everyday faces">
+                            {YOUR_EVERYDAY_EMOTIONS.map(tile)}
                         </ul>
                         <h3 className="m-0 text-base font-semibold">Intimate moments (18+)</h3>
                         <ul className="m-0 grid list-none grid-cols-4 gap-2 p-0 sm:grid-cols-7" aria-label="Intimate faces">

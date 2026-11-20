@@ -1,5 +1,5 @@
 import type { Message, MessagePart, MessageRoll } from './chat';
-import type { ExpressionEmotion } from './expressions';
+import type { FaceEmotion } from './expressions';
 import type { Emotion } from './expressions';
 import type { Snapshot } from './snapshot';
 
@@ -19,7 +19,7 @@ export type NovelStep =
           /** The Persona it was written as; null or left out for the Role (.scratch/your-faces/spec.md). */
           personaId?: number | null;
           /** Its face; left out without one (.scratch/your-faces/spec.md). */
-          face?: ExpressionEmotion;
+          face?: FaceEmotion;
       }
     | { kind: 'narration'; key: string; messageId: number | null; partIndex: number; paragraph: number; text: string }
     | {
@@ -42,7 +42,7 @@ export type NovelStep =
 export interface NovelInput {
     messages: readonly Message[];
     /** The line just sent, before the API stored it. */
-    pending: { identityName: string; text: string; roll?: boolean; personaId?: number | null; face?: ExpressionEmotion | null } | null;
+    pending: { identityName: string; text: string; roll?: boolean; personaId?: number | null; face?: FaceEmotion | null } | null;
     /** The reply so far while a turn streams. */
     replySoFar: readonly MessagePart[] | null;
     /** The reply ↺ Again is replacing: left out, as the thread hides it. */

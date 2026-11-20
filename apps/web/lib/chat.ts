@@ -3,7 +3,7 @@ import { apiFetch, apiSend } from './api';
 import { resumableTurn } from './turn-stream';
 import type { Belief } from './memory';
 import type { BondLevels } from './bonds';
-import type { Emotion, Expression, ExpressionEmotion } from './expressions';
+import type { Emotion, Expression, FaceEmotion } from './expressions';
 import { MissingField } from './story';
 import type { TraySavedReply } from './saved-replies';
 import type { ChatReplaceRule } from './replace-rules';
@@ -71,7 +71,7 @@ export interface UserMessage {
     /** The Roll it was sent with (CONTEXT.md, "Roll"); null without one. */
     roll: MessageRoll | null;
     /** The face it was written with, picked or guessed by the Judge (.scratch/your-faces/spec.md); null or left out without one. */
-    face?: { emotion: ExpressionEmotion; by: 'user' | 'judge' } | null;
+    face?: { emotion: FaceEmotion; by: 'user' | 'judge' } | null;
     createdAt: string;
     /** Its Thai reading for the text as it stands; null when none was made (.scratch/write-for-me/spec.md). */
     thaiReading: string | null;
@@ -525,7 +525,7 @@ export interface TurnExtras {
     /** With `roll`: the Role's Stat the Roll is made for, from a Roll offer taken (.scratch/judge-rolls/spec.md). */
     rollStat?: string | null;
     /** A send only (.scratch/your-faces/spec.md): the face the user picked; the Narrator is told it. */
-    face?: ExpressionEmotion | null;
+    face?: FaceEmotion | null;
 }
 
 /**

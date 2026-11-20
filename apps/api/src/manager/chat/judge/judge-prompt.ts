@@ -1,8 +1,8 @@
 import { UnparseableOutputError } from '../../../errors/model-gateway.errors.js';
 import { TimeOfDay, TIMES_OF_DAY } from '../../../model/chat/entities/chat.entity.js';
 import { BOND_AXES, bondAxisScale, BondLevels, bondLevelsInWords, isBondLevel } from '../../../model/ledger/bond-axes.js';
-import { Emotion, isEmotion, isExpressionEmotion } from '../../../model/story/emotion.js';
-import type { ExpressionEmotion } from '../../../model/story/emotion.js';
+import { Emotion, isEmotion, isFaceEmotion } from '../../../model/story/emotion.js';
+import type { FaceEmotion } from '../../../model/story/emotion.js';
 import { PromptMessage } from '../../../service/model-gateway/model-gateway.js';
 import { exchangeUserLine } from '../exchange.js';
 import { PASSED_BY_REPLIES } from '../scene-replies.js';
@@ -519,14 +519,14 @@ export function buildJudgePrompt(input: JudgePromptInput & RollOfferJudgeInput &
 }
 
 /** The judgement with the Roll offer and the Secret reveals it gave, if any; read loosely, so anything else is none. */
-export function parseJudgement(text: string): Judgement & { rollOffer?: JudgedRollOffer | null; secretsRevealed?: number[]; userFace?: ExpressionEmotion } {
+export function parseJudgement(text: string): Judgement & { rollOffer?: JudgedRollOffer | null; secretsRevealed?: number[]; userFace?: FaceEmotion } {
     const judgement = parseJudgementCore(text);
     // The core has already read the JSON, so this match parses.
     const json = JSON.parse(text.match(/\{[\s\S]*\}/)![0]) as Record<string, unknown>;
     const rollOffer = readJudgedRollOffer(json.roll_offer);
-    // .scratch/your-faces/spec.md: one of the Expression emotions; "neutral" or anything else is none.
+    // .scratch/your-faces/spec.md: one of your faces' emotions (.scratch/more-faces/spec.md); "neutral" or anything else is none.
     const userEmotion = str(json.user_emotion).toLowerCase();
-    const userFace = isExpressionEmotion(userEmotion) ? userEmotion : null;
+    const userFace = isFaceEmotion(userEmotion) ? userEmotion : null;
     // Only when it gave some (.scratch/secret-reveals/spec.md), so a judgement without them reads as before.
     const secretsRevealed = readJudgedSecrets(json.secrets_revealed);
     return { ...judgement, ...(rollOffer ? { rollOffer } : {}), ...(secretsRevealed.length > 0 ? { secretsRevealed } : {}), ...(userFace ? { userFace } : {}) };
@@ -562,11 +562,34 @@ export interface UserFaceJudgeInput {
 /** The answer is a word or two. */
 export const USER_FACE_EXTRA_TOKENS = 20;
 
-/** What the Judge is told: the emotion the user's own line shows, from the same list as the Characters' lines. */
+/**
+ * The emotions of the user's own line: the Characters' list with the two faces only the user makes
+ * (.scratch/more-faces/spec.md) after the everyday ones; mild irritation leaves `anger` for `annoyed`.
+ */
+export const USER_FACE_MEANINGS: Record<'neutral' | FaceEmotion, string> = {
+    neutral: EMOTION_MEANINGS.neutral,
+    joy: EMOTION_MEANINGS.joy,
+    love: EMOTION_MEANINGS.love,
+    embarrassment: EMOTION_MEANINGS.embarrassment,
+    sadness: EMOTION_MEANINGS.sadness,
+    anger: 'angry, furious, disgusted, contemptuous',
+    fear: EMOTION_MEANINGS.fear,
+    surprise: 'surprised, shocked, realising',
+    annoyed: 'annoyed, irritated, exasperated, unimpressed, sulking',
+    thinking: 'thinking it over, pondering, puzzled, weighing something up, curious',
+    teasing: EMOTION_MEANINGS.teasing,
+    desire: EMOTION_MEANINGS.desire,
+    flustered: EMOTION_MEANINGS.flustered,
+    longing: EMOTION_MEANINGS.longing,
+    passion: EMOTION_MEANINGS.passion,
+    afterglow: EMOTION_MEANINGS.afterglow,
+};
+
+/** What the Judge is told: the emotion the user's own line shows, from your faces' list. */
 export function userFaceSection(identityName: string): string {
     return `# ${identityName}'s face
 Give "user_emotion": the emotion ${identityName} shows in their own line of the latest exchange, one of:
-${Object.entries(EMOTION_MEANINGS)
+${Object.entries(USER_FACE_MEANINGS)
     .map(([emotion, meaning]) => `  - "${emotion}": ${meaning}`)
     .join('\n')}
 When unsure, "neutral".`;

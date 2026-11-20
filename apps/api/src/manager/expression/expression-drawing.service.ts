@@ -1,37 +1,44 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 import { AppError } from '../../errors/app-error.js';
-import { EXPRESSION_EMOTIONS, ExpressionEmotion } from '../../model/story/emotion.js';
+import { EXPRESSION_EMOTIONS, ExpressionEmotion, FaceEmotion } from '../../model/story/emotion.js';
 import { CharacterResponse } from '../../model/story/entities/character.entity.js';
 import { ExpressionManagerService } from './expression.service.js';
 
 /** How a Character's Draw all run is going (.scratch/expression-drawing/spec.md). */
-export interface ExpressionDrawing {
+export interface ExpressionDrawing<E extends FaceEmotion = FaceEmotion> {
     running: boolean;
     /** What it draws, in the fixed order of the emotions. */
-    emotions: ExpressionEmotion[];
+    emotions: E[];
     /** Drawn so far. */
-    drawn: ExpressionEmotion[];
+    drawn: E[];
     /** Being drawn now. */
-    current: ExpressionEmotion | null;
+    current: E | null;
     /** Why it stopped early. */
     failed: { code: string; message: string } | null;
 }
 
-interface Run extends ExpressionDrawing {
+interface Run extends ExpressionDrawing<ExpressionEmotion> {
     storyId: number;
 }
 
-const IDLE: ExpressionDrawing = { running: false, emotions: [], drawn: [], current: null, failed: null };
+const IDLE: ExpressionDrawing<ExpressionEmotion> = { running: false, emotions: [], drawn: [], current: null, failed: null };
 
 /** Code for a failure that is not one of the API's own errors (docs/error-codes.md: internal). */
 const UNEXPECTED = '500.000.000';
 
-/** The emotions a run draws: all of them to redraw, else those with no Expression or an outdated drawn one. */
-export function emotionsToDraw(character: Pick<CharacterResponse, 'expressions'>, redraw: boolean): ExpressionEmotion[] {
-    if (redraw) return [...EXPRESSION_EMOTIONS];
-    const current = new Set(character.expressions.filter((one) => !one.outdated).map((one) => one.emotion));
-    return EXPRESSION_EMOTIONS.filter((emotion) => !current.has(emotion));
+/**
+ * The emotions a run draws: all of them to redraw, else those with no Expression or an outdated
+ * drawn one. A Character's thirteen, or your faces' list (.scratch/more-faces/spec.md).
+ */
+export function emotionsToDraw<E extends FaceEmotion = ExpressionEmotion>(
+    owner: Pick<CharacterResponse, 'expressions'>,
+    redraw: boolean,
+    all: readonly E[] = EXPRESSION_EMOTIONS as readonly ExpressionEmotion[] as readonly E[],
+): E[] {
+    if (redraw) return [...all];
+    const current = new Set<FaceEmotion>(owner.expressions.filter((one) => !one.outdated).map((one) => one.emotion));
+    return all.filter((emotion) => !current.has(emotion));
 }
 
 /**

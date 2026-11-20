@@ -1,7 +1,7 @@
 import { readdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 
-import { EXPRESSION_EMOTIONS } from '../src/model/story/emotion.js';
+import { FACE_EMOTIONS } from '../src/model/story/emotion.js';
 import { startTestApp, TestApp } from './harness/test-app.js';
 
 /**
@@ -115,13 +115,13 @@ describe('Your faces', () => {
             await t.http.delete(`/api/stories/${story.id}/role/expressions/anger`).expect(404);
         });
 
-        it('Draw all draws every face that is missing, one after another', async () => {
+        it('Draw all draws every face that is missing, one after another, Annoyed and Thinking among them', async () => {
             const story = await storyWithRole();
             await t.http.put(`/api/stories/${story.id}/role/expressions/joy`).attach('image', png('mine'), 'mine.png').expect(200);
-            for (const emotion of EXPRESSION_EMOTIONS.slice(1)) t.gateway.scriptImage('expression_image', { image: { bytes: png(`rin-${emotion}`), mimeType: 'image/png' } });
+            for (const emotion of FACE_EMOTIONS.slice(1)) t.gateway.scriptImage('expression_image', { image: { bytes: png(`rin-${emotion}`), mimeType: 'image/png' } });
 
             const started = await t.http.post(`/api/stories/${story.id}/role/expression-drawing`).send({}).expect(201);
-            expect(started.body.emotions).toEqual(EXPRESSION_EMOTIONS.slice(1));
+            expect(started.body.emotions).toEqual(FACE_EMOTIONS.slice(1));
             const deadline = Date.now() + 5_000;
             let status = started.body;
             while (status.running) {
@@ -129,9 +129,9 @@ describe('Your faces', () => {
                 await new Promise((resolve) => setTimeout(resolve, 25));
                 status = (await t.http.get(`/api/stories/${story.id}/role/expression-drawing`).expect(200)).body;
             }
-            expect(status).toMatchObject({ running: false, failed: null, drawn: EXPRESSION_EMOTIONS.slice(1) });
+            expect(status).toMatchObject({ running: false, failed: null, drawn: FACE_EMOTIONS.slice(1) });
             const after = (await t.http.get(`/api/stories/${story.id}`).expect(200)).body as Story;
-            expect(after.role.expressions).toHaveLength(EXPRESSION_EMOTIONS.length);
+            expect(after.role.expressions).toHaveLength(FACE_EMOTIONS.length);
         });
 
         it('Duplicate copies them into files of its own, and deleting a Story deletes them', async () => {
@@ -226,6 +226,64 @@ describe('Your faces', () => {
             expect(user.content).toContain("# Rin's face");
             // A guessed face is never told to the Narrator.
             expect(t.gateway.textCalls('turn')[1].messages.map((message) => message.content).join('\n')).not.toContain('face as they say this');
+        });
+    });
+
+    describe('Annoyed and Thinking (.scratch/more-faces/spec.md)', () => {
+        it('the Role and a Persona have them, listed after the everyday faces; a Character does not', async () => {
+            const story = await storyWithRole();
+            await t.http.put(`/api/stories/${story.id}/role/expressions/thinking`).attach('image', png('hm'), 'hm.png').expect(200);
+            await t.http.put(`/api/stories/${story.id}/role/expressions/teasing`).attach('image', png('sly'), 'sly.png').expect(200);
+            t.gateway.scriptImage('expression_image', { image: { bytes: png('rin-annoyed'), mimeType: 'image/png' } });
+            const drawn = (await t.http.post(`/api/stories/${story.id}/role/expressions/annoyed/draw`).expect(201)).body as Story;
+            expect(drawn.role.expressions.map((one) => one.emotion)).toEqual(['annoyed', 'thinking', 'teasing']);
+            const [call] = t.gateway.imageCalls('expression_image');
+            expect(call.prompt).toContain('an unimpressed, irritated look');
+
+            const persona = (await t.http.post('/api/personas').send({ name: 'Rin' }).expect(201)).body as Persona;
+            const uploaded = (await t.http.put(`/api/personas/${persona.id}/expressions/annoyed`).attach('image', png('mine'), 'mine.png').expect(200)).body as Persona;
+            expect(uploaded.expressions.map((one) => one.emotion)).toEqual(['annoyed']);
+
+            const character = (await t.http.post(`/api/stories/${story.id}/characters`).send({ name: 'Mira', appearance: 'Tall.', personality: 'Warm.', voice: 'Quick.' }).expect(201)).body as { id: number };
+            await t.http.put(`/api/stories/${story.id}/characters/${character.id}/expressions/annoyed`).attach('image', png('mira'), 'mira.png').expect(400);
+        });
+
+        it('a Message can be sent with one, the Narrator is told it, and the Judge can guess one', async () => {
+            const story = await storyWithRole();
+            await t.http.put(`/api/stories/${story.id}/role/expressions/annoyed`).attach('image', png('huff'), 'huff.png').expect(200);
+            await t.http.patch(`/api/stories/${story.id}`).send({ setting: 'A lantern market.', opening: 'The lanterns are lit.' }).expect(200);
+            await t.http.post(`/api/stories/${story.id}/characters`).send({ name: 'Mira', appearance: 'Tall.', personality: 'Warm.', voice: 'Quick.' }).expect(201);
+            const chatId = (await t.http.post(`/api/stories/${story.id}/chats`).expect(201)).body.id as number;
+            const settle = async () => {
+                const deadline = Date.now() + 5_000;
+                for (;;) {
+                    const chat = (await t.http.get(`/api/stories/${story.id}/chats/${chatId}`).expect(200)).body as { messages: Array<{ kind: string; face?: { emotion: string; by: string } | null; judge?: { status: string } | null; memory?: { status: string } | null }> };
+                    const last = chat.messages.at(-1);
+                    if (last && last.judge?.status !== 'pending' && last.memory?.status !== 'pending') return chat;
+                    if (Date.now() > deadline) throw new Error('The judge did not settle in time');
+                    await new Promise((resolve) => setTimeout(resolve, 25));
+                }
+            };
+            const judged = (userEmotion: string) =>
+                JSON.stringify({ bond_changes: [], arc_steps: [], scene: { move_on: false, reason: 'not yet' }, user_emotion: userEmotion });
+
+            t.gateway.scriptText('turn', '@Mira: Penny for them?');
+            t.gateway.scriptText('judge', judged('joy'));
+            t.gateway.scriptText('memory_extraction', '{"operations":[]}');
+            await t.http.post(`/api/stories/${story.id}/chats/${chatId}/messages`).send({ text: 'Hm.', face: 'thinking' }).expect(201);
+            let chat = await settle();
+            expect(chat.messages.filter((message) => message.kind === 'user')[0].face).toEqual({ emotion: 'thinking', by: 'user' });
+            expect(t.gateway.textCalls('turn')[0].messages.map((message) => message.content).join('\n')).toContain("Rin's face as they say this: thoughtful, thinking it over, eyes turned aside.");
+
+            t.gateway.scriptText('turn', '@Mira: Oh, sulking now?');
+            t.gateway.scriptText('judge', judged('annoyed'));
+            t.gateway.scriptText('memory_extraction', '{"operations":[]}');
+            await t.http.post(`/api/stories/${story.id}/chats/${chatId}/messages`).send({ text: 'Fine. Whatever.' }).expect(201);
+            chat = await settle();
+            expect(chat.messages.filter((message) => message.kind === 'user')[1].face).toEqual({ emotion: 'annoyed', by: 'judge' });
+            const asked = t.gateway.textCalls('judge')[1].messages.map((message) => message.content).join('\n');
+            expect(asked).toContain('"annoyed": annoyed, irritated');
+            expect(asked).toContain('"thinking": thinking it over');
         });
     });
 

@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { PortraitCrop } from '../../model/story/entities/character.entity.js';
 import type { ExpressionResponse } from '../../model/story/entities/character-expression.entity.js';
-import type { ExpressionEmotion } from '../../model/story/emotion.js';
+import type { FaceEmotion } from '../../model/story/emotion.js';
 
 import {
     AlreadyEpilogueError,
@@ -1281,7 +1281,7 @@ export class ChatManagerService {
         /** .scratch/judge-rolls/spec.md: the Role's Stat the Roll is made for; one it doesn't have adds nothing. */
         rollStat: string | null = null,
         /** .scratch/your-faces/spec.md: the face the user picked for this Message. */
-        face: ExpressionEmotion | null = null,
+        face: FaceEmotion | null = null,
     ): Promise<ChatDetail> {
         if (text.trim() === '') throw new EmptyMessageError();
         const { story, chat: loaded } = await this.load(storyId, chatId);
@@ -2549,7 +2549,7 @@ function detailsFor(story: StoryEntity, chat: ChatEntity, state: LedgerState) {
 
 /** A User Message's Roll as the prompt reads it; null without one. */
 /** The face the user picked for their Message (.scratch/your-faces/spec.md); null for none or one the Judge guessed. */
-function pickedFaceOf(message: MessageEntity | undefined): ExpressionEmotion | null {
+function pickedFaceOf(message: MessageEntity | undefined): FaceEmotion | null {
     return message?.kind === MessageKind.User && message.faceBy === 'user' ? message.face : null;
 }
 

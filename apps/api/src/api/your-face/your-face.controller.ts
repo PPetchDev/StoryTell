@@ -5,8 +5,8 @@ import { ApiBody, ApiConsumes, ApiCreatedResponse, ApiOkResponse, ApiParam, ApiT
 import { NoImageFileError } from '../../errors/image.errors.js';
 import { YourFaceManagerService } from '../../manager/your-face/your-face.service.js';
 import { PersonaResponse } from '../../model/persona/entities/persona.entity.js';
-import { EXPRESSION_EMOTIONS } from '../../model/story/emotion.js';
-import type { ExpressionEmotion } from '../../model/story/emotion.js';
+import { FACE_EMOTIONS } from '../../model/story/emotion.js';
+import type { FaceEmotion } from '../../model/story/emotion.js';
 import { StoryDetail } from '../../manager/story/story.service.js';
 import { ExpressionDrawingResponseBodyDTO, StartExpressionDrawingRequestBodyDTO } from '../expression/dto/expression-drawing.dto.js';
 import { UploadExpressionRequestBodyDTO } from '../expression/dto/expression.request.dto.js';
@@ -16,7 +16,7 @@ import { PortraitCropRequestBodyDTO } from '../reference-image/dto/portrait-crop
 import { StoryResponseBodyDTO } from '../story/dto/story.response.dto.js';
 
 const Id = (name: string) => Param(name, ParseIntPipe);
-const Emotion = () => Param('emotion', new ParseEnumPipe(Object.fromEntries(EXPRESSION_EMOTIONS.map((emotion) => [emotion, emotion]))));
+const Emotion = () => Param('emotion', new ParseEnumPipe(Object.fromEntries(FACE_EMOTIONS.map((emotion) => [emotion, emotion]))));
 
 interface UploadedImage {
     buffer: Buffer;
@@ -31,20 +31,20 @@ const asPersona = (answer: Promise<StoryDetail | PersonaResponse>) => answer as 
 
 /** The Role's Expressions (.scratch/your-faces/spec.md). Every write answers the whole Story, whose Role lists its `expressions`. */
 @ApiTags('Your faces')
-@ApiParam({ name: 'emotion', enum: EXPRESSION_EMOTIONS })
+@ApiParam({ name: 'emotion', enum: FACE_EMOTIONS })
 @Controller('stories/:storyId/role/expressions/:emotion')
 export class RoleExpressionApiController {
     constructor(private readonly faces: YourFaceManagerService) {}
 
     @Post('draw')
     @ApiCreatedResponse({ type: StoryResponseBodyDTO, description: DRAW })
-    draw(@Id('storyId') storyId: number, @Emotion() emotion: ExpressionEmotion): Promise<StoryResponseBodyDTO> {
+    draw(@Id('storyId') storyId: number, @Emotion() emotion: FaceEmotion): Promise<StoryResponseBodyDTO> {
         return asStory(this.faces.draw({ storyId }, emotion));
     }
 
     @Post('cutout')
     @ApiCreatedResponse({ type: StoryResponseBodyDTO, description: 'Takes the background away for the Visual novel stage.' })
-    cutOut(@Id('storyId') storyId: number, @Emotion() emotion: ExpressionEmotion): Promise<StoryResponseBodyDTO> {
+    cutOut(@Id('storyId') storyId: number, @Emotion() emotion: FaceEmotion): Promise<StoryResponseBodyDTO> {
         return asStory(this.faces.cutOut({ storyId }, emotion));
     }
 
@@ -54,26 +54,26 @@ export class RoleExpressionApiController {
     @ApiConsumes('multipart/form-data')
     @ApiBody({ type: UploadExpressionRequestBodyDTO })
     @ApiOkResponse({ type: StoryResponseBodyDTO, description: "The picture is now the emotion's Expression, with the centre square." })
-    upload(@Id('storyId') storyId: number, @Emotion() emotion: ExpressionEmotion, @UploadedFile() file: UploadedImage | undefined): Promise<StoryResponseBodyDTO> {
+    upload(@Id('storyId') storyId: number, @Emotion() emotion: FaceEmotion, @UploadedFile() file: UploadedImage | undefined): Promise<StoryResponseBodyDTO> {
         if (!file) throw new NoImageFileError();
         return asStory(this.faces.upload({ storyId }, emotion, file.buffer));
     }
 
     @Delete()
     @ApiOkResponse({ type: StoryResponseBodyDTO })
-    remove(@Id('storyId') storyId: number, @Emotion() emotion: ExpressionEmotion): Promise<StoryResponseBodyDTO> {
+    remove(@Id('storyId') storyId: number, @Emotion() emotion: FaceEmotion): Promise<StoryResponseBodyDTO> {
         return asStory(this.faces.remove({ storyId }, emotion));
     }
 
     @Put('crop')
     @ApiOkResponse({ type: StoryResponseBodyDTO })
-    setCrop(@Id('storyId') storyId: number, @Emotion() emotion: ExpressionEmotion, @Body() body: PortraitCropRequestBodyDTO): Promise<StoryResponseBodyDTO> {
+    setCrop(@Id('storyId') storyId: number, @Emotion() emotion: FaceEmotion, @Body() body: PortraitCropRequestBodyDTO): Promise<StoryResponseBodyDTO> {
         return asStory(this.faces.setCrop({ storyId }, emotion, body));
     }
 
     @Delete('crop')
     @ApiOkResponse({ type: StoryResponseBodyDTO, description: 'Back to the centre square.' })
-    clearCrop(@Id('storyId') storyId: number, @Emotion() emotion: ExpressionEmotion): Promise<StoryResponseBodyDTO> {
+    clearCrop(@Id('storyId') storyId: number, @Emotion() emotion: FaceEmotion): Promise<StoryResponseBodyDTO> {
         return asStory(this.faces.setCrop({ storyId }, emotion, null));
     }
 }
@@ -99,20 +99,20 @@ export class RoleExpressionDrawingApiController {
 
 /** A Persona's Expressions (.scratch/your-faces/spec.md). Every write answers the Persona, which lists its `expressions`. */
 @ApiTags('Your faces')
-@ApiParam({ name: 'emotion', enum: EXPRESSION_EMOTIONS })
+@ApiParam({ name: 'emotion', enum: FACE_EMOTIONS })
 @Controller('personas/:personaId/expressions/:emotion')
 export class PersonaExpressionApiController {
     constructor(private readonly faces: YourFaceManagerService) {}
 
     @Post('draw')
     @ApiCreatedResponse({ type: PersonaResponseBodyDTO, description: DRAW })
-    draw(@Id('personaId') personaId: number, @Emotion() emotion: ExpressionEmotion): Promise<PersonaResponseBodyDTO> {
+    draw(@Id('personaId') personaId: number, @Emotion() emotion: FaceEmotion): Promise<PersonaResponseBodyDTO> {
         return asPersona(this.faces.draw({ personaId }, emotion));
     }
 
     @Post('cutout')
     @ApiCreatedResponse({ type: PersonaResponseBodyDTO })
-    cutOut(@Id('personaId') personaId: number, @Emotion() emotion: ExpressionEmotion): Promise<PersonaResponseBodyDTO> {
+    cutOut(@Id('personaId') personaId: number, @Emotion() emotion: FaceEmotion): Promise<PersonaResponseBodyDTO> {
         return asPersona(this.faces.cutOut({ personaId }, emotion));
     }
 
@@ -122,26 +122,26 @@ export class PersonaExpressionApiController {
     @ApiConsumes('multipart/form-data')
     @ApiBody({ type: UploadExpressionRequestBodyDTO })
     @ApiOkResponse({ type: PersonaResponseBodyDTO })
-    upload(@Id('personaId') personaId: number, @Emotion() emotion: ExpressionEmotion, @UploadedFile() file: UploadedImage | undefined): Promise<PersonaResponseBodyDTO> {
+    upload(@Id('personaId') personaId: number, @Emotion() emotion: FaceEmotion, @UploadedFile() file: UploadedImage | undefined): Promise<PersonaResponseBodyDTO> {
         if (!file) throw new NoImageFileError();
         return asPersona(this.faces.upload({ personaId }, emotion, file.buffer));
     }
 
     @Delete()
     @ApiOkResponse({ type: PersonaResponseBodyDTO })
-    remove(@Id('personaId') personaId: number, @Emotion() emotion: ExpressionEmotion): Promise<PersonaResponseBodyDTO> {
+    remove(@Id('personaId') personaId: number, @Emotion() emotion: FaceEmotion): Promise<PersonaResponseBodyDTO> {
         return asPersona(this.faces.remove({ personaId }, emotion));
     }
 
     @Put('crop')
     @ApiOkResponse({ type: PersonaResponseBodyDTO })
-    setCrop(@Id('personaId') personaId: number, @Emotion() emotion: ExpressionEmotion, @Body() body: PortraitCropRequestBodyDTO): Promise<PersonaResponseBodyDTO> {
+    setCrop(@Id('personaId') personaId: number, @Emotion() emotion: FaceEmotion, @Body() body: PortraitCropRequestBodyDTO): Promise<PersonaResponseBodyDTO> {
         return asPersona(this.faces.setCrop({ personaId }, emotion, body));
     }
 
     @Delete('crop')
     @ApiOkResponse({ type: PersonaResponseBodyDTO })
-    clearCrop(@Id('personaId') personaId: number, @Emotion() emotion: ExpressionEmotion): Promise<PersonaResponseBodyDTO> {
+    clearCrop(@Id('personaId') personaId: number, @Emotion() emotion: FaceEmotion): Promise<PersonaResponseBodyDTO> {
         return asPersona(this.faces.setCrop({ personaId }, emotion, null));
     }
 }

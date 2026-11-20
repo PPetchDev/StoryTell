@@ -8,7 +8,7 @@ import { CharacterPortrait } from '@/components/portrait/character-portrait';
 import { Cast, characterColour, Portrait, Portraits } from '@/lib/character-colour';
 import { DiceIcon } from '@/components/icons';
 import { Message, MessagePart, MessageRoll, ROLL_OUTCOME_LABELS, signedStat } from '@/lib/chat';
-import { EMOTION_LABEL, ExpressionEmotion, linePicture } from '@/lib/expressions';
+import { EMOTION_LABEL, FaceEmotion, linePicture } from '@/lib/expressions';
 import { referenceImageUrl } from '@/lib/story';
 import { personaImageUrl } from '@/lib/persona';
 
@@ -95,7 +95,7 @@ export function UserLine({
     /** The Persona it was written as: its picture shows in place of the initial (.scratch/persona-image/spec.md). */
     personaId?: number | null;
     /** The face it was written with (.scratch/your-faces/spec.md): its Expression shows when the Role or Persona has one. */
-    face?: ExpressionEmotion | null;
+    face?: FaceEmotion | null;
 }) {
     const picture = usePersonaPicture(personaId);
     const pictureCrop = usePersonaPictureCrop(personaId);

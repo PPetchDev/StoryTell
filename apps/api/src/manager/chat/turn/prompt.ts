@@ -1,5 +1,5 @@
 import { Balance, Difficulty, Pacing, Pov, ReplyLength, Tense } from '../../../model/story/entities/story.entity.js';
-import type { ExpressionEmotion } from '../../../model/story/emotion.js';
+import type { FaceEmotion } from '../../../model/story/emotion.js';
 import type { TimeOfDay } from '../../../model/chat/entities/chat.entity.js';
 import { BondLevels, bondLevelsInWords } from '../../../model/ledger/bond-axes.js';
 import { PromptMessage } from '../../../service/model-gateway/model-gateway.js';
@@ -192,7 +192,7 @@ export interface TurnPromptInput {
     suddenEvent?: PromptSuddenEvent | null;
     /** The Roll the user's message was sent with (.scratch/roll/spec.md); null or left out for none. Turn-only. */
     /** The face the user picked for the Message this turn answers (.scratch/your-faces/spec.md); null or left out without one. */
-    face?: ExpressionEmotion | null;
+    face?: FaceEmotion | null;
     roll?: Roll | null;
     /**
      * Set on an Epilogue turn (.scratch/endings/spec.md): a turn without a User Message that closes
@@ -718,7 +718,7 @@ export function turnFinalInstruction(identity: string): string {
  * How each face looks, as the Narrator is told the one the user picked (.scratch/your-faces/spec.md):
  * plain words a Character could see, not the Judge's tagging guide.
  */
-export const FACE_WORDS: Record<ExpressionEmotion, string> = {
+export const FACE_WORDS: Record<FaceEmotion, string> = {
     joy: 'happy, smiling, bright',
     love: 'tender and warm, a soft smile',
     embarrassment: 'embarrassed and shy, blushing, looking away',
@@ -726,6 +726,8 @@ export const FACE_WORDS: Record<ExpressionEmotion, string> = {
     anger: 'angry, brows drawn, glaring',
     fear: 'afraid, eyes wide, tense',
     surprise: 'surprised, eyes wide, mouth open',
+    annoyed: 'annoyed, unimpressed, brows lowered, lips pressed flat',
+    thinking: 'thoughtful, thinking it over, eyes turned aside',
     teasing: 'teasing, a sly smile, playfully flirting',
     desire: 'heated with desire, flushed, heavy-lidded',
     flustered: 'flustered, flushed red, breathless and shy',
@@ -738,7 +740,7 @@ export const FACE_WORDS: Record<ExpressionEmotion, string> = {
  * The face the user picked as they sent this Message (.scratch/your-faces/spec.md): what everyone
  * there can see, so the Characters answer it. Null without one.
  */
-export function faceLine(face: ExpressionEmotion | null, identity: string): string | null {
+export function faceLine(face: FaceEmotion | null, identity: string): string | null {
     if (!face) return null;
     return `${identity}'s face as they say this: ${FACE_WORDS[face]}. The Characters there can see it and may answer it, but don't describe ${identity} doing anything new.`;
 }

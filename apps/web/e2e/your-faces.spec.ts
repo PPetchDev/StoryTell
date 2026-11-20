@@ -53,7 +53,11 @@ test("the Role tab has the Role's Expressions: an upload fills its tile, and Dra
 
     await page.goto(`/stories/${storyId}?tab=role`);
     const faces = page.getByRole('group', { name: 'Expressions' });
-    await expect(faces.getByRole('button', { name: /^\w+ Expression, none yet$/ })).toHaveCount(13);
+    // The Characters' thirteen and two only you make (.scratch/more-faces/spec.md), after the everyday ones.
+    await expect(faces.getByRole('button', { name: /^\w+ Expression, none yet$/ })).toHaveCount(15);
+    await expect(faces.getByRole('list', { name: 'Everyday feelings' }).getByRole('button')).toHaveText([
+        'Happy', 'Loving', 'Embarrassed', 'Sad', 'Angry', 'Scared', 'Surprised', 'Annoyed', 'Thinking',
+    ].map((label) => new RegExp(label)));
     await faces.getByRole('button', { name: 'Happy Expression, none yet' }).tap();
     const row = faces.getByRole('group', { name: 'Happy Expression' });
     await expect(row.getByRole('button', { name: /^Draw/ })).toBeVisible();
@@ -111,7 +115,9 @@ test('the face picker sends a face with the Message, shows it beside the line, a
     const composer = page.getByRole('form', { name: 'Composer' });
     await composer.getByRole('button', { name: 'Pick your face for this message' }).tap();
     const sheet = page.getByRole('dialog', { name: 'Your face' });
-    await expect(sheet.getByRole('list', { name: 'Everyday faces' }).getByRole('button')).toHaveCount(7);
+    await expect(sheet.getByRole('list', { name: 'Everyday faces' }).getByRole('button')).toHaveCount(9);
+    await expect(sheet.getByRole('button', { name: 'Annoyed' })).toBeVisible();
+    await expect(sheet.getByRole('button', { name: 'Thinking' })).toBeVisible();
     await expect(sheet.getByRole('button', { name: 'Embarrassed' }).locator('img')).toHaveCount(1);
     await sheet.getByRole('button', { name: 'Embarrassed' }).tap();
     await expect(sheet).toHaveCount(0);

@@ -66,6 +66,7 @@ import { RoleSections1764490000000 } from './1764490000000-RoleSections.js';
 import { RoleImage1764500000000 } from './1764500000000-RoleImage.js';
 import { YourFaces1764510000000 } from './1764510000000-YourFaces.js';
 import { PictureFaces1764520000000 } from './1764520000000-PictureFaces.js';
+import { MoreFaces1764530000000 } from './1764530000000-MoreFaces.js';
 import { UsageMessage1764330000000 } from './1764330000000-UsageMessage.js';
 import { MessageBookmarks1764340000000 } from './1764340000000-MessageBookmarks.js';
 import { PushSubscriptions1764350000000 } from './1764350000000-PushSubscriptions.js';
@@ -161,4 +162,5 @@ export const migrations = [
     RoleImage1764500000000,
     YourFaces1764510000000,
     PictureFaces1764520000000,
+    MoreFaces1764530000000,
 ];

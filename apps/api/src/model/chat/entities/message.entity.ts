@@ -14,7 +14,7 @@ import type { PersonaEntity } from '../../persona/entities/persona.entity.js';
 import type { ChatEntity } from './chat.entity.js';
 import type { MessagePartEntity, MessagePartResponse } from './message-part.entity.js';
 import type { ReplyVersionEntity } from './reply-version.entity.js';
-import type { ExpressionEmotion } from '../../story/emotion.js';
+import type { FaceEmotion } from '../../story/emotion.js';
 
 export enum MessageKind {
     User = 'user',
@@ -72,7 +72,7 @@ export interface UserMessageResponse {
      * The face it was written with (.scratch/your-faces/spec.md): picked by the user as they sent it,
      * or guessed by the Judge from what they wrote; null without one.
      */
-    face: { emotion: ExpressionEmotion; by: FaceBy } | null;
+    face: { emotion: FaceEmotion; by: FaceBy } | null;
     createdAt: string;
 }
 
@@ -187,7 +187,7 @@ export class MessageEntity {
 
     /** A User Message's face (.scratch/your-faces/spec.md); both NULL without one. */
     @Column({ type: 'text', nullable: true })
-    face: ExpressionEmotion | null;
+    face: FaceEmotion | null;
 
     @Column({ name: 'face_by', type: 'text', nullable: true })
     faceBy: FaceBy | null;

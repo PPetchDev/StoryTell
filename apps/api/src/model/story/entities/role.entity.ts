@@ -2,7 +2,7 @@ import { Column, Entity, JoinColumn, OneToMany, OneToOne, PrimaryGeneratedColumn
 import type { PortraitCrop } from './character.entity.js';
 import type { Relation } from 'typeorm';
 
-import { EXPRESSION_EMOTIONS } from '../emotion.js';
+import { FACE_EMOTIONS } from '../emotion.js';
 import type { IdentityExpressionEntity } from '../../your-face/entities/identity-expression.entity.js';
 import type { ExpressionResponse } from './character-expression.entity.js';
 
@@ -88,7 +88,7 @@ export class RoleEntity {
             imagePath: this.imagePath ?? null,
             imageCrop: this.imageCrop ? { x: this.imageCrop.x, y: this.imageCrop.y, size: this.imageCrop.size } : null,
             expressions: [...(this.expressions ?? [])]
-                .sort((a, b) => EXPRESSION_EMOTIONS.indexOf(a.emotion) - EXPRESSION_EMOTIONS.indexOf(b.emotion))
+                .sort((a, b) => FACE_EMOTIONS.indexOf(a.emotion) - FACE_EMOTIONS.indexOf(b.emotion))
                 .map((expression) => expression.toResponse(this.imagePath ?? null)),
         };
     }

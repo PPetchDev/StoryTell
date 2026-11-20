@@ -1,6 +1,6 @@
 'use client';
 
-import type { ExpressionEmotion } from '@/lib/expressions';
+import type { FaceEmotion } from '@/lib/expressions';
 
 import {
     CSSProperties,
@@ -821,7 +821,7 @@ export interface PendingLine {
     /** Sent with a Roll (CONTEXT.md, "Roll"): shown as "Rolling…" until the API answers with the number. */
     roll?: boolean;
     /** The face it was sent with (.scratch/your-faces/spec.md). */
-    face?: ExpressionEmotion | null;
+    face?: FaceEmotion | null;
 }
 
 /** "Writing…" with three pulsing dots, where the reply will appear (the thread, the Visual novel view's box). */

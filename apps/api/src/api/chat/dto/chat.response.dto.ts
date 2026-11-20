@@ -28,8 +28,8 @@ import { BondChangeResponse } from '../../../model/ledger/entities/bond-change.e
 import { SceneAdvanceResponse } from '../../../model/ledger/entities/scene-advance.entity.js';
 import type { SceneMover } from '../../../model/ledger/entities/scene-advance.entity.js';
 import { RollbackCounts } from '../../../model/ledger/ledger.service.js';
-import { EXPRESSION_EMOTIONS } from '../../../model/story/emotion.js';
-import type { ExpressionEmotion } from '../../../model/story/emotion.js';
+import { FACE_EMOTIONS } from '../../../model/story/emotion.js';
+import type { FaceEmotion } from '../../../model/story/emotion.js';
 import { ExpressionDTO, MissingFieldDTO, PortraitCropDTO } from '../../story/dto/story.response.dto.js';
 import { TraySavedReplyDTO } from '../../saved-reply/dto/saved-reply.response.dto.js';
 import { ChatReplaceRuleDTO } from '../../replace-rule/dto/replace-rule.response.dto.js';
@@ -214,8 +214,8 @@ export class RollStatDTO {
 /** A User Message's Roll (.scratch/roll/spec.md). */
 /** A User Message's face (.scratch/your-faces/spec.md). */
 export class MessageFaceDTO {
-    @ApiProperty({ enum: EXPRESSION_EMOTIONS })
-    emotion: ExpressionEmotion;
+    @ApiProperty({ enum: FACE_EMOTIONS })
+    emotion: FaceEmotion;
 
     @ApiProperty({ enum: ['user', 'judge'], description: "The user picked it as they sent it, or the Judge guessed it from what they wrote." })
     by: 'user' | 'judge';

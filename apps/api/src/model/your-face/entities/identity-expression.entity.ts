@@ -3,7 +3,7 @@ import type { Relation } from 'typeorm';
 
 import type { PersonaEntity } from '../../persona/entities/persona.entity.js';
 import type { RoleEntity } from '../../story/entities/role.entity.js';
-import type { ExpressionEmotion } from '../../story/emotion.js';
+import type { FaceEmotion } from '../../story/emotion.js';
 import type { PortraitCrop } from '../../story/entities/character.entity.js';
 import type { ExpressionResponse } from '../../story/entities/character-expression.entity.js';
 
@@ -36,7 +36,7 @@ export class IdentityExpressionEntity {
     persona: Relation<PersonaEntity> | null;
 
     @Column({ type: 'text' })
-    emotion: ExpressionEmotion;
+    emotion: FaceEmotion;
 
     @Column({ name: 'image_path', type: 'text' })
     imagePath: string;

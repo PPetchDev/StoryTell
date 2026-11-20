@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { EMOTION_LABEL, type ExpressionEmotion } from '@/lib/expressions';
+import { EMOTION_LABEL, type FaceEmotion } from '@/lib/expressions';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { ChatBackdrop } from '@/components/chat/backdrop';
@@ -186,7 +186,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
      */
     const [roll, setRoll] = useState(false);
     /** The face picked for the next Message (.scratch/your-faces/spec.md); it goes with one send, like the Roll. */
-    const [face, setFace] = useState<ExpressionEmotion | null>(null);
+    const [face, setFace] = useState<FaceEmotion | null>(null);
     /** The Stat of the Roll offer taken (.scratch/judge-rolls/spec.md), sent with the armed Roll; null when it was armed by hand. */
     const [rollStat, setRollStat] = useState<RollStat | null>(null);
     /** Each tap on the Character row's "Who's here" opens the sheet in the top bar. */

@@ -16,19 +16,32 @@ export type IntimateEmotion = 'teasing' | 'desire' | 'flustered' | 'longing' | '
 export const EVERYDAY_EMOTIONS: readonly EverydayEmotion[] = ['joy', 'love', 'embarrassment', 'sadness', 'anger', 'fear', 'surprise'];
 export const INTIMATE_EMOTIONS: readonly IntimateEmotion[] = ['teasing', 'desire', 'flustered', 'longing', 'passion', 'afterglow'];
 
+/** Faces only you make: the Role's and a Persona's (.scratch/more-faces/spec.md). */
+export type YourOnlyEmotion = 'annoyed' | 'thinking';
+export const YOUR_ONLY_EMOTIONS: readonly YourOnlyEmotion[] = ['annoyed', 'thinking'];
+
+/** Your faces: the Characters' thirteen and the two only you make. */
+export type FaceEmotion = ExpressionEmotion | YourOnlyEmotion;
+
+/** Your everyday faces, in the order the editor and the face picker list them. */
+export const YOUR_EVERYDAY_EMOTIONS: readonly FaceEmotion[] = [...EVERYDAY_EMOTIONS, ...YOUR_ONLY_EMOTIONS];
+
 /** How a Character's Draw all run on the server is going (.scratch/expression-drawing/spec.md). */
 export interface ExpressionDrawing {
     running: boolean;
     /** What it draws, in order; empty when idle. */
-    emotions: ExpressionEmotion[];
-    drawn: ExpressionEmotion[];
-    current: ExpressionEmotion | null;
+    emotions: FaceEmotion[];
+    drawn: FaceEmotion[];
+    current: FaceEmotion | null;
     /** Why it stopped early. */
     failed: { code: string; message: string } | null;
 }
 
 /** In the order the editor and the Character profile list them. */
 export const EXPRESSION_EMOTIONS: readonly ExpressionEmotion[] = [...EVERYDAY_EMOTIONS, ...INTIMATE_EMOTIONS];
+
+/** Your faces in the order the editor lists them. */
+export const FACE_EMOTIONS: readonly FaceEmotion[] = [...YOUR_EVERYDAY_EMOTIONS, ...INTIMATE_EMOTIONS];
 
 /**
  * The everyday picture an intimate line shows when the Character has no picture for its emotion,
@@ -43,7 +56,7 @@ export const EVERYDAY_FALLBACK: Record<IntimateEmotion, EverydayEmotion> = {
     afterglow: 'joy',
 };
 
-export const EMOTION_LABEL: Record<Emotion, string> = {
+export const EMOTION_LABEL: Record<Emotion | YourOnlyEmotion, string> = {
     neutral: 'Neutral',
     joy: 'Happy',
     love: 'Loving',
@@ -52,6 +65,8 @@ export const EMOTION_LABEL: Record<Emotion, string> = {
     anger: 'Angry',
     fear: 'Scared',
     surprise: 'Surprised',
+    annoyed: 'Annoyed',
+    thinking: 'Thinking',
     teasing: 'Teasing',
     desire: 'Desire',
     flustered: 'Flustered',
@@ -62,7 +77,7 @@ export const EMOTION_LABEL: Record<Emotion, string> = {
 
 /** A Character's picture for one emotion (CONTEXT.md: "Expression"). */
 export interface Expression {
-    emotion: ExpressionEmotion;
+    emotion: FaceEmotion;
     /** Relative to the image folder. */
     imagePath: string;
     /** Its own square of its picture; null uses the Portrait's. */
@@ -104,7 +119,7 @@ export interface LinePicture {
  * initial. Whole: that Expression's full image, else the whole Reference image, else none. A
  * `neutral` or untagged line has the Portrait: the Portrait is the neutral face.
  */
-export function linePicture(character: PictureSource | null | undefined, emotion: Emotion | null | undefined): LinePicture {
+export function linePicture(character: PictureSource | null | undefined, emotion: Emotion | YourOnlyEmotion | null | undefined): LinePicture {
     if (!character) return { round: { kind: 'initial' }, whole: null, cutout: false };
     const expression = emotion && emotion !== 'neutral' ? expressionFor(character, emotion) : undefined;
     if (expression) {
@@ -130,7 +145,7 @@ export function stageSrc(src: string, small: boolean): string {
 }
 
 /** The Expression for an emotion; for an intimate one without its own picture, the nearest everyday one's. */
-function expressionFor(character: PictureSource, emotion: ExpressionEmotion): Expression | undefined {
+function expressionFor(character: PictureSource, emotion: FaceEmotion): Expression | undefined {
     const own = character.expressions.find((one) => one.emotion === emotion);
     if (own || !(emotion in EVERYDAY_FALLBACK)) return own;
     const everyday = EVERYDAY_FALLBACK[emotion as IntimateEmotion];

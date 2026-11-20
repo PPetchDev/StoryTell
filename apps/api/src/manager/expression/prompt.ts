@@ -1,4 +1,4 @@
-import { ExpressionEmotion } from '../../model/story/emotion.js';
+import { FaceEmotion } from '../../model/story/emotion.js';
 
 /**
  * How each emotion shows: the face, then one clear gesture of the arms and hands
@@ -7,7 +7,7 @@ import { ExpressionEmotion } from '../../model/story/emotion.js';
  * named gesture reads at a glance, as a visual novel's sprites do. Checked on seedream-v5-pro-edit on
  * 2026-11-18 (fear). The Judge's meanings are broader; these are what one picture can show.
  */
-export const EXPRESSION_LOOKS: Record<ExpressionEmotion, string> = {
+export const EXPRESSION_LOOKS: Record<FaceEmotion, string> = {
     joy: 'a wide, bright smile with the eyes creased in laughter; both hands clasped together in front of the chest',
     love: 'a soft, tender smile and a warm, lingering gaze, a faint flush on the cheeks; one hand resting over the heart, head tilted a little',
     embarrassment: 'blushing deeply, eyes glancing away to one side, a shy small smile; one hand touching the cheek, the other arm relaxed at the side',
@@ -15,6 +15,9 @@ export const EXPRESSION_LOOKS: Record<ExpressionEmotion, string> = {
     anger: 'brows drawn hard together, eyes narrowed in a glare, jaw clenched; arms folded firmly across the chest',
     fear: 'eyes wide with fear, brows raised and pinched together, lips parted; both hands raised close to the chest with the fingers curled, shoulders lifted a little',
     surprise: 'eyes wide open, brows raised high, mouth open in a small gasp; one hand raised to cover the mouth',
+    // Your faces only (.scratch/more-faces/spec.md).
+    annoyed: 'an unimpressed, irritated look, brows lowered, eyes half-lidded, lips pressed flat in a small pout; both hands on the hips',
+    thinking: 'a thoughtful look, eyes turned up and to one side, lips pursed a little; one hand under the chin, the other arm folded across the waist supporting the elbow',
     teasing: 'a sly half-smile, eyes narrowed playfully, one eyebrow raised; one fingertip resting on the lower lip, head tilted slightly',
     desire: 'heavy-lidded eyes looking straight at the viewer, deeply flushed cheeks, lips slightly parted; the fingertips of one hand tracing the collarbone, hips shifted a little to one side',
     flustered: 'flushed bright red, breathing quickly, eyes glancing away; both hands gripping the hem of the clothing, arms drawn in close to the body',
@@ -29,7 +32,7 @@ export const EXPRESSION_LOOKS: Record<ExpressionEmotion, string> = {
  * the arms and hands changed. The edit comes first and the Appearance last, so a prompt cut to the
  * model's limit keeps the edit.
  */
-export function expressionPrompt(character: { name: string; appearance: string }, emotion: ExpressionEmotion): string {
+export function expressionPrompt(character: { name: string; appearance: string }, emotion: FaceEmotion): string {
     const name = character.name.trim();
     const who = name === '' ? 'this adult character' : `${name}, an adult`;
     return [

@@ -31,6 +31,33 @@ export type ExpressionEmotion = (typeof EXPRESSION_EMOTIONS)[number];
  */
 export const INTIMATE_EMOTIONS = ['teasing', 'desire', 'flustered', 'longing', 'passion', 'afterglow'] as const;
 
+/**
+ * Your faces (.scratch/more-faces/spec.md): the Role's and a Persona's Expressions, and the face a
+ * Message of yours shows. The Characters' thirteen plus two only you make, after the everyday ones.
+ */
+export const FACE_EMOTIONS = [
+    'joy',
+    'love',
+    'embarrassment',
+    'sadness',
+    'anger',
+    'fear',
+    'surprise',
+    'annoyed',
+    'thinking',
+    'teasing',
+    'desire',
+    'flustered',
+    'longing',
+    'passion',
+    'afterglow',
+] as const;
+export type FaceEmotion = (typeof FACE_EMOTIONS)[number];
+
+export function isFaceEmotion(value: unknown): value is FaceEmotion {
+    return typeof value === 'string' && (FACE_EMOTIONS as readonly string[]).includes(value);
+}
+
 export function isEmotion(value: unknown): value is Emotion {
     return typeof value === 'string' && (EMOTIONS as readonly string[]).includes(value);
 }

@@ -1,4 +1,4 @@
-import type { ExpressionEmotion } from '../story/emotion.js';
+import type { FaceEmotion } from '../story/emotion.js';
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, IsNull, MoreThan, Not, Repository } from 'typeorm';
@@ -172,7 +172,7 @@ export class ChatModelService {
         text: string,
         identity: StampedIdentity,
         roll: { value: number; target: number; stat?: { name: string; bonus: number } | null } | null = null,
-        face: ExpressionEmotion | null = null,
+        face: FaceEmotion | null = null,
     ): Promise<MessageEntity> {
         return this.messages.save(
             this.messages.create({
@@ -194,7 +194,7 @@ export class ChatModelService {
     }
 
     /** The Judge's guess of a User Message's face (.scratch/your-faces/spec.md); never over one the user picked. */
-    async setJudgedFace(messageId: number, emotion: ExpressionEmotion): Promise<void> {
+    async setJudgedFace(messageId: number, emotion: FaceEmotion): Promise<void> {
         await this.messages
             .createQueryBuilder()
             .update()

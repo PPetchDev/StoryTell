@@ -2,7 +2,7 @@
 
 import { createContext, ReactNode, useContext, useMemo } from 'react';
 
-import { Expression, ExpressionEmotion } from '@/lib/expressions';
+import { Expression, FaceEmotion } from '@/lib/expressions';
 import type { PortraitCrop } from '@/lib/story';
 
 interface Pictures {
@@ -80,7 +80,7 @@ export function useYourFaces(personaId: number | null | undefined): Expression[]
 }
 
 /** The Expression of one face of the Role or a Persona; null when it has none. */
-export function useYourFace(personaId: number | null | undefined, emotion: ExpressionEmotion | null | undefined): Expression | null {
+export function useYourFace(personaId: number | null | undefined, emotion: FaceEmotion | null | undefined): Expression | null {
     const faces = useYourFaces(personaId);
     return emotion ? (faces.find((face) => face.emotion === emotion) ?? null) : null;
 }

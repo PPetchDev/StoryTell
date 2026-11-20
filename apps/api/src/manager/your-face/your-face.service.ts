@@ -7,7 +7,7 @@ import { UnsupportedImageError } from '../../errors/image.errors.js';
 import { OutOfCreditError } from '../../errors/model-gateway.errors.js';
 import { ExpressionNotFoundError, NoReferenceImageToDrawError } from '../../errors/story.errors.js';
 import { PersonaResponse } from '../../model/persona/entities/persona.entity.js';
-import { EXPRESSION_EMOTIONS, ExpressionEmotion } from '../../model/story/emotion.js';
+import { FACE_EMOTIONS, FaceEmotion } from '../../model/story/emotion.js';
 import { PortraitCrop } from '../../model/story/entities/character.entity.js';
 import { ExpressionResponse } from '../../model/story/entities/character-expression.entity.js';
 import { StoryModelService } from '../../model/story/story.service.js';
@@ -32,7 +32,7 @@ interface Owner {
     picturePath: string | null;
     expressions: ExpressionResponse[];
     storyId: number | null;
-    pathFor(emotion: ExpressionEmotion, extension: string): string;
+    pathFor(emotion: FaceEmotion, extension: string): string;
 }
 
 interface Run extends ExpressionDrawing {
@@ -64,7 +64,7 @@ export class YourFaceManagerService {
     ) {}
 
     /** Draws the emotion's Expression from the owner's picture: one `expression_image` call, then its cut-out. */
-    async draw(target: FaceTarget, emotion: ExpressionEmotion): Promise<StoryDetail | PersonaResponse> {
+    async draw(target: FaceTarget, emotion: FaceEmotion): Promise<StoryDetail | PersonaResponse> {
         const owner = await this.drawable(target);
         const drawnFrom = owner.picturePath!;
         const reference = await this.imageStore.read(drawnFrom);
@@ -81,7 +81,7 @@ export class YourFaceManagerService {
     }
 
     /** Cuts out an Expression that is there: one `image_cutout` call; a failed call is the error. */
-    async cutOut(target: FaceTarget, emotion: ExpressionEmotion): Promise<StoryDetail | PersonaResponse> {
+    async cutOut(target: FaceTarget, emotion: FaceEmotion): Promise<StoryDetail | PersonaResponse> {
         const owner = await this.find(target);
         const expression = owner.expressions.find((one) => one.emotion === emotion);
         if (!expression) throw new ExpressionNotFoundError();
@@ -91,7 +91,7 @@ export class YourFaceManagerService {
     }
 
     /** Stores an uploaded picture as the emotion's Expression, with the centre square; the type is read from the bytes. */
-    async upload(target: FaceTarget, emotion: ExpressionEmotion, bytes: Buffer): Promise<StoryDetail | PersonaResponse> {
+    async upload(target: FaceTarget, emotion: FaceEmotion, bytes: Buffer): Promise<StoryDetail | PersonaResponse> {
         const owner = await this.find(target);
         const mimeType = ImageStoreService.sniffMimeType(bytes);
         if (!mimeType) throw new UnsupportedImageError();
@@ -99,7 +99,7 @@ export class YourFaceManagerService {
         return this.answer(target);
     }
 
-    async setCrop(target: FaceTarget, emotion: ExpressionEmotion, crop: PortraitCrop | null): Promise<StoryDetail | PersonaResponse> {
+    async setCrop(target: FaceTarget, emotion: FaceEmotion, crop: PortraitCrop | null): Promise<StoryDetail | PersonaResponse> {
         const owner = await this.find(target);
         const square = crop ? { x: crop.x, y: crop.y, size: crop.size } : null;
         if (!(await this.faces.setCrop(owner.owner, emotion, square))) throw new ExpressionNotFoundError();
@@ -107,7 +107,7 @@ export class YourFaceManagerService {
     }
 
     /** Deletes the Expression and its files; its emotion shows the picture again. */
-    async remove(target: FaceTarget, emotion: ExpressionEmotion): Promise<StoryDetail | PersonaResponse> {
+    async remove(target: FaceTarget, emotion: FaceEmotion): Promise<StoryDetail | PersonaResponse> {
         const owner = await this.find(target);
         const removed = await this.faces.remove(owner.owner, emotion);
         if (!removed) throw new ExpressionNotFoundError();
@@ -122,7 +122,7 @@ export class YourFaceManagerService {
         const going = this.runs.get(owner.key);
         if (going?.running) return view(going);
         await this.drawable(target);
-        const emotions = emotionsToDraw(owner, redraw);
+        const emotions = emotionsToDraw(owner, redraw, FACE_EMOTIONS);
         if (emotions.length === 0) {
             this.runs.delete(owner.key);
             return { ...IDLE };
@@ -199,7 +199,7 @@ export class YourFaceManagerService {
     }
 
     /** Writes the file, then the row; a failure before the row deletes the new file. Deletes the replaced files after. */
-    private async storeFile(owner: Owner, emotion: ExpressionEmotion, bytes: Buffer, extension: string, fields: { crop: PortraitCrop | null | 'keep'; drawnFrom: string | null }): Promise<string> {
+    private async storeFile(owner: Owner, emotion: FaceEmotion, bytes: Buffer, extension: string, fields: { crop: PortraitCrop | null | 'keep'; drawnFrom: string | null }): Promise<string> {
         const imagePath = owner.pathFor(emotion, extension);
         await this.imageStore.write(imagePath, bytes);
         let previous;
@@ -215,7 +215,7 @@ export class YourFaceManagerService {
     }
 
     /** Cuts out the picture now at `imagePath` and keeps it as that Expression's cut-out. Swallows a failure unless `rethrow`. */
-    private async cutOutExpression(owner: Owner, emotion: ExpressionEmotion, imagePath: string, image: ImageData | Buffer, rethrow = false): Promise<void> {
+    private async cutOutExpression(owner: Owner, emotion: FaceEmotion, imagePath: string, image: ImageData | Buffer, rethrow = false): Promise<void> {
         let cutoutPath: string | null = null;
         try {
             const source: ImageData = Buffer.isBuffer(image) ? { bytes: image, mimeType: ImageStoreService.sniffMimeType(image) ?? 'image/jpeg' } : image;
@@ -255,5 +255,3 @@ function view({ running, emotions, drawn, current, failed }: Run): ExpressionDra
     return { running, emotions: [...emotions], drawn: [...drawn], current, failed };
 }
 
-/** Every emotion an identity Expression can have, for the routes' enum check. */
-export const FACE_EMOTIONS = EXPRESSION_EMOTIONS;
