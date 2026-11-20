@@ -134,6 +134,14 @@ for (const width of [320, 360, 390, 412]) {
                 expect(place.width).toBeGreaterThanOrEqual(44);
             }
 
+            // The composer's band and the top bar run edge to edge (the user, 2026-11-20): inside the
+            // page's sides the Backdrop showed beside them.
+            for (const band of [page.locator('footer:has(form[aria-label="Composer"])'), page.locator('header:has([aria-label="Chat menu"])')]) {
+                const edges = await box(band);
+                expect(edges.x).toBe(0);
+                expect(edges.width).toBe(width);
+            }
+
             // The Character row's portraits sit in the middle of their rings, and the tools stand under
             // them in the same columns (the user, 2026-11-19: off-centre portraits, crooked rows).
             const chips = await composer

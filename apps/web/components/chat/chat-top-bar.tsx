@@ -514,7 +514,7 @@ export function ChatTopBar({
     return (
         <>
             {/* At most 56px; half-way into the page's side padding on a phone; the page colour, so a Backdrop shows behind the Messages only. */}
-            <header className={`-mx-2 flex max-h-14 min-h-12 shrink-0 items-center gap-1 border-b border-line bg-bg py-1 ${COLUMN}`}>
+            <header className={`flex max-h-14 max-lg:-mx-4 max-lg:px-2 min-h-12 shrink-0 items-center gap-1 border-b border-line bg-bg py-1 ${COLUMN}`}>
                 <Link href={`/stories/${chat.storyId}/chats`} className={BAR_ICON} aria-label="Back to Chats">
                     <ChevronLeftIcon size={22} strokeWidth={2} />
                 </Link>

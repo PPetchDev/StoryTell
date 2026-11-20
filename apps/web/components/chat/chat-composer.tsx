@@ -564,7 +564,8 @@ export function ChatComposer({
     return (
         <footer
             ref={footerRef}
-            className={`shrink-0 ${away ? 'pb-[env(safe-area-inset-bottom)]' : 'border-t border-line pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]'} bg-bg ${COLUMN}`}
+            // Edge to edge on a phone (the user, 2026-11-20): inside the page's 16px sides, the Backdrop showed beside it.
+            className={`shrink-0 max-lg:-mx-4 max-lg:px-4 ${away ? 'pb-[env(safe-area-inset-bottom)]' : 'border-t border-line pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]'} bg-bg ${COLUMN}`}
             data-tucked={away ? '' : undefined}
             onFocus={(event) => {
                 ownsFocus.current = footerRef.current?.contains(event.target as Node) ?? false;
