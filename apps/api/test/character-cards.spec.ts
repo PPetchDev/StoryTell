@@ -86,7 +86,7 @@ describe('Character cards: the mapping (pure)', () => {
             narrationVoice: null,
             backdrop: 'none',
         });
-        expect(result.role).toEqual({ name: 'Ash', description: '' });
+        expect(result.role).toEqual({ name: 'Ash', description: '', sections: [] });
         expect(result.character).toEqual({
             name: 'Mira',
             appearance: '',
@@ -276,7 +276,7 @@ describe('Character cards: the mapping (pure)', () => {
             arcDirections: 'Learns to trust.',
             speakingVoice: null,
         });
-        expect(result.role).toEqual({ name: 'Bea', description: 'Bea is the new keeper.' });
+        expect(result.role).toEqual({ name: 'Bea', description: 'Bea is the new keeper.', sections: [] });
         expect(result.story).toMatchObject({ setting: 'The island, where Bea arrives.', pov: 'first', tense: 'present', replyLength: 'long', imageStyle: 'ink wash' });
         // A Style value outside its set stays at the default (left unset).
         const odd = plan(v2Card({ extensions: { storytell: { version: 1, character: {}, style: { pov: 'fourth' } } } }));
@@ -914,7 +914,7 @@ describe('Character cards: the writer (pure)', () => {
                 arcDirections: mira.arcDirections,
                 speakingVoice: null,
             });
-            expect(back.role).toEqual({ name: 'Ash', description: story.role.description });
+            expect(back.role).toEqual({ name: 'Ash', description: story.role.description, sections: [] });
             expect(back.story).toEqual({ title: 'Mira', setting: story.setting, opening: story.opening, ...story.style, narrationVoice: null, backdrop: 'none' });
             expect(back.lore).toEqual(
                 story.lore.filter((entry) => entry.text.trim() !== '').map(({ id: _id, ...fields }) => fields),

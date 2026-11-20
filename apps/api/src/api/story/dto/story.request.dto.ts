@@ -147,6 +147,19 @@ export class RoleStatRequestDTO {
     value: number;
 }
 
+/** One of a Role's own sections (.scratch/role-sections/spec.md); the manager checks the rules across the list. */
+export class RoleSectionRequestDTO {
+    @ApiProperty({ description: 'Its heading: 1 to 60 characters on one line.' })
+    @IsString()
+    @MaxLength(200)
+    heading: string;
+
+    @ApiProperty({ description: 'Its free text, at most 20000 characters; may be empty.' })
+    @IsString()
+    @MaxLength(TEXT_MAX)
+    text: string;
+}
+
 export class RoleRequestBodyDTO implements RoleFields {
     @ApiPropertyOptional({ description: 'The name of the part the user plays.' })
     @IsOptional()
@@ -167,6 +180,17 @@ export class RoleRequestBodyDTO implements RoleFields {
     @ValidateNested({ each: true })
     @Type(() => RoleStatRequestDTO)
     stats?: RoleStatRequestDTO[];
+
+    @ApiPropertyOptional({
+        type: [RoleSectionRequestDTO],
+        description: "The Role's own sections, at most 20, replacing the whole list (.scratch/role-sections/spec.md).",
+    })
+    @ValidateIf((_body, value) => value !== undefined)
+    @IsArray()
+    @ArrayMaxSize(50)
+    @ValidateNested({ each: true })
+    @Type(() => RoleSectionRequestDTO)
+    sections?: RoleSectionRequestDTO[];
 }
 
 export class CharacterRequestBodyDTO implements CharacterFields {

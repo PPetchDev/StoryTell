@@ -95,6 +95,10 @@ _Avoid_: Game master, GM, system
 The part a Story defines for the user to play; every Story has one.
 _Avoid_: Player character, protagonist
 
+**Role section**:
+One of the Role's own blocks of free text, written by the author beside its Description under any heading ("Powers", "Outfit") or none, in the author's order. Every section with text reaches the Characters with the Description, its placeholders filled like the Role's; a Persona has none.
+_Avoid_: Custom field, attribute, trait
+
 **Persona**:
 The user's own reusable self-description, which can be worn in place of a Story's Role. It may have a picture the user uploads, its **Persona image**, which shows beside the user's lines in a Chat that wears it; unlike a Character's Reference image no model ever sees it.
 _Avoid_: Profile, avatar, user character

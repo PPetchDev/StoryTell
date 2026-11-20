@@ -60,7 +60,20 @@ export interface Role {
     description: string;
     /** Its Stats (CONTEXT.md, "Stat"), in the author's order; left out by an older API. */
     stats?: RoleStat[];
+    /** Its own sections (CONTEXT.md, "Role section"), in the author's order; left out by an older API. */
+    sections?: RoleSection[];
 }
+
+/** One of the Role's own sections: a heading and free text, read with the Description. */
+export interface RoleSection {
+    heading: string;
+    text: string;
+}
+
+/** The Role's sections' limits (mirrors apps/api/src/manager/story/role-sections.ts). */
+export const MAX_ROLE_SECTIONS = 20;
+export const ROLE_SECTION_HEADING_MAX = 60;
+export const ROLE_SECTION_TEXT_MAX = 20000;
 
 /** One of the Role's Stats: a name and the number it adds to a Roll made for it. */
 export interface RoleStat {

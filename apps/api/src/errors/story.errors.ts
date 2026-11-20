@@ -236,3 +236,10 @@ export class InvalidStatsError extends AppError {
         super('422.003.041', reason);
     }
 }
+
+/** A Role's sections that break a rule (.scratch/role-sections/spec.md): too many, a heading on two lines, or too long. */
+export class InvalidRoleSectionsError extends AppError {
+    constructor(reason: string) {
+        super('422.003.042', reason);
+    }
+}

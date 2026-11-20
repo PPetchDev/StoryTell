@@ -101,7 +101,10 @@ export function renderStory(story: StoryResponse, options: { loreTriggers?: bool
         line('Setting', story.setting),
         line('Opening', story.opening),
         `Style: ${story.style.pov} person, ${story.style.tense} tense, ${story.style.replyLength} replies, ${story.style.pacing} pacing, ${story.style.balance} between dialogue and action, ${story.style.difficulty} difficulty. ${line('Image style', story.style.imageStyle)}`,
-        `Role (the part the author plays):\n  ${line('Name', story.role.name)}\n  ${line('Description', story.role.description)}`,
+        // The Role's own sections only when it has some (.scratch/role-sections/spec.md), so other prompts stay as they were.
+        `Role (the part the author plays):\n  ${line('Name', story.role.name)}\n  ${line('Description', story.role.description)}${(story.role.sections ?? [])
+            .map((section) => `\n  ${line(`Section "${section.heading}"`, section.text)}`)
+            .join('')}`,
     ];
     // Only when there are some, so every other Story's prompt stays as it was (.scratch/opening-questions/spec.md).
     const questions = story.openingQuestions ?? [];

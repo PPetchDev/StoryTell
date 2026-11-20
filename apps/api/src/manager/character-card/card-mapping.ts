@@ -4,6 +4,8 @@ import { Backdrop, Balance, Difficulty, Pacing, Pov, ReplyLength, Tense } from '
 import { cleanPatterns, compileLorePattern } from '../chat/lore/lore-pattern.js';
 import type { OpeningQuestion } from '../../model/story/entities/story.entity.js';
 import { cleanOpeningQuestions } from '../story/opening-questions.js';
+import type { RoleSection } from '../../model/story/entities/role.entity.js';
+import { fitHeading, MAX_ROLE_SECTIONS } from '../story/role-sections.js';
 import { CharacterFields, cleanKeywords, LoreEntryFields, StoryFields } from '../story/story.service.js';
 import { CardBookEntry, CardData } from './card-reader.js';
 
@@ -35,7 +37,7 @@ export type CardLoreEntry = Required<LoreEntryFields> & LoreTriggers;
 export interface CardStoryPlan {
     story: Required<Pick<StoryFields, 'title' | 'setting' | 'opening'>> &
         Pick<StoryFields, 'pov' | 'tense' | 'replyLength' | 'pacing' | 'balance' | 'difficulty' | 'imageStyle'> & { narrationVoice: string | null; backdrop: Backdrop };
-    role: { name: string; description: string };
+    role: { name: string; description: string; sections: RoleSection[] };
     character: Required<Omit<CharacterFields, 'speakingVoice' | 'dubVoice'>> & { speakingVoice: string | null };
     lore: CardLoreEntry[];
     /** A Storytell card's Opening questions (.scratch/opening-questions/spec.md); none from any other card. */
@@ -57,7 +59,8 @@ export interface StorytellBlock {
         /** As written: checked against the voice list by the mapping (ticket 06). Absent = the default. */
         speakingVoice?: unknown;
     };
-    role: { name: string; description: string };
+    /** `sections` only when the Story had some (.scratch/role-sections/spec.md). */
+    role: { name: string; description: string; sections: RoleSection[] };
     /** As the card writer puts them, only when the Story had some: unchecked here. */
     openingQuestions?: unknown;
     /** The Opening as written, placeholders kept; only beside `openingQuestions`. */
@@ -107,7 +110,13 @@ export function storytellBlock(card: CardData): StorytellBlock | null {
             arcDirections: str(character.arcDirections),
             speakingVoice: character.speakingVoice,
         },
-        role: { name: str(role.name), description: str(role.description) },
+        role: {
+            name: str(role.name),
+            description: str(role.description),
+            sections: Array.isArray(role.sections)
+                ? role.sections.filter(isObject).map((section) => ({ heading: str(section.heading), text: str(section.text) }))
+                : [],
+        },
         openingQuestions: block.openingQuestions,
         ...(typeof block.opening === 'string' && { opening: block.opening }),
         style: {
@@ -285,7 +294,19 @@ export function mapCard(card: CardData, choices: CardChoices, knownVoice: (voice
               speakingVoice: null,
           };
 
-    const role = { name: names.user, description: block ? field("The Role's description", block.role.description) : '' };
+    // The Role's sections (.scratch/role-sections/spec.md): headings made one line and cut to fit, empty sections dropped.
+    const sections = (block?.role.sections ?? [])
+        .map((section, index) => ({
+            heading: fitHeading(clean(section.heading)),
+            text: field(`Role section ${index + 1}`, section.text),
+        }))
+        .filter((section) => section.heading !== '' || section.text !== '');
+    if (sections.length > MAX_ROLE_SECTIONS) leftOut.push(`Role sections past the first ${MAX_ROLE_SECTIONS}.`);
+    const role = {
+        name: names.user,
+        description: block ? field("The Role's description", block.role.description) : '',
+        sections: sections.slice(0, MAX_ROLE_SECTIONS),
+    };
 
     const lore = mapLore(card, clean, field, leftOut);
 

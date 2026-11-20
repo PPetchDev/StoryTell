@@ -140,7 +140,14 @@ export function writeCard(story: StoryResponse, character: Character): CardDefin
                     ...(character.speakingVoice !== null && { speakingVoice: character.speakingVoice }),
                 },
                 // As written, placeholders kept, so a Storytell import asks the questions again.
-                role: { name: story.role.name, description: u(story.role.description) },
+                role: {
+                    name: story.role.name,
+                    description: u(story.role.description),
+                    // Only when it has some (.scratch/role-sections/spec.md), so a card without stays as before.
+                    ...((story.role.sections ?? []).length > 0 && {
+                        sections: story.role.sections.map((section) => ({ heading: u(section.heading), text: u(section.text) })),
+                    }),
+                },
                 ...(questions.length > 0 && {
                     openingQuestions: questions.map((question) => ({ ...question })),
                     opening: u(story.opening),

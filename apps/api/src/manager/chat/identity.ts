@@ -2,6 +2,7 @@ import { ChatEntity } from '../../model/chat/entities/chat.entity.js';
 import { MessageEntity, MessageKind } from '../../model/chat/entities/message.entity.js';
 import { StoryEntity } from '../../model/story/entities/story.entity.js';
 import { fillPlaceholders } from '../story/opening-questions.js';
+import { roleText } from '../story/role-sections.js';
 
 /**
  * Who the user is playing in a Chat (spec: "worn identity: the Role, or a Persona"). The
@@ -26,7 +27,8 @@ export function wornIdentity(story: StoryEntity, chat: ChatEntity): WornIdentity
         return { personaId: chat.persona.id, name: chat.persona.name, description: chat.persona.description };
     }
     const fill = (text: string) => fillPlaceholders(text, story.openingQuestions, chat.openingAnswers);
-    return { personaId: null, name: fill(story.role.name), description: fill(story.role.description) };
+    // The Role's sections (.scratch/role-sections/spec.md) follow its Description, placeholders filled too.
+    return { personaId: null, name: fill(story.role.name), description: roleText(story.role.description, story.role.sections, fill) };
 }
 
 /**

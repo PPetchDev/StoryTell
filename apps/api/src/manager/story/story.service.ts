@@ -28,9 +28,10 @@ import {
     SuddenEventLimitError,
     SuddenEventNotFoundError,
 } from '../../errors/story.errors.js';
-import { InvalidStatsError } from '../../errors/story.errors.js';
+import { InvalidRoleSectionsError, InvalidStatsError } from '../../errors/story.errors.js';
 import { statsProblem } from '../chat/roll-offer/roll-offer.js';
-import { RoleStat } from '../../model/story/entities/role.entity.js';
+import { RoleSection, RoleStat } from '../../model/story/entities/role.entity.js';
+import { roleSectionsProblem, tidyRoleSections } from './role-sections.js';
 import { cleanPatterns, compileLorePattern } from '../chat/lore/lore-pattern.js';
 import { ImageNotFoundError, SnapshotNotFoundError, UnsupportedImageError } from '../../errors/image.errors.js';
 import { ChatModelService } from '../../model/chat/chat.service.js';
@@ -131,6 +132,8 @@ export interface RoleFields {
     description?: string;
     /** The whole list of Stats (.scratch/judge-rolls/spec.md), replacing the one before. */
     stats?: RoleStat[];
+    /** The whole list of sections (.scratch/role-sections/spec.md), replacing the one before. */
+    sections?: RoleSection[];
 }
 
 export interface CharacterFields {
@@ -548,6 +551,12 @@ export class StoryManagerService {
             const problem = statsProblem(stats);
             if (problem) throw new InvalidStatsError(problem);
             story.role.stats = stats;
+        }
+        if (fields.sections !== undefined) {
+            const sections = tidyRoleSections(fields.sections);
+            const problem = roleSectionsProblem(sections);
+            if (problem) throw new InvalidRoleSectionsError(problem);
+            story.role.sections = sections;
         }
         assignSent(story.role, fields, ['name', 'description']);
         await this.storyModel.saveRole(story.role);

@@ -43,6 +43,7 @@ import {
     SuddenEventFields,
     TENSE_LABELS,
     RoleStat,
+    RoleSection,
 } from '@/lib/story';
 import { ADD_BUTTON, ADD_BUTTON_IN_CARD } from './add-button';
 import { focusChoice, movedIndex } from './arrow-keys';
@@ -79,6 +80,7 @@ import { SharedLore } from './shared-lore';
 import { SuddenEventCard } from './sudden-event-card';
 import { AiEventsSwitch } from './ai-events-switch';
 import { StatsCard } from './stats-card';
+import { RoleSectionsCard, roleSectionTexts, savableRoleSections } from './role-sections-card';
 import { StartingBeliefsCard } from './starting-beliefs-card';
 import { OpeningQuestionsCard, savableQuestions } from './opening-questions-card';
 import { StartingBondsCard } from './starting-bonds-card';
@@ -382,6 +384,11 @@ export function StoryEditor({ initial }: { initial: Story }) {
     const setRoleStats = (stats: RoleStat[]) => {
         setStory((current) => ({ ...current, role: { ...current.role, stats } }));
         queue('role.stats', () => storyApi.updateRole(storyId, { stats }), applyStatus);
+    };
+    /** The Role's own sections (.scratch/role-sections/spec.md): shown and saved whole, as one list. */
+    const setRoleSections = (sections: RoleSection[]) => {
+        setStory((current) => ({ ...current, role: { ...current.role, sections } }));
+        queue('role.sections', () => storyApi.updateRole(storyId, { sections: savableRoleSections(sections) }), applyStatus);
     };
     const setRollOffers = (rollOffers: boolean) => {
         setStory((current) => ({ ...current, rollOffers }));
@@ -722,7 +729,7 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                 </section>
                                 <OpeningQuestionsCard
                                     questions={story.openingQuestions ?? []}
-                                    texts={[story.opening, story.role.name, story.role.description]}
+                                    texts={[story.opening, story.role.name, story.role.description, ...roleSectionTexts(story.role.sections ?? [])]}
                                     onChange={setOpeningQuestions}
                                 />
                                 {/* Delete Story: quiet, at the very foot of the Story tab, and it asks first. */}
@@ -891,6 +898,9 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                     {...rewritable({ target: 'role', field: 'description' })}
                                 />
                             </section>
+                        )}
+                        {tab === 'role' && (
+                            <RoleSectionsCard sections={story.role.sections ?? []} placeholderHint={placeholderHint} onChange={setRoleSections} />
                         )}
                         {tab === 'role' && (
                             <StatsCard

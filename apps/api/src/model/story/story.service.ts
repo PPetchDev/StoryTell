@@ -176,7 +176,7 @@ export class StoryModelService {
                 }),
             );
             await manager.save(
-                manager.create(RoleEntity, { storyId: story.id, name: source.role.name, description: source.role.description, stats: source.role.stats ?? [] }),
+                manager.create(RoleEntity, { storyId: story.id, name: source.role.name, description: source.role.description, stats: source.role.stats ?? [], sections: source.role.sections ?? [] }),
             );
             const characterIds = new Map<number, number>();
             for (const character of source.characters) {

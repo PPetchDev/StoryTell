@@ -9,12 +9,20 @@ export interface RoleStat {
     value: number;
 }
 
+/** One of the Role's own sections (.scratch/role-sections/spec.md): a heading and free text. */
+export interface RoleSection {
+    heading: string;
+    text: string;
+}
+
 export interface RoleResponse {
     id: number;
     name: string;
     description: string;
     /** Its Stats, in the author's order; empty without. */
     stats: RoleStat[];
+    /** Its sections, in the author's order; empty without. */
+    sections: RoleSection[];
 }
 
 /** The part the user plays. Exactly one per Story, created with it. */
@@ -40,7 +48,11 @@ export class RoleEntity {
     @Column({ type: 'jsonb', default: () => "'[]'" })
     stats: RoleStat[];
 
+    /** Its sections (.scratch/role-sections/spec.md), at most 20, in the author's order. */
+    @Column({ type: 'jsonb', default: () => "'[]'" })
+    sections: RoleSection[];
+
     toResponse(): RoleResponse {
-        return { id: this.id, name: this.name, description: this.description, stats: this.stats ?? [] };
+        return { id: this.id, name: this.name, description: this.description, stats: this.stats ?? [], sections: this.sections ?? [] };
     }
 }
