@@ -2,7 +2,7 @@ import { apiFetch, apiSend } from './api';
 import { resumableTurn } from './turn-stream';
 import type { Belief } from './memory';
 import type { BondLevels } from './bonds';
-import type { Emotion } from './expressions';
+import type { Emotion, Expression, ExpressionEmotion } from './expressions';
 import { MissingField } from './story';
 import type { TraySavedReply } from './saved-replies';
 import type { ChatReplaceRule } from './replace-rules';
@@ -69,6 +69,8 @@ export interface UserMessage {
     personaId: number | null;
     /** The Roll it was sent with (CONTEXT.md, "Roll"); null without one. */
     roll: MessageRoll | null;
+    /** The face it was written with, picked or guessed by the Judge (.scratch/your-faces/spec.md); null or left out without one. */
+    face?: { emotion: ExpressionEmotion; by: 'user' | 'judge' } | null;
     createdAt: string;
     /** Its Thai reading for the text as it stands; null when none was made (.scratch/write-for-me/spec.md). */
     thaiReading: string | null;
@@ -256,6 +258,10 @@ export interface Chat extends ChatSummary {
     personaImages: Array<{ personaId: number; imagePath: string }>;
     /** The Role's picture, for your lines written as the Role (.scratch/role-image/spec.md); left out by an older API. */
     roleImagePath?: string | null;
+    /** The Role's Expressions, for the faces of your lines written as the Role (.scratch/your-faces/spec.md); left out by an older API. */
+    roleExpressions?: Expression[];
+    /** The Expressions of the Personas in this Chat that have any; left out by an older API. */
+    personaExpressions?: Array<{ personaId: number; expressions: Expression[] }>;
     roleName: string;
     /** What this Chat answered to its Story's Opening questions, by key; null when it was asked none. */
     openingAnswers?: Record<string, string> | null;
@@ -515,6 +521,8 @@ export interface TurnExtras {
     roll?: boolean;
     /** With `roll`: the Role's Stat the Roll is made for, from a Roll offer taken (.scratch/judge-rolls/spec.md). */
     rollStat?: string | null;
+    /** A send only (.scratch/your-faces/spec.md): the face the user picked; the Narrator is told it. */
+    face?: ExpressionEmotion | null;
 }
 
 /**
@@ -584,7 +592,7 @@ export const chatApi = {
         apiSend<Chat>('PUT', `/stories/${storyId}/chats/${chatId}/sitting-out`, { characterIds }),
     remove: (storyId: number, chatId: number) => apiSend<void>('DELETE', `/stories/${storyId}/chats/${chatId}`),
     send: (storyId: number, chatId: number, text: string, stream?: TurnStream, extras?: TurnExtras) =>
-        turn<Chat>('POST', `/stories/${storyId}/chats/${chatId}/messages`, withExtras(extras?.roll ? { text, roll: true, ...(extras.rollStat ? { rollStat: extras.rollStat } : {}) } : { text }, extras), stream),
+        turn<Chat>('POST', `/stories/${storyId}/chats/${chatId}/messages`, withExtras({ text, ...(extras?.roll ? { roll: true, ...(extras.rollStat ? { rollStat: extras.rollStat } : {}) } : {}), ...(extras?.face ? { face: extras.face } : {}) }, extras), stream),
     retry: (storyId: number, chatId: number, stream?: TurnStream, extras?: TurnExtras) =>
         turn<Chat>('POST', `/stories/${storyId}/chats/${chatId}/retry`, withExtras(undefined, extras), stream),
     /** Lets the story go on without a line from the user: the Narrator writes the next reply. */

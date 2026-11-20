@@ -6,6 +6,7 @@ import { ChatModelModule } from '../../model/chat/chat.module.js';
 import { LedgerModelModule } from '../../model/ledger/ledger.module.js';
 import { SnapshotModelModule } from '../../model/snapshot/snapshot.module.js';
 import { StoryModelModule } from '../../model/story/story.module.js';
+import { YourFaceModelModule } from '../../model/your-face/your-face.module.js';
 import { ImageStoreModule } from '../../store/image/image-store.module.js';
 import { ReadAloudManagerModule } from '../read-aloud/read-aloud.module.js';
 import { VoiceManagerModule } from '../voice/voice.module.js';
@@ -13,7 +14,7 @@ import { StoryManagerService } from './story.service.js';
 import { CharacterSecretsManagerService } from './character-secrets.service.js';
 
 @Module({
-    imports: [StageModelModule, StoryModelModule, DocumentModelModule, ChatModelModule, LedgerModelModule, SnapshotModelModule, ImageStoreModule, ReadAloudManagerModule, VoiceManagerModule],
+    imports: [StageModelModule, StoryModelModule, DocumentModelModule, ChatModelModule, LedgerModelModule, SnapshotModelModule, ImageStoreModule, ReadAloudManagerModule, VoiceManagerModule, YourFaceModelModule],
     providers: [StoryManagerService, CharacterSecretsManagerService],
     exports: [StoryManagerService, CharacterSecretsManagerService],
 })

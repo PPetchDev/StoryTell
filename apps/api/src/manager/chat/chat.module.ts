@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { YourFaceModelModule } from '../../model/your-face/your-face.module.js';
 
 import { BranchModelModule } from '../../model/branch/branch.module.js';
 import { ChatModelModule } from '../../model/chat/chat.module.js';
@@ -34,7 +35,7 @@ import { StageModelModule } from '../../model/stage/stage.module.js';
 import { ImageStoreModule } from '../../store/image/image-store.module.js';
 
 @Module({
-    imports: [ChatModelModule, BranchModelModule, StoryModelModule, SettingsModelModule, LedgerModelModule, MemoryModelModule, PersonaModelModule, SnapshotModelModule, DocumentModelModule, SavedReplyModelModule, ReplaceRuleModelModule, ReadAloudManagerModule, UsageRecordModelModule, StageModelModule, ImageStoreModule],
+    imports: [ChatModelModule, BranchModelModule, StoryModelModule, SettingsModelModule, LedgerModelModule, MemoryModelModule, PersonaModelModule, SnapshotModelModule, DocumentModelModule, SavedReplyModelModule, ReplaceRuleModelModule, ReadAloudManagerModule, UsageRecordModelModule, StageModelModule, ImageStoreModule, YourFaceModelModule],
     providers: [ChatManagerService, DocumentSearchManagerService, JudgeManagerService, BeliefManagerService, MemoryEmbeddingManagerService, MemoryExtractionManagerService, MemoryManagerService, SuggestedRepliesManagerService, WriteForMeManagerService, ThaiReadingManagerService, DiaryManagerService, ThoughtsManagerService, SpeechRepairManagerService, StorySoFarManagerService, ChaptersManagerService, ChatTranscriptManagerService, StageManagerService],
     exports: [ChatManagerService, MemoryManagerService, BeliefManagerService, StorySoFarManagerService, ChaptersManagerService, ChatTranscriptManagerService],
 })

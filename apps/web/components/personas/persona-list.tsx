@@ -5,9 +5,11 @@ import { ChangeEvent, useRef, useState } from 'react';
 import { useConnection } from '@/components/connection';
 import { initialOf } from '@/components/portrait/character-portrait';
 import { Autosave } from '@/components/story-editor/autosave';
+import { ExpressionSet } from '@/components/story-editor/expressions';
 import { ConfirmButton } from '@/components/story-editor/fields';
 import { ApiError, ApiUnreachableError } from '@/lib/api';
 import { preparedForUpload } from '@/lib/cover';
+import { expressionEndpoints } from '@/lib/expression-endpoints';
 import { Persona, personaApi, personaImageUrl } from '@/lib/persona';
 
 interface PersonaCardProps {
@@ -37,6 +39,13 @@ function PersonaCard({ persona, autosave, justCreated, onSaved, onDelete, focusA
     /** What is happening to the picture, in words, while it is: "Uploading…", "Removing…". */
     const [pictureBusy, setPictureBusy] = useState<string | null>(null);
     const [pictureError, setPictureError] = useState<string | null>(null);
+    /** Its Expressions (.scratch/your-faces/spec.md), as the last write answered them. */
+    const [faces, setFaces] = useState(persona.expressions ?? []);
+    const took = (saved: Persona) => {
+        setFaces(saved.expressions ?? []);
+        setPicture(saved.imagePath);
+        onSaved(saved);
+    };
     const fileInput = useRef<HTMLInputElement>(null);
     const pictureButton = useRef<HTMLButtonElement>(null);
 
@@ -44,9 +53,7 @@ function PersonaCard({ persona, autosave, justCreated, onSaved, onDelete, focusA
         setPictureBusy(doing);
         setPictureError(null);
         try {
-            const savedPersona = await save();
-            setPicture(savedPersona.imagePath);
-            onSaved(savedPersona);
+            took(await save());
         } catch (caught) {
             if (caught instanceof ApiUnreachableError) reportUnreachable();
             setPictureError(caught instanceof ApiError ? caught.message : "Couldn't save the picture. Try again.");
@@ -174,6 +181,33 @@ function PersonaCard({ persona, autosave, justCreated, onSaved, onDelete, focusA
                     Who you are while wearing it: what Characters can see and know about you.
                 </p>
             </div>
+            <ExpressionSet<Persona>
+                owner={{
+                    key: `persona-${persona.id}`,
+                    name: name.trim() === '' ? 'this Persona' : name,
+                    expressions: faces,
+                    picturePath: picture,
+                    defaultCrop: null,
+                    pictureName: 'picture',
+                    squareName: 'the centre square',
+                    plainName: 'its picture',
+                }}
+                api={expressionEndpoints<Persona>(`/personas/${persona.id}`)}
+                commit={async (run, onError) => {
+                    try {
+                        const saved = await run();
+                        took(saved);
+                        return saved;
+                    } catch (caught) {
+                        if (caught instanceof ApiUnreachableError) reportUnreachable();
+                        onError(caught instanceof Error ? caught.message : 'Something went wrong.');
+                        return undefined;
+                    }
+                }}
+                flush={async () => {}}
+                onDrawn={took}
+                reload={() => personaApi.get(persona.id)}
+            />
             <div className="toolbar">
                 <ConfirmButton
                     label="Delete"

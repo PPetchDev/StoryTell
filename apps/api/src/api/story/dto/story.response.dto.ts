@@ -197,6 +197,9 @@ export class RoleDTO implements RoleResponse {
         description: "Its picture's path, served by `GET /api/images/{path}` (.scratch/role-image/spec.md); null without.",
     })
     imagePath: string | null;
+
+    @ApiProperty({ type: () => [ExpressionDTO], description: 'Its Expressions, drawn from its picture or uploaded (.scratch/your-faces/spec.md); empty without.' })
+    expressions: ExpressionDTO[];
 }
 
 export class PortraitCropDTO implements PortraitCrop {

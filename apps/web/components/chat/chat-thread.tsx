@@ -1,5 +1,7 @@
 'use client';
 
+import type { ExpressionEmotion } from '@/lib/expressions';
+
 import {
     CSSProperties,
     FocusEvent,
@@ -818,6 +820,8 @@ export interface PendingLine {
     personaId?: number | null;
     /** Sent with a Roll (CONTEXT.md, "Roll"): shown as "Rolling…" until the API answers with the number. */
     roll?: boolean;
+    /** The face it was sent with (.scratch/your-faces/spec.md). */
+    face?: ExpressionEmotion | null;
 }
 
 /** "Writing…" with three pulsing dots, where the reply will appear (the thread, the Visual novel view's box). */
@@ -1061,7 +1065,7 @@ export function ChatThread(props: ChatThreadProps) {
                 />
                 {pending && (
                     <article className="mb-5" aria-label={`${pending.identityName} said`} aria-busy="true">
-                        <UserLine identityName={pending.identityName} text={pending.text} roll={pending.roll ? 'pending' : null} personaId={pending.personaId} />
+                        <UserLine identityName={pending.identityName} text={pending.text} roll={pending.roll ? 'pending' : null} personaId={pending.personaId} face={pending.face ?? null} />
                     </article>
                 )}
                 {streaming && (

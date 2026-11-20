@@ -64,6 +64,7 @@ import { DressedStage1764470000000 } from './1764470000000-DressedStage.js';
 import { JapaneseDub1764480000000 } from './1764480000000-JapaneseDub.js';
 import { RoleSections1764490000000 } from './1764490000000-RoleSections.js';
 import { RoleImage1764500000000 } from './1764500000000-RoleImage.js';
+import { YourFaces1764510000000 } from './1764510000000-YourFaces.js';
 import { UsageMessage1764330000000 } from './1764330000000-UsageMessage.js';
 import { MessageBookmarks1764340000000 } from './1764340000000-MessageBookmarks.js';
 import { PushSubscriptions1764350000000 } from './1764350000000-PushSubscriptions.js';
@@ -157,4 +158,5 @@ export const migrations = [
     JapaneseDub1764480000000,
     RoleSections1764490000000,
     RoleImage1764500000000,
+    YourFaces1764510000000,
 ];

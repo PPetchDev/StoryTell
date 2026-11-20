@@ -33,7 +33,7 @@ const Id = (name: string) => Param(name, ParseIntPipe);
 const Emotion = () =>
     Param('emotion', new ParseEnumPipe(Object.fromEntries(EXPRESSION_EMOTIONS.map((emotion) => [emotion, emotion]))));
 
-const MAX_UPLOAD_MB = 15;
+export const MAX_UPLOAD_MB = 15;
 
 /** The part of a multer file this controller reads. */
 interface UploadedImage {
@@ -42,7 +42,7 @@ interface UploadedImage {
 
 /** Multer's size limit surfaces as Nest's 413; answer it with the typed domain error instead. */
 @Catch(PayloadTooLargeException)
-class UploadTooLargeFilter implements ExceptionFilter {
+export class UploadTooLargeFilter implements ExceptionFilter {
     catch(_exception: PayloadTooLargeException, host: ArgumentsHost): void {
         new AppErrorFilter().catch(new ImageTooLargeError(MAX_UPLOAD_MB), host);
     }

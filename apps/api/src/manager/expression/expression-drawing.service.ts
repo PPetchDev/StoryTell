@@ -28,7 +28,7 @@ const IDLE: ExpressionDrawing = { running: false, emotions: [], drawn: [], curre
 const UNEXPECTED = '500.000.000';
 
 /** The emotions a run draws: all of them to redraw, else those with no Expression or an outdated drawn one. */
-export function emotionsToDraw(character: CharacterResponse, redraw: boolean): ExpressionEmotion[] {
+export function emotionsToDraw(character: Pick<CharacterResponse, 'expressions'>, redraw: boolean): ExpressionEmotion[] {
     if (redraw) return [...EXPRESSION_EMOTIONS];
     const current = new Set(character.expressions.filter((one) => !one.outdated).map((one) => one.emotion));
     return EXPRESSION_EMOTIONS.filter((emotion) => !current.has(emotion));

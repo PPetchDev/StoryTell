@@ -66,6 +66,8 @@ import {
 } from './editor-tabs';
 import { FieldMarksContext } from './field-marks';
 import { ConfirmButton, SegmentedField, TextField } from './fields';
+import { ExpressionSet } from './expressions';
+import { expressionEndpoints } from '@/lib/expression-endpoints';
 import { OpeningPreview } from './opening-preview';
 import { fieldDomId, FieldRewrites, rewritableField, rewriteKey, RewriteStates } from './rewrite';
 import { LoreCard } from './lore-card';
@@ -244,6 +246,10 @@ export function StoryEditor({ initial }: { initial: Story }) {
      * A drawn Expression, which lands outside the save queue: only the Characters' Expressions are
      * taken from the answer, so nothing typed while it drew is put back.
      */
+    /** Takes the Role's faces from an answer, and nothing else of it (.scratch/your-faces/spec.md). */
+    const applyRoleFaces = useCallback((saved: Story) => {
+        setStory((current) => ({ ...current, role: { ...current.role, imagePath: saved.role.imagePath ?? null, expressions: saved.role.expressions ?? [] } }));
+    }, []);
     const applyExpressions = useCallback((saved: Story) => {
         setStory((current) => ({
             ...current,
@@ -905,8 +911,35 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                 storyId={storyId}
                                 roleName={story.role.name}
                                 imagePath={story.role.imagePath ?? null}
-                                onSaved={(saved) => setStory((current) => ({ ...current, role: { ...current.role, imagePath: saved.role.imagePath ?? null } }))}
+                                onSaved={(saved) =>
+                                    setStory((current) => ({
+                                        ...current,
+                                        role: { ...current.role, imagePath: saved.role.imagePath ?? null, expressions: saved.role.expressions ?? [] },
+                                    }))
+                                }
                             />
+                        )}
+                        {/* The Role's faces (.scratch/your-faces/spec.md), drawn from its picture as a Character's are. */}
+                        {tab === 'role' && (
+                            <div className="card m-0">
+                                <ExpressionSet<Story>
+                                    owner={{
+                                        key: 'role',
+                                        name: story.role.name.trim() === '' ? 'your Role' : story.role.name,
+                                        expressions: story.role.expressions ?? [],
+                                        picturePath: story.role.imagePath ?? null,
+                                        defaultCrop: null,
+                                        pictureName: 'Role picture',
+                                        squareName: 'the centre square',
+                                        plainName: 'the Role picture',
+                                    }}
+                                    api={expressionEndpoints<Story>(`/stories/${storyId}/role`)}
+                                    commit={(run, onError) => commit(run, applyRoleFaces, onError)}
+                                    flush={flush}
+                                    onDrawn={applyRoleFaces}
+                                    reload={() => storyApi.get(storyId)}
+                                />
+                            </div>
                         )}
                         {tab === 'role' && (
                             <RoleSectionsCard sections={story.role.sections ?? []} placeholderHint={placeholderHint} onChange={setRoleSections} />

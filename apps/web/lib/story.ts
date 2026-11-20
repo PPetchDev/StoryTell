@@ -64,6 +64,8 @@ export interface Role {
     sections?: RoleSection[];
     /** Its picture's path (.scratch/role-image/spec.md), shown beside your lines written as the Role; null without, left out by an older API. */
     imagePath?: string | null;
+    /** Its Expressions, drawn from its picture or uploaded (.scratch/your-faces/spec.md); left out by an older API. */
+    expressions?: Expression[];
 }
 
 /** One of the Role's own sections: a heading and free text, read with the Description. */

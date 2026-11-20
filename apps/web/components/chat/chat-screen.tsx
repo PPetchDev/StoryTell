@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { EMOTION_LABEL, type ExpressionEmotion } from '@/lib/expressions';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { ChatBackdrop } from '@/components/chat/backdrop';
@@ -184,6 +185,8 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
      * the app throws the dice. Gone on leaving, like the nudge and the Cue.
      */
     const [roll, setRoll] = useState(false);
+    /** The face picked for the next Message (.scratch/your-faces/spec.md); it goes with one send, like the Roll. */
+    const [face, setFace] = useState<ExpressionEmotion | null>(null);
     /** The Stat of the Roll offer taken (.scratch/judge-rolls/spec.md), sent with the armed Roll; null when it was armed by hand. */
     const [rollStat, setRollStat] = useState<RollStat | null>(null);
     /** Each tap on the Character row's "Who's here" opens the sheet in the top bar. */
@@ -541,13 +544,16 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
         const rolledStat = rolled ? rollStat : null;
         setRoll(false);
         setRollStat(null);
-        setPending({ text, identityName: chat.identityName, personaId: chat.personaId, roll: rolled });
+        const faced = face;
+        setFace(null);
+        setPending({ text, identityName: chat.identityName, personaId: chat.personaId, roll: rolled, face: faced });
         void runTurn(
-            (stream) => chatApi.send(chat.storyId, chat.id, text, stream, { nudge, cue, roll: rolled, rollStat: rolledStat?.name ?? null }),
+            (stream) => chatApi.send(chat.storyId, chat.id, text, stream, { nudge, cue, roll: rolled, rollStat: rolledStat?.name ?? null, face: faced }),
             () => {
                 setDraft((current) => (current === '' ? typed : current));
                 if (rolled) setRoll(true);
                 if (rolled) setRollStat(rolledStat);
+                if (faced) setFace(faced);
             },
         );
     };
@@ -688,7 +694,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
 
     return (
         // The user's lines look their Persona's picture up here (.scratch/persona-image/spec.md).
-        <PersonaPictures images={chat.personaImages ?? []} roleImage={chat.roleImagePath ?? null}>
+        <PersonaPictures images={chat.personaImages ?? []} roleImage={chat.roleImagePath ?? null} faces={chat.personaExpressions ?? []} roleFaces={chat.roleExpressions ?? []}>
         <main className={SCREEN}>
             <ChatBackdrop picture={backdrop} />
             <ChatTopBar
@@ -931,6 +937,12 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                 cue={cue}
                 onCue={() => setCueSheet(true)}
                 onClearCue={() => setCue(null)}
+                face={face}
+                onFace={(next) => {
+                    setFace(next);
+                    announce(next ? `Your face for this message: ${EMOTION_LABEL[next]}.` : 'No face for this message.');
+                }}
+                faces={chat.personaId === null ? (chat.roleExpressions ?? []) : ((chat.personaExpressions ?? []).find((entry) => entry.personaId === chat.personaId)?.expressions ?? [])}
                 roll={roll}
                 onRoll={(next) => {
                     setRoll(next);

@@ -1,7 +1,8 @@
 import { UnparseableOutputError } from '../../../errors/model-gateway.errors.js';
 import { TimeOfDay, TIMES_OF_DAY } from '../../../model/chat/entities/chat.entity.js';
 import { BOND_AXES, bondAxisScale, BondLevels, bondLevelsInWords, isBondLevel } from '../../../model/ledger/bond-axes.js';
-import { Emotion, isEmotion } from '../../../model/story/emotion.js';
+import { Emotion, isEmotion, isExpressionEmotion } from '../../../model/story/emotion.js';
+import type { ExpressionEmotion } from '../../../model/story/emotion.js';
 import { PromptMessage } from '../../../service/model-gateway/model-gateway.js';
 import { exchangeUserLine } from '../exchange.js';
 import { PASSED_BY_REPLIES } from '../scene-replies.js';
@@ -497,33 +498,38 @@ function withRollOfferShape(system: string): string {
 const ROLL_OFFER_SYSTEMS = new Map([SYSTEM_WITH_FACTS, SYSTEM_WITH_EXPRESSIONS_AND_FACTS].map((system) => [system, withRollOfferShape(system)]));
 if ([...ROLL_OFFER_SYSTEMS].some(([before, after]) => before === after)) throw new Error('judge prompt: the reply shape no longer ends as expected');
 
-export function buildJudgePrompt(input: JudgePromptInput & RollOfferJudgeInput & SecretsJudgeInput): { messages: PromptMessage[]; maxTokens: number } {
+export function buildJudgePrompt(input: JudgePromptInput & RollOfferJudgeInput & SecretsJudgeInput & UserFaceJudgeInput): { messages: PromptMessage[]; maxTokens: number } {
     const prompt = buildJudgePromptCore(input);
     const section = input.rollOfferSection?.trim();
     const secrets = input.secretsShape ? input.secretsSection?.trim() : undefined;
-    const sections = [section, secrets].filter((text): text is string => !!text);
+    const face = input.userFace ? userFaceSection(input.identityName) : undefined;
+    const sections = [section, secrets, face].filter((text): text is string => !!text);
     return {
         messages: prompt.messages.map((message) => {
             if (message.role === 'system') {
                 const offered = ROLL_OFFER_SYSTEMS.get(message.content) ?? message.content;
                 const content = input.secretsShape ? withSecretsShape(offered) : offered;
-                return { ...message, content: input.detailsSection ? withDetailsShape(content) : content };
+                const detailed = input.detailsSection ? withDetailsShape(content) : content;
+                return { ...message, content: input.userFace ? withUserFaceShape(detailed) : detailed };
             }
             return sections.length > 0 && message.role === 'user' ? { ...message, content: [message.content, ...sections].join('\n\n') } : message;
         }),
-        maxTokens: prompt.maxTokens + (section ? ROLL_OFFER_EXTRA_TOKENS : 0) + (secrets ? SECRETS_EXTRA_TOKENS : 0),
+        maxTokens: prompt.maxTokens + (section ? ROLL_OFFER_EXTRA_TOKENS : 0) + (secrets ? SECRETS_EXTRA_TOKENS : 0) + (face ? USER_FACE_EXTRA_TOKENS : 0),
     };
 }
 
 /** The judgement with the Roll offer and the Secret reveals it gave, if any; read loosely, so anything else is none. */
-export function parseJudgement(text: string): Judgement & { rollOffer?: JudgedRollOffer | null; secretsRevealed?: number[] } {
+export function parseJudgement(text: string): Judgement & { rollOffer?: JudgedRollOffer | null; secretsRevealed?: number[]; userFace?: ExpressionEmotion } {
     const judgement = parseJudgementCore(text);
     // The core has already read the JSON, so this match parses.
     const json = JSON.parse(text.match(/\{[\s\S]*\}/)![0]) as Record<string, unknown>;
     const rollOffer = readJudgedRollOffer(json.roll_offer);
+    // .scratch/your-faces/spec.md: one of the Expression emotions; "neutral" or anything else is none.
+    const userEmotion = str(json.user_emotion).toLowerCase();
+    const userFace = isExpressionEmotion(userEmotion) ? userEmotion : null;
     // Only when it gave some (.scratch/secret-reveals/spec.md), so a judgement without them reads as before.
     const secretsRevealed = readJudgedSecrets(json.secrets_revealed);
-    return { ...judgement, ...(rollOffer ? { rollOffer } : {}), ...(secretsRevealed.length > 0 ? { secretsRevealed } : {}) };
+    return { ...judgement, ...(rollOffer ? { rollOffer } : {}), ...(secretsRevealed.length > 0 ? { secretsRevealed } : {}), ...(userFace ? { userFace } : {}) };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -541,6 +547,36 @@ export interface SecretsJudgeInput {
     secretsShape?: boolean;
     /** The "# Secrets that may come out" section (`judgeSecretsSection`), sent only with the shape and only when a Secret is on offer. It goes last. */
     secretsSection?: string | null;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Your faces (.scratch/your-faces/spec.md): the emotion of the user's own line, asked only when the
+// User Message has no face the user picked and the Role or Persona it was written as has Expressions.
+// ---------------------------------------------------------------------------------------------
+
+export interface UserFaceJudgeInput {
+    /** Ask the user's line's emotion: the shape names `user_emotion` and its section goes last. */
+    userFace?: boolean;
+}
+
+/** The answer is a word or two. */
+export const USER_FACE_EXTRA_TOKENS = 20;
+
+/** What the Judge is told: the emotion the user's own line shows, from the same list as the Characters' lines. */
+export function userFaceSection(identityName: string): string {
+    return `# ${identityName}'s face
+Give "user_emotion": the emotion ${identityName} shows in their own line of the latest exchange, one of:
+${Object.entries(EMOTION_MEANINGS)
+    .map(([emotion, meaning]) => `  - "${emotion}": ${meaning}`)
+    .join('\n')}
+When unsure, "neutral".`;
+}
+
+/** The reply shape with `user_emotion`, so DeepSeek V4 Flash gives it (as with the facts and the details). */
+export function withUserFaceShape(system: string): string {
+    const shaped = system.replace(/\}\nEmpty arrays when nothing changed\.$/, ',\n "user_emotion":"neutral"}\nEmpty arrays when nothing changed.');
+    if (shaped === system) throw new Error('judge prompt: the reply shape no longer ends as expected');
+    return shaped;
 }
 
 /** The reply shape with `details` (DETAILS_SHAPE), whenever the details section is sent: every judgement on live. */

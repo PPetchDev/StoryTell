@@ -1,4 +1,9 @@
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import type { Relation } from 'typeorm';
+
+import { EXPRESSION_EMOTIONS } from '../../story/emotion.js';
+import type { ExpressionResponse } from '../../story/entities/character-expression.entity.js';
+import type { IdentityExpressionEntity } from '../../your-face/entities/identity-expression.entity.js';
 
 export interface PersonaResponse {
     id: number;
@@ -6,6 +11,8 @@ export interface PersonaResponse {
     description: string;
     /** Its picture, as a path under `/api/images/` (.scratch/persona-image/spec.md); null without one. */
     imagePath: string | null;
+    /** Its Expressions (.scratch/your-faces/spec.md), in the order of the emotions; empty without. */
+    expressions: ExpressionResponse[];
     createdAt: string;
     updatedAt: string;
 }
@@ -40,12 +47,19 @@ export class PersonaEntity {
     @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
     updatedAt: Date;
 
+    /** Its Expressions (.scratch/your-faces/spec.md); loaded with it. */
+    @OneToMany('IdentityExpressionEntity', 'persona')
+    expressions: Relation<IdentityExpressionEntity[]>;
+
     toResponse(): PersonaResponse {
         return {
             id: this.id,
             name: this.name,
             description: this.description,
             imagePath: this.imagePath ?? null,
+            expressions: [...(this.expressions ?? [])]
+                .sort((a, b) => EXPRESSION_EMOTIONS.indexOf(a.emotion) - EXPRESSION_EMOTIONS.indexOf(b.emotion))
+                .map((expression) => expression.toResponse(this.imagePath ?? null)),
             createdAt: this.createdAt.toISOString(),
             updatedAt: this.updatedAt.toISOString(),
         };

@@ -62,6 +62,7 @@ import {
     Tense,
 } from '../../model/story/entities/story.entity.js';
 import { CoverColumns, ExpressionColumns, StoryModelService } from '../../model/story/story.service.js';
+import { YourFaceModelService } from '../../model/your-face/your-face.service.js';
 import { ImageData } from '../../service/model-gateway/model-gateway.js';
 import { ImageStoreService } from '../../store/image/image-store.service.js';
 import { parseReply, ReplyPart } from '../chat/turn/reply-parser.js';
@@ -295,6 +296,7 @@ export class StoryManagerService {
         private readonly voices: VoiceManagerService,
         private readonly readAloud: ReadAloudManagerService,
         private readonly stageModel: StageModelService,
+        private readonly yourFaces: YourFaceModelService,
     ) {}
 
     async listStories(): Promise<StoryListItem[]> {
@@ -460,6 +462,29 @@ export class StoryManagerService {
                     await this.storyModel.saveRole(copy.role);
                 }
             }
+            // The Role's Expressions (.scratch/your-faces/spec.md), each in a file of the copy's own; one drawn
+            // from the source's current Role image points at the copy's.
+            if (source.role.expressions?.length) {
+                const copy = await this.load(copyId);
+                const rows = [];
+                for (const expression of source.role.expressions) {
+                    const token = randomBytes(6).toString('hex');
+                    const copied = await copyFile(expression.imagePath, (ext) => `expressions/story-${copyId}/role-${expression.emotion}-${token}.${ext}`);
+                    if (!copied) continue;
+                    const cutout = expression.cutoutPath
+                        ? await copyFile(expression.cutoutPath, () => `expressions/story-${copyId}/role-${expression.emotion}-${token}-cutout.png`)
+                        : null;
+                    const current = expression.drawnFrom !== null && expression.drawnFrom === source.role.imagePath;
+                    rows.push({
+                        emotion: expression.emotion,
+                        imagePath: copied,
+                        crop: expression.crop ? { ...expression.crop } : null,
+                        drawnFrom: current ? (copy.role.imagePath ?? expression.drawnFrom) : expression.drawnFrom,
+                        cutoutPath: cutout,
+                    });
+                }
+                await this.yourFaces.insertMany({ roleId: copy.role.id }, rows);
+            }
         } catch (error) {
             await this.storyModel.deleteStory(copyId);
             for (const relativePath of written) await this.removeFile(relativePath);
@@ -486,6 +511,11 @@ export class StoryManagerService {
         for (const imagePath of stageFiles) await this.removeFile(imagePath);
         if (story.coverImagePath) await this.removeFile(story.coverImagePath);
         if (story.role.imagePath) await this.removeFile(story.role.imagePath);
+        // The Role's Expressions (.scratch/your-faces/spec.md): their rows went with the Role.
+        for (const expression of story.role.expressions ?? []) {
+            await this.removeFile(expression.imagePath);
+            if (expression.cutoutPath) await this.removeFile(expression.cutoutPath);
+        }
         // Its Messages went with it through CASCADE; their Read aloud audio goes too.
         await this.readAloud.sweep();
     }

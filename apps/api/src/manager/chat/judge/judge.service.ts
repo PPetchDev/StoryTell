@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { YourFaceModelService } from '../../../model/your-face/your-face.service.js';
 
 import { AppConfig } from '../../../config/app-config.js';
 import { AppError } from '../../../errors/app-error.js';
@@ -76,6 +77,7 @@ export class JudgeManagerService {
         private readonly gateway: ModelGateway,
         private readonly config: AppConfig,
         private readonly stage: StageManagerService,
+        private readonly yourFaces: YourFaceModelService,
     ) {
         this.runs = new BackgroundRuns(config.backgroundRetryMs);
     }
@@ -202,6 +204,15 @@ export class JudgeManagerService {
                 },
             );
             const replyParts = message.parts.map((part) => part.toResponse());
+            // .scratch/your-faces/spec.md: the user's own line gets a face the Judge guesses when they picked
+            // none, and only where it can show: the Role or Persona it was written as has Expressions.
+            const userMessage = index > 0 && chat.messages[index - 1].kind === MessageKind.User ? chat.messages[index - 1] : null;
+            const askFace =
+                userMessage !== null &&
+                userMessage.faceBy !== 'user' &&
+                (userMessage.personaId === null
+                    ? (story.role.expressions ?? []).length > 0
+                    : (await this.yourFaces.list({ personaId: userMessage.personaId })).length > 0);
             // Lines are tagged only where a tag can show (.scratch/expressions/spec.md): otherwise the prompt is as before.
             const tagLines = story.characters.some((character) => (character.expressions ?? []).length > 0);
             const offering = rollOffering(story, chat, index);
@@ -258,6 +269,7 @@ export class JudgeManagerService {
                 nowSection: judgeNowSection(nowNotes, detailsCast),
                 rollOfferSection: offering.section,
                 ...(secretsShape ? { secretsShape, secretsSection: judgeSecretsSection(secrets.offered) } : {}),
+                ...(askFace ? { userFace: true } : {}),
             }), judgeItemsSection(items)), aiEvents);
 
             const result = await this.gateway.completeText({
@@ -324,6 +336,7 @@ export class JudgeManagerService {
             // Expressions the parts are not touched, so the record is exactly as before.
             const emotions = tagLines ? emotionsOfParts(message.parts, judgement.expressions) : undefined;
             await this.ledger.record(chat.id, message.id, { ...applied, suddenEvent: stepped.step, details: [...detailed.changes, ...facted.changes, ...noted.changes, ...itemed.changes], ending: ended.reached, ...(emotions ? { emotions } : {}), ...(proposed.event ? { newEvent: proposed.event } : {}), rollOffer: offered.offer, ...(revealed.reveals.length > 0 ? { secretReveals: revealed.reveals } : {}) });
+            if (askFace && userMessage && judgement.userFace) await this.chatModel.setJudgedFace(userMessage.id, judgement.userFace);
             // The place, light, outfits and line emotions are settled: dress the stage (.scratch/dressed-stage/spec.md).
             this.stage.dress(story.id, chat.id);
             return { ok: true };

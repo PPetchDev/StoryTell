@@ -13,6 +13,7 @@ import { StorySoFarApiModule } from './story-so-far/story-so-far.module.js';
 import { ChaptersApiModule } from './chapters/chapters.module.js';
 import { LoreSuggestionsApiModule } from './lore-suggestions/lore-suggestions.module.js';
 import { RecapApiModule } from './recap/recap.module.js';
+import { YourFaceApiModule } from './your-face/your-face.module.js';
 import { BookApiModule } from './book/book.module.js';
 import { PeopleApiModule } from './people/people.module.js';
 import { PersonaApiModule } from './persona/persona.module.js';
@@ -44,6 +45,7 @@ import { VoiceApiModule } from './voice/voice.module.js';
         ChaptersApiModule,
         RecapApiModule,
         LoreSuggestionsApiModule,
+        YourFaceApiModule,
         BookApiModule,
         SettingsApiModule,
         UsageApiModule,

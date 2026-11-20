@@ -1,6 +1,7 @@
 'use client';
 
 import { CSSProperties, KeyboardEvent, MouseEvent, PointerEvent, ReactNode, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useYourFace } from '@/components/chat/persona-pictures';
 
 import { useCastCharacter, useCastLookup, useCharacterProfile } from '@/components/chat/character-profile';
 import { COLUMN } from '@/components/chat/chat-classes';
@@ -383,6 +384,8 @@ export function NovelView(props: NovelViewProps) {
                                     draggable={false}
                                 />
                             )}
+                            {/* Your face on the stage (.scratch/your-faces/spec.md): only where the Role or Persona has that Expression. */}
+                            {step?.kind === 'user' && step.face && <YourFacePicture key={step.key} step={step} />}
                             {step?.kind === 'speech' && (
                                 <SpeakerPicture
                                     key={step.key}
@@ -472,6 +475,23 @@ function SpeakerPicture({ step, cast, sprites }: { step: Extract<NovelStep, { ki
         </span>
     );
     return picture;
+}
+
+/** The user's character with the face of their line, cut out where it can be (.scratch/your-faces/spec.md); nothing without that Expression. */
+function YourFacePicture({ step }: { step: Extract<NovelStep, { kind: 'user' }> }) {
+    const face = useYourFace(step.personaId ?? null, step.face ?? null);
+    if (!face) return null;
+    const cut = face.cutoutPath !== null;
+    const src = stageSrc(referenceImageUrl(cut ? face.cutoutPath! : face.imagePath), cut);
+    return cut ? (
+        <div className="absolute inset-0 flex justify-center overflow-hidden">
+            {/* eslint-disable-next-line @next/next/no-img-element -- served by the API from the image folder */}
+            <img className="stage-figure block h-[128%] w-auto max-w-none select-none" src={src} alt={step.identityName} data-stage-picture="" data-your-face={face.emotion} draggable={false} />
+        </div>
+    ) : (
+        // eslint-disable-next-line @next/next/no-img-element -- served by the API from the image folder
+        <img className="block h-full max-w-full object-contain object-bottom motion-safe:animate-fade-in" src={src} alt={step.identityName} data-stage-picture="" data-your-face={face.emotion} draggable={false} />
+    );
 }
 
 /** The box's words: the speaker's name in their colour (the worn name for the user's line, none for narration), then the text. */

@@ -28,7 +28,9 @@ import { BondChangeResponse } from '../../../model/ledger/entities/bond-change.e
 import { SceneAdvanceResponse } from '../../../model/ledger/entities/scene-advance.entity.js';
 import type { SceneMover } from '../../../model/ledger/entities/scene-advance.entity.js';
 import { RollbackCounts } from '../../../model/ledger/ledger.service.js';
-import { MissingFieldDTO } from '../../story/dto/story.response.dto.js';
+import { EXPRESSION_EMOTIONS } from '../../../model/story/emotion.js';
+import type { ExpressionEmotion } from '../../../model/story/emotion.js';
+import { ExpressionDTO, MissingFieldDTO } from '../../story/dto/story.response.dto.js';
 import { TraySavedReplyDTO } from '../../saved-reply/dto/saved-reply.response.dto.js';
 import { ChatReplaceRuleDTO } from '../../replace-rule/dto/replace-rule.response.dto.js';
 
@@ -127,6 +129,15 @@ export class ListChatsResponseBodyDTO implements ChatList {
 }
 
 /** A Persona's picture, for the user's lines written as it (.scratch/persona-image/spec.md). */
+/** One Persona's Expressions in a Chat (.scratch/your-faces/spec.md). */
+export class ChatPersonaExpressionsDTO {
+    @ApiProperty()
+    personaId: number;
+
+    @ApiProperty({ type: () => [ExpressionDTO] })
+    expressions: ExpressionDTO[];
+}
+
 export class ChatPersonaImageDTO {
     @ApiProperty()
     personaId: number;
@@ -198,6 +209,15 @@ export class RollStatDTO {
 }
 
 /** A User Message's Roll (.scratch/roll/spec.md). */
+/** A User Message's face (.scratch/your-faces/spec.md). */
+export class MessageFaceDTO {
+    @ApiProperty({ enum: EXPRESSION_EMOTIONS })
+    emotion: ExpressionEmotion;
+
+    @ApiProperty({ enum: ['user', 'judge'], description: "The user picked it as they sent it, or the Judge guessed it from what they wrote." })
+    by: 'user' | 'judge';
+}
+
 export class MessageRollDTO implements MessageRoll {
     @ApiProperty({ description: 'What the d20 showed, 1 to 20.' })
     value: number;
@@ -411,6 +431,13 @@ export class MessageDTO {
 
     @ApiPropertyOptional({ type: MessageRollDTO, nullable: true, description: 'User Message only: the Roll it was sent with; null without one.' })
     roll?: MessageRollDTO | null;
+
+    @ApiPropertyOptional({
+        type: () => MessageFaceDTO,
+        nullable: true,
+        description: "User Message only: the face it was written with, picked by the user or guessed by the Judge (.scratch/your-faces/spec.md); null without one.",
+    })
+    face?: MessageFaceDTO | null;
 
     @ApiPropertyOptional({ description: 'AI Message only: the model that wrote it, or "author" for the Opening.' })
     model?: string;
@@ -638,6 +665,12 @@ export class ChatResponseBodyDTO extends ChatSummaryDTO implements Omit<ChatDeta
         description: "The Story's Role's picture, shown beside the user's lines written as the Role (.scratch/role-image/spec.md); null without.",
     })
     roleImagePath: string | null;
+
+    @ApiProperty({ type: () => [ExpressionDTO], description: "The Role's Expressions, for the faces of the user's lines written as the Role (.scratch/your-faces/spec.md)." })
+    roleExpressions: ExpressionDTO[];
+
+    @ApiProperty({ type: () => [ChatPersonaExpressionsDTO], description: "The Expressions of the Personas in this Chat that have any (.scratch/your-faces/spec.md)." })
+    personaExpressions: ChatPersonaExpressionsDTO[];
 
     @ApiProperty({ description: "The Story's Role's name, which the swap offers beside the Personas, its placeholders filled with this Chat's answers." })
     roleName: string;

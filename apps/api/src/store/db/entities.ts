@@ -48,6 +48,7 @@ import { UsageRecordEntity } from '../../model/usage-record/entities/usage-recor
 import { ReplaceRuleEntity } from '../../model/replace-rule/entities/replace-rule.entity.js';
 import { SavedReplyEntity } from '../../model/saved-reply/entities/saved-reply.entity.js';
 import { PersonaEntity } from '../../model/persona/entities/persona.entity.js';
+import { IdentityExpressionEntity } from '../../model/your-face/entities/identity-expression.entity.js';
 import { SnapshotCharacterEntity } from '../../model/snapshot/entities/snapshot-character.entity.js';
 import { SnapshotEntity } from '../../model/snapshot/entities/snapshot.entity.js';
 
@@ -57,6 +58,7 @@ export const entities = [
     RoleEntity,
     CharacterEntity,
     CharacterExpressionEntity,
+    IdentityExpressionEntity,
     ReferenceCutoutEntity,
     PlacePictureEntity,
     OutfitSpriteEntity,

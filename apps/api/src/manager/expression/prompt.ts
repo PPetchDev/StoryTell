@@ -37,6 +37,7 @@ export function expressionPrompt(character: { name: string; appearance: string }
             'Keep the figure standing upright in a natural, relaxed, well-balanced pose, with the legs and feet as in the picture. ' +
             `Change only the facial expression and the arms and hands, to show: ${EXPRESSION_LOOKS[emotion]}. Natural, anatomically correct hands. ` +
             'Plain flat background in the same colour. No text, no watermark, no other people.',
-        `Appearance to keep: ${character.appearance.trim()}`,
+        // The Role and a Persona have no Appearance (.scratch/your-faces/spec.md): their picture alone shows it.
+        ...(character.appearance.trim() ? [`Appearance to keep: ${character.appearance.trim()}`] : []),
     ].join('\n');
 }

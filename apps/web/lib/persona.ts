@@ -1,4 +1,5 @@
 import { apiFetch, apiSend } from './api';
+import type { Expression } from './expressions';
 
 // Mirrors the API's Persona DTOs (apps/api/src/api/persona/dto/persona.response.dto.ts).
 
@@ -8,6 +9,8 @@ export interface Persona {
     description: string;
     /** Its picture (CONTEXT.md, "Persona image"), as a path under `/api/images/`; null without one. */
     imagePath: string | null;
+    /** Its Expressions, drawn from its picture or uploaded (.scratch/your-faces/spec.md); left out by an older API. */
+    expressions?: Expression[];
     createdAt: string;
     updatedAt: string;
 }
@@ -23,6 +26,7 @@ export function personaImageUrl(imagePath: string, width?: 320 | 640): string {
 
 /** The list is read with useApiQuery('/personas'); writes answer with the Persona. */
 export const personaApi = {
+    get: (personaId: number) => apiFetch<Persona>(`/personas/${personaId}`),
     create: (fields: { name: string; description: string }) => apiSend<Persona>('POST', '/personas', fields),
     /** Old User Messages keep the name they were stamped with. */
     update: (personaId: number, fields: { name?: string; description?: string }) =>

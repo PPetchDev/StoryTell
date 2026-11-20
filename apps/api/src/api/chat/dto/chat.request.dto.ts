@@ -1,4 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { EXPRESSION_EMOTIONS } from '../../../model/story/emotion.js';
+import type { ExpressionEmotion } from '../../../model/story/emotion.js';
 import { IsArray, IsBoolean, IsIn, IsInt, IsObject, IsOptional, IsString, MaxLength, Min, ValidateIf } from 'class-validator';
 
 import type { ChatFields } from '../../../manager/chat/chat.service.js';
@@ -111,6 +113,15 @@ export class SendMessageRequestBodyDTO extends TurnRequestBodyDTO {
     @IsString()
     @MaxLength(100)
     rollStat?: string;
+
+    @ApiPropertyOptional({
+        enum: EXPRESSION_EMOTIONS,
+        description:
+            "Optional: the face the user's character makes as they say this (.scratch/your-faces/spec.md). The Narrator is told it, so the Characters see it; it shows beside the line with the Role's or Persona's Expression. Left out: none, and the Judge may guess one for the picture.",
+    })
+    @IsOptional()
+    @IsIn(EXPRESSION_EMOTIONS)
+    face?: ExpressionEmotion;
 }
 
 export class EditMessageRequestBodyDTO extends TurnRequestBodyDTO {

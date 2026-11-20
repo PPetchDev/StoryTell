@@ -1,4 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
+import type { ExpressionResponse } from '../../model/story/entities/character-expression.entity.js';
+import type { ExpressionEmotion } from '../../model/story/emotion.js';
 
 import {
     AlreadyEpilogueError,
@@ -245,6 +247,10 @@ export interface ChatDetail extends ChatSummary {
     personaImages: Array<{ personaId: number; imagePath: string }>;
     /** The Role's picture, for the user's lines written as the Role (.scratch/role-image/spec.md). */
     roleImagePath: string | null;
+    /** The Role's Expressions, for the faces of the user's lines written as the Role (.scratch/your-faces/spec.md). */
+    roleExpressions: ExpressionResponse[];
+    /** The Expressions of the Personas in this Chat that have any (.scratch/your-faces/spec.md). */
+    personaExpressions: Array<{ personaId: number; expressions: ExpressionResponse[] }>;
     /** The Author's note (.scratch/authors-note/spec.md); empty when there is none. */
     authorsNote: string;
     /** Read replies aloud (.scratch/read-aloud/spec.md, "Auto-read"); off by default. */
@@ -1271,6 +1277,8 @@ export class ChatManagerService {
         withRoll = false,
         /** .scratch/judge-rolls/spec.md: the Role's Stat the Roll is made for; one it doesn't have adds nothing. */
         rollStat: string | null = null,
+        /** .scratch/your-faces/spec.md: the face the user picked for this Message. */
+        face: ExpressionEmotion | null = null,
     ): Promise<ChatDetail> {
         if (text.trim() === '') throw new EmptyMessageError();
         const { story, chat: loaded } = await this.load(storyId, chatId);
@@ -1288,6 +1296,7 @@ export class ChatManagerService {
                 text,
                 wornIdentity(story, chat),
                 roll,
+                face,
             );
             chat.messages.push(userMessage);
             // The reply before it is settled on its shown version, even if this turn fails.
@@ -1955,6 +1964,8 @@ export class ChatManagerService {
             // The event as this reply finds it: `chat.messages` holds everything before the reply.
             suddenEvent: promptSuddenEvent(chatEventState(story.suddenEvents ?? [], state.chatSuddenEvents, state.suddenEventSteps), newestAiMessage(chat)?.id ?? null),
             roll: userText !== null ? rollOf(chat.messages[chat.messages.length - 1]) : null,
+            // The face the user picked (.scratch/your-faces/spec.md); never one the Judge only guessed.
+            face: userText !== null ? pickedFaceOf(chat.messages[chat.messages.length - 1]) : null,
             epilogue: asEpilogue ? promptEpilogue(endingState(story.endings ?? [], state.endingsReached)) : null,
             thoughts: thoughts.map((thought) => ({ characterName: thought.name, text: thought.text })),
             watch,
@@ -2243,6 +2254,11 @@ export class ChatManagerService {
                 persona.imagePath && inChat.has(persona.id) ? [{ personaId: persona.id, imagePath: persona.imagePath }] : [],
             ),
             roleImagePath: story.role.imagePath ?? null,
+            roleExpressions: story.role.toResponse().expressions,
+            personaExpressions: personas.flatMap((persona) => {
+                const expressions = persona.toResponse().expressions;
+                return expressions.length > 0 && inChat.has(persona.id) ? [{ personaId: persona.id, expressions }] : [];
+            }),
             messages: withThaiReadings(
                 chat.messages.map((message) => message.toResponse()),
                 readings,
@@ -2528,6 +2544,11 @@ function detailsFor(story: StoryEntity, chat: ChatEntity, state: LedgerState) {
 }
 
 /** A User Message's Roll as the prompt reads it; null without one. */
+/** The face the user picked for their Message (.scratch/your-faces/spec.md); null for none or one the Judge guessed. */
+function pickedFaceOf(message: MessageEntity | undefined): ExpressionEmotion | null {
+    return message?.kind === MessageKind.User && message.faceBy === 'user' ? message.face : null;
+}
+
 function rollOf(message: MessageEntity | undefined): Roll | null {
     if (!message || message.roll === null || message.roll === undefined || message.rollTarget === null || message.rollTarget === undefined) return null;
     // The Stat stays with the Roll (.scratch/judge-rolls/spec.md), so a Retry, an edit or Again reads the same total.

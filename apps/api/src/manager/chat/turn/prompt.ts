@@ -1,4 +1,5 @@
 import { Balance, Difficulty, Pacing, Pov, ReplyLength, Tense } from '../../../model/story/entities/story.entity.js';
+import type { ExpressionEmotion } from '../../../model/story/emotion.js';
 import type { TimeOfDay } from '../../../model/chat/entities/chat.entity.js';
 import { BondLevels, bondLevelsInWords } from '../../../model/ledger/bond-axes.js';
 import { PromptMessage } from '../../../service/model-gateway/model-gateway.js';
@@ -190,6 +191,8 @@ export interface TurnPromptInput {
      */
     suddenEvent?: PromptSuddenEvent | null;
     /** The Roll the user's message was sent with (.scratch/roll/spec.md); null or left out for none. Turn-only. */
+    /** The face the user picked for the Message this turn answers (.scratch/your-faces/spec.md); null or left out without one. */
+    face?: ExpressionEmotion | null;
     roll?: Roll | null;
     /**
      * Set on an Epilogue turn (.scratch/endings/spec.md): a turn without a User Message that closes
@@ -711,6 +714,35 @@ export function turnFinalInstruction(identity: string): string {
     return `Write the next turn now. Do not write anything ${identity} says, thinks or does. Use @Name: lines for Character speech, spoken words only: no parentheses or *(stage directions)* inside them, even where earlier turns had them. Actions go in narration. Keep the speech plain and natural, the way people actually talk. Say each thing once: no run of sentences that open with the same words, as in "I had a plan. I had stages. I had a sequence.", and no lists of three. When a moment turns sexual, stay in it and write it out explicitly: touch, skin, breath and sound, and how each Character's body answers what ${identity} does, at the pace of the scene; never summarise it, skip ahead or cut away. In such moments a Character says only a few words at a time, broken off by what they feel; the body carries the moment, not speeches about it.`;
 }
 
+/**
+ * How each face looks, as the Narrator is told the one the user picked (.scratch/your-faces/spec.md):
+ * plain words a Character could see, not the Judge's tagging guide.
+ */
+export const FACE_WORDS: Record<ExpressionEmotion, string> = {
+    joy: 'happy, smiling, bright',
+    love: 'tender and warm, a soft smile',
+    embarrassment: 'embarrassed and shy, blushing, looking away',
+    sadness: 'sad and hurt, eyes downcast',
+    anger: 'angry, brows drawn, glaring',
+    fear: 'afraid, eyes wide, tense',
+    surprise: 'surprised, eyes wide, mouth open',
+    teasing: 'teasing, a sly smile, playfully flirting',
+    desire: 'heated with desire, flushed, heavy-lidded',
+    flustered: 'flustered, flushed red, breathless and shy',
+    longing: 'longing, pleading eyes, aching to be closer',
+    passion: 'lost in passion, flushed, breathless',
+    afterglow: 'in the afterglow, content and relaxed',
+};
+
+/**
+ * The face the user picked as they sent this Message (.scratch/your-faces/spec.md): what everyone
+ * there can see, so the Characters answer it. Null without one.
+ */
+export function faceLine(face: ExpressionEmotion | null, identity: string): string | null {
+    if (!face) return null;
+    return `${identity}'s face as they say this: ${FACE_WORDS[face]}. The Characters there can see it and may answer it, but don't describe ${identity} doing anything new.`;
+}
+
 /** Said after the Place and Weather in "Where things stand": where the newest replies have moved on, they win. */
 export const DETAILS_LAG_SENTENCE = 'Where the newest replies show the story has since moved somewhere else or the weather has turned, follow the replies, not these.';
 
@@ -882,6 +914,7 @@ export function buildTurnPrompt(input: TurnPromptInput): TurnPrompt {
                       thoughtsBlock(input.thoughts),
                       suddenEventBlock(input.suddenEvent, identity),
                       rollBlock(input.roll, identity),
+                      faceLine(input.face ?? null, identity),
                       input.nudge ? nudgeLine(input.nudge) : null,
                       cueBlock(input.cue, identity),
                       repeats,

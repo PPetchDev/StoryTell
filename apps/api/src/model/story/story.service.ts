@@ -29,7 +29,7 @@ import { AccountModelService } from '../account/account.service.js';
  * real Story, and every page that read a Story waited seconds (docs/ui-audit-2026-11-13.md, H1).
  */
 const FULL_RELATIONS = {
-    role: true,
+    role: { expressions: true },
     characters: { expressions: true, secretList: true, referenceCutout: true },
     startingBonds: true,
     startingBeliefs: true,

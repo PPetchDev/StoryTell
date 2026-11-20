@@ -6,6 +6,7 @@ import { announce } from '@/components/announcer';
 import { useConnection } from '@/components/connection';
 import { PortraitImage } from '@/components/portrait/portrait-image';
 import { ApiError, apiFetch, ApiUnreachableError } from '@/lib/api';
+import { ExpressionEndpoints, expressionEndpoints } from '@/lib/expression-endpoints';
 import { preparedForUpload } from '@/lib/cover';
 import { EMOTION_LABEL, EVERYDAY_EMOTIONS, Expression, ExpressionDrawing, EXPRESSION_EMOTIONS, ExpressionEmotion, INTIMATE_EMOTIONS } from '@/lib/expressions';
 import { Character, PortraitCrop, referenceImageUrl, Story, storyApi } from '@/lib/story';
@@ -15,8 +16,8 @@ import { SUBSECTION, SUBSECTION_LEGEND } from './folding-card';
 import { PortraitCropper } from './portrait-cropper';
 import { UndoNotice, useUndo } from './undo-notice';
 
-/** Runs a write that answers with the whole Story, after pending edits; a failure goes to `onError`. */
-type Commit = (run: () => Promise<Story>, onError: (message: string) => void) => Promise<Story | undefined>;
+/** Runs a write that answers with the whole Story (or the Persona), after pending edits; a failure goes to `onError`. */
+type Commit<T = Story> = (run: () => Promise<T>, onError: (message: string) => void) => Promise<T | undefined>;
 
 /** The error codes a draw is routed on (docs/error-codes.md). */
 const OUT_OF_IMAGE_CREDIT = '402.001.004';
@@ -65,14 +66,70 @@ interface ExpressionsProps {
 }
 
 /**
- * A Character's Expressions (.scratch/expressions/spec.md, "In the Story editor"): one row per
- * emotion with a picture, after the Reference image on the Character card. Each row is its own
- * request; a drawing goes outside the editor's save queue, so the other rows and fields stay
- * usable while it draws.
+ * A Character's Expressions (.scratch/expressions/spec.md, "In the Story editor"), after the
+ * Reference image on the Character card.
  */
 export function Expressions({ storyId, character, commit, flush, onDrawn }: ExpressionsProps) {
-    const heading = character.name.trim() === '' ? 'this Character' : character.name;
-    const byEmotion = new Map(character.expressions.map((expression) => [expression.emotion, expression]));
+    return (
+        <ExpressionSet<Story>
+            owner={{
+                key: `character-${character.id}`,
+                name: character.name.trim() === '' ? 'this Character' : character.name,
+                expressions: character.expressions,
+                picturePath: character.referenceImagePath,
+                defaultCrop: character.portraitCrop,
+                pictureName: 'Reference image',
+                squareName: "the Portrait's face square",
+                plainName: 'the Portrait',
+            }}
+            api={expressionEndpoints<Story>(`/stories/${storyId}/characters/${character.id}`)}
+            commit={commit}
+            flush={flush}
+            onDrawn={onDrawn}
+            reload={() => storyApi.get(storyId)}
+        />
+    );
+}
+
+/** Whose Expressions a set shows: a Character, the Role or a Persona (.scratch/your-faces/spec.md). */
+export interface ExpressionOwner {
+    /** Unique on the page, for the rows' ids. */
+    key: string;
+    /** As the questions and labels name it. */
+    name: string;
+    expressions: Expression[];
+    /** The picture an Expression is drawn from; none, nothing can be drawn. */
+    picturePath: string | null;
+    /** The square an Expression without its own uses. */
+    defaultCrop: PortraitCrop | null;
+    /** What that picture is called: "Reference image", "Role image". */
+    pictureName: string;
+    /** What that square is called. */
+    squareName: string;
+    /** What a feeling without an Expression shows. */
+    plainName: string;
+}
+
+interface ExpressionSetProps<T> {
+    owner: ExpressionOwner;
+    api: ExpressionEndpoints<T>;
+    commit: Commit<T>;
+    /** Sends pending field edits first. */
+    flush(): Promise<void>;
+    /** Takes a drawn Expression from an answer. */
+    onDrawn(answer: T): void;
+    /** The owner's answer as saved, to take in what a Draw all run drew. */
+    reload(): Promise<T>;
+}
+
+/**
+ * One owner's Expressions: one row per emotion with a picture. Each row is its own request; a
+ * drawing goes outside the editor's save queue, so the other rows and fields stay usable while it
+ * draws.
+ */
+export function ExpressionSet<T>({ owner, api, commit, flush, onDrawn, reload }: ExpressionSetProps<T>) {
+    const heading = owner.name;
+    const byEmotion = new Map(owner.expressions.map((expression) => [expression.emotion, expression]));
     const price = useDrawPrice();
     /** The one emotion whose actions show; the rest are a tile each (docs/ui-audit-2026-11-13.md, H2). */
     const [open, setOpen] = useState<ExpressionEmotion | null>(null);
@@ -80,7 +137,7 @@ export function Expressions({ storyId, character, commit, flush, onDrawn }: Expr
     /** The Draw all run on the server, while one is going (.scratch/expression-drawing/spec.md). */
     const [run, setRun] = useState<ExpressionDrawing | null>(null);
     const [drawAllError, setDrawAllError] = useState<string | null>(null);
-    const canDraw = character.referenceImagePath !== null;
+    const canDraw = owner.picturePath !== null;
     // Draw all draws only what has no picture or an outdated one; with all thirteen there it redraws them.
     const missing = EXPRESSION_EMOTIONS.filter((emotion) => byEmotion.get(emotion)?.outdated !== false);
     const redraw = missing.length === 0;
@@ -104,14 +161,15 @@ export function Expressions({ storyId, character, commit, flush, onDrawn }: Expr
     // A run started earlier, from this page or another, shows where it is.
     useEffect(() => {
         let live = true;
-        storyApi.expressionDrawing(storyId, character.id).then(
+        api.drawing().then(
             (state) => live && state.running && setRun(state),
             () => {},
         );
         return () => {
             live = false;
         };
-    }, [storyId, character.id]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- once per owner
+    }, [owner.key]);
 
     // Follows a running run: each new picture shows as it lands. A failed check is not an outage: it asks again.
     const running = run?.running === true;
@@ -121,12 +179,12 @@ export function Expressions({ storyId, character, commit, flush, onDrawn }: Expr
         let live = true;
         const check = async () => {
             try {
-                const state = await storyApi.expressionDrawing(storyId, character.id);
+                const state = await api.drawing();
                 if (!live) return;
                 if (state.drawn.length !== seen || !state.running) {
                     seen = state.drawn.length;
-                    const story = await storyApi.get(storyId);
-                    if (live) onDrawn(story);
+                    const answer = await reload();
+                    if (live) onDrawn(answer);
                 }
                 if (!live) return;
                 if (state.running) setRun(state);
@@ -141,14 +199,14 @@ export function Expressions({ storyId, character, commit, flush, onDrawn }: Expr
             window.clearInterval(timer);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps -- follows the run, not each render's callbacks
-    }, [running, storyId, character.id]);
+    }, [running, owner.key]);
 
     /** Starts the run on the server: it draws one after another by itself and stops at the first failure. */
     const drawAll = async () => {
         setDrawAllError(null);
         try {
             await flush();
-            const state = await storyApi.startExpressionDrawing(storyId, character.id, redraw);
+            const state = await api.startDrawing(redraw);
             if (state.running) setRun(state);
             else ended(state);
         } catch (caught) {
@@ -160,10 +218,10 @@ export function Expressions({ storyId, character, commit, flush, onDrawn }: Expr
 
     const tiles = (emotions: readonly ExpressionEmotion[]) =>
         emotions.map((emotion) => (
-            <ExpressionRow
+            <ExpressionRow<T>
                 key={emotion}
-                storyId={storyId}
-                character={character}
+                owner={owner}
+                api={api}
                 heading={heading}
                 emotion={emotion}
                 expression={byEmotion.get(emotion)}
@@ -180,10 +238,10 @@ export function Expressions({ storyId, character, commit, flush, onDrawn }: Expr
         <fieldset className={`${SUBSECTION} lg:col-span-2`}>
             <legend className={SUBSECTION_LEGEND}>Expressions</legend>
             <p className={`${FIELD_HINT} mb-2`}>
-                A picture for each feeling. In a Chat, a line that shows one has this picture in place of the Portrait; the
-                others keep the Portrait. Tap a feeling to draw, upload or change it.
+                A picture for each feeling. In a Chat, a line that shows one has this picture in place of {owner.plainName}; the
+                others keep {owner.plainName}. Tap a feeling to draw, upload or change it.
             </p>
-            {character.referenceImagePath === null && <p className={`${FIELD_HINT} mb-2`}>Add a Reference image to draw Expressions.</p>}
+            {owner.picturePath === null && <p className={`${FIELD_HINT} mb-2`}>Add a {owner.pictureName} to draw Expressions.</p>}
             {canDraw && (
                 <div className="mb-2 flex flex-wrap items-center gap-2">
                     <ConfirmButton
@@ -194,7 +252,7 @@ export function Expressions({ storyId, character, commit, flush, onDrawn }: Expr
                         warning={
                             (redraw
                                 ? 'Each one replaces the one there'
-                                : 'Only those with no picture, or one drawn from an older Reference image; uploads stay') +
+                                : `Only those with no picture, or one drawn from an older ${owner.pictureName}; uploads stay`) +
                             ', and each is cut out to stand on the Backdrop in the novel view. It goes on if you leave this page.'
                         }
                         confirmLabel={allPrice === null ? allLabel : `${allLabel} · ~${usd(allPrice)}`}
@@ -225,8 +283,7 @@ export function Expressions({ storyId, character, commit, flush, onDrawn }: Expr
     );
 }
 
-interface ExpressionRowProps extends Omit<ExpressionsProps, 'character'> {
-    character: Character;
+interface ExpressionRowProps<T> extends Omit<ExpressionSetProps<T>, 'reload'> {
     heading: string;
     emotion: ExpressionEmotion;
     expression: Expression | undefined;
@@ -238,7 +295,7 @@ interface ExpressionRowProps extends Omit<ExpressionsProps, 'character'> {
     onToggle(): void;
 }
 
-function ExpressionRow({ storyId, character, heading, emotion, expression, price, commit, flush, onDrawn, open, locked, onToggle }: ExpressionRowProps) {
+function ExpressionRow<T>({ owner, api, heading, emotion, expression, price, commit, flush, onDrawn, open, locked, onToggle }: ExpressionRowProps<T>) {
     const { reportUnreachable } = useConnection();
     const [ownBusy, setBusy] = useState<string | null>(null);
     const busy = ownBusy ?? (locked ? 'Waiting for Draw all…' : null);
@@ -256,13 +313,13 @@ function ExpressionRow({ storyId, character, heading, emotion, expression, price
         if (busy) announce(`${label}: ${busy}`);
     }, [busy, label]);
     const src = expression ? referenceImageUrl(expression.imagePath) : null;
-    const canDraw = character.referenceImagePath !== null;
+    const canDraw = owner.picturePath !== null;
     const drawLabel = price === null ? 'Draw' : `Draw · ${usd(price)}`;
 
     /** One write of this row at a time; `what` says what is being saved. */
     const save = async (
         what: string,
-        run: () => Promise<Story>,
+        run: () => Promise<T>,
         onError = (message: string) => setError(`Couldn't save the ${label} Expression: ${message}`),
     ): Promise<boolean> => {
         setBusy(what);
@@ -278,7 +335,7 @@ function ExpressionRow({ storyId, character, heading, emotion, expression, price
         setError(null);
         try {
             await flush();
-            onDrawn(await storyApi.drawExpression(storyId, character.id, emotion));
+            onDrawn(await api.draw(emotion));
             // The picture changes out of sight of a screen reader (audit H12).
             announce(`Drew the ${label} Expression.`);
         } catch (caught) {
@@ -298,32 +355,32 @@ function ExpressionRow({ storyId, character, heading, emotion, expression, price
         if (!file) return;
         await save('Uploading…', async () => {
             const { picture, filename } = await preparedForUpload(file);
-            return storyApi.uploadExpression(storyId, character.id, emotion, picture, filename);
+            return api.upload(emotion, picture, filename);
         });
     };
 
     /** Reset acts at once, with an Undo that puts the picked square back (audit H3). */
     const resetCrop = () => {
         const before = expression?.crop;
-        void save('Saving…', () => storyApi.clearExpressionCrop(storyId, character.id, emotion)).then((saved) => {
+        void save('Saving…', () => api.clearCrop(emotion)).then((saved) => {
             if (!saved || !before) return;
             undo.offer({
-                message: `Reset the ${label} Expression to the Portrait's face square.`,
-                undo: () => void save('Saving…', () => storyApi.setExpressionCrop(storyId, character.id, emotion, before)),
+                message: `Reset the ${label} Expression to ${owner.squareName}.`,
+                undo: () => void save('Saving…', () => api.setCrop(emotion, before)),
                 focusAfterUndo: () => row.current?.querySelector<HTMLElement>('[data-reset-face]'),
             });
         });
     };
 
     const saveCrop = (crop: PortraitCrop) => {
-        void save('Saving…', () => storyApi.setExpressionCrop(storyId, character.id, emotion, crop), setCropError).then((saved) => {
+        void save('Saving…', () => api.setCrop(emotion, crop), setCropError).then((saved) => {
             if (saved) setCropping(false);
         });
     };
 
     // A write that runs or failed keeps its actions in view, so its status and error stay readable.
     const shown = open || busy !== null || error !== null;
-    const panelId = `expression-${character.id}-${emotion}`;
+    const panelId = `expression-${owner.key}-${emotion}`;
 
     return (
         <>
@@ -340,7 +397,7 @@ function ExpressionRow({ storyId, character, heading, emotion, expression, price
                 onClick={onToggle}
             >
                 {src ? (
-                    <PortraitImage portrait={{ src, crop: expression!.crop ?? character.portraitCrop }} className="size-12 flex-none" />
+                    <PortraitImage portrait={{ src, crop: expression!.crop ?? owner.defaultCrop }} className="size-12 flex-none" />
                 ) : (
                     <span className="grid size-12 flex-none place-items-center rounded-full border border-dashed border-faint text-lg text-muted" aria-hidden="true">
                         +
@@ -358,9 +415,9 @@ function ExpressionRow({ storyId, character, heading, emotion, expression, price
                         {busy}
                     </span>
                 )}
-                {!busy && expression?.outdated && <span className="hint mt-0">Drawn from an earlier Reference image.</span>}
+                {!busy && expression?.outdated && <span className="hint mt-0">Drawn from an earlier {owner.pictureName}.</span>}
                 {!busy && expression && !expression.outdated && (
-                    <span className="hint mt-0">{expression.crop ? 'Its own face square.' : "The Portrait's face square."}</span>
+                    <span className="hint mt-0">{expression.crop ? 'Its own face square.' : `${owner.squareName.charAt(0).toUpperCase()}${owner.squareName.slice(1)}.`}</span>
                 )}
                 {!busy && expression && (
                     <span className="hint mt-0">
@@ -413,7 +470,7 @@ function ExpressionRow({ storyId, character, heading, emotion, expression, price
                         aria-label={`Cut out ${label}`}
                         disabled={busy !== null}
                         onClick={() =>
-                            void save('Cutting out…', () => storyApi.cutOutExpression(storyId, character.id, emotion), (message) =>
+                            void save('Cutting out…', () => api.cutOut(emotion), (message) =>
                                 setError(`Couldn't cut out the ${label} Expression: ${message}`),
                             )
                         }
@@ -440,9 +497,9 @@ function ExpressionRow({ storyId, character, heading, emotion, expression, price
                         danger
                         disabled={busy !== null}
                         question={`Remove the ${label} Expression?`}
-                        warning="Its picture is deleted, and lines that show it get the Portrait."
+                        warning={`Its picture is deleted, and lines that show it get ${owner.plainName}.`}
                         confirmLabel="Remove"
-                        onConfirm={() => void save('Removing…', () => storyApi.removeExpression(storyId, character.id, emotion))}
+                        onConfirm={() => void save('Removing…', () => api.remove(emotion))}
                     />
                 )}
             </div>
@@ -467,7 +524,7 @@ function ExpressionRow({ storyId, character, heading, emotion, expression, price
                 <PortraitCropper
                     name={heading}
                     src={src}
-                    initial={expression!.crop ?? character.portraitCrop}
+                    initial={expression!.crop ?? owner.defaultCrop}
                     saving={busy !== null}
                     error={cropError}
                     onSave={saveCrop}

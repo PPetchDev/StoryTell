@@ -214,6 +214,16 @@ export const DiceIcon = icon(
         <circle cx="15.4" cy="15.4" r="0.9" fill="currentColor" />
     </>,
 );
+/** 🙂 Your face for the Message about to be sent (.scratch/your-faces/spec.md). */
+export const FaceIcon = icon(
+    'FaceIcon',
+    <>
+        <circle cx="12" cy="12" r="8.5" />
+        <circle cx="9" cy="10" r="0.9" fill="currentColor" />
+        <circle cx="15" cy="10" r="0.9" fill="currentColor" />
+        <path d="M8.5 14.2c1.9 2 5.1 2 7 0" />
+    </>,
+);
 /** 🏠 A Place: a house. */
 export const PlaceIcon = icon(
     'PlaceIcon',

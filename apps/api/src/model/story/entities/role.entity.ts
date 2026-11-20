@@ -1,5 +1,9 @@
-import { Column, Entity, JoinColumn, OneToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, JoinColumn, OneToMany, OneToOne, PrimaryGeneratedColumn } from 'typeorm';
 import type { Relation } from 'typeorm';
+
+import { EXPRESSION_EMOTIONS } from '../emotion.js';
+import type { IdentityExpressionEntity } from '../../your-face/entities/identity-expression.entity.js';
+import type { ExpressionResponse } from './character-expression.entity.js';
 
 import type { StoryEntity } from './story.entity.js';
 
@@ -25,6 +29,8 @@ export interface RoleResponse {
     sections: RoleSection[];
     /** Its picture's path in the image folder (.scratch/role-image/spec.md), or null. */
     imagePath: string | null;
+    /** Its Expressions (.scratch/your-faces/spec.md), in the order of the emotions; empty without. */
+    expressions: ExpressionResponse[];
 }
 
 /** The part the user plays. Exactly one per Story, created with it. */
@@ -61,6 +67,10 @@ export class RoleEntity {
     @Column({ name: 'image_path', type: 'text', nullable: true })
     imagePath: string | null;
 
+    /** Its Expressions (.scratch/your-faces/spec.md); loaded with the Story. */
+    @OneToMany('IdentityExpressionEntity', 'role')
+    expressions: Relation<IdentityExpressionEntity[]>;
+
     toResponse(): RoleResponse {
         return {
             id: this.id,
@@ -69,6 +79,9 @@ export class RoleEntity {
             stats: this.stats ?? [],
             sections: this.sections ?? [],
             imagePath: this.imagePath ?? null,
+            expressions: [...(this.expressions ?? [])]
+                .sort((a, b) => EXPRESSION_EMOTIONS.indexOf(a.emotion) - EXPRESSION_EMOTIONS.indexOf(b.emotion))
+                .map((expression) => expression.toResponse(this.imagePath ?? null)),
         };
     }
 }

@@ -50,6 +50,11 @@ export class PersonaManagerService {
         const persona = await this.find(id);
         await this.personaModel.remove(persona.id);
         if (persona.imagePath) await this.removeFile(persona.imagePath);
+        // Its Expressions (.scratch/your-faces/spec.md): their rows went with it.
+        for (const expression of persona.expressions ?? []) {
+            await this.removeFile(expression.imagePath);
+            if (expression.cutoutPath) await this.removeFile(expression.cutoutPath);
+        }
     }
 
     /**

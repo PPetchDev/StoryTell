@@ -15,7 +15,7 @@ const ai = (parts: MessagePartResponse[]) =>
 
 describe('Thai reading: the source text (pure)', () => {
     it("is a User Message's stored text as it is", () => {
-        expect(thaiReadingSource({ id: 1, kind: 'user', text: '*I sit.* "Thanks."', identityName: 'Ash', personaId: null, roll: null, createdAt })).toBe(
+        expect(thaiReadingSource({ id: 1, kind: 'user', text: '*I sit.* "Thanks."', identityName: 'Ash', personaId: null, roll: null, face: null, createdAt })).toBe(
             '*I sit.* "Thanks."',
         );
     });

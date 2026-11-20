@@ -2,12 +2,14 @@ import { CSSProperties, ReactNode, useContext, useId } from 'react';
 
 import { MessageTabStop } from '@/components/chat/chat-classes';
 import { useCastCharacter, useCharacterProfile } from '@/components/chat/character-profile';
-import { usePersonaPicture } from '@/components/chat/persona-pictures';
+import { usePersonaPicture, useYourFace } from '@/components/chat/persona-pictures';
+import { PortraitImage } from '@/components/portrait/portrait-image';
 import { CharacterPortrait } from '@/components/portrait/character-portrait';
 import { Cast, characterColour, Portrait, Portraits } from '@/lib/character-colour';
 import { DiceIcon } from '@/components/icons';
 import { Message, MessagePart, MessageRoll, ROLL_OUTCOME_LABELS, signedStat } from '@/lib/chat';
-import { linePicture } from '@/lib/expressions';
+import { EMOTION_LABEL, ExpressionEmotion, linePicture } from '@/lib/expressions';
+import { referenceImageUrl } from '@/lib/story';
 import { personaImageUrl } from '@/lib/persona';
 
 import { useShownText } from './shown-text';
@@ -85,14 +87,18 @@ export function UserLine({
     text,
     roll = null,
     personaId = null,
+    face = null,
 }: {
     identityName: string;
     text: string;
     roll?: MessageRoll | 'pending' | null;
     /** The Persona it was written as: its picture shows in place of the initial (.scratch/persona-image/spec.md). */
     personaId?: number | null;
+    /** The face it was written with (.scratch/your-faces/spec.md): its Expression shows when the Role or Persona has one. */
+    face?: ExpressionEmotion | null;
 }) {
     const picture = usePersonaPicture(personaId);
+    const faced = useYourFace(personaId, face);
     return (
         <div className={`flex items-start justify-end gap-2 ${STORY_SIZE}`}>
             <div className="flex max-w-[calc(100%_-_2.75rem)] min-w-0 flex-col items-end">
@@ -102,7 +108,12 @@ export function UserLine({
                 </p>
                 {roll && <RollLine roll={roll} />}
             </div>
-            {picture ? (
+            {faced ? (
+                <span className="relative shrink-0" data-your-face={faced.emotion} title={EMOTION_LABEL[faced.emotion]}>
+                    <PortraitImage portrait={{ src: referenceImageUrl(faced.imagePath), crop: faced.crop }} className="size-9" />
+                    <span className="sr-only">{`Face: ${EMOTION_LABEL[faced.emotion]}`}</span>
+                </span>
+            ) : picture ? (
                 // eslint-disable-next-line @next/next/no-img-element -- served by the API from the image folder, as a thumbnail
                 <img className={`${AVATAR} bg-surface-raised`} src={personaImageUrl(picture, 320)} alt="" draggable={false} data-persona-picture />
             ) : (
@@ -217,7 +228,7 @@ export interface ReadingNow {
  * its speaker's bubble; a User Message as a bubble on the right.
  */
 export function MessageBody({ message, cast, portraits = {}, readingNow = null }: MessageBodyProps) {
-    if (message.kind === 'user') return <UserLine identityName={message.identityName} text={message.text} roll={message.roll} personaId={message.personaId} />;
+    if (message.kind === 'user') return <UserLine identityName={message.identityName} text={message.text} roll={message.roll} personaId={message.personaId} face={message.face?.emotion ?? null} />;
     return <AiMessageParts parts={message.parts} cast={cast} portraits={portraits} readingNow={readingNow} />;
 }
 

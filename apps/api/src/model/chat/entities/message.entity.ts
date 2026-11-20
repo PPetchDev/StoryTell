@@ -14,6 +14,7 @@ import type { PersonaEntity } from '../../persona/entities/persona.entity.js';
 import type { ChatEntity } from './chat.entity.js';
 import type { MessagePartEntity, MessagePartResponse } from './message-part.entity.js';
 import type { ReplyVersionEntity } from './reply-version.entity.js';
+import type { ExpressionEmotion } from '../../story/emotion.js';
 
 export enum MessageKind {
     User = 'user',
@@ -67,8 +68,16 @@ export interface UserMessageResponse {
     personaId: number | null;
     /** The Roll it was sent with (.scratch/roll/spec.md); null without one. */
     roll: MessageRoll | null;
+    /**
+     * The face it was written with (.scratch/your-faces/spec.md): picked by the user as they sent it,
+     * or guessed by the Judge from what they wrote; null without one.
+     */
+    face: { emotion: ExpressionEmotion; by: FaceBy } | null;
     createdAt: string;
 }
+
+/** Who gave a User Message its face: the user, who picked it, or the Judge, who guessed it. */
+export type FaceBy = 'user' | 'judge';
 
 /** A User Message's Roll: what the d20 showed, the number to reach, and how it came out. */
 export interface MessageRoll {
@@ -175,6 +184,13 @@ export class MessageEntity {
 
     @Column({ name: 'roll_bonus', type: 'smallint', nullable: true })
     rollBonus: number | null;
+
+    /** A User Message's face (.scratch/your-faces/spec.md); both NULL without one. */
+    @Column({ type: 'text', nullable: true })
+    face: ExpressionEmotion | null;
+
+    @Column({ name: 'face_by', type: 'text', nullable: true })
+    faceBy: FaceBy | null;
 
     /**
      * The Roll offer the Judge left on this AI Message (.scratch/judge-rolls/spec.md); NULL without
@@ -295,6 +311,7 @@ export class MessageEntity {
                 identityName: this.identityName ?? '',
                 personaId: this.personaId,
                 roll: this.rollResponse(),
+                face: this.face && this.faceBy ? { emotion: this.face, by: this.faceBy } : null,
                 createdAt: this.createdAt.toISOString(),
             };
         }

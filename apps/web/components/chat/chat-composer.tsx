@@ -5,6 +5,8 @@ import { FormEvent, ReactNode, RefObject, useEffect, useId, useLayoutEffect, use
 
 import { COLUMN, ICON_BUTTON, LABEL_CAPS, PANEL_NOTE, SEND_BUTTON, TOOL_CHIP } from '@/components/chat/chat-classes';
 import { useConnection } from '@/components/connection';
+import type { Expression, ExpressionEmotion } from '@/lib/expressions';
+import { FacePicker } from '@/components/chat/face-picker';
 import { CloseIcon, DiceIcon, PencilIcon, PlayIcon, StopIcon, UndoIcon, ChevronDownIcon } from '@/components/icons';
 import { ApiUnreachableError } from '@/lib/api';
 import { backgroundNotice, Chat, chatApi, SuggestedReply, RollStat, signedStat } from '@/lib/chat';
@@ -383,6 +385,11 @@ interface ChatComposerProps {
     /** Opens the Cue sheet. */
     onCue(): void;
     onClearCue(): void;
+    /** The face picked for the next Message (.scratch/your-faces/spec.md), or null. */
+    face?: ExpressionEmotion | null;
+    onFace?(next: ExpressionEmotion | null): void;
+    /** The worn Role's or Persona's Expressions, for the face picker's pictures. */
+    faces?: Expression[];
     /** Whether the next Message is sent with a Roll (CONTEXT.md, "Roll"). */
     roll: boolean;
     onRoll(next: boolean): void;
@@ -429,6 +436,9 @@ export function ChatComposer({
     onClearCue,
     roll,
     onRoll,
+    face = null,
+    onFace,
+    faces = [],
     rollStat = null,
     rollOfferBand,
     watching = false,
@@ -851,6 +861,16 @@ export function ChatComposer({
                         >
                             <DiceIcon size={20} />
                         </button>
+                        {/* .scratch/your-faces/spec.md: the face the user makes as they send; the Narrator is told it. */}
+                        {onFace && (
+                            <FacePicker
+                                face={face}
+                                onFace={onFace}
+                                faces={faces}
+                                name={chat.identityName}
+                                disabled={writing || busy || blocked || writingForMe || dictating || watching}
+                            />
+                        )}
                         {/* .scratch/dictation/spec.md: only where the browser can record. */}
                         {dictation.supported && <DictateButton ref={micRef} dictation={dictation} disabledReason={micDisabledReason} />}
                         <span className="flex-1" aria-hidden="true" />

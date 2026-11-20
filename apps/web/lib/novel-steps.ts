@@ -1,4 +1,5 @@
 import type { Message, MessagePart, MessageRoll } from './chat';
+import type { ExpressionEmotion } from './expressions';
 import type { Emotion } from './expressions';
 import type { Snapshot } from './snapshot';
 
@@ -15,6 +16,10 @@ export type NovelStep =
           text: string;
           /** The Roll it was sent with (CONTEXT.md, "Roll"), or `'pending'` while it is being sent; left out without one. */
           roll?: MessageRoll | 'pending';
+          /** The Persona it was written as; null or left out for the Role (.scratch/your-faces/spec.md). */
+          personaId?: number | null;
+          /** Its face; left out without one (.scratch/your-faces/spec.md). */
+          face?: ExpressionEmotion;
       }
     | { kind: 'narration'; key: string; messageId: number | null; partIndex: number; paragraph: number; text: string }
     | {
@@ -32,7 +37,7 @@ export type NovelStep =
 export interface NovelInput {
     messages: readonly Message[];
     /** The line just sent, before the API stored it. */
-    pending: { identityName: string; text: string; roll?: boolean } | null;
+    pending: { identityName: string; text: string; roll?: boolean; personaId?: number | null; face?: ExpressionEmotion | null } | null;
     /** The reply so far while a turn streams. */
     replySoFar: readonly MessagePart[] | null;
     /** The reply ↺ Again is replacing: left out, as the thread hides it. */
@@ -97,6 +102,8 @@ export function novelSteps({ messages, pending, replySoFar, replacing, snapshots
                 identityName: message.identityName,
                 text: message.text,
                 ...(message.roll ? { roll: message.roll } : {}),
+                personaId: message.personaId,
+                ...(message.face ? { face: message.face.emotion } : {}),
             });
             continue;
         }
@@ -113,6 +120,8 @@ export function novelSteps({ messages, pending, replySoFar, replacing, snapshots
             identityName: pending.identityName,
             text: pending.text,
             ...(pending.roll ? { roll: 'pending' as const } : {}),
+            personaId: pending.personaId ?? null,
+            ...(pending.face ? { face: pending.face } : {}),
         });
     }
     if (replySoFar) steps.push(...partSteps(replySoFar, shown, null, (rest) => `${LIVE_PREFIX}${rest}`));

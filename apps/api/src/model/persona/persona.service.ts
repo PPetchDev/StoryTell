@@ -15,12 +15,12 @@ export class PersonaModelService {
 
     /** Every Persona, oldest first. */
     findAll(): Promise<PersonaEntity[]> {
-        return this.personas.find({ where: { userId: this.accounts.currentId() }, order: { id: 'ASC' } });
+        return this.personas.find({ where: { userId: this.accounts.currentId() }, relations: { expressions: true }, order: { id: 'ASC' } });
     }
 
     /** The current Account's Persona; another Account's answers as missing. */
     findOne(id: number): Promise<PersonaEntity | null> {
-        return this.personas.findOneBy({ id, userId: this.accounts.currentId() });
+        return this.personas.findOne({ where: { id, userId: this.accounts.currentId() }, relations: { expressions: true } });
     }
 
     save(persona: Partial<PersonaEntity>): Promise<PersonaEntity> {

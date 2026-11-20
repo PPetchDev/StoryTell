@@ -173,7 +173,7 @@ export class ChatApiController {
         @Res() response: Response,
     ): Promise<void> {
         return answerTurn<ChatResponseBodyDTO>(request, response, 201, this.turns, chatId, (stream) =>
-            this.chatManager.send(storyId, chatId, body.text, stream, body.nudgeCharacterId, body.cue, body.roll === true, body.rollStat ?? null),
+            this.chatManager.send(storyId, chatId, body.text, stream, body.nudgeCharacterId, body.cue, body.roll === true, body.rollStat ?? null, body.face ?? null),
         );
     }
 

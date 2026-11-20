@@ -92,7 +92,7 @@ The AI voice that describes the Setting and action and decides which Characters 
 _Avoid_: Game master, GM, system
 
 **Role**:
-The part a Story defines for the user to play; every Story has one. It may have a picture the author uploads, its **Role image**, which shows beside the user's lines written as the Role; like a Persona image, no model ever sees it.
+The part a Story defines for the user to play; every Story has one. It may have a picture the author uploads, its **Role image**, which shows beside the user's lines written as the Role. No text model ever sees it; the image model does only to draw the Role's Expressions from it.
 _Avoid_: Player character, protagonist
 
 **Role section**:
@@ -100,7 +100,7 @@ One of the Role's own blocks of free text, written by the author beside its Desc
 _Avoid_: Custom field, attribute, trait
 
 **Persona**:
-The user's own reusable self-description, which can be worn in place of a Story's Role. It may have a picture the user uploads, its **Persona image**, which shows beside the user's lines in a Chat that wears it; unlike a Character's Reference image no model ever sees it.
+The user's own reusable self-description, which can be worn in place of a Story's Role. It may have a picture the user uploads, its **Persona image**, which shows beside the user's lines in a Chat that wears it. No text model ever sees it; the image model does only to draw the Persona's Expressions from it.
 _Avoid_: Profile, avatar, user character
 
 **Cover**:
@@ -298,7 +298,7 @@ The collection of every Snapshot taken in any of a Story's Chats, grouped by Cha
 _Avoid_: Album, library
 
 **Reference image**:
-An image of a Character, chosen by the author, that keeps the Character looking the same in every Snapshot; in play its Portrait shows beside their lines, and the whole image only in their Character profile.
+An image of a Character, generated and picked or uploaded by the author, that keeps the Character looking the same in every Snapshot; in play its Portrait shows beside their lines, and the whole image only in their Character profile.
 _Avoid_: Avatar, profile picture
 
 **Portrait**:
@@ -306,8 +306,12 @@ The square of a Character's Reference image that the author picks to stand for t
 _Avoid_: Avatar, profile picture, icon
 
 **Expression**:
-A Character's picture for one emotion, drawn from their Reference image or uploaded by the author. When a line of theirs carries that emotion it shows in place of their Portrait; without one, the Portrait shows as usual. Six of the thirteen emotions belong to intimate scenes between adults; a line with one of those and no picture for it shows the nearest everyday Expression.
+A Character's picture for one emotion, drawn from their Reference image or uploaded by the author; the Role and a Persona have them too, drawn from the Role image or Persona image. When a line of theirs carries that emotion it shows in place of their Portrait; without one, the Portrait shows as usual. Six of the thirteen emotions belong to intimate scenes between adults; a line with one of those and no picture for it shows the nearest everyday Expression.
 _Avoid_: Sprite, emote, mood picture
+
+**Face**:
+The emotion a User Message is written with, one of the Expression emotions: picked by the user as they send it, when the Narrator is told it so the Characters can see it, or guessed afterwards by the Background judge from what they wrote, for the picture only. It shows the Role's or Persona's Expression beside the line.
+_Avoid_: Mood, user emotion, reaction
 
 **Draw all**:
 Drawing a Character's Expressions one after another on the server, the ones with no picture or an outdated drawn one, or all thirteen again when every one is there. It goes on when the page is closed or the phone loses its connection, and stops at the first failure.
