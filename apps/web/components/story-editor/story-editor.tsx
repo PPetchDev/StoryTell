@@ -81,6 +81,7 @@ import { SuddenEventCard } from './sudden-event-card';
 import { AiEventsSwitch } from './ai-events-switch';
 import { StatsCard } from './stats-card';
 import { RoleSectionsCard, roleSectionTexts, savableRoleSections } from './role-sections-card';
+import { RolePicture } from './role-picture';
 import { StartingBeliefsCard } from './starting-beliefs-card';
 import { OpeningQuestionsCard, savableQuestions } from './opening-questions-card';
 import { StartingBondsCard } from './starting-bonds-card';
@@ -898,6 +899,14 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                     {...rewritable({ target: 'role', field: 'description' })}
                                 />
                             </section>
+                        )}
+                        {tab === 'role' && (
+                            <RolePicture
+                                storyId={storyId}
+                                roleName={story.role.name}
+                                imagePath={story.role.imagePath ?? null}
+                                onSaved={(saved) => setStory((current) => ({ ...current, role: { ...current.role, imagePath: saved.role.imagePath ?? null } }))}
+                            />
                         )}
                         {tab === 'role' && (
                             <RoleSectionsCard sections={story.role.sections ?? []} placeholderHint={placeholderHint} onChange={setRoleSections} />

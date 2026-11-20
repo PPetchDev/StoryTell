@@ -23,6 +23,8 @@ export interface RoleResponse {
     stats: RoleStat[];
     /** Its sections, in the author's order; empty without. */
     sections: RoleSection[];
+    /** Its picture's path in the image folder (.scratch/role-image/spec.md), or null. */
+    imagePath: string | null;
 }
 
 /** The part the user plays. Exactly one per Story, created with it. */
@@ -52,7 +54,21 @@ export class RoleEntity {
     @Column({ type: 'jsonb', default: () => "'[]'" })
     sections: RoleSection[];
 
+    /**
+     * Its picture (.scratch/role-image/spec.md): `role-images/story-<id>/picture-<random>.<ext>`,
+     * owned by the Role, shown beside the user's lines written as the Role. No model reads it.
+     */
+    @Column({ name: 'image_path', type: 'text', nullable: true })
+    imagePath: string | null;
+
     toResponse(): RoleResponse {
-        return { id: this.id, name: this.name, description: this.description, stats: this.stats ?? [], sections: this.sections ?? [] };
+        return {
+            id: this.id,
+            name: this.name,
+            description: this.description,
+            stats: this.stats ?? [],
+            sections: this.sections ?? [],
+            imagePath: this.imagePath ?? null,
+        };
     }
 }

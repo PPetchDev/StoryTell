@@ -62,6 +62,8 @@ export interface Role {
     stats?: RoleStat[];
     /** Its own sections (CONTEXT.md, "Role section"), in the author's order; left out by an older API. */
     sections?: RoleSection[];
+    /** Its picture's path (.scratch/role-image/spec.md), shown beside your lines written as the Role; null without, left out by an older API. */
+    imagePath?: string | null;
 }
 
 /** One of the Role's own sections: a heading and free text, read with the Description. */
@@ -632,6 +634,13 @@ export const storyApi = {
         return apiFetch<Story>(`/stories/${storyId}/cover/upload`, { method: 'PUT', body: form });
     },
     clearCover: (storyId: number) => apiSend<Story>('DELETE', `/stories/${storyId}/cover`),
+    /** Stores a picture from the phone as the Role's (.scratch/role-image/spec.md), which owns its file. */
+    uploadRoleImage: (storyId: number, picture: Blob, filename: string) => {
+        const form = new FormData();
+        form.append('image', picture, filename);
+        return apiFetch<Story>(`/stories/${storyId}/role/image`, { method: 'PUT', body: form });
+    },
+    clearRoleImage: (storyId: number) => apiSend<Story>('DELETE', `/stories/${storyId}/role/image`),
     setCoverFocus: (storyId: number, focus: CoverFocus) =>
         apiSend<Story>('PUT', `/stories/${storyId}/cover/focus`, focus),
     clearCoverFocus: (storyId: number) => apiSend<Story>('DELETE', `/stories/${storyId}/cover/focus`),

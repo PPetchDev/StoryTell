@@ -243,6 +243,8 @@ export interface ChatDetail extends ChatSummary {
      * those its User Messages were written as, where they still exist and have one.
      */
     personaImages: Array<{ personaId: number; imagePath: string }>;
+    /** The Role's picture, for the user's lines written as the Role (.scratch/role-image/spec.md). */
+    roleImagePath: string | null;
     /** The Author's note (.scratch/authors-note/spec.md); empty when there is none. */
     authorsNote: string;
     /** Read replies aloud (.scratch/read-aloud/spec.md, "Auto-read"); off by default. */
@@ -2240,6 +2242,7 @@ export class ChatManagerService {
             personaImages: personas.flatMap((persona) =>
                 persona.imagePath && inChat.has(persona.id) ? [{ personaId: persona.id, imagePath: persona.imagePath }] : [],
             ),
+            roleImagePath: story.role.imagePath ?? null,
             messages: withThaiReadings(
                 chat.messages.map((message) => message.toResponse()),
                 readings,

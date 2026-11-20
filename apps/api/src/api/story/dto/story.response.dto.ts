@@ -190,6 +190,13 @@ export class RoleDTO implements RoleResponse {
 
     @ApiProperty({ type: [RoleSectionDTO], description: "Its own sections, in the author's order (.scratch/role-sections/spec.md); empty without." })
     sections: RoleSectionDTO[];
+
+    @ApiProperty({
+        type: String,
+        nullable: true,
+        description: "Its picture's path, served by `GET /api/images/{path}` (.scratch/role-image/spec.md); null without.",
+    })
+    imagePath: string | null;
 }
 
 export class PortraitCropDTO implements PortraitCrop {

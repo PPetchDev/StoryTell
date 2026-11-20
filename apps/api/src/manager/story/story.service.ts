@@ -449,6 +449,17 @@ export class StoryManagerService {
             } else if (cover?.source === CoverSource.ReferenceImage && cover.characterId !== null && images.has(characterIds.get(cover.characterId)!)) {
                 await this.storyModel.setCover(copyId, { snapshotId: null, characterId: characterIds.get(cover.characterId)!, imagePath: null, focus });
             }
+
+            // The Role's picture (.scratch/role-image/spec.md), in a file of the copy's own.
+            if (source.role.imagePath) {
+                const token = randomBytes(6).toString('hex');
+                const imagePath = await copyFile(source.role.imagePath, (ext) => `role-images/story-${copyId}/picture-${token}.${ext}`);
+                if (imagePath) {
+                    const copy = await this.load(copyId);
+                    copy.role.imagePath = imagePath;
+                    await this.storyModel.saveRole(copy.role);
+                }
+            }
         } catch (error) {
             await this.storyModel.deleteStory(copyId);
             for (const relativePath of written) await this.removeFile(relativePath);
@@ -474,6 +485,7 @@ export class StoryManagerService {
         for (const imagePath of galleryFiles) await this.removeFile(imagePath);
         for (const imagePath of stageFiles) await this.removeFile(imagePath);
         if (story.coverImagePath) await this.removeFile(story.coverImagePath);
+        if (story.role.imagePath) await this.removeFile(story.role.imagePath);
         // Its Messages went with it through CASCADE; their Read aloud audio goes too.
         await this.readAloud.sweep();
     }
@@ -517,6 +529,42 @@ export class StoryManagerService {
         } catch (error) {
             await this.removeFile(relativePath);
             throw error;
+        }
+        return this.reload(storyId);
+    }
+
+    /**
+     * Stores an uploaded picture as the Role's (.scratch/role-image/spec.md), which owns its file;
+     * the one it replaces is deleted. The type is read from the bytes, as for a Cover.
+     */
+    async uploadRoleImage(storyId: number, bytes: Buffer): Promise<StoryDetail> {
+        const story = await this.load(storyId);
+        const mimeType = ImageStoreService.sniffMimeType(bytes);
+        if (!mimeType) throw new UnsupportedImageError();
+        const extension = ImageStoreService.extensionFor(mimeType)!;
+        // A fresh name per upload, so a browser never shows the replaced picture from its cache.
+        const relativePath = `role-images/story-${storyId}/picture-${randomBytes(6).toString('hex')}.${extension}`;
+        await this.imageStore.write(relativePath, bytes);
+        const previous = story.role.imagePath;
+        try {
+            story.role.imagePath = relativePath;
+            await this.storyModel.saveRole(story.role);
+        } catch (error) {
+            await this.removeFile(relativePath);
+            throw error;
+        }
+        if (previous) await this.removeFile(previous);
+        return this.reload(storyId);
+    }
+
+    /** The Role without a picture again; its file is deleted. Not an error when there is none. */
+    async clearRoleImage(storyId: number): Promise<StoryDetail> {
+        const story = await this.load(storyId);
+        const previous = story.role.imagePath;
+        if (previous) {
+            story.role.imagePath = null;
+            await this.storyModel.saveRole(story.role);
+            await this.removeFile(previous);
         }
         return this.reload(storyId);
     }

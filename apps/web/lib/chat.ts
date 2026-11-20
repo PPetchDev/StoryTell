@@ -254,6 +254,8 @@ export interface Chat extends ChatSummary {
     personaId: number | null;
     /** The pictures of the Personas this Chat shows: the worn one and those its User Messages were written as, where they have one. */
     personaImages: Array<{ personaId: number; imagePath: string }>;
+    /** The Role's picture, for your lines written as the Role (.scratch/role-image/spec.md); left out by an older API. */
+    roleImagePath?: string | null;
     roleName: string;
     /** What this Chat answered to its Story's Opening questions, by key; null when it was asked none. */
     openingAnswers?: Record<string, string> | null;

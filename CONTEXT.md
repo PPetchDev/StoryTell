@@ -92,7 +92,7 @@ The AI voice that describes the Setting and action and decides which Characters 
 _Avoid_: Game master, GM, system
 
 **Role**:
-The part a Story defines for the user to play; every Story has one.
+The part a Story defines for the user to play; every Story has one. It may have a picture the author uploads, its **Role image**, which shows beside the user's lines written as the Role; like a Persona image, no model ever sees it.
 _Avoid_: Player character, protagonist
 
 **Role section**:

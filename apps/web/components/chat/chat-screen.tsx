@@ -688,7 +688,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
 
     return (
         // The user's lines look their Persona's picture up here (.scratch/persona-image/spec.md).
-        <PersonaPictures images={chat.personaImages ?? []}>
+        <PersonaPictures images={chat.personaImages ?? []} roleImage={chat.roleImagePath ?? null}>
         <main className={SCREEN}>
             <ChatBackdrop picture={backdrop} />
             <ChatTopBar

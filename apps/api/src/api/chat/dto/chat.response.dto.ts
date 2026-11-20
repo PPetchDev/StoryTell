@@ -632,6 +632,13 @@ export class ChatResponseBodyDTO extends ChatSummaryDTO implements Omit<ChatDeta
     })
     personaImages: ChatPersonaImageDTO[];
 
+    @ApiProperty({
+        type: String,
+        nullable: true,
+        description: "The Story's Role's picture, shown beside the user's lines written as the Role (.scratch/role-image/spec.md); null without.",
+    })
+    roleImagePath: string | null;
+
     @ApiProperty({ description: "The Story's Role's name, which the swap offers beside the Personas, its placeholders filled with this Chat's answers." })
     roleName: string;
 
