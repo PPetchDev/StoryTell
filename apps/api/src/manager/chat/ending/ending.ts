@@ -209,7 +209,7 @@ export function epilogueInstruction(identity: string, epilogue: PromptEpilogue):
 
 /** The trailing instruction of an Epilogue turn, in place of the turn's own. */
 export function epilogueFinalInstruction(identity: string): string {
-    return `Write the epilogue now, mostly as narration. Give ${identity} no line of speech and no new decision. Use @Name: lines for Character speech, spoken words only: no parentheses or *(stage directions)* inside them, even where earlier turns had them.`;
+    return `Write the epilogue now, mostly as narration. Give ${identity} no line of speech and no new decision. Use @Name: lines for Character speech, spoken words only, with no quotation marks: no parentheses, *(stage directions)* or narration inside them, even where earlier turns had them.`;
 }
 
 /** The Chat's Ending as the Chat screen shows it; null when it has reached none. */

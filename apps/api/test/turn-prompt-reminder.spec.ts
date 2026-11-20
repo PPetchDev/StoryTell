@@ -53,7 +53,7 @@ describe('Turn prompt: the gender rule and the reminder near the end', () => {
         expect(system).toContain('# Dialogue');
         expect(system).toContain("Each Character's speech on lines starting with \"@Name:\"");
         expect(system).not.toContain('speech and small actions');
-        expect(system).toContain('Never put stage directions, parentheses or *asterisk actions* inside it.');
+        expect(system).toContain('Never put stage directions, parentheses, *asterisk actions* or narration ("She leans on the fence.") inside it');
         expect(system).toContain('goes in a short narration line before or after the speech');
         expect(system).toContain("never copy the card's descriptive words into the story as labels");
         expect(system).toContain("Don't repeat the same details turn after turn");
@@ -92,7 +92,7 @@ describe('Turn prompt: the gender rule and the reminder near the end', () => {
                 '- Dulcie: Teasing.\n' +
                 "Each Character's comparisons and turns of phrase come from their own life: don't lend one Character's trade or images to another, or to the narration about them.\n" +
                 'As they change and grow in the story, what they say changes, not how they talk: keep each one sounding like this in every line.\n' +
-                'Write the next turn now. Do not write anything Petch says, thinks or does. Use @Name: lines for Character speech, spoken words only: no parentheses or *(stage directions)* inside them, even where earlier turns had them. Actions go in narration. Keep the speech plain and natural, the way people actually talk. Say each thing once: no run of sentences that open with the same words, as in "I had a plan. I had stages. I had a sequence.", and no lists of three. When a moment turns sexual, stay in it and write it out explicitly: touch, skin, breath and sound, and how each Character\'s body answers what Petch does, at the pace of the scene; never summarise it, skip ahead or cut away. In such moments a Character says only a few words at a time, broken off by what they feel; the body carries the moment, not speeches about it.',
+                'Write the next turn now. Do not write anything Petch says, thinks or does. Use @Name: lines for Character speech, spoken words only, with no quotation marks: no parentheses, *(stage directions)* or narration inside them, even where earlier turns had them. Actions go in narration. Keep the speech plain and natural, the way people actually talk. Say each thing once: no run of sentences that open with the same words, as in "I had a plan. I had stages. I had a sequence.", and no lists of three. When a moment turns sexual, stay in it and write it out explicitly: touch, skin, breath and sound, and how each Character\'s body answers what Petch does, at the pace of the scene; never summarise it, skip ahead or cut away. In such moments a Character says only a few words at a time, broken off by what they feel; the body carries the moment, not speeches about it.',
         });
     });
 

@@ -137,3 +137,35 @@ test('backdropOf: none, the Cover at its focus, or the newest Snapshot still in 
     expect(backdropOf({ backdrop: 'snapshot', cover }, [], thread)).toEqual({ src: '/api/images/covers/story-1/cover-a.jpg', position: '25% 75%' });
     expect(backdropOf({ backdrop: 'snapshot', cover: null }, [snapshot(12, 99)], thread)).toBeNull();
 });
+
+// Speech written as prose (.scratch/quoted-speech/spec.md): the API keeps a Character's lines and the
+// beat between them apart; the Visual novel view reads them as one passage of a novel.
+test("a Character's lines with a short beat between them are one step, quoted, the beat in italics", () => {
+    const beat = 'She leans on the fence post.';
+    const prose = ai(5, [
+        speech('Tamsin', 12, 'Going, going.', 'joy'),
+        narration(beat),
+        speech('Tamsin', 12, 'Sleep well, Rin.'),
+        narration('The night settles.\n\nA dog barks.'),
+        speech('Ines', 13, 'Goodnight.'),
+        narration('Ines turns away.'),
+        speech('Tamsin', 12, 'Cookies.'),
+    ]);
+    const steps = novelSteps(input({ messages: [prose] }));
+
+    expect(steps.map((step) => [step.kind, step.key])).toEqual([
+        ['speech', 'm5:0:0'],
+        ['narration', 'm5:3:0'],
+        ['narration', 'm5:3:1'],
+        ['speech', 'm5:4:0'],
+        ['narration', 'm5:5:0'],
+        ['speech', 'm5:6:0'],
+    ]);
+    expect(steps[0]).toMatchObject({ speakerName: 'Tamsin', text: `“Going, going.” *${beat}* “Sleep well, Rin.”`, emotion: 'joy', partIndexes: [0, 1, 2] });
+    // Read aloud finds the joined step from any of its parts.
+    expect(readingStep(steps, 5, 1, 0)).toBe(0);
+    expect(readingStep(steps, 5, 2, null)).toBe(0);
+    // A long beat stays its own step.
+    const long = novelSteps(input({ messages: [ai(6, [speech('Tamsin', 12, 'One.'), narration('x'.repeat(241)), speech('Tamsin', 12, 'Two.')])] }));
+    expect(long.map((step) => step.kind)).toEqual(['speech', 'narration', 'speech']);
+});

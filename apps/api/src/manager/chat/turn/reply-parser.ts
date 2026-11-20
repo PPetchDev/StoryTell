@@ -110,7 +110,97 @@ export function parseReply(text: string, cast: CastName[], identityName: string,
     }
 
     for (const part of parts) part.text = part.text.trim();
-    return { parts: parts.filter((part) => part.text !== ''), unknownSpeakers, cutAtUserLine, droppedSpeakers };
+    return { parts: withQuotedSpeechSplit(parts.filter((part) => part.text !== '')), unknownSpeakers, cutAtUserLine, droppedSpeakers };
+}
+
+/** A piece of a speech line written as prose: the words said, or the narration between them. */
+export interface QuotedPiece {
+    kind: 'speech' | 'narration';
+    text: string;
+}
+
+/** A speech line written as prose opens with a quotation mark. */
+const OPENS_QUOTED = /^\s*["“]/;
+
+/** A narration piece needs a letter: punctuation or a dash between two quotes is nothing to show. */
+const HAS_LETTER = /\p{L}/u;
+
+/**
+ * A speech line written as prose, the way a novel writes dialogue (.scratch/quoted-speech/spec.md):
+ * `"Going, going." She leans on the post. "Sleep well."`. Seen on live (2026-11-20): GLM-5.3 wrote
+ * 49 of a Chat's 110 speech lines this way, so the action showed in the speech bubble and was read
+ * aloud in the Character's voice. The quoted words are speech, quotes taken off; the text between
+ * them is narration. Only a line that opens with a quotation mark is split, so a line that merely
+ * quotes someone ("She told me, "Wear them."") stays as written. And every piece between the quotes
+ * must read as narration about someone (`She leans…`, `A grin.`, `Ines turns.`): on live a Character
+ * also opens by echoing your words and goes on talking (`"Can't give you both." Listen to you…`), and
+ * that line stays as written. Null when there is nothing to split.
+ */
+export function splitQuotedSpeech(text: string, speakerName = ''): QuotedPiece[] | null {
+    if (!OPENS_QUOTED.test(text)) return null;
+    const pieces: QuotedPiece[] = [];
+    let allNarration = true;
+    const push = (kind: QuotedPiece['kind'], raw: string): void => {
+        let piece = raw.trim();
+        if (piece === '' || (kind === 'narration' && !HAS_LETTER.test(piece))) return;
+        if (kind === 'narration' && !readsAsNarration(piece, speakerName)) allNarration = false;
+        // `"Going, going," she says, "…"`: each piece stands on its own once apart.
+        piece = piece.replace(/[,;:]$/, '.');
+        if (kind === 'narration') piece = piece.charAt(0).toUpperCase() + piece.slice(1);
+        const last = pieces[pieces.length - 1];
+        if (last?.kind === kind) last.text += ' ' + piece;
+        else pieces.push({ kind, text: piece });
+    };
+    let inside = false;
+    let current = '';
+    for (const char of text) {
+        // “ always opens and ” always closes; a straight quote does whichever is due.
+        const opens = char === '“' || (char === '"' && !inside);
+        const closes = char === '”' || (char === '"' && inside);
+        if (opens && !inside) {
+            push('narration', current);
+            current = '';
+            inside = true;
+        } else if (closes && inside) {
+            push('speech', current);
+            current = '';
+            inside = false;
+        } else {
+            current += char;
+        }
+    }
+    // An unclosed quote (a line still streaming, or a model's slip) is speech to its end.
+    push(inside ? 'speech' : 'narration', current);
+    return pieces.length > 0 && allNarration ? pieces : null;
+}
+
+/** The words narration about the speaker opens with: `She leans…`, `A grin, sharp and bright.`, `Another pause.` */
+const NARRATION_OPENERS = new Set(['she', 'he', 'they', 'her', 'his', 'their', 'it', 'its', 'a', 'an', 'the', 'another']);
+
+/**
+ * Whether text between two quotes reads as narration: it opens with a word from
+ * NARRATION_OPENERS or a word of the speaker's name. Text that opens with punctuation
+ * (`"IT'S HUGE"! He said…`) or with the Character's own words (`Listen to you.`) does not.
+ */
+function readsAsNarration(piece: string, speakerName: string): boolean {
+    const first = (piece.match(/^\p{L}+/u)?.[0] ?? '').toLowerCase();
+    if (first === '') return false;
+    return NARRATION_OPENERS.has(first) || speakerName.toLowerCase().split(/\s+/).includes(first);
+}
+
+/** The parts with each prose speech line split into speech and narration; narration that ends up side by side merges, as the parser merges it. */
+function withQuotedSpeechSplit(parts: ReplyPart[]): ReplyPart[] {
+    const split: ReplyPart[] = [];
+    for (const part of parts) {
+        const pieces = part.kind === 'speech' ? splitQuotedSpeech(part.text, part.speakerName) : null;
+        const expanded: ReplyPart[] = pieces ? pieces.map((piece) => (piece.kind === 'speech' ? { ...part, text: piece.text } : { kind: 'narration', text: piece.text })) : [part];
+        for (const each of expanded) {
+            const last = split[split.length - 1];
+            if (each.kind === 'narration' && last?.kind === 'narration') last.text += '\n\n' + each.text;
+            else split.push(each);
+        }
+    }
+    return split;
 }
 
 /** The `@Name:` text of a parsed Message, as the editor (ticket 25) and the prompt show it. */
@@ -135,10 +225,14 @@ export function spokenOnly(text: string): string {
         .trim();
 }
 
-/** A reply as the history of a prompt reads it: `partsToText`, with each speech line's words only; a line left with none is dropped. */
+/**
+ * A reply as the history of a prompt reads it: `partsToText`, with each speech line's words only; a
+ * line left with none is dropped. Replies stored before prose speech lines were split reach it split
+ * (.scratch/quoted-speech/spec.md), so they don't teach the model the habit.
+ */
 export function historyPartsText(parts: ReplyPart[]): string {
     return partsToText(
-        parts.flatMap((part): ReplyPart[] => {
+        withQuotedSpeechSplit(parts.map((part) => ({ ...part }))).flatMap((part): ReplyPart[] => {
             if (part.kind !== 'speech') return [part];
             const text = spokenOnly(part.text);
             return text === '' ? [] : [{ ...part, text }];

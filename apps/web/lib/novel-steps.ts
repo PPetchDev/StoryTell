@@ -31,6 +31,11 @@ export type NovelStep =
           speakerName: string;
           text: string;
           emotion: Emotion | null;
+          /**
+           * The parts this step shows, when a Character's lines and the short narration between them
+           * read as one passage of a novel (.scratch/quoted-speech/spec.md); left out for one part.
+           */
+          partIndexes?: number[];
       }
     | { kind: 'snapshot'; key: string; messageId: number; snapshot: Snapshot };
 
@@ -57,6 +62,47 @@ export function paragraphsOf(text: string): string[] {
         .split(/\n\s*\n/)
         .map((paragraph) => paragraph.trim())
         .filter((paragraph) => paragraph !== '');
+}
+
+/** A narration beat between two lines of one Character is joined to them up to this many characters (.scratch/quoted-speech/spec.md). */
+export const BEAT_MAX_CHARS = 240;
+
+type SpeechStep = Extract<NovelStep, { kind: 'speech' }>;
+
+/**
+ * A Character's lines with the short narration between them, as one step that reads like a novel
+ * (.scratch/quoted-speech/spec.md): `“Going, going.” *She leans on the post.* “Sleep well.”`. The
+ * thread shows them apart, and the voices read them apart; only the Visual novel view joins them,
+ * so a step is not one sentence of a Character's, then a gesture, then the next sentence.
+ */
+function withBeatsJoined(steps: NovelStep[]): NovelStep[] {
+    const joined: NovelStep[] = [];
+    for (let index = 0; index < steps.length; index++) {
+        const step = steps[index];
+        if (step.kind !== 'speech') {
+            joined.push(step);
+            continue;
+        }
+        let passage: SpeechStep = step;
+        for (;;) {
+            const beat = steps[index + 1];
+            const next = steps[index + 2];
+            const sameSpeaker =
+                next?.kind === 'speech' && next.messageId === step.messageId && next.characterId === step.characterId && next.speakerName === step.speakerName;
+            // A beat is one short paragraph: a narration part of more paragraphs gives a step for each, so the next step would not be speech.
+            if (!sameSpeaker || beat?.kind !== 'narration' || beat.text.length > BEAT_MAX_CHARS) break;
+            const quoted = (text: string) => `“${text}”`;
+            const first = passage === step ? quoted(step.text) : passage.text;
+            passage = {
+                ...passage,
+                text: `${first} *${beat.text.replace(/\*/g, '')}* ${quoted(next.text)}`,
+                partIndexes: [...(passage.partIndexes ?? [step.partIndex]), beat.partIndex, next.partIndex],
+            };
+            index += 2;
+        }
+        joined.push(passage);
+    }
+    return joined;
 }
 
 /**
@@ -86,7 +132,7 @@ function partSteps(parts: readonly MessagePart[], shown: (text: string) => strin
             emotion: part.emotion,
         });
     });
-    return steps;
+    return withBeatsJoined(steps);
 }
 
 /** The Chat as steps, each with a key that stays put while the list grows. */
@@ -186,7 +232,7 @@ export function readingStep(steps: readonly NovelStep[], messageId: number, part
     return steps.findIndex(
         (step) =>
             step.messageId === messageId &&
-            ((step.kind === 'speech' && step.partIndex === partIndex) ||
+            ((step.kind === 'speech' && (step.partIndex === partIndex || (step.partIndexes?.includes(partIndex) ?? false))) ||
                 (step.kind === 'narration' && step.partIndex === partIndex && step.paragraph === (paragraph ?? 0))),
     );
 }
