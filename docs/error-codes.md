@@ -94,6 +94,10 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | `404.003.150` | `SecretNotFoundError` | No Secret with that id on that Character (`PATCH`/`DELETE /api/stories/:storyId/characters/:characterId/secrets/:secretId`, `.scratch/secret-reveals/spec.md`). Nothing changes. |
 | `422.003.151` | `InvalidSecretError` | A Secret's level that breaks a rule: a feeling without a level or a level without a feeling, or a level outside the feeling's scale. The message says which; nothing changes. A text over 1,000 characters, or a feeling other than the four, is a validation error (`400.000.000`). |
 | `422.003.152` | `SecretLimitError` | A ninth Secret on one Character. Nothing is added. |
+| `404.003.160` | `PlaceNotFoundError` | No Place with that id in this Story (`PATCH`/`DELETE /api/stories/:storyId/places/:placeId`, `POST …/draw`, `.scratch/places-ahead/spec.md`). Nothing changes. |
+| `422.003.161` | `InvalidPlaceError` | A Place with no name, a name or looks too long, a name the Story has already (in any case or spacing), or a 31st Place (`POST`/`PATCH /api/stories/:storyId/places…`). The message says which. Nothing changes. |
+| `409.003.162` | `PlaceBeingDrawnError` | Drawing a Place in a light while that picture is being drawn already (`POST /api/stories/:storyId/places/:placeId/draw`). No call is made. |
+| `409.003.163` | `NoDayPlacePictureError` | Drawing a Place's evening or night before its day picture, which they are edits of (`POST …/places/:placeId/draw`). No call is made. |
 | `404.004.001` | `ChatNotFoundError` | No Chat with that id in this Story. |
 | `422.004.002` | `StoryNotPlayableError` | The Story has a required field empty. The message names the missing fields. Blocks starting a Chat, sending, Continue and Regenerate. |
 | `409.004.003` | `NoTurnToRetryError` | Retry when the Chat is not waiting for a reply to a User Message. |

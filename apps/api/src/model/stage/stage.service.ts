@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 
-import { OutfitSpriteEntity, PlacePictureEntity, StageLight } from './stage.entities.js';
+import { OutfitSpriteEntity, PlacePictureEntity, StageLight, StoryPlaceEntity } from './stage.entities.js';
 
 /** A failed drawing is tried again after this long (.scratch/dressed-stage/spec.md). */
 export const STAGE_RETRY_AFTER_MS = 30 * 60_000;
@@ -16,6 +16,7 @@ export class StageModelService {
     constructor(
         @InjectRepository(PlacePictureEntity) private readonly places: Repository<PlacePictureEntity>,
         @InjectRepository(OutfitSpriteEntity) private readonly sprites: Repository<OutfitSpriteEntity>,
+        @InjectRepository(StoryPlaceEntity) private readonly storyPlaces: Repository<StoryPlaceEntity>,
         @InjectDataSource() private readonly dataSource: DataSource,
     ) {}
 
@@ -123,5 +124,70 @@ export class StageModelService {
             ...places.map((row) => row.imagePath),
             ...sprites.flatMap((row) => [row.source_path, row.image_path]),
         ].filter((file): file is string => file !== null);
+    }
+
+    /** The Story's Places, in their order (.scratch/places-ahead/spec.md). */
+    placesOf(storyId: number): Promise<StoryPlaceEntity[]> {
+        return this.storyPlaces.find({ where: { storyId }, order: { position: 'ASC', id: 'ASC' } });
+    }
+
+    placeOf(storyId: number, id: number): Promise<StoryPlaceEntity | null> {
+        return this.storyPlaces.findOneBy({ storyId, id });
+    }
+
+    async addPlace(storyId: number, place: { name: string; placeKey: string; looks: string }): Promise<StoryPlaceEntity> {
+        const last = await this.storyPlaces.findOne({ where: { storyId }, order: { position: 'DESC' } });
+        return this.storyPlaces.save(this.storyPlaces.create({ storyId, ...place, position: (last?.position ?? -1) + 1 }));
+    }
+
+    /** Changes a Place; a new name takes its pictures along, unless the new key has pictures of its own. */
+    async changePlace(place: StoryPlaceEntity, change: { name: string; placeKey: string; looks: string }): Promise<void> {
+        await this.dataSource.transaction(async (manager) => {
+            if (change.placeKey !== place.placeKey) {
+                await manager.query(
+                    `UPDATE "place_picture" SET "place_key" = $3 WHERE "story_id" = $1 AND "place_key" = $2
+                     AND NOT EXISTS (SELECT 1 FROM "place_picture" WHERE "story_id" = $1 AND "place_key" = $3)`,
+                    [place.storyId, place.placeKey, change.placeKey],
+                );
+            }
+            await manager.update(StoryPlaceEntity, { id: place.id }, change);
+        });
+    }
+
+    async removePlace(id: number): Promise<void> {
+        await this.storyPlaces.delete({ id });
+    }
+
+    /** Every place picture of a Story, drawn ahead or in play, in any status. */
+    picturesOf(storyId: number): Promise<PlacePictureEntity[]> {
+        return this.places.find({ where: { storyId }, order: { id: 'ASC' } });
+    }
+
+    /**
+     * Takes a picture of a place to draw now, drawn before or not: marked drawing, with the file it
+     * replaces. Null while it is being drawn already.
+     */
+    async claimPlaceDrawing(storyId: number, placeKey: string, light: StageLight): Promise<{ id: number; replaces: string | null } | null> {
+        const rows: { id: number; image_path: string | null }[] = await this.dataSource.query(
+            `INSERT INTO "place_picture" ("story_id", "place_key", "light", "status") VALUES ($1, $2, $3, 'drawing')
+             ON CONFLICT ("story_id", "place_key", "light") DO UPDATE SET "status" = 'drawing', "created_at" = now()
+             WHERE "place_picture"."status" <> 'drawing'
+             RETURNING "id", "image_path"`,
+            [storyId, placeKey, light],
+        );
+        return rows[0] ? { id: rows[0].id, replaces: rows[0].image_path } : null;
+    }
+
+    /** A drawing that failed and replaced nothing goes; one that replaced a picture keeps it, ready. */
+    async undoPlaceDrawing(id: number, kept: string | null): Promise<void> {
+        if (kept === null) await this.places.delete({ id });
+        else await this.places.update({ id }, { status: 'ready', imagePath: kept });
+    }
+
+    /** Removes a place's pictures in every light; answers their files, for deleting. */
+    async removePlacePictures(storyId: number, placeKey: string): Promise<string[]> {
+        const rows = await this.places.findBy({ storyId, placeKey });
+        await this.places.delete({ storyId, placeKey });
+        return rows.map((row) => row.imagePath).filter((file): file is string => file !== null);
     }
 }

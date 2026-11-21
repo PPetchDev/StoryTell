@@ -181,6 +181,7 @@ export class JudgeManagerService {
             // How long ago the Place was noted, up to the judged reply (.scratch/cache-and-voices/spec.md).
             const ageOfPlace = placeAge(detailsBefore, chat.messages.slice(0, index + 1).map((written) => written.id));
             const detailsCast = story.characters.map((character) => ({ id: character.id, name: character.name }));
+            const placeNames = await this.stage.placeNames(story.id);
             // The Chat's Established facts before this reply (.scratch/story-quality/spec.md), read the same way.
             // With the topics the user deleted, which stay deleted (.scratch/facts-panel/spec.md).
             const factsBefore = factsState(state.detailChanges.filter((change) => change.messageId !== message.id));
@@ -263,7 +264,7 @@ export class JudgeManagerService {
                 aiText: partsToText(replyParts),
                 ...(tagLines ? { expressionParts: replyParts } : {}),
                 suddenEventSection: eventsJudged ? judgeSuddenEventSection(events) : null,
-                detailsSection: judgeDetailsSection(details, detailsCast, ageOfPlace),
+                detailsSection: judgeDetailsSection(details, detailsCast, ageOfPlace, placeNames),
                 endingSection: judgeEndingSection(endings),
                 factsSection: judgeFactsSection(facts),
                 nowSection: judgeNowSection(nowNotes, detailsCast),

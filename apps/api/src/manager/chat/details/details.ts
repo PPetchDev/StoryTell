@@ -152,7 +152,7 @@ export interface DetailsCastMember {
  * The Judge's section about the Place, the Weather and the Outfits: what each is now, then the
  * rule and the JSON field, so the system message never changes. Read after the latest exchange.
  */
-export function judgeDetailsSection(details: ChatDetails, cast: readonly DetailsCastMember[], age: number | null = null): string {
+export function judgeDetailsSection(details: ChatDetails, cast: readonly DetailsCastMember[], age: number | null = null, placeNames: readonly string[] = []): string {
     const wearing = cast.map((member) => `${member.name}: ${details.outfits.find((entry) => entry.characterId === member.id)?.outfit ?? 'not yet known'}`);
     const after = cast.map((member) => `${member.name}: ${details.goals.find((entry) => entry.characterId === member.id)?.goal ?? 'none yet'}`);
     return [
@@ -162,6 +162,10 @@ export function judgeDetailsSection(details: ChatDetails, cast: readonly Details
         `Wearing: ${wearing.join('; ') || '(no Characters)'}`,
         `Goals: ${after.join('; ') || '(no Characters)'}`,
         'Details rule: give "details" in your JSON every time. "where": first, in a few words of the story\'s own, what the latest exchange and the recent story show about where everyone is at its end ("Inside the tent… seated on the felt"); the Place above may be out of date. "place": answer it every time, from "where": "same" when the story is still at the Place above, or else where it is now, in a few words ("inside the tent", "the lamp room"); going inside or out, into another room or to another spot is a move. For the rest, give only what the latest exchange changed or first made clear: "weather" null, "outfits" and "goals" empty, when it did not. "weather": a few words, only as the story shows it. "outfit": what that Character is wearing now (clothes, shoes, jewellery and anything else worn), in one short phrase, when they change, put something on or take something off, or when the story first describes it; never what they hold or carry, where they are or what they do. Read them from the story; never guess.',
+        // The Story's Places (.scratch/places-ahead/spec.md): named exactly, play finds the pictures drawn ahead.
+        ...(placeNames.length > 0
+            ? [`Places rule: when the story is at one of the Story's Places, answer "place" with its name exactly as written here: ${placeNames.map((name) => `"${name}"`).join(', ')}. Any other place, in a few words of your own.`]
+            : []),
         'Goals rule: add "goals": [{"character": "Name", "goal": "..."}] inside "details" for a Character in the latest exchange who has none yet ("none yet" above) once the story so far shows what they want, and for any Character the latest exchange gave a new aim, or saw reach or give up the one they had ("goal": ""). "goal": what that Character is after now, in one short phrase from their side ("get the ledger to Kessel unseen", "win back Nara\'s trust"), drawn from what the story shows they want and from who they are. Most characters in a story want something: when one in the latest exchange still has none, give theirs now. Only for the Characters listed above, never for the user\'s own character; leave the rest out.',
     ].join('\n');
 }

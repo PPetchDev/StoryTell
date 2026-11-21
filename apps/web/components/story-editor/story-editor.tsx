@@ -71,6 +71,7 @@ import { expressionEndpoints } from '@/lib/expression-endpoints';
 import { OpeningPreview } from './opening-preview';
 import { fieldDomId, FieldRewrites, rewritableField, rewriteKey, RewriteStates } from './rewrite';
 import { LoreCard } from './lore-card';
+import { PlacesCard } from './places-card';
 import { EDITOR_CARD, FoldingCard, isCardFolded, NOTE, openAdded, openCard } from './folding-card';
 import { SavedReplyList } from '@/components/saved-replies/saved-reply-list';
 import { storySavedReplies } from '@/lib/saved-replies';
@@ -858,6 +859,7 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                         onChange={setBackdrop}
                                     />
                                 </section>
+                                <PlacesCard storyId={storyId} loreNames={story.lore.map((entry) => entry.name)} />
                                 <FoldingCard foldKey={`saved-replies:${storyId}`} label="Saved replies" title="Saved replies" fieldPrefixes={[]}>
                                     <p className={NOTE}>
                                         Lines for this Story only, listed first in the composer&apos;s Saved replies tray. {'{user}'} becomes the

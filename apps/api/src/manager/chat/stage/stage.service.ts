@@ -147,6 +147,11 @@ export class StageManagerService implements OnApplicationBootstrap {
     }
 
     /** Queues what the Chat's stage needs now. Never rejects; does nothing with the switch off. */
+    /** The Story's Place names, for the Judge to answer with (.scratch/places-ahead/spec.md). */
+    async placeNames(storyId: number): Promise<string[]> {
+        return (await this.stage.placesOf(storyId)).map((place) => place.name);
+    }
+
     dress(storyId: number, chatId: number): void {
         const previous = this.chains.get(chatId) ?? Promise.resolve();
         const next = previous

@@ -31,7 +31,7 @@ import { MemoryEntity } from '../../model/memory/entities/memory.entity.js';
 import { SettingsEntity } from '../../model/settings/entities/settings.entity.js';
 import { CharacterExpressionEntity } from '../../model/story/entities/character-expression.entity.js';
 import { ReferenceCutoutEntity } from '../../model/story/entities/reference-cutout.entity.js';
-import { OutfitSpriteEntity, PlacePictureEntity } from '../../model/stage/stage.entities.js';
+import { OutfitSpriteEntity, PlacePictureEntity, StoryPlaceEntity } from '../../model/stage/stage.entities.js';
 import { CharacterSecretEntity } from '../../model/story/entities/character-secret.entity.js';
 import { SecretRevealEntity } from '../../model/ledger/entities/secret-reveal.entity.js';
 import { CharacterEntity } from '../../model/story/entities/character.entity.js';
@@ -61,6 +61,7 @@ export const entities = [
     IdentityExpressionEntity,
     ReferenceCutoutEntity,
     PlacePictureEntity,
+    StoryPlaceEntity,
     OutfitSpriteEntity,
     CharacterSecretEntity,
     SecretRevealEntity,

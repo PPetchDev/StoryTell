@@ -29,7 +29,7 @@ const CUTOUT_PRICE_USD = 0.01;
 let drawPrice: Promise<number | null> | undefined;
 
 /** What one drawing costs: the Settings Snapshot model's 1K price, read once per page load. */
-function loadDrawPrice(): Promise<number | null> {
+export function loadDrawPrice(): Promise<number | null> {
     drawPrice ??= apiFetch<SettingsResponse>('/settings').then(
         ({ settings, imageModels }) =>
             imageModels.find((model) => model.id === settings.imageModel)?.sizes.find((size) => size.size === '1K')?.priceUsd ?? null,
@@ -41,7 +41,7 @@ function loadDrawPrice(): Promise<number | null> {
     return drawPrice;
 }
 
-function useDrawPrice(): number | null {
+export function useDrawPrice(): number | null {
     const [price, setPrice] = useState<number | null>(null);
     useEffect(() => {
         let live = true;

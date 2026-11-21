@@ -72,3 +72,34 @@ export class OutfitSpriteEntity {
     @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
     createdAt: Date;
 }
+
+/**
+ * A place the author names and describes ahead of play (.scratch/places-ahead/spec.md). Its key is
+ * the place key its `place_picture` rows use, so play finds the pictures drawn ahead.
+ */
+@Entity('story_place')
+@Unique('uq_story_place', ['storyId', 'placeKey'])
+export class StoryPlaceEntity {
+    @PrimaryGeneratedColumn()
+    id: number;
+
+    @Column({ name: 'story_id', type: 'integer' })
+    storyId: number;
+
+    @Column({ type: 'text' })
+    name: string;
+
+    /** `stageKey(name)`. */
+    @Column({ name: 'place_key', type: 'text' })
+    placeKey: string;
+
+    /** How it looks, in a few words; empty draws it from its name alone. */
+    @Column({ type: 'text', default: '' })
+    looks: string;
+
+    @Column({ type: 'integer' })
+    position: number;
+
+    @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+    createdAt: Date;
+}

@@ -243,3 +243,31 @@ export class InvalidRoleSectionsError extends AppError {
         super('422.003.042', reason);
     }
 }
+
+/** No Place with that id in this Story (.scratch/places-ahead/spec.md). */
+export class PlaceNotFoundError extends AppError {
+    constructor() {
+        super('404.003.160', 'Place not found in this Story.');
+    }
+}
+
+/** A Place that breaks a rule (.scratch/places-ahead/spec.md): no name, too long, a name the Story has, or too many. */
+export class InvalidPlaceError extends AppError {
+    constructor(reason: string) {
+        super('422.003.161', reason);
+    }
+}
+
+/** That Place's picture in that light is being drawn now (.scratch/places-ahead/spec.md). */
+export class PlaceBeingDrawnError extends AppError {
+    constructor() {
+        super('409.003.162', 'That picture is being drawn already.');
+    }
+}
+
+/** Evening or night asked before day: they are edits of the day picture (.scratch/places-ahead/spec.md). */
+export class NoDayPlacePictureError extends AppError {
+    constructor() {
+        super('409.003.163', 'Draw the day picture first: evening and night are drawn from it.');
+    }
+}
