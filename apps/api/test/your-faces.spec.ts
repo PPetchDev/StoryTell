@@ -230,7 +230,7 @@ describe('Your faces', () => {
     });
 
     describe('Annoyed and Thinking (.scratch/more-faces/spec.md)', () => {
-        it('the Role and a Persona have them, listed after the everyday faces; a Character does not', async () => {
+        it('the Role, a Persona and a Character have them, listed after the first everyday faces', async () => {
             const story = await storyWithRole();
             await t.http.put(`/api/stories/${story.id}/role/expressions/thinking`).attach('image', png('hm'), 'hm.png').expect(200);
             await t.http.put(`/api/stories/${story.id}/role/expressions/teasing`).attach('image', png('sly'), 'sly.png').expect(200);
@@ -244,8 +244,10 @@ describe('Your faces', () => {
             const uploaded = (await t.http.put(`/api/personas/${persona.id}/expressions/annoyed`).attach('image', png('mine'), 'mine.png').expect(200)).body as Persona;
             expect(uploaded.expressions.map((one) => one.emotion)).toEqual(['annoyed']);
 
-            const character = (await t.http.post(`/api/stories/${story.id}/characters`).send({ name: 'Mira', appearance: 'Tall.', personality: 'Warm.', voice: 'Quick.' }).expect(201)).body as { id: number };
-            await t.http.put(`/api/stories/${story.id}/characters/${character.id}/expressions/annoyed`).attach('image', png('mira'), 'mira.png').expect(400);
+            await t.http.post(`/api/stories/${story.id}/characters`).send({ name: 'Mira', appearance: 'Tall.', personality: 'Warm.', voice: 'Quick.' }).expect(201);
+            const [mira] = ((await t.http.get(`/api/stories/${story.id}`).expect(200)).body as { characters: Array<{ id: number }> }).characters;
+            const withMira = (await t.http.put(`/api/stories/${story.id}/characters/${mira.id}/expressions/annoyed`).attach('image', png('mira'), 'mira.png').expect(200)).body as { characters: Array<{ expressions: Expression[] }> };
+            expect(withMira.characters[0].expressions.map((one) => one.emotion)).toEqual(['annoyed']);
         });
 
         it('a Message can be sent with one, the Narrator is told it, and the Judge can guess one', async () => {

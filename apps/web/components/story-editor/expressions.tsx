@@ -8,7 +8,7 @@ import { PortraitImage } from '@/components/portrait/portrait-image';
 import { ApiError, apiFetch, ApiUnreachableError } from '@/lib/api';
 import { ExpressionEndpoints, expressionEndpoints } from '@/lib/expression-endpoints';
 import { preparedForUpload } from '@/lib/cover';
-import { EMOTION_LABEL, EVERYDAY_EMOTIONS, Expression, ExpressionDrawing, EXPRESSION_EMOTIONS, FACE_EMOTIONS, FaceEmotion, INTIMATE_EMOTIONS, YOUR_EVERYDAY_EMOTIONS } from '@/lib/expressions';
+import { EMOTION_LABEL, EVERYDAY_EMOTIONS, Expression, ExpressionDrawing, EXPRESSION_EMOTIONS, FaceEmotion, INTIMATE_EMOTIONS } from '@/lib/expressions';
 import { Character, PortraitCrop, referenceImageUrl, Story, storyApi } from '@/lib/story';
 import { SettingsResponse, usd } from '@/lib/types';
 import { ConfirmButton, FIELD_HINT } from './fields';
@@ -108,8 +108,6 @@ export interface ExpressionOwner {
     squareName: string;
     /** What a feeling without an Expression shows. */
     plainName: string;
-    /** The Role or a Persona: your faces add Annoyed and Thinking (.scratch/more-faces/spec.md). */
-    yours?: boolean;
 }
 
 interface ExpressionSetProps<T> {
@@ -140,8 +138,7 @@ export function ExpressionSet<T>({ owner, api, commit, flush, onDrawn, reload }:
     const [run, setRun] = useState<ExpressionDrawing | null>(null);
     const [drawAllError, setDrawAllError] = useState<string | null>(null);
     const canDraw = owner.picturePath !== null;
-    const all = owner.yours ? FACE_EMOTIONS : EXPRESSION_EMOTIONS;
-    const everyday = owner.yours ? YOUR_EVERYDAY_EMOTIONS : EVERYDAY_EMOTIONS;
+    const all = EXPRESSION_EMOTIONS;
     // Draw all draws only what has no picture or an outdated one; with all of them there it redraws them.
     const missing = all.filter((emotion) => byEmotion.get(emotion)?.outdated !== false);
     const redraw = missing.length === 0;
@@ -275,12 +272,12 @@ export function ExpressionSet<T>({ owner, api, commit, flush, onDrawn, reload }:
                 </p>
             )}
             {/* Dense, so an open feeling's actions take a whole row under it and the tiles after it close the gap. */}
-            <ul className={`m-0 mt-2 grid list-none grid-flow-row-dense grid-cols-4 gap-2 p-0 ${owner.yours ? 'sm:grid-cols-9' : 'sm:grid-cols-7'}`} aria-label="Everyday feelings">
-                {tiles(everyday)}
+            <ul className="m-0 mt-2 grid list-none grid-flow-row-dense grid-cols-4 gap-2 p-0 sm:grid-cols-8" aria-label="Everyday feelings">
+                {tiles(EVERYDAY_EMOTIONS)}
             </ul>
             <h3 className="m-0 mt-4 text-base font-semibold">Intimate scenes (18+)</h3>
             <p className={`${FIELD_HINT} mt-0.5 mb-2`}>Shown only in an intimate moment between adults. Without one, the nearest feeling above shows.</p>
-            <ul className="m-0 grid list-none grid-flow-row-dense grid-cols-4 gap-2 p-0 sm:grid-cols-7" aria-label="Intimate feelings">
+            <ul className="m-0 grid list-none grid-flow-row-dense grid-cols-4 gap-2 p-0 sm:grid-cols-8" aria-label="Intimate feelings">
                 {tiles(INTIMATE_EMOTIONS)}
             </ul>
         </fieldset>

@@ -6,7 +6,7 @@ import { ICON_BUTTON } from '@/components/chat/chat-classes';
 import { FaceIcon } from '@/components/icons';
 import { PortraitImage } from '@/components/portrait/portrait-image';
 import { Sheet } from '@/components/sheet/sheet';
-import { EMOTION_LABEL, Expression, FaceEmotion, INTIMATE_EMOTIONS, YOUR_EVERYDAY_EMOTIONS } from '@/lib/expressions';
+import { EMOTION_LABEL, EVERYDAY_EMOTIONS, Expression, FaceEmotion, INTIMATE_EMOTIONS } from '@/lib/expressions';
 import { referenceImageUrl } from '@/lib/story';
 
 interface FacePickerProps {
@@ -85,11 +85,11 @@ export function FacePicker({ face, onFace, faces, name, disabled = false, onPoin
                         <button type="button" className="button button-quiet justify-self-start" aria-pressed={face === null} onClick={() => choose(null)}>
                             No face
                         </button>
-                        <ul className="m-0 grid list-none grid-cols-4 gap-2 p-0 sm:grid-cols-9" aria-label="Everyday faces">
-                            {YOUR_EVERYDAY_EMOTIONS.map(tile)}
+                        <ul className="m-0 grid list-none grid-cols-4 gap-2 p-0 sm:grid-cols-8" aria-label="Everyday faces">
+                            {EVERYDAY_EMOTIONS.map(tile)}
                         </ul>
                         <h3 className="m-0 text-base font-semibold">Intimate moments (18+)</h3>
-                        <ul className="m-0 grid list-none grid-cols-4 gap-2 p-0 sm:grid-cols-7" aria-label="Intimate faces">
+                        <ul className="m-0 grid list-none grid-cols-4 gap-2 p-0 sm:grid-cols-8" aria-label="Intimate faces">
                             {INTIMATE_EMOTIONS.map(tile)}
                         </ul>
                     </div>

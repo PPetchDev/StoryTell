@@ -235,7 +235,6 @@ function PersonaCard({ persona, autosave, justCreated, onSaved, onDelete, focusA
                     pictureName: 'picture',
                     squareName: "the picture's face square",
                     plainName: 'its picture',
-                    yours: true,
                 }}
                 api={expressionEndpoints<Persona>(`/personas/${persona.id}`)}
                 commit={async (run, onError) => {

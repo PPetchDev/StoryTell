@@ -938,7 +938,6 @@ export function StoryEditor({ initial }: { initial: Story }) {
                                         pictureName: 'Role picture',
                                         squareName: "the Role picture's face square",
                                         plainName: 'the Role picture',
-                                        yours: true,
                                     }}
                                     api={expressionEndpoints<Story>(`/stories/${storyId}/role`)}
                                     commit={(run, onError) => commit(run, applyRoleFaces, onError)}

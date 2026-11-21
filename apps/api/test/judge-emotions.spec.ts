@@ -53,9 +53,18 @@ describe('The judge tags emotions only when the Story has an Expression', () => 
             '"desire": only in an intimate or sexual moment: aroused, wanting, seductive',
             '"embarrassment": shy, embarrassed, ashamed, awkward',
             '"sadness": sad, hurt, grieving, disappointed',
-            '"anger": angry, annoyed, disgusted, contemptuous',
-            '"fear": afraid, nervous, anxious',
-            '"surprise": surprised, shocked, confused, realising',
+            '"anger": angry, furious, disgusted, contemptuous',
+            '"fear": afraid, frightened, panicking',
+            '"surprise": surprised, shocked, realising',
+            // .scratch/more-faces/spec.md
+            '"annoyed": annoyed, irritated, exasperated, unimpressed, sulking',
+            '"thinking": thinking it over, pondering, puzzled, weighing something up, curious',
+            '"smug": smug, sly, self-satisfied, knowing, mischievous, playfully teasing',
+            '"determined": determined, resolute, serious, focused, ready to fight',
+            '"worried": worried, concerned, anxious, uneasy, nervous',
+            '"hurt": in physical pain, wounded, wincing',
+            '"tired": tired, sleepy, exhausted, drained',
+            '"proud": proud, confident, triumphant, pleased with themselves',
         ]) {
             expect(system).toContain(meaning);
         }

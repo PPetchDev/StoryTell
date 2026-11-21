@@ -2,6 +2,7 @@ import { readdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 
 import { ProviderOutageError } from '../src/errors/model-gateway.errors.js';
+import { EXPRESSION_EMOTIONS } from '../src/model/story/emotion.js';
 import { startTestApp, TestApp } from './harness/test-app.js';
 
 interface Expression {
@@ -28,7 +29,7 @@ interface Drawing {
     failed: { code: string; message: string } | null;
 }
 
-const ALL = ['joy', 'love', 'embarrassment', 'sadness', 'anger', 'fear', 'surprise', 'teasing', 'desire', 'flustered', 'longing', 'passion', 'afterglow'];
+const ALL: string[] = [...EXPRESSION_EMOTIONS];
 
 const MIRA = { name: 'Mira', appearance: 'Tall, grey-green eyes, black hair tied back.', personality: 'Guarded.', voice: 'Short.' };
 
@@ -109,7 +110,7 @@ describe('Draw all on the server', () => {
         expect((started as Drawing).emotions).toEqual(ALL.slice(2));
         const done = await finished(story);
         expect(done).toEqual({ running: false, emotions: ALL.slice(2), drawn: ALL.slice(2), current: null, failed: null });
-        expect(t.gateway.imageCalls('expression_image')).toHaveLength(11);
+        expect(t.gateway.imageCalls('expression_image')).toHaveLength(ALL.length - 2);
         const expressions = (await getStory(story.id)).characters[0].expressions;
         expect(expressions.map((one) => one.emotion)).toEqual(ALL);
         expect(expressions[1].imagePath).toBe(love.characters[0].expressions.find((one) => one.emotion === 'love')!.imagePath);
@@ -131,7 +132,7 @@ describe('Draw all on the server', () => {
         expect((await getStory(story.id)).characters[0].expressions.every((one) => !one.outdated)).toBe(true);
     });
 
-    it('with every one there and current, draws nothing unless asked to redraw, then draws all thirteen', async () => {
+    it('with every one there and current, draws nothing unless asked to redraw, then draws them all', async () => {
         const story = await createStory();
         await pickReferenceImage(story, 'mira');
         t.gateway.scriptImage('expression_image', ...ALL.map((emotion) => drawnPicture(emotion)));
@@ -147,7 +148,7 @@ describe('Draw all on the server', () => {
         const { body: redraw } = await t.http.post(drawingPath(story)).send({ redraw: true }).expect(201);
         expect((redraw as Drawing).emotions).toEqual(ALL);
         expect((await finished(story)).drawn).toEqual(ALL);
-        expect(t.gateway.imageCalls('expression_image')).toHaveLength(13);
+        expect(t.gateway.imageCalls('expression_image')).toHaveLength(ALL.length);
     });
 
     it('answers before the drawings finish, and goes on with no one asking', async () => {
@@ -158,13 +159,13 @@ describe('Draw all on the server', () => {
         const { body } = await t.http.post(drawingPath(story)).send({}).expect(201);
 
         expect(body).toMatchObject({ running: true, emotions: ALL, drawn: [] });
-        // Nobody asks about the run: only the saved Story is read until all thirteen are there.
+        // Nobody asks about the run: only the saved Story is read until all of them are there.
         let saved = 0;
-        for (let tries = 0; tries < 300 && saved < 13; tries++) {
+        for (let tries = 0; tries < 300 && saved < ALL.length; tries++) {
             await new Promise((resolve) => setTimeout(resolve, 50));
             saved = (await getStory(story.id)).characters[0].expressions.length;
         }
-        expect(saved).toBe(13);
+        expect(saved).toBe(ALL.length);
         expect(await finished(story)).toMatchObject({ running: false, drawn: ALL, failed: null });
     });
 
@@ -178,7 +179,7 @@ describe('Draw all on the server', () => {
 
         expect(again).toMatchObject({ running: true, emotions: ALL });
         await finished(story);
-        expect(t.gateway.imageCalls('expression_image')).toHaveLength(13);
+        expect(t.gateway.imageCalls('expression_image')).toHaveLength(ALL.length);
     });
 
     it('stops at the first failure, keeps what was drawn, and says why', async () => {

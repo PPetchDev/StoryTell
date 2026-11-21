@@ -15,9 +15,15 @@ export const EXPRESSION_LOOKS: Record<FaceEmotion, string> = {
     anger: 'brows drawn hard together, eyes narrowed in a glare, jaw clenched; arms folded firmly across the chest',
     fear: 'eyes wide with fear, brows raised and pinched together, lips parted; both hands raised close to the chest with the fingers curled, shoulders lifted a little',
     surprise: 'eyes wide open, brows raised high, mouth open in a small gasp; one hand raised to cover the mouth',
-    // Your faces only (.scratch/more-faces/spec.md).
+    // .scratch/more-faces/spec.md
     annoyed: 'an unimpressed, irritated look, brows lowered, eyes half-lidded, lips pressed flat in a small pout; both hands on the hips',
     thinking: 'a thoughtful look, eyes turned up and to one side, lips pursed a little; one hand under the chin, the other arm folded across the waist supporting the elbow',
+    smug: 'a smug, knowing half-smile with one corner of the mouth raised, eyes narrowed with amusement, chin tilted up; arms folded loosely across the chest',
+    determined: 'a determined, resolute look, brows set low and firm, eyes focused straight ahead, mouth set in a firm line; one hand clenched into a fist in front of the chest',
+    worried: 'a worried look, brows drawn up and together, eyes uneasy, lips pressed together; both hands clasped tightly together in front of the chest',
+    hurt: 'wincing in pain, eyes squeezed half shut, teeth gritted; one hand pressed to the side of the ribs',
+    tired: 'a tired, sleepy look, heavy drooping eyelids, a small yawn; one hand raised to rub one eye',
+    proud: 'a proud, confident smile, chin raised, eyes bright; one hand on the hip and the other resting flat on the chest',
     teasing: 'a sly half-smile, eyes narrowed playfully, one eyebrow raised; one fingertip resting on the lower lip, head tilted slightly',
     desire: 'heavy-lidded eyes looking straight at the viewer, deeply flushed cheeks, lips slightly parted; the fingertips of one hand tracing the collarbone, hips shifted a little to one side',
     flustered: 'flushed bright red, breathing quickly, eyes glancing away; both hands gripping the hem of the clothing, arms drawn in close to the body',

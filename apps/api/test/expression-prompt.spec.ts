@@ -21,7 +21,7 @@ describe('Expression drawing prompt', () => {
 
     it('gives every emotion a description of its own', () => {
         const looks = EXPRESSION_EMOTIONS.map((emotion) => EXPRESSION_LOOKS[emotion]);
-        expect(new Set(looks).size).toBe(13);
+        expect(new Set(looks).size).toBe(EXPRESSION_EMOTIONS.length);
         // Each names one gesture of the arms and hands, after the face.
         for (const look of looks) expect(look).toMatch(/; .*(hand|arms|finger)/);
         // No vague whole-body bending, which drew odd poses.

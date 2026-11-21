@@ -80,9 +80,9 @@ describe('Stage pictures', () => {
 
     const expressionPath = (story: Story, emotion: string) => `/api/stories/${story.id}/characters/${story.characters[0].id}/expressions/${emotion}`;
 
-    it('draws every one of the thirteen emotions, the six intimate ones included', async () => {
+    it('draws every one of the emotions, the six intimate ones included', async () => {
         const story = await pickReferenceImage(await createStory(), 'nara');
-        expect(EXPRESSION_EMOTIONS).toHaveLength(13);
+        expect(EXPRESSION_EMOTIONS).toHaveLength(21);
         for (const emotion of INTIMATE_EMOTIONS) {
             t.gateway.scriptImage('expression_image', { image: { bytes: png(emotion), mimeType: 'image/png' } });
             await t.http.post(`${expressionPath(story, emotion)}/draw`).expect(201);

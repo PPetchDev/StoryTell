@@ -5,26 +5,51 @@ import { type PortraitCrop, referenceImageUrl } from './story';
 /** The feeling a Character's line carries, as the Judge tags it. `neutral` has no picture: the Portrait is the neutral face. */
 export type Emotion = 'neutral' | ExpressionEmotion;
 
-/** The thirteen emotions an Expression can be made for. */
+/** The emotions an Expression can be made for, a Character's or yours. */
 export type ExpressionEmotion = EverydayEmotion | IntimateEmotion;
 
-export type EverydayEmotion = 'joy' | 'love' | 'embarrassment' | 'sadness' | 'anger' | 'fear' | 'surprise';
+/** The last eight are from .scratch/more-faces/spec.md. */
+export type EverydayEmotion =
+    | 'joy'
+    | 'love'
+    | 'embarrassment'
+    | 'sadness'
+    | 'anger'
+    | 'fear'
+    | 'surprise'
+    | 'annoyed'
+    | 'thinking'
+    | 'smug'
+    | 'determined'
+    | 'worried'
+    | 'hurt'
+    | 'tired'
+    | 'proud';
 
 /** The emotions of an intimate scene between adults, in the order such a scene goes (.scratch/stage-pictures/spec.md). */
 export type IntimateEmotion = 'teasing' | 'desire' | 'flustered' | 'longing' | 'passion' | 'afterglow';
 
-export const EVERYDAY_EMOTIONS: readonly EverydayEmotion[] = ['joy', 'love', 'embarrassment', 'sadness', 'anger', 'fear', 'surprise'];
+export const EVERYDAY_EMOTIONS: readonly EverydayEmotion[] = [
+    'joy',
+    'love',
+    'embarrassment',
+    'sadness',
+    'anger',
+    'fear',
+    'surprise',
+    'annoyed',
+    'thinking',
+    'smug',
+    'determined',
+    'worried',
+    'hurt',
+    'tired',
+    'proud',
+];
 export const INTIMATE_EMOTIONS: readonly IntimateEmotion[] = ['teasing', 'desire', 'flustered', 'longing', 'passion', 'afterglow'];
 
-/** Faces only you make: the Role's and a Persona's (.scratch/more-faces/spec.md). */
-export type YourOnlyEmotion = 'annoyed' | 'thinking';
-export const YOUR_ONLY_EMOTIONS: readonly YourOnlyEmotion[] = ['annoyed', 'thinking'];
-
-/** Your faces: the Characters' thirteen and the two only you make. */
-export type FaceEmotion = ExpressionEmotion | YourOnlyEmotion;
-
-/** Your everyday faces, in the order the editor and the face picker list them. */
-export const YOUR_EVERYDAY_EMOTIONS: readonly FaceEmotion[] = [...EVERYDAY_EMOTIONS, ...YOUR_ONLY_EMOTIONS];
+/** Your faces (.scratch/your-faces/spec.md): the same emotions as a Character's. */
+export type FaceEmotion = ExpressionEmotion;
 
 /** How a Character's Draw all run on the server is going (.scratch/expression-drawing/spec.md). */
 export interface ExpressionDrawing {
@@ -40,14 +65,18 @@ export interface ExpressionDrawing {
 /** In the order the editor and the Character profile list them. */
 export const EXPRESSION_EMOTIONS: readonly ExpressionEmotion[] = [...EVERYDAY_EMOTIONS, ...INTIMATE_EMOTIONS];
 
-/** Your faces in the order the editor lists them. */
-export const FACE_EMOTIONS: readonly FaceEmotion[] = [...YOUR_EVERYDAY_EMOTIONS, ...INTIMATE_EMOTIONS];
-
 /**
- * The everyday picture an intimate line shows when the Character has no picture for its emotion,
- * so a Story drawn before these emotions still changes faces in such a scene.
+ * The picture a line shows when the Character has no picture for its emotion, so a Story drawn
+ * before these emotions still changes faces: an intimate one shows the nearest everyday one
+ * (.scratch/stage-pictures/spec.md), a newer everyday one the nearest older one
+ * (.scratch/more-faces/spec.md). Thinking, Determined and Tired have none: the Portrait shows.
  */
-export const EVERYDAY_FALLBACK: Record<IntimateEmotion, EverydayEmotion> = {
+export const EVERYDAY_FALLBACK: Partial<Record<ExpressionEmotion, EverydayEmotion>> = {
+    annoyed: 'anger',
+    smug: 'joy',
+    worried: 'fear',
+    hurt: 'sadness',
+    proud: 'joy',
     teasing: 'joy',
     desire: 'love',
     flustered: 'embarrassment',
@@ -56,7 +85,7 @@ export const EVERYDAY_FALLBACK: Record<IntimateEmotion, EverydayEmotion> = {
     afterglow: 'joy',
 };
 
-export const EMOTION_LABEL: Record<Emotion | YourOnlyEmotion, string> = {
+export const EMOTION_LABEL: Record<Emotion, string> = {
     neutral: 'Neutral',
     joy: 'Happy',
     love: 'Loving',
@@ -67,6 +96,12 @@ export const EMOTION_LABEL: Record<Emotion | YourOnlyEmotion, string> = {
     surprise: 'Surprised',
     annoyed: 'Annoyed',
     thinking: 'Thinking',
+    smug: 'Smug',
+    determined: 'Determined',
+    worried: 'Worried',
+    hurt: 'Hurt',
+    tired: 'Tired',
+    proud: 'Proud',
     teasing: 'Teasing',
     desire: 'Desire',
     flustered: 'Flustered',
@@ -119,7 +154,7 @@ export interface LinePicture {
  * initial. Whole: that Expression's full image, else the whole Reference image, else none. A
  * `neutral` or untagged line has the Portrait: the Portrait is the neutral face.
  */
-export function linePicture(character: PictureSource | null | undefined, emotion: Emotion | YourOnlyEmotion | null | undefined): LinePicture {
+export function linePicture(character: PictureSource | null | undefined, emotion: Emotion | null | undefined): LinePicture {
     if (!character) return { round: { kind: 'initial' }, whole: null, cutout: false };
     const expression = emotion && emotion !== 'neutral' ? expressionFor(character, emotion) : undefined;
     if (expression) {
@@ -144,11 +179,11 @@ export function stageSrc(src: string, small: boolean): string {
     return small ? `${src}${src.includes('?') ? '&' : '?'}w=640` : src;
 }
 
-/** The Expression for an emotion; for an intimate one without its own picture, the nearest everyday one's. */
+/** The Expression for an emotion; for one without its own picture, the nearest everyday one's where there is one. */
 function expressionFor(character: PictureSource, emotion: FaceEmotion): Expression | undefined {
     const own = character.expressions.find((one) => one.emotion === emotion);
-    if (own || !(emotion in EVERYDAY_FALLBACK)) return own;
-    const everyday = EVERYDAY_FALLBACK[emotion as IntimateEmotion];
+    const everyday = EVERYDAY_FALLBACK[emotion];
+    if (own || !everyday) return own;
     return character.expressions.find((one) => one.emotion === everyday);
 }
 
@@ -165,6 +200,6 @@ export function outfitPicture(
     const find = (wanted: string) => sprites.find((sprite) => sprite.emotion === wanted);
     const wanted = emotion && emotion !== 'neutral' ? emotion : null;
     const sprite =
-        (wanted && find(wanted)) || (wanted && wanted in EVERYDAY_FALLBACK ? find(EVERYDAY_FALLBACK[wanted as IntimateEmotion]) : undefined) || find('neutral');
+        (wanted && find(wanted)) || (wanted && EVERYDAY_FALLBACK[wanted] ? find(EVERYDAY_FALLBACK[wanted]!) : undefined) || find('neutral');
     return sprite ? { whole: referenceImageUrl(sprite.imagePath), cutout: sprite.cutOut } : null;
 }

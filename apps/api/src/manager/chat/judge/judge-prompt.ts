@@ -138,9 +138,18 @@ export const EMOTION_MEANINGS: Record<Emotion, string> = {
     love: 'tender, affectionate, warm, fond',
     embarrassment: 'shy, embarrassed, ashamed, awkward',
     sadness: 'sad, hurt, grieving, disappointed',
-    anger: 'angry, annoyed, disgusted, contemptuous',
-    fear: 'afraid, nervous, anxious',
-    surprise: 'surprised, shocked, confused, realising',
+    anger: 'angry, furious, disgusted, contemptuous',
+    fear: 'afraid, frightened, panicking',
+    surprise: 'surprised, shocked, realising',
+    // .scratch/more-faces/spec.md
+    annoyed: 'annoyed, irritated, exasperated, unimpressed, sulking',
+    thinking: 'thinking it over, pondering, puzzled, weighing something up, curious',
+    smug: 'smug, sly, self-satisfied, knowing, mischievous, playfully teasing',
+    determined: 'determined, resolute, serious, focused, ready to fight',
+    worried: 'worried, concerned, anxious, uneasy, nervous',
+    hurt: 'in physical pain, wounded, wincing',
+    tired: 'tired, sleepy, exhausted, drained',
+    proud: 'proud, confident, triumphant, pleased with themselves',
     // An intimate scene between adults (.scratch/stage-pictures/spec.md), in the order such a scene goes.
     teasing: 'only in an intimate or sexual moment: teasing, flirting, playfully seductive',
     desire: 'only in an intimate or sexual moment: aroused, wanting, seductive',
@@ -562,34 +571,11 @@ export interface UserFaceJudgeInput {
 /** The answer is a word or two. */
 export const USER_FACE_EXTRA_TOKENS = 20;
 
-/**
- * The emotions of the user's own line: the Characters' list with the two faces only the user makes
- * (.scratch/more-faces/spec.md) after the everyday ones; mild irritation leaves `anger` for `annoyed`.
- */
-export const USER_FACE_MEANINGS: Record<'neutral' | FaceEmotion, string> = {
-    neutral: EMOTION_MEANINGS.neutral,
-    joy: EMOTION_MEANINGS.joy,
-    love: EMOTION_MEANINGS.love,
-    embarrassment: EMOTION_MEANINGS.embarrassment,
-    sadness: EMOTION_MEANINGS.sadness,
-    anger: 'angry, furious, disgusted, contemptuous',
-    fear: EMOTION_MEANINGS.fear,
-    surprise: 'surprised, shocked, realising',
-    annoyed: 'annoyed, irritated, exasperated, unimpressed, sulking',
-    thinking: 'thinking it over, pondering, puzzled, weighing something up, curious',
-    teasing: EMOTION_MEANINGS.teasing,
-    desire: EMOTION_MEANINGS.desire,
-    flustered: EMOTION_MEANINGS.flustered,
-    longing: EMOTION_MEANINGS.longing,
-    passion: EMOTION_MEANINGS.passion,
-    afterglow: EMOTION_MEANINGS.afterglow,
-};
-
-/** What the Judge is told: the emotion the user's own line shows, from your faces' list. */
+/** What the Judge is told: the emotion the user's own line shows, from the same list as the Characters' lines. */
 export function userFaceSection(identityName: string): string {
     return `# ${identityName}'s face
 Give "user_emotion": the emotion ${identityName} shows in their own line of the latest exchange, one of:
-${Object.entries(USER_FACE_MEANINGS)
+${Object.entries(EMOTION_MEANINGS)
     .map(([emotion, meaning]) => `  - "${emotion}": ${meaning}`)
     .join('\n')}
 When unsure, "neutral".`;

@@ -137,8 +137,8 @@ test('the editor lists the intimate feelings under their own heading; an upload 
     const intimate = expressions.getByRole('list', { name: 'Intimate feelings' });
     await expect(intimate.getByRole('button')).toHaveCount(6);
     await expect(intimate.getByRole('button', { name: 'Desire Expression' })).toBeVisible();
-    // Desire is there, so Draw all draws only the other twelve (.scratch/expression-drawing/spec.md).
-    await expect(expressions.getByRole('button', { name: 'Draw the 12 missing Expressions of Nara' })).toBeVisible();
+    // Desire is there, so Draw all draws only the other twenty (.scratch/expression-drawing/spec.md, .scratch/more-faces/spec.md).
+    await expect(expressions.getByRole('button', { name: 'Draw the 20 missing Expressions of Nara' })).toBeVisible();
 
     // The drawn Desire is cut out: no Cut out button.
     await intimate.getByRole('button', { name: 'Desire Expression' }).click();
@@ -164,18 +164,18 @@ test('the editor lists the intimate feelings under their own heading; an upload 
 // goes on when the page goes away; coming back shows where it is.
 test('Draw all draws the missing ones on the server, and goes on through a reload', async ({ page, request }) => {
     const { storyId } = await storyWithNara(page, request);
-    await request.post(`${FAKE}/image`, { data: { kind: 'expression_image', replies: Array.from({ length: 12 }, () => ({ delayMs: 400 })) } });
+    await request.post(`${FAKE}/image`, { data: { kind: 'expression_image', replies: Array.from({ length: 20 }, () => ({ delayMs: 250 })) } });
     await page.goto(`/stories/${storyId}?tab=characters`);
     let expressions = (await openCard(page, 'Character 1')).getByRole('group', { name: 'Expressions' });
 
-    await expressions.getByRole('button', { name: 'Draw the 12 missing Expressions of Nara' }).click();
-    await expressions.getByRole('button', { name: /^Draw the 12 missing(?! Expressions)/ }).click();
-    await expect(expressions.getByRole('status').filter({ hasText: 'of 12. It goes on if you leave this page.' })).toBeVisible();
+    await expressions.getByRole('button', { name: 'Draw the 20 missing Expressions of Nara' }).click();
+    await expressions.getByRole('button', { name: /^Draw the 20 missing(?! Expressions)/ }).click();
+    await expect(expressions.getByRole('status').filter({ hasText: 'of 20. It goes on if you leave this page.' })).toBeVisible();
 
     await page.reload();
     expressions = (await openCard(page, 'Character 1')).getByRole('group', { name: 'Expressions' });
-    await expect(expressions.getByRole('button', { name: 'Redraw all 13 Expressions of Nara' })).toBeVisible({ timeout: 30_000 });
+    await expect(expressions.getByRole('button', { name: 'Redraw all 21 Expressions of Nara' })).toBeVisible({ timeout: 30_000 });
     await expect(expressions.getByRole('button', { name: /none yet/ })).toHaveCount(0);
     const nara = (await (await request.get(`/api/stories/${storyId}`)).json()).characters[0];
-    expect(nara.expressions).toHaveLength(13);
+    expect(nara.expressions).toHaveLength(21);
 });
