@@ -174,6 +174,33 @@ describe('Places drawn ahead (HTTP)', () => {
         expect(chat.stage.placePicturePath).toBe(drawn.places[0].pictures.day!.imagePath);
     });
 
+    it('with Dress the stage off, a Chat still shows a Place drawn ahead, with no outfits, and draws nothing', async () => {
+        const storyId = await createStory();
+        const { places: [house] } = (await t.http.post(places(storyId)).send({ name: "Rin's tree-house" }).expect(201)).body as Places;
+        t.gateway.scriptImage('place_picture', picture('house-day'));
+        const drawn = (await t.http.post(`${places(storyId)}/${house.id}/draw`).send({ light: 'day' }).expect(201)).body as Places;
+        t.gateway.reset();
+        const chatId = (await t.http.post(`/api/stories/${storyId}/chats`).expect(201)).body.id as number;
+        // Before the story is anywhere with a picture: no stage.
+        expect((await t.http.get(`/api/stories/${storyId}/chats/${chatId}`).expect(200)).body.stage).toBeNull();
+
+        t.gateway.scriptText('turn', { text: '@Nara: You came back.', model: 'glm-5.3' });
+        t.gateway.scriptText('judge', JSON.stringify({ bond_changes: [], arc_steps: [], scene: { move_on: false, reason: 'not yet' }, details: { place: "Rin's tree-house", outfits: [{ character: 'Nara', outfit: 'a silk robe' }] } }));
+        t.gateway.scriptText('memory_extraction', NO_OPS);
+        await t.http.post(`/api/stories/${storyId}/chats/${chatId}/messages`).send({ text: 'Hello.' }).expect(201);
+        for (let tries = 0; tries < 250; tries++) {
+            const chat = (await t.http.get(`/api/stories/${storyId}/chats/${chatId}`).expect(200)).body;
+            if (chat.messages.at(-1).judge?.status !== 'pending') break;
+            await new Promise((resolve) => setTimeout(resolve, 20));
+        }
+        await stage.idle(chatId);
+
+        const chat = (await t.http.get(`/api/stories/${storyId}/chats/${chatId}`).expect(200)).body;
+        expect(chat.dressStage).toBe(false);
+        expect(chat.stage).toMatchObject({ placePicturePath: drawn.places[0].pictures.day!.imagePath, outfits: [], outfitChanges: [], drawing: 0 });
+        expect(t.gateway.imageCalls()).toEqual([]);
+    });
+
     it('lists a place met in play, and Remove takes its pictures and files; removing a Place takes its own', async () => {
         const storyId = await createStory();
         const { places: [house] } = (await t.http.post(places(storyId)).send({ name: 'The hut' }).expect(201)).body as Places;

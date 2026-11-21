@@ -311,7 +311,11 @@ export interface ChatStage {
     drawing: number;
 }
 
-/** Reads what the Chat's stage shows now; null with the switch off. */
+/**
+ * Reads what the Chat's stage shows now. With the switch off it still answers the place pictures
+ * already drawn (drawn ahead, or by another Chat), with no outfits, so the Place backdrop and the
+ * novel view show them; null when none of its places has one (.scratch/places-ahead/spec.md).
+ */
 export async function chatStage(
     stage: StageModelService,
     story: StoryEntity,
@@ -319,7 +323,7 @@ export async function chatStage(
     details: { place: string | null; outfits: { characterId: number; outfit: string }[] },
     records: readonly { kind: string; characterId: number | null; value: string; messageId: number | null }[] = [],
 ): Promise<ChatStage | null> {
-    if (!chat.dressStage) return null;
+    const dressed = chat.dressStage;
     let placePicturePath: string | null = null;
     if (details.place) {
         const key = stageKey(details.place);
@@ -327,7 +331,7 @@ export async function chatStage(
     }
     const outfits: ChatStage['outfits'] = [];
     const appearance = new Map(story.characters.map((character) => [character.id, character.appearance]));
-    for (const { characterId, outfit } of details.outfits) {
+    for (const { characterId, outfit } of dressed ? details.outfits : []) {
         const worn = wornOnly(outfit);
         if (worn === '' || isUsualOutfit(worn, appearance.get(characterId) ?? '')) continue;
         const sprites: OutfitSpriteEntity[] = await stage.readySprites(chat.id, characterId, sameOutfitKey(worn, await stage.outfitKeys(chat.id, characterId)));
@@ -350,7 +354,7 @@ export async function chatStage(
                 placePaths.set(key, (await stage.readyPlace(story.id, key, lightOf(chat.timeOfDay))) ?? (await stage.readyPlaces(story.id, key))[0]?.imagePath ?? null);
             }
             places.push({ messageId: record.messageId, imagePath: placePaths.get(key)! });
-        } else if (record.kind === 'outfit' && record.characterId !== null) {
+        } else if (dressed && record.kind === 'outfit' && record.characterId !== null) {
             const worn = wornOnly(record.value);
             // Held things and poses alone say nothing about clothes: the outfit before stands.
             if (worn === '') continue;
@@ -365,6 +369,11 @@ export async function chatStage(
             }
             outfitChanges.push({ messageId: record.messageId, characterId: record.characterId, usual, sprites });
         }
+    }
+    if (!dressed) {
+        return placePicturePath === null && places.every((place) => place.imagePath === null)
+            ? null
+            : { placePicturePath, outfits: [], places, outfitChanges: [], drawing: 0 };
     }
     return { placePicturePath, outfits, places, outfitChanges, drawing: await stage.drawingFor(story.id, chat.id) };
 }

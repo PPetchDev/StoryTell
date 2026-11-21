@@ -78,3 +78,9 @@ The author usually knows the main places before play: the home base, the capital
 - Drawing outfits ahead.
 - Suggesting Places from the Setting with AI; it could come later.
 - Weather in the place picture.
+
+## Fix after the first live drawing (2026-11-21)
+
+- Rin's tree-house was drawn ahead on live, in all three lights, for $0.18: $0.06 a picture, the same for the evening and night edits as for day.
+- The Story's backdrop was then set to Place, but Chat 1 still showed the Cover. A Chat answered its stage, and with it the place picture, only with Dress the stage on.
+- Now a Chat with the switch off answers the place pictures already drawn, with no outfits and nothing drawn, so the Place backdrop and the novel view show them. With none drawn for its places, it answers no stage, as before.
