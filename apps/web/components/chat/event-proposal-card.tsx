@@ -35,7 +35,7 @@ interface EventProposalCardProps {
 export function EventProposalCard({ proposal, busy, onStart, onDecline }: EventProposalCardProps) {
     return (
         <section
-            className={`-mx-2 shrink-0 border-b border-line bg-surface px-2 py-2 [@media(max-height:560px)]:py-1 ${COLUMN} ${SHORTEST_HIDDEN}`}
+            className={`-mx-2 shrink-0 border-b border-line bg-surface px-2 py-2 max-lg:-mx-4 max-lg:px-4 [@media(max-height:560px)]:py-1 ${COLUMN} ${SHORTEST_HIDDEN}`}
             aria-label="Proposed event"
             data-event-proposal={proposal.id}
         >

@@ -39,7 +39,7 @@ interface Run extends ExpressionDrawing {
     target: FaceTarget;
 }
 
-const IDLE: ExpressionDrawing = { running: false, emotions: [], drawn: [], current: null, failed: null };
+const IDLE: ExpressionDrawing = { running: false, emotions: [], drawn: [], current: null, failed: null, stopped: false };
 const UNEXPECTED = '500.000.000';
 const token = () => randomBytes(6).toString('hex');
 
@@ -127,7 +127,7 @@ export class YourFaceManagerService {
             this.runs.delete(owner.key);
             return { ...IDLE };
         }
-        const run: Run = { target, running: true, emotions, drawn: [], current: null, failed: null };
+        const run: Run = { target, running: true, emotions, drawn: [], current: null, failed: null, stopped: false };
         this.runs.set(owner.key, run);
         void this.drawAll(run, owner.key);
         return view(run);
@@ -140,9 +140,19 @@ export class YourFaceManagerService {
         return run ? view(run) : { ...IDLE };
     }
 
+    /** Asks the owner's running run to stop after the drawing under way (docs/ui-audit-2026-11-21.md, M4). */
+    async stopDrawing(target: FaceTarget): Promise<ExpressionDrawing> {
+        const owner = await this.find(target);
+        const run = this.runs.get(owner.key);
+        if (!run) return { ...IDLE };
+        if (run.running) run.stopped = true;
+        return view(run);
+    }
+
     private async drawAll(run: Run, key: string): Promise<void> {
         try {
             for (const emotion of run.emotions) {
+                if (run.stopped) break;
                 run.current = emotion;
                 await this.draw(run.target, emotion);
                 run.drawn.push(emotion);
@@ -251,7 +261,7 @@ export class YourFaceManagerService {
     }
 }
 
-function view({ running, emotions, drawn, current, failed }: Run): ExpressionDrawing {
-    return { running, emotions: [...emotions], drawn: [...drawn], current, failed };
+function view({ running, emotions, drawn, current, failed, stopped }: Run): ExpressionDrawing {
+    return { running, emotions: [...emotions], drawn: [...drawn], current, failed, stopped };
 }
 

@@ -4,6 +4,7 @@ import { ChangeEvent, useEffect, useRef, useState } from 'react';
 
 import { announce } from '@/components/announcer';
 import { useConnection } from '@/components/connection';
+import { EMOTION_GRID, TILE_LABEL, tileLabel } from '@/components/portrait/emotion-tiles';
 import { PortraitImage } from '@/components/portrait/portrait-image';
 import { ApiError, apiFetch, ApiUnreachableError } from '@/lib/api';
 import { ExpressionEndpoints, expressionEndpoints } from '@/lib/expression-endpoints';
@@ -136,7 +137,14 @@ export function ExpressionSet<T>({ owner, api, commit, flush, onDrawn, reload }:
     const { reportUnreachable } = useConnection();
     /** The Draw all run on the server, while one is going (.scratch/expression-drawing/spec.md). */
     const [run, setRun] = useState<ExpressionDrawing | null>(null);
+    /** The run as last shown, for an answer that lands after a check already ended it. */
+    const runRef = useRef(run);
+    runRef.current = run;
+    /** Stop was asked of this run: a check sent before it must not bring Stop back. */
+    const stopAsked = useRef(false);
     const [drawAllError, setDrawAllError] = useState<string | null>(null);
+    /** How a run the user stopped ended: news, not an error. */
+    const [drawAllNote, setDrawAllNote] = useState<string | null>(null);
     const canDraw = owner.picturePath !== null;
     const all = EXPRESSION_EMOTIONS;
     // Draw all draws only what has no picture or an outdated one; with all of them there it redraws them.
@@ -148,13 +156,20 @@ export function ExpressionSet<T>({ owner, api, commit, flush, onDrawn, reload }:
     const allLabel =
         redraw ? `Redraw all ${toDraw}` : toDraw === all.length ? `Draw all ${toDraw}` : `Draw the ${toDraw} missing`;
     const drawingAll = run?.running
-        ? `Drawing ${run.current ? EMOTION_LABEL[run.current] : '…'}, ${Math.min(run.drawn.length + 1, run.emotions.length)} of ${run.emotions.length}. It goes on if you leave this page.`
+        ? run.stopped
+            ? `Stopping after ${run.current ? EMOTION_LABEL[run.current] : 'this one'}…`
+            : `Drawing ${run.current ? EMOTION_LABEL[run.current] : '…'}, ${Math.min(run.drawn.length + 1, run.emotions.length)} of ${run.emotions.length}. It goes on if you leave this page.`
         : null;
 
     /** A run that ended: take in its last pictures and say how it went. */
     const ended = (last: ExpressionDrawing) => {
         setRun(null);
-        if (last.failed === null) announce(`Drew ${last.drawn.length} Expressions.`);
+        // Stop that landed on the last drawing stopped nothing: the run drew them all.
+        if (last.stopped && last.failed === null && last.drawn.length < last.emotions.length) {
+            setDrawAllNote(`Stopped after ${last.drawn.length} of ${last.emotions.length}. Draw again to draw the rest.`);
+            announce(`Stopped after ${last.drawn.length} of ${last.emotions.length}.`);
+        }
+        else if (last.failed === null) announce(`Drew ${last.drawn.length} Expressions.`);
         else if (last.failed.code === OUT_OF_IMAGE_CREDIT) setDrawAllError('Out of image credit, so the rest were not drawn. Play is unaffected.');
         else setDrawAllError(`Stopped: ${last.failed.message}`);
     };
@@ -188,7 +203,7 @@ export function ExpressionSet<T>({ owner, api, commit, flush, onDrawn, reload }:
                     if (live) onDrawn(answer);
                 }
                 if (!live) return;
-                if (state.running) setRun(state);
+                if (state.running) setRun(stopAsked.current ? { ...state, stopped: true } : state);
                 else ended(state);
             } catch {
                 // Offline for a moment: the run goes on on the server; the next check catches up.
@@ -202,9 +217,32 @@ export function ExpressionSet<T>({ owner, api, commit, flush, onDrawn, reload }:
         // eslint-disable-next-line react-hooks/exhaustive-deps -- follows the run, not each render's callbacks
     }, [running, owner.key]);
 
+    /** Stop (docs/ui-audit-2026-11-21.md, M4): the drawing under way finishes, being paid for already; none of the rest starts. */
+    const stopAll = async () => {
+        stopAsked.current = true;
+        setRun((current) => (current ? { ...current, stopped: true } : current));
+        try {
+            const state = await api.stopDrawing();
+            // A check ended it meanwhile: it has taken in the pictures and said so.
+            if (!runRef.current) return;
+            if (state.running) setRun(state);
+            else {
+                // It ended before the next check: take in its last pictures, which only a check would.
+                const answer = await reload();
+                onDrawn(answer);
+                ended(state);
+            }
+        } catch (caught) {
+            if (caught instanceof ApiUnreachableError) reportUnreachable();
+            else setDrawAllError(`Not stopped: ${caught instanceof Error ? caught.message : 'Something went wrong.'}`);
+        }
+    };
+
     /** Starts the run on the server: it draws one after another by itself and stops at the first failure. */
     const drawAll = async () => {
         setDrawAllError(null);
+        setDrawAllNote(null);
+        stopAsked.current = false;
         try {
             await flush();
             const state = await api.startDrawing(redraw);
@@ -264,20 +302,26 @@ export function ExpressionSet<T>({ owner, api, commit, flush, onDrawn, reload }:
                             {drawingAll}
                         </span>
                     )}
+                    {run?.running && !run.stopped && (
+                        <button type="button" className="button button-quiet" aria-label={`Stop drawing the Expressions of ${heading}`} onClick={() => void stopAll()}>
+                            Stop
+                        </button>
+                    )}
                 </div>
             )}
+            {drawAllNote && <p className={`${FIELD_HINT} mt-0 mb-2`}>{drawAllNote}</p>}
             {drawAllError && (
                 <p className="field-error m-0 mb-2" role="alert">
                     {drawAllError}
                 </p>
             )}
             {/* Dense, so an open feeling's actions take a whole row under it and the tiles after it close the gap. */}
-            <ul className="m-0 mt-2 grid list-none grid-flow-row-dense grid-cols-4 gap-2 p-0 sm:grid-cols-8" aria-label="Everyday feelings">
+            <ul className={`m-0 mt-2 grid list-none grid-flow-row-dense gap-2 p-0 ${EMOTION_GRID}`} aria-label="Everyday feelings">
                 {tiles(EVERYDAY_EMOTIONS)}
             </ul>
             <h3 className="m-0 mt-4 text-base font-semibold">Intimate scenes (18+)</h3>
             <p className={`${FIELD_HINT} mt-0.5 mb-2`}>Shown only in an intimate moment between adults. Without one, the nearest feeling above shows.</p>
-            <ul className="m-0 grid list-none grid-flow-row-dense grid-cols-4 gap-2 p-0 sm:grid-cols-8" aria-label="Intimate feelings">
+            <ul className={`m-0 grid list-none grid-flow-row-dense gap-2 p-0 ${EMOTION_GRID}`} aria-label="Intimate feelings">
                 {tiles(INTIMATE_EMOTIONS)}
             </ul>
         </fieldset>
@@ -310,9 +354,10 @@ function ExpressionRow<T>({ owner, api, heading, emotion, expression, price, com
     const undo = useUndo();
     const label = EMOTION_LABEL[emotion];
     // A status mounted with its words is often not read: say each write as it starts too (audit H12).
+    // Only its own writes: while Draw all runs, the run's one status says how it goes (docs/ui-audit-2026-11-21.md, H1).
     useEffect(() => {
-        if (busy) announce(`${label}: ${busy}`);
-    }, [busy, label]);
+        if (ownBusy) announce(`${label}: ${ownBusy}`);
+    }, [ownBusy, label]);
     const src = expression ? referenceImageUrl(expression.imagePath) : null;
     const canDraw = owner.picturePath !== null;
     const drawLabel = price === null ? 'Draw' : `Draw · ${usd(price)}`;
@@ -380,7 +425,8 @@ function ExpressionRow<T>({ owner, api, heading, emotion, expression, price, com
     };
 
     // A write that runs or failed keeps its actions in view, so its status and error stay readable.
-    const shown = open || busy !== null || error !== null;
+    // Draw all's lock alone opens nothing: 21 panels of disabled buttons hid every tile (docs/ui-audit-2026-11-21.md, H1).
+    const shown = open || ownBusy !== null || error !== null;
     const panelId = `expression-${owner.key}-${emotion}`;
 
     return (
@@ -394,17 +440,25 @@ function ExpressionRow<T>({ owner, api, heading, emotion, expression, price, com
                 ].join(' ')}
                 aria-expanded={shown}
                 aria-controls={panelId}
-                aria-label={`${label} Expression${expression ? '' : ', none yet'}`}
+                aria-label={`${label} Expression${expression ? (expression.outdated ? ', drawn from an earlier picture' : '') : ', none yet'}`}
                 onClick={onToggle}
             >
                 {src ? (
-                    <PortraitImage portrait={{ src, crop: expression!.crop ?? owner.defaultCrop }} className="size-12 flex-none" />
+                    <span className="relative flex-none">
+                        <PortraitImage portrait={{ src, crop: expression!.crop ?? owner.defaultCrop }} className="size-12" />
+                        {/* An outdated one says so on its tile, not only in its panel (docs/ui-audit-2026-11-21.md, M5). */}
+                        {expression!.outdated && (
+                            <span className="absolute -right-1 -bottom-1 rounded-full border border-line bg-banner-surface px-1 text-xs leading-4 font-semibold text-text" aria-hidden="true">
+                                old
+                            </span>
+                        )}
+                    </span>
                 ) : (
                     <span className="grid size-12 flex-none place-items-center rounded-full border border-dashed border-faint text-lg text-muted" aria-hidden="true">
                         +
                     </span>
                 )}
-                <span className="max-w-full truncate">{busy ? '…' : label}</span>
+                <span className={TILE_LABEL}>{ownBusy ? '…' : tileLabel(emotion)}</span>
             </button>
         </li>
         <li id={panelId} hidden={!shown} className="col-span-full">

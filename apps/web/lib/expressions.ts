@@ -60,6 +60,8 @@ export interface ExpressionDrawing {
     current: FaceEmotion | null;
     /** Why it stopped early. */
     failed: { code: string; message: string } | null;
+    /** Stop was asked: it ends after the drawing under way. */
+    stopped: boolean;
 }
 
 /** In the order the editor and the Character profile list them. */

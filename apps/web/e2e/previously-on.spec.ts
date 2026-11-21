@@ -58,6 +58,8 @@ async function expectFits(page: Page, card: Locator, width: number) {
     expect(close.x + close.width).toBeLessThanOrEqual(width + 0.5);
     const text = (await card.locator('[data-recap-text]').boundingBox())!;
     expect(text.x + text.width).toBeLessThanOrEqual(width + 0.5);
+    // Folded, it leaves the thread most of a short screen (docs/ui-audit-2026-11-21.md, H3).
+    expect(box.height).toBeLessThan(740 * 0.3);
 }
 
 test('after six hours away the Chat opens on a recap, which fits the phone, stays dismissed, comes back from the menu, and goes on a send', async ({ page, request }) => {
@@ -72,6 +74,13 @@ test('after six hours away the Chat opens on a recap, which fits the phone, stay
 
         await expectFits(page, card, 360);
         await expectFits(page, card, 320);
+        // Read more opens it whole; Show less folds it again.
+        const more = card.getByRole('button', { name: 'Read more' });
+        await expect(more).toHaveAttribute('aria-expanded', 'false');
+        await more.tap();
+        await expect(card.getByRole('button', { name: 'Show less' })).toHaveAttribute('aria-expanded', 'true');
+        await card.getByRole('button', { name: 'Show less' }).tap();
+        await expect(more).toBeVisible();
         await page.setViewportSize({ width: 390, height: 844 });
 
         // Opening it again in the same gap: the same recap, no new call.

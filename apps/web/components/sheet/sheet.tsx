@@ -175,7 +175,7 @@ function useDragToClose(panel: RefObject<HTMLElement | null>, close: () => void)
 function SheetTop({ title, onClose, drag }: { title?: string; onClose(): void; drag: ReturnType<typeof useDragToClose> }) {
     return (
         <div className="relative flex min-h-10 flex-none touch-none items-center justify-center" {...drag}>
-            {title && <h2 className="absolute top-0 left-0 m-0 text-base leading-11">{title}</h2>}
+            {title && <h2 className="absolute top-0 left-0 m-0 max-w-[calc(100%-3.25rem)] truncate text-base leading-11">{title}</h2>}
             <span className="h-1 w-10 cursor-grab rounded-full bg-field-line" aria-hidden="true" />
             <button
                 type="button"

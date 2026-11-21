@@ -55,9 +55,12 @@ test("the Role tab has the Role's Expressions: an upload fills its tile, and Dra
     const faces = page.getByRole('group', { name: 'Expressions' });
     // The same 21 as a Character's (.scratch/more-faces/spec.md).
     await expect(faces.getByRole('button', { name: /^\w+ Expression, none yet$/ })).toHaveCount(21);
-    await expect(faces.getByRole('list', { name: 'Everyday feelings' }).getByRole('button')).toHaveText([
-        'Happy', 'Loving', 'Embarrassed', 'Sad', 'Angry', 'Scared', 'Surprised', 'Annoyed', 'Thinking', 'Smug', 'Determined', 'Worried', 'Hurt', 'Tired', 'Proud',
-    ].map((label) => new RegExp(label)));
+    // By name: a long label shows a soft hyphen where it may break (docs/ui-audit-2026-11-21.md, H2).
+    const everyday = await faces
+        .getByRole('list', { name: 'Everyday feelings' })
+        .getByRole('button')
+        .evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label')!.split(' Expression')[0]));
+    expect(everyday).toEqual(['Happy', 'Loving', 'Embarrassed', 'Sad', 'Angry', 'Scared', 'Surprised', 'Annoyed', 'Thinking', 'Smug', 'Determined', 'Worried', 'Hurt', 'Tired', 'Proud']);
     await faces.getByRole('button', { name: 'Happy Expression, none yet' }).tap();
     const row = faces.getByRole('group', { name: 'Happy Expression' });
     await expect(row.getByRole('button', { name: /^Draw/ })).toBeVisible();
@@ -120,6 +123,18 @@ test('the face picker sends a face with the Message, shows it beside the line, a
     await expect(sheet.getByRole('button', { name: 'Thinking' })).toBeVisible();
     await expect(sheet.getByRole('button', { name: 'Smug' })).toBeVisible();
     await expect(sheet.getByRole('button', { name: 'Embarrassed' }).locator('img')).toHaveCount(1);
+    // Its own short title, the name in the words under it (docs/ui-audit-2026-11-21.md, M7).
+    await expect(sheet.getByRole('heading', { name: 'Your face' })).toBeVisible();
+    await expect(sheet).toContainText('The face Rin makes as you send this message.');
+    // Every label whole: cut short, "Embarrassed" and "Determined" read "Embarra…" (H2).
+    for (const width of [360, 320]) {
+        await page.setViewportSize({ width, height: 740 });
+        const cut = await page.evaluate(() =>
+            Array.from(document.querySelectorAll('[role="dialog"] li button > span:last-child')).filter((label) => label.scrollWidth > label.clientWidth + 1).map((label) => label.textContent),
+        );
+        expect(cut).toEqual([]);
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
     await sheet.getByRole('button', { name: 'Embarrassed' }).tap();
     await expect(sheet).toHaveCount(0);
     const picker = composer.getByRole('button', { name: 'Your face: Embarrassed. Change it' });

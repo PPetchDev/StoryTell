@@ -16,6 +16,8 @@ export interface ExpressionEndpoints<T> {
     remove(emotion: FaceEmotion): Promise<T>;
     startDrawing(redraw: boolean): Promise<ExpressionDrawing>;
     drawing(): Promise<ExpressionDrawing>;
+    /** Stops a run after the drawing under way (docs/ui-audit-2026-11-21.md, M4). */
+    stopDrawing(): Promise<ExpressionDrawing>;
 }
 
 export function expressionEndpoints<T>(base: string): ExpressionEndpoints<T> {
@@ -33,5 +35,6 @@ export function expressionEndpoints<T>(base: string): ExpressionEndpoints<T> {
         remove: (emotion) => apiSend<T>('DELETE', one(emotion)),
         startDrawing: (redraw) => apiSend<ExpressionDrawing>('POST', `${base}/expression-drawing`, { redraw }),
         drawing: () => apiFetch<ExpressionDrawing>(`${base}/expression-drawing`),
+        stopDrawing: () => apiSend<ExpressionDrawing>('DELETE', `${base}/expression-drawing`),
     };
 }

@@ -33,6 +33,25 @@ export function RecapCard({ storyId, chatId, newestMessageId, openRequest }: Rec
     const [open, setOpen] = useState(false);
     const [phase, setPhase] = useState<Phase>('writing');
     const [recap, setRecap] = useState<RecapEntry | null>(null);
+    /** Folded to three lines until asked: open in full, it left a short phone no room for the story (docs/ui-audit-2026-11-21.md, H3). */
+    const [whole, setWhole] = useState(false);
+    /** Folded, it hides lines: only then is there more to read. */
+    const [cut, setCut] = useState(false);
+    const textRef = useRef<HTMLParagraphElement>(null);
+    // A new recap, or the card shown again, starts folded.
+    useEffect(() => {
+        setWhole(false);
+    }, [recap?.messageId, open]);
+    // Measured on every change of size too: hidden on a short screen it measures nothing, and a turned phone re-wraps it.
+    useEffect(() => {
+        const el = textRef.current;
+        if (!el || whole) return;
+        const measure = () => setCut(el.scrollHeight > el.clientHeight + 1);
+        measure();
+        const resized = new ResizeObserver(measure);
+        resized.observe(el);
+        return () => resized.disconnect();
+    }, [whole, recap, phase, open]);
     const alive = useRef(true);
     const newestRef = useRef(newestMessageId);
     newestRef.current = newestMessageId;
@@ -123,7 +142,7 @@ export function RecapCard({ storyId, chatId, newestMessageId, openRequest }: Rec
 
     return (
         <section
-            className={`-mx-2 shrink-0 border-b border-line bg-surface px-2 py-1.5 ${COLUMN} ${SHORT_HIDDEN}`}
+            className={`-mx-2 shrink-0 border-b border-line bg-surface px-2 py-1.5 max-lg:-mx-4 max-lg:px-4 ${COLUMN} ${SHORT_HIDDEN}`}
             aria-labelledby={`recap-heading-${chatId}`}
             data-recap
         >
@@ -136,9 +155,30 @@ export function RecapCard({ storyId, chatId, newestMessageId, openRequest }: Rec
                 </button>
             </div>
             {phase === 'written' && recap ? (
-                <p className="m-0 max-h-[40vh] overflow-y-auto pb-1 text-sm leading-relaxed whitespace-pre-wrap text-text [overflow-wrap:anywhere]" data-recap-text>
-                    {recap.text}
-                </p>
+                <>
+                    <p
+                        ref={textRef}
+                        id={`recap-text-${chatId}`}
+                        className={[
+                            'm-0 text-sm leading-relaxed whitespace-pre-wrap text-text [overflow-wrap:anywhere]',
+                            whole ? 'max-h-[30vh] overflow-y-auto' : 'line-clamp-3',
+                        ].join(' ')}
+                        data-recap-text
+                    >
+                        {recap.text}
+                    </p>
+                    {(cut || whole) && (
+                    <button
+                        type="button"
+                        className="button button-quiet button-small min-h-11"
+                        aria-expanded={whole}
+                        aria-controls={`recap-text-${chatId}`}
+                        onClick={() => setWhole((was) => !was)}
+                    >
+                        {whole ? 'Show less' : 'Read more'}
+                    </button>
+                    )}
+                </>
             ) : phase === 'writing' ? (
                 <p role="status" className="m-0 pb-1 text-sm text-muted motion-safe:animate-pulse-soft">
                     Writing a recap of where the story stands…

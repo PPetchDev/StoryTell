@@ -20,6 +20,7 @@ import { stageAt } from '@/lib/stage';
 import { firstStepOf, isLive, novelSteps, NovelStep, openingStep, readingStep, stepIndex } from '@/lib/novel-steps';
 import { ChatSnapshots, Snapshot, snapshotImageUrl } from '@/lib/snapshot';
 import type { SpeechItem } from '@/lib/read-aloud';
+import { SCROLL_FADES, useScrollFade } from '@/lib/scroll-fade';
 import { STORY_TEXT_SIZE, useTextSize } from '@/lib/text-size';
 
 /*
@@ -521,7 +522,8 @@ function StepText({ step, cast, epilogue = false }: { step: Exclude<NovelStep, {
             {label}
             <p className="mt-0 mb-1 text-md font-bold" style={{ color: colour }} data-speaker="">
                 {openProfile ? (
-                    <button type="button" className="bare-button cursor-pointer font-bold underline decoration-dotted underline-offset-4 focus-ring" aria-label={`Profile of ${name}`} onClick={openProfile}>
+                    // A 44px hit area round the name: a near miss fell on the stage and moved the story on (docs/ui-audit-2026-11-21.md, H4).
+                    <button type="button" className="bare-button hit-area cursor-pointer font-bold underline decoration-dotted underline-offset-4 focus-ring" aria-label={`Profile of ${name}`} onClick={openProfile}>
                         {name}
                     </button>
                 ) : (
@@ -557,6 +559,9 @@ interface StepToolsProps {
  */
 function StepTools({ step, withRow, newestAi, isLast, blocked, onAgain, onVersion, onSnapshot, onEditInThread }: StepToolsProps) {
     const player = useReadAloud();
+    // The row fades at an end that hides more tools: cut off with no sign, Read aloud and Edit were lost (docs/ui-audit-2026-11-21.md, M1).
+    const toolRow = useRef<HTMLDivElement>(null);
+    const toolFade = useScrollFade(toolRow);
     const messageId = step.kind !== 'user' ? step.messageId : null;
     let read: ReactNode = null;
     if (player && messageId !== null && step.kind !== 'user') {
@@ -592,7 +597,12 @@ function StepTools({ step, withRow, newestAi, isLast, blocked, onAgain, onVersio
     const again = isLast && !isOpening(newestAi) && !blocked;
     return (
         // One row that scrolls sideways (.scratch/novel-reading/spec.md): wrapped, the newest reply's tools took three rows of the box.
-        <div className="flex flex-nowrap items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&>*]:shrink-0 [&::-webkit-scrollbar]:hidden" role="group" aria-label="Message actions">
+        <div
+            ref={toolRow}
+            className={`flex min-w-0 flex-nowrap items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&>*]:shrink-0 [&::-webkit-scrollbar]:hidden ${SCROLL_FADES[toolFade]}`}
+            role="group"
+            aria-label="Message actions"
+        >
             {versions && <VersionSwitch versions={versions} onVersion={(version) => onVersion(newestAi.id, version)} />}
             {again && (
                 <button type="button" className={BOX_TOOL} aria-label="Again" title="Again" onClick={() => onAgain(newestAi.id)}>

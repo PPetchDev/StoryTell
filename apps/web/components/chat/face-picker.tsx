@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { ICON_BUTTON } from '@/components/chat/chat-classes';
 import { FaceIcon } from '@/components/icons';
+import { EMOTION_GRID, TILE_LABEL, tileLabel } from '@/components/portrait/emotion-tiles';
 import { PortraitImage } from '@/components/portrait/portrait-image';
 import { Sheet } from '@/components/sheet/sheet';
 import { EMOTION_LABEL, EVERYDAY_EMOTIONS, Expression, FaceEmotion, INTIMATE_EMOTIONS } from '@/lib/expressions';
@@ -44,6 +45,7 @@ export function FacePicker({ face, onFace, faces, name, disabled = false, onPoin
                         'bare-button flex min-h-11 w-full flex-col items-center gap-1 rounded-lg px-1 py-1.5 text-sm',
                         'press focus-ring aria-pressed:bg-accent-soft aria-pressed:outline-2 aria-pressed:outline-accent',
                     ].join(' ')}
+                    aria-label={EMOTION_LABEL[emotion]}
                     aria-pressed={face === emotion}
                     onClick={() => choose(emotion)}
                 >
@@ -54,7 +56,7 @@ export function FacePicker({ face, onFace, faces, name, disabled = false, onPoin
                             <FaceIcon size={20} />
                         </span>
                     )}
-                    <span className="max-w-full truncate">{EMOTION_LABEL[emotion]}</span>
+                    <span className={TILE_LABEL}>{tileLabel(emotion)}</span>
                 </button>
             </li>
         );
@@ -79,17 +81,18 @@ export function FacePicker({ face, onFace, faces, name, disabled = false, onPoin
                 )}
             </button>
             {open && (
-                <Sheet label="Your face" title={`${name}'s face`} onClose={() => setOpen(false)}>
+                // A short title of its own: a long name ran under the grip and Close (docs/ui-audit-2026-11-21.md, M7).
+                <Sheet label="Your face" title="Your face" onClose={() => setOpen(false)}>
                     <div className="grid grid-cols-[minmax(0,1fr)] gap-3 pb-1">
-                        <p className="m-0 text-sm text-muted">The face you make as you send this message. Everyone there sees it.</p>
+                        <p className="m-0 text-sm text-muted">The face {name} makes as you send this message. Everyone there sees it.</p>
                         <button type="button" className="button button-quiet justify-self-start" aria-pressed={face === null} onClick={() => choose(null)}>
                             No face
                         </button>
-                        <ul className="m-0 grid list-none grid-cols-4 gap-2 p-0 sm:grid-cols-8" aria-label="Everyday faces">
+                        <ul className={`m-0 grid list-none gap-2 p-0 ${EMOTION_GRID}`} aria-label="Everyday faces">
                             {EVERYDAY_EMOTIONS.map(tile)}
                         </ul>
                         <h3 className="m-0 text-base font-semibold">Intimate moments (18+)</h3>
-                        <ul className="m-0 grid list-none grid-cols-4 gap-2 p-0 sm:grid-cols-8" aria-label="Intimate faces">
+                        <ul className={`m-0 grid list-none gap-2 p-0 ${EMOTION_GRID}`} aria-label="Intimate faces">
                             {INTIMATE_EMOTIONS.map(tile)}
                         </ul>
                     </div>

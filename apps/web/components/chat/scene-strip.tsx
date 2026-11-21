@@ -108,8 +108,8 @@ export function SceneStrip({
         return name ? [{ ...entry, name }] : [];
     });
     return (
-        // Half-way into the page's side padding, like the top bar.
-        <div className={`-mx-2 flex shrink-0 flex-wrap items-start border-b border-line bg-surface ${COLUMN} ${SHORTEST_HIDDEN}`}>
+        // To the screen edges on a phone, like the top bar (docs/ui-audit-2026-11-21.md, M3); half-way into the padding on a wide screen.
+        <div className={`-mx-2 flex shrink-0 max-lg:-mx-4 max-lg:px-2 flex-wrap items-start border-b border-line bg-surface ${COLUMN} ${SHORTEST_HIDDEN}`}>
             <button
                 type="button"
                 className="bare-button flex min-h-11 min-w-0 flex-1 flex-wrap items-center gap-x-2.5 gap-y-1 px-2 py-1.5 text-left text-sm text-muted cursor-pointer focus-ring-inset"

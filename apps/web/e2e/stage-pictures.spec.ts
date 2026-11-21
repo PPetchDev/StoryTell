@@ -157,6 +157,11 @@ test('the editor lists the intimate feelings under their own heading; an upload 
     for (const width of [360, 320]) {
         await page.setViewportSize({ width, height: 740 });
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+        // Every tile's label whole, not cut to "Embarr…" (docs/ui-audit-2026-11-21.md, H2).
+        const cut = await page.evaluate(() =>
+            Array.from(document.querySelectorAll('ul[aria-label$="feelings"] li > button > span:last-child')).filter((label) => label.scrollWidth > label.clientWidth + 1).map((label) => label.textContent),
+        );
+        expect(cut).toEqual([]);
     }
 });
 
@@ -171,6 +176,9 @@ test('Draw all draws the missing ones on the server, and goes on through a reloa
     await expressions.getByRole('button', { name: 'Draw the 20 missing Expressions of Nara' }).click();
     await expressions.getByRole('button', { name: /^Draw the 20 missing(?! Expressions)/ }).click();
     await expect(expressions.getByRole('status').filter({ hasText: 'of 20. It goes on if you leave this page.' })).toBeVisible();
+    // The run opens no row of its own: 21 panels of disabled buttons hid every tile (docs/ui-audit-2026-11-21.md, H1).
+    await expect(expressions.getByRole('group', { name: /Expression$/ })).toHaveCount(0);
+    await expect(expressions.getByRole('button', { name: 'Thinking Expression, none yet' })).toContainText('Thinking');
 
     await page.reload();
     expressions = (await openCard(page, 'Character 1')).getByRole('group', { name: 'Expressions' });
@@ -178,4 +186,23 @@ test('Draw all draws the missing ones on the server, and goes on through a reloa
     await expect(expressions.getByRole('button', { name: /none yet/ })).toHaveCount(0);
     const nara = (await (await request.get(`/api/stories/${storyId}`)).json()).characters[0];
     expect(nara.expressions).toHaveLength(21);
+});
+
+// docs/ui-audit-2026-11-21.md, M4: Draw all can be stopped; the drawing under way is kept, the rest wait for the next Draw all.
+test('Stop ends Draw all after the drawing under way', async ({ page, request }) => {
+    const { storyId } = await storyWithNara(page, request);
+    await request.post(`${FAKE}/image`, { data: { kind: 'expression_image', replies: Array.from({ length: 20 }, () => ({ delayMs: 1500 })) } });
+    await page.goto(`/stories/${storyId}?tab=characters`);
+    const expressions = (await openCard(page, 'Character 1')).getByRole('group', { name: 'Expressions' });
+
+    await expressions.getByRole('button', { name: 'Draw the 20 missing Expressions of Nara' }).click();
+    await expressions.getByRole('button', { name: /^Draw the 20 missing(?! Expressions)/ }).click();
+    await expressions.getByRole('button', { name: 'Stop drawing the Expressions of Nara' }).click();
+
+    await expect(expressions.getByText(/^Stopped after \d+ of 20\. Draw again to draw the rest\.$/)).toBeVisible({ timeout: 30_000 });
+    await expect(expressions.getByRole('button', { name: 'Stop drawing the Expressions of Nara' })).toHaveCount(0);
+    const nara = (await (await request.get(`/api/stories/${storyId}`)).json()).characters[0];
+    expect(nara.expressions.length).toBeGreaterThan(1);
+    expect(nara.expressions.length).toBeLessThan(21);
+    await expect(expressions.getByRole('button', { name: `Draw the ${21 - nara.expressions.length} missing Expressions of Nara` })).toBeVisible();
 });

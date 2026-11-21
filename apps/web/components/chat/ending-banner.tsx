@@ -70,7 +70,7 @@ export function EndingBanner({ ending, written, canWrite, whyNot, busy, fresh, o
     }, [busy]);
     if (written) {
         return (
-            <section className={`-mx-2 shrink-0 border-b border-line bg-surface px-2 py-1.5 ${COLUMN} ${SHORT_HIDDEN}`} aria-label="Ending" data-epilogue="written">
+            <section className={`-mx-2 shrink-0 border-b border-line bg-surface px-2 py-1.5 max-lg:-mx-4 max-lg:px-4 ${COLUMN} ${SHORT_HIDDEN}`} aria-label="Ending" data-epilogue="written">
                 <p className="m-0 truncate text-sm text-muted">
                     <EndingIcon size={14} className="mr-1 inline-block shrink-0 align-[-0.15em] text-accent" />
                     Ending: <strong className="font-semibold text-text">{ending.name}</strong>
@@ -80,7 +80,7 @@ export function EndingBanner({ ending, written, canWrite, whyNot, busy, fresh, o
     }
     return (
         <section
-            className={`-mx-2 shrink-0 border-b border-line bg-surface ${COLUMN} ${SHORT_HIDDEN}`}
+            className={`-mx-2 shrink-0 border-b border-line bg-surface max-lg:-mx-4 max-lg:px-2 ${COLUMN} ${SHORT_HIDDEN}`}
             aria-label="Ending"
             data-epilogue="none"
             data-suggested={ending.suggested || undefined}

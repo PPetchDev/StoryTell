@@ -96,7 +96,8 @@ const STICK_NO_BAR = 'sticky bottom-[calc(1rem+env(safe-area-inset-bottom))] z-s
 function CreditLine({ text, onUsagePage, hide }: { text: string; onUsagePage: boolean; hide(): void }) {
     return (
         <p className="m-0 flex min-h-11 min-w-0 items-center gap-2 rounded-md border border-banner-line bg-banner-surface pl-3 text-sm shadow-lg shadow-shadow-soft">
-            <strong className="min-w-0 flex-1 truncate font-semibold">{text}</strong>
+            {/* Two lines, not cut: cut, the amount never showed on a phone (docs/ui-audit-2026-11-21.md, M2). */}
+            <strong className="line-clamp-2 min-w-0 flex-1 py-1 leading-snug font-semibold">{text}</strong>
             {!onUsagePage && (
                 <Link href="/usage" className="flex min-h-11 flex-none items-center px-1 text-text">
                     Usage

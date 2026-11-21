@@ -46,7 +46,7 @@ export function SuddenEventBanner({ event }: { event: ChatSuddenEvent }) {
     const zone = lower ? { left: '0%', width: `${event.goal}%` } : { left: `${event.goal}%`, width: `${100 - event.goal}%` };
     return (
         <section
-            className={`-mx-2 shrink-0 border-b border-line bg-surface px-2 py-2 [@media(max-height:560px)]:py-1 ${COLUMN} ${SHORTEST_HIDDEN}`}
+            className={`-mx-2 shrink-0 border-b border-line bg-surface px-2 py-2 max-lg:-mx-4 max-lg:px-4 [@media(max-height:560px)]:py-1 ${COLUMN} ${SHORTEST_HIDDEN}`}
             aria-label="Sudden event"
             data-status={event.status}
         >

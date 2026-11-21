@@ -80,7 +80,8 @@ export function RoleSectionsCard({ sections, placeholderHint, onChange }: RoleSe
                     >
                         <div className="mb-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
                             <span className="min-w-0 truncate text-md font-semibold text-muted">{section.heading.trim() || `Section ${index + 1}`}</span>
-                            <span className="flex flex-wrap gap-1">
+                            {/* 8px apart: at 4px their 44px hit areas overlapped, and a miss could land on Remove (docs/ui-audit-2026-11-21.md, M6). */}
+                            <span className="flex flex-wrap gap-2">
                                 <button
                                     type="button"
                                     className="button button-quiet button-small"

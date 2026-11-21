@@ -35,4 +35,7 @@ export class ExpressionDrawingResponseBodyDTO implements ExpressionDrawing {
 
     @ApiProperty({ type: ExpressionDrawingFailureDTO, nullable: true, description: 'Why the run stopped early; the rest were not drawn.' })
     failed: ExpressionDrawingFailureDTO | null;
+
+    @ApiProperty({ description: 'Stop was asked: the run ends after the drawing under way and draws none of the rest.' })
+    stopped: boolean;
 }

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post } from '@nestjs/common';
 import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 
 import { ExpressionDrawingService } from '../../manager/expression/expression-drawing.service.js';
@@ -34,5 +34,11 @@ export class ExpressionDrawingApiController {
     @ApiOkResponse({ type: ExpressionDrawingResponseBodyDTO, description: 'The running or last run since the API started, or an idle one.' })
     status(@Id('storyId') storyId: number, @Id('characterId') characterId: number): Promise<ExpressionDrawingResponseBodyDTO> {
         return this.drawing.status(storyId, characterId);
+    }
+
+    @Delete()
+    @ApiOkResponse({ type: ExpressionDrawingResponseBodyDTO, description: 'Stops the run after the drawing under way, which is paid for already; answers the run, or an idle one when there is none.' })
+    stop(@Id('storyId') storyId: number, @Id('characterId') characterId: number): Promise<ExpressionDrawingResponseBodyDTO> {
+        return this.drawing.stop(storyId, characterId);
     }
 }

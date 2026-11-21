@@ -95,6 +95,12 @@ export class RoleExpressionDrawingApiController {
     status(@Id('storyId') storyId: number): Promise<ExpressionDrawingResponseBodyDTO> {
         return this.faces.drawing({ storyId });
     }
+
+    @Delete()
+    @ApiOkResponse({ type: ExpressionDrawingResponseBodyDTO, description: 'Stops the run after the drawing under way, which is paid for already; answers the run, or an idle one when there is none.' })
+    stop(@Id('storyId') storyId: number): Promise<ExpressionDrawingResponseBodyDTO> {
+        return this.faces.stopDrawing({ storyId });
+    }
 }
 
 /** A Persona's Expressions (.scratch/your-faces/spec.md). Every write answers the Persona, which lists its `expressions`. */
@@ -162,5 +168,11 @@ export class PersonaExpressionDrawingApiController {
     @ApiOkResponse({ type: ExpressionDrawingResponseBodyDTO })
     status(@Id('personaId') personaId: number): Promise<ExpressionDrawingResponseBodyDTO> {
         return this.faces.drawing({ personaId });
+    }
+
+    @Delete()
+    @ApiOkResponse({ type: ExpressionDrawingResponseBodyDTO, description: 'Stops the run after the drawing under way, which is paid for already; answers the run, or an idle one when there is none.' })
+    stop(@Id('personaId') personaId: number): Promise<ExpressionDrawingResponseBodyDTO> {
+        return this.faces.stopDrawing({ personaId });
     }
 }

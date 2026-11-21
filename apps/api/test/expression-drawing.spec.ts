@@ -27,6 +27,7 @@ interface Drawing {
     drawn: string[];
     current: string | null;
     failed: { code: string; message: string } | null;
+    stopped: boolean;
 }
 
 const ALL: string[] = [...EXPRESSION_EMOTIONS];
@@ -109,7 +110,7 @@ describe('Draw all on the server', () => {
 
         expect((started as Drawing).emotions).toEqual(ALL.slice(2));
         const done = await finished(story);
-        expect(done).toEqual({ running: false, emotions: ALL.slice(2), drawn: ALL.slice(2), current: null, failed: null });
+        expect(done).toEqual({ running: false, emotions: ALL.slice(2), drawn: ALL.slice(2), current: null, failed: null, stopped: false });
         expect(t.gateway.imageCalls('expression_image')).toHaveLength(ALL.length - 2);
         const expressions = (await getStory(story.id)).characters[0].expressions;
         expect(expressions.map((one) => one.emotion)).toEqual(ALL);
@@ -141,7 +142,7 @@ describe('Draw all on the server', () => {
         t.gateway.reset();
 
         const { body: idle } = await t.http.post(drawingPath(story)).send({}).expect(201);
-        expect(idle).toEqual({ running: false, emotions: [], drawn: [], current: null, failed: null });
+        expect(idle).toEqual({ running: false, emotions: [], drawn: [], current: null, failed: null, stopped: false });
         expect(t.gateway.imageCalls()).toEqual([]);
 
         t.gateway.scriptImage('expression_image', ...ALL.map((emotion) => drawnPicture(`${emotion}-redrawn`)));
@@ -182,6 +183,40 @@ describe('Draw all on the server', () => {
         expect(t.gateway.imageCalls('expression_image')).toHaveLength(ALL.length);
     });
 
+    // docs/ui-audit-2026-11-21.md, M4: Draw all could not be stopped.
+    it('stops when asked, after the drawing under way: that one is kept, none of the rest is drawn', async () => {
+        const story = await createStory();
+        await pickReferenceImage(story, 'mira');
+        t.gateway.scriptImage('expression_image', ...ALL.map((emotion) => drawnPicture(emotion, 40)));
+        await t.http.post(drawingPath(story)).send({}).expect(201);
+
+        const { body: asked } = await t.http.delete(drawingPath(story)).expect(200);
+
+        expect(asked).toMatchObject({ running: true, stopped: true });
+        const done = await finished(story);
+        expect(done).toMatchObject({ running: false, stopped: true, failed: null, current: null });
+        expect(done.drawn.length).toBeGreaterThanOrEqual(1);
+        expect(done.drawn.length).toBeLessThan(ALL.length);
+        expect(t.gateway.imageCalls('expression_image')).toHaveLength(done.drawn.length);
+        expect((await getStory(story.id)).characters[0].expressions.map((one) => one.emotion)).toEqual(done.drawn);
+
+        // Draw all again picks up the rest.
+        const { body: again } = await t.http.post(drawingPath(story)).send({}).expect(201);
+        expect((again as Drawing).emotions).toEqual(ALL.slice(done.drawn.length));
+        expect(again).toMatchObject({ stopped: false });
+        await finished(story);
+    });
+
+    it('answers Stop with no run going as idle, and draws nothing', async () => {
+        const story = await createStory();
+        await pickReferenceImage(story, 'mira');
+
+        const { body } = await t.http.delete(drawingPath(story)).expect(200);
+
+        expect(body).toEqual({ running: false, emotions: [], drawn: [], current: null, failed: null, stopped: false });
+        expect(t.gateway.imageCalls()).toEqual([]);
+    });
+
     it('stops at the first failure, keeps what was drawn, and says why', async () => {
         const story = await createStory();
         await pickReferenceImage(story, 'mira');
@@ -190,7 +225,7 @@ describe('Draw all on the server', () => {
         await t.http.post(drawingPath(story)).send({}).expect(201);
         const done = await finished(story);
 
-        expect(done).toEqual({ running: false, emotions: ALL, drawn: ['joy', 'love'], current: null, failed: { code: '502.001.001', message: 'Venice: down' } });
+        expect(done).toEqual({ running: false, emotions: ALL, drawn: ['joy', 'love'], current: null, failed: { code: '502.001.001', message: 'Venice: down' }, stopped: false });
         expect(t.gateway.imageCalls('expression_image')).toHaveLength(3);
         expect((await getStory(story.id)).characters[0].expressions.map((one) => one.emotion)).toEqual(['joy', 'love']);
 
@@ -241,7 +276,7 @@ describe('Draw all on the server', () => {
         const other = await createStory();
 
         const { body } = await t.http.get(drawingPath(story)).expect(200);
-        expect(body).toEqual({ running: false, emotions: [], drawn: [], current: null, failed: null });
+        expect(body).toEqual({ running: false, emotions: [], drawn: [], current: null, failed: null, stopped: false });
 
         const wrong = `/api/stories/${other.id}/characters/${story.characters[0].id}/expression-drawing`;
         await t.http.get(wrong).expect(404);
