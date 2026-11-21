@@ -38,6 +38,8 @@ describe('Places drawn ahead: the Judge', () => {
     it("names the Story's Places for the Judge to answer with, exactly", () => {
         const section = judgeDetailsSection(details, [], null, ["Rin's tree-house", 'The Crescent hearth']);
         expect(section).toContain(`Places rule: when the story is at one of the Story's Places, answer "place" with its name exactly as written here: "Rin's tree-house", "The Crescent hearth".`);
+        // A Chat already there in other words is moved onto the Place's name, so its pictures show.
+        expect(section).toContain(`When the Place above is one of these in other words ("inside the tree house" for "Rin's tree-house"), answer with that name, not "same".`);
     });
 
     it('says nothing of Places when the Story has none', () => {
