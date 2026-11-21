@@ -70,6 +70,8 @@ The play-model list grows, but only through a check. Each candidate (Kimi K3.1-P
   It sits there, not in the real model table, because the Settings controller and the Chat manager read it, and they must read it when the fake gateway runs too (every API test and e2e). Typing it as a record over `PlayModel` makes a play model without an entry a compile error.
 - The prices are for display only. UsageRecords keep the cost OpenRouter reports.
 - The Settings controller builds its play-model options from the catalogue instead of its own hard-coded list.
+- The Drift notice has a ✕ ("Dismiss the Drift notice"). Closing it hides it for that Chat and that change (last model and play model) on this device; another change shows it again (2026-11-21).
+- A Reach-out never raises the Drift notice: it is written by the background model, so the notice looks at the last AI Message that is not a Reach-out (2026-11-21; live Chat 1 showed "deepseek-v4-flash" after Tamsin's Reach-out though the user only played on GLM-5.3).
 - The Drift notice stops relying on the web's own model-name map: the Chat response's `drift` gains `lastModelLabel` and `playModelLabel`. A model no longer in the catalogue shows its stored id.
 - The web drops its `MODEL_LABELS` map and reads names from the API.
 - The Settings page's Drift warning ("A different model plays Characters differently…") shows whenever the chosen Play model differs from the saved one and names no model, so it needs no change for a new model.

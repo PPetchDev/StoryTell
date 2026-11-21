@@ -23,7 +23,9 @@ async function playableChat(request: APIRequestContext): Promise<{ storyId: numb
 
 /** Scripts turn replies, each with a judge and an extraction that change nothing. */
 async function scriptTurns(request: APIRequestContext, ...replies: (string | object)[]): Promise<void> {
-    await request.post('/api/testing/fake-gateway/text', { data: { kind: 'turn', replies } });
+    // Written by the play model, as on live, so no Drift notice adds its ✕ to the Tab order.
+    const turns = replies.map((reply) => (typeof reply === 'string' ? { text: reply, model: 'glm-5.3' } : reply));
+    await request.post('/api/testing/fake-gateway/text', { data: { kind: 'turn', replies: turns } });
     await request.post('/api/testing/fake-gateway/text', { data: { kind: 'judge', replies: replies.map(() => NO_CHANGE) } });
     await request.post('/api/testing/fake-gateway/text', { data: { kind: 'memory_extraction', replies: replies.map(() => NO_OPS) } });
 }

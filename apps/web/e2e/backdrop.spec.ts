@@ -93,7 +93,7 @@ test('the Chat backdrop on the Style tab: None by default; Cover shows the Cover
         expect(box).toEqual({ x: 0, y: 0, width: 390, height: 844 });
         // The dimming overlay of the page colour sits over the picture.
         const dim = await backdrop(page).evaluate((element) => getComputedStyle(element, '::after').backgroundColor);
-        expect(dim).toBe('rgba(22, 19, 31, 0.94)');
+        expect(dim).toBe('rgba(22, 19, 31, 0.82)');
         // The Messages are still on top: a tap reaches the thread, not the picture.
         await expect(page.getByRole('article', { name: 'Opening' }).getByText('Boots off, keeper.')).toBeVisible();
         const topmost = await page.evaluate(() => {

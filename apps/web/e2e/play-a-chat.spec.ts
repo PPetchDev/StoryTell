@@ -76,3 +76,44 @@ test('starts a Chat, sees the Opening, sends, and sees narration plus named spee
         await request.delete(`/api/stories/${storyId}`);
     }
 });
+
+test('the Drift notice closes, stays closed for that change, and comes back for another', async ({ page, request }) => {
+    const storyId = await createPlayableStory(request);
+    const created = await request.post(`/api/stories/${storyId}/chats`);
+    expect(created.ok()).toBe(true);
+    const chatId = (await created.json()).id as number;
+
+    // The Chat as the API answers it, with a Drift the test picks (changing the play model would touch every other test).
+    let drift = { lastModel: 'deepseek-v4-flash', playModel: 'glm-5.3', lastModelLabel: 'DeepSeek V4 Flash', playModelLabel: 'GLM-5.3' };
+    await page.route((url) => url.pathname === `/api/stories/${storyId}/chats/${chatId}`, async (route) => {
+        if (route.request().method() !== 'GET') return route.continue();
+        const response = await route.fetch();
+        await route.fulfill({ response, json: { ...(await response.json()), drift } });
+    });
+
+    try {
+        await page.setViewportSize({ width: 360, height: 780 });
+        await page.goto(`/stories/${storyId}/chats/${chatId}`);
+        const notice = page.getByText(/Drift notice: the last reply came from DeepSeek V4 Flash; the play model is now GLM-5\.3/);
+        await expect(notice).toBeVisible();
+
+        const close = page.getByRole('button', { name: 'Dismiss the Drift notice' });
+        const box = await close.boundingBox();
+        expect(box!.width).toBeGreaterThanOrEqual(44);
+        expect(box!.x + box!.width).toBeLessThanOrEqual(360);
+        await close.click();
+        await expect(notice).toHaveCount(0);
+
+        // Closed for this change, on this device.
+        await page.reload();
+        await expect(page.getByLabel('Write as Ash')).toBeVisible();
+        await expect(page.getByText('Drift notice')).toHaveCount(0);
+
+        // Another change shows it again.
+        drift = { lastModel: 'glm-5.3', playModel: 'deepseek-v4-pro', lastModelLabel: 'GLM-5.3', playModelLabel: 'DeepSeek V4 Pro' };
+        await page.reload();
+        await expect(page.getByText(/the play model is now DeepSeek V4 Pro/)).toBeVisible();
+    } finally {
+        await request.delete(`/api/stories/${storyId}`);
+    }
+});

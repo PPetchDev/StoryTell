@@ -266,8 +266,12 @@
     --bond-desire: var(--character-7);
     --bond-tension: var(--character-1);
     --bond-neutral: var(--character-neutral);
-    /* Chat looks ticket 03: the page colour laid over a Backdrop picture, so lines on it stay readable. */
-    --backdrop-dim: rgba(22, 19, 31, 0.94);
+    /*
+     * Chat looks ticket 03: the page colour laid over a Backdrop picture, so lines on it stay readable.
+     * 0.82 is the least that keeps the muted text and every Character colour at 4.5:1 over a white
+     * picture (0.94 hid the picture, 2026-11-21).
+     */
+    --backdrop-dim: rgba(22, 19, 31, 0.82);
     /*
      * Audit L5: the Snapshot viewer's black stage and what sits on it, and the scrim under a badge on
      * a picture. Pictures keep their colours, so these are the same in both themes (no light values).

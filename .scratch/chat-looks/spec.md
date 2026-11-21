@@ -138,7 +138,7 @@ Three looks, none of which changes what a Chat is:
   - It uses data the Chat page already loads: the Story, and the Chat's Snapshots, which the screen refreshes after a Snapshot finishes.
 - **Drawing it:**
   - A fixed layer behind the Chat screen, covering the Chat area: the whole viewport on a phone, and the viewport minus the side rail from 1024px.
-  - The picture is `object-fit: cover` at the focus point, blurred about 3px, under an overlay of the page colour (`--backdrop-dim`, about 85% opacity, per theme).
+  - The picture is `object-fit: cover` at the focus point, blurred about 3px, under an overlay of the page colour (`--backdrop-dim`, per theme: 82% in dark, 90% in light). 82% is the least that keeps the muted text and every Character colour at 4.5:1 over a white picture; it was 94%, which hid the picture (2026-11-21).
   - The top bar, Scene strip and composer keep their own surfaces. User bubbles and Character bubbles are unchanged. Narration, speaker names and timestamps sit on the dimmed picture.
   - The Memory drawer, sheets and dialogs keep opaque backgrounds.
 - **Readable:** the contrast check adds `--text`, `--muted`, `--accent` and the Character colours over the overlay on a pure white and on a pure black picture, in both themes. The overlay strength is whatever makes every one of those pass. The blur is decoration, not counted.

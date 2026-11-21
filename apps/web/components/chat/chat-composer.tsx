@@ -37,10 +37,40 @@ interface NoticesProps {
     retrying: boolean;
 }
 
+const driftKey = (chatId: number) => `storytell:drift-dismissed:${chatId}`;
+
+/**
+ * The Drift notice, unless the user closed it for this very change (the model that wrote the last
+ * reply and the play model now). It is kept on this device; a different change shows it again, and
+ * a reply from the play model clears it as before.
+ */
+function useDismissableDrift(chat: Chat): [Chat['drift'], () => void] {
+    const change = chat.drift ? `${chat.drift.lastModel}>${chat.drift.playModel}` : null;
+    const [dismissed, setDismissed] = useState<string | null>(null);
+    useEffect(() => {
+        try {
+            setDismissed(window.localStorage.getItem(driftKey(chat.id)));
+        } catch {
+            // No storage (a private window): the notice shows until closed on this page.
+        }
+    }, [chat.id]);
+    const dismiss = () => {
+        if (change === null) return;
+        setDismissed(change);
+        try {
+            window.localStorage.setItem(driftKey(chat.id), change);
+        } catch {
+            // As above: closed for this visit only.
+        }
+    };
+    return [change !== null && change !== dismissed ? chat.drift : null, dismiss];
+}
+
 /** What stands between the user and the next turn, if anything: each in a region of its own, mounted throughout. */
 function Notices({ chat, failedSnapshots, onRetryBackground, retrying }: NoticesProps) {
     // One notice, in plain words, for everything that didn't save; one Retry reruns all of it.
     const failed = backgroundNotice(chat, failedSnapshots);
+    const [drift, dismissDrift] = useDismissableDrift(chat);
     return (
         <>
             <Status>
@@ -69,10 +99,15 @@ function Notices({ chat, failedSnapshots, onRetryBackground, retrying }: Notices
                 )}
             </Status>
             <Status>
-                {chat.drift && (
-                    <p className="notice">
-                        Drift notice: the last reply came from {chat.drift.lastModelLabel}; the play model is now {chat.drift.playModelLabel}. Characters
-                        may sound different from here on.
+                {drift && (
+                    <p className="notice flex items-start gap-2">
+                        <span className="min-w-0 flex-1">
+                            Drift notice: the last reply came from {drift.lastModelLabel}; the play model is now {drift.playModelLabel}. Characters may
+                            sound different from here on.
+                        </span>
+                        <button type="button" className={`${ICON_BUTTON} -my-2 -mr-2 shrink-0`} aria-label="Dismiss the Drift notice" onClick={dismissDrift}>
+                            <CloseIcon size={18} />
+                        </button>
                     </p>
                 )}
             </Status>

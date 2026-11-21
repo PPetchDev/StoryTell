@@ -2493,10 +2493,12 @@ function awaitingReply(chat: ChatEntity): boolean {
     return last?.kind === MessageKind.User;
 }
 
-/** The model of the last AI Message a model wrote; the Opening ("author") doesn't count. */
+/** The model of the last AI Message the play model wrote; the Opening ("author") and Reach-outs don't count. */
 function lastAiModel(chat: ChatEntity): string | null {
     for (let i = chat.messages.length - 1; i >= 0; i--) {
         const message = chat.messages[i];
+        // A Reach-out is written by the background model, never the play model: it says nothing of a change.
+        if (message.reachOut) continue;
         if (message.kind === MessageKind.Ai && message.model && message.model !== AUTHOR_MODEL) {
             return message.model;
         }

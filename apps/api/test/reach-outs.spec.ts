@@ -41,6 +41,7 @@ interface Message {
 interface Chat {
     id: number;
     messages: Message[];
+    drift: { lastModel: string; playModel: string } | null;
 }
 
 /** The first moment at or after `from` that is outside quiet hours, on the hour plus a minute. */
@@ -166,6 +167,8 @@ describe('Reach-outs (HTTP)', () => {
             expect.objectContaining({ kind: 'speech', characterId: mira, speakerName: 'Mira', text: 'The lamp held all night. I kept wishing you had stayed to see it.' }),
         ]);
         expect(chat.messages.slice(0, -1).every((message) => !message.reachOut)).toBe(true);
+        // Written by the background model, it is no change of play model: no Drift notice.
+        expect(chat.drift).toBeNull();
 
         // Who wrote it read their Thought, and never their Secrets.
         const [call] = t.gateway.textCalls('reach_out');
