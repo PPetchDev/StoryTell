@@ -26,6 +26,10 @@ const DRAW =
     'Drawn from its picture (the Role image or Persona image) at the Expression price, replacing any there and keeping its square, then cut out. ' +
     'Refused before any call without a picture (409.003.023) or with the Venice pool used up (402.001.004).';
 
+const UPLOAD_CUTOUT =
+    "Keeps an uploaded see-through PNG or WebP as the Expression's cut-out for the Visual novel stage, replacing any there; free. " +
+    'Refused without the Expression (404), or for a picture with no see-through pixel (415.002.014).';
+
 const asStory = (answer: Promise<StoryDetail | PersonaResponse>) => answer as Promise<StoryResponseBodyDTO>;
 const asPersona = (answer: Promise<StoryDetail | PersonaResponse>) => answer as Promise<PersonaResponseBodyDTO>;
 
@@ -57,6 +61,17 @@ export class RoleExpressionApiController {
     upload(@Id('storyId') storyId: number, @Emotion() emotion: FaceEmotion, @UploadedFile() file: UploadedImage | undefined): Promise<StoryResponseBodyDTO> {
         if (!file) throw new NoImageFileError();
         return asStory(this.faces.upload({ storyId }, emotion, file.buffer));
+    }
+
+    @Put('cutout')
+    @UseFilters(UploadTooLargeFilter)
+    @UseInterceptors(FileInterceptor('image', { limits: { fileSize: MAX_UPLOAD_MB * 1024 * 1024, files: 1 } }))
+    @ApiConsumes('multipart/form-data')
+    @ApiBody({ type: UploadExpressionRequestBodyDTO })
+    @ApiOkResponse({ type: StoryResponseBodyDTO, description: UPLOAD_CUTOUT })
+    uploadCutout(@Id('storyId') storyId: number, @Emotion() emotion: FaceEmotion, @UploadedFile() file: UploadedImage | undefined): Promise<StoryResponseBodyDTO> {
+        if (!file) throw new NoImageFileError();
+        return asStory(this.faces.uploadCutout({ storyId }, emotion, file.buffer));
     }
 
     @Delete()
@@ -131,6 +146,17 @@ export class PersonaExpressionApiController {
     upload(@Id('personaId') personaId: number, @Emotion() emotion: FaceEmotion, @UploadedFile() file: UploadedImage | undefined): Promise<PersonaResponseBodyDTO> {
         if (!file) throw new NoImageFileError();
         return asPersona(this.faces.upload({ personaId }, emotion, file.buffer));
+    }
+
+    @Put('cutout')
+    @UseFilters(UploadTooLargeFilter)
+    @UseInterceptors(FileInterceptor('image', { limits: { fileSize: MAX_UPLOAD_MB * 1024 * 1024, files: 1 } }))
+    @ApiConsumes('multipart/form-data')
+    @ApiBody({ type: UploadExpressionRequestBodyDTO })
+    @ApiOkResponse({ type: PersonaResponseBodyDTO, description: UPLOAD_CUTOUT })
+    uploadCutout(@Id('personaId') personaId: number, @Emotion() emotion: FaceEmotion, @UploadedFile() file: UploadedImage | undefined): Promise<PersonaResponseBodyDTO> {
+        if (!file) throw new NoImageFileError();
+        return asPersona(this.faces.uploadCutout({ personaId }, emotion, file.buffer));
     }
 
     @Delete()

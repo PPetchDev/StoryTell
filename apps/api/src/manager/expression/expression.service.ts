@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 
-import { UnsupportedImageError } from '../../errors/image.errors.js';
+import { NotSeeThroughError, UnsupportedImageError } from '../../errors/image.errors.js';
 import { OutOfCreditError } from '../../errors/model-gateway.errors.js';
 import { CharacterNotFoundError, ExpressionNotFoundError, NoReferenceImageToDrawError } from '../../errors/story.errors.js';
 import { ExpressionEmotion } from '../../model/story/emotion.js';
@@ -127,6 +127,35 @@ export class ExpressionManagerService {
         const mimeType = ImageStoreService.sniffMimeType(bytes);
         if (!mimeType) throw new UnsupportedImageError();
         await this.storeFile(storyId, characterId, emotion, bytes, ImageStoreService.extensionFor(mimeType)!, { crop: null, drawnFrom: null });
+        return this.saved(storyId);
+    }
+
+    /**
+     * Keeps an uploaded see-through picture as the Expression's cut-out (.scratch/stage-pictures/spec.md,
+     * "Upload a cut-out"), replacing any there; the Expression's own picture stays. No model call.
+     */
+    async uploadCutout(storyId: number, characterId: number, emotion: ExpressionEmotion, bytes: Buffer): Promise<StoryDetail> {
+        const character = await this.findCharacter(storyId, characterId);
+        const expression = character.expressions.find((one) => one.emotion === emotion);
+        if (!expression) throw new ExpressionNotFoundError();
+        if (!ImageStoreService.sniffMimeType(bytes)) throw new UnsupportedImageError();
+        const extension = await ImageStoreService.seeThroughExtension(bytes);
+        if (!extension) throw new NotSeeThroughError();
+        const cutoutPath = expressionImagePath(storyId, characterId, emotion, extension).replace(/\.(png|webp)$/, '-cutout.$1');
+        await this.imageStore.write(cutoutPath, bytes);
+        let previous: string | null | false;
+        try {
+            previous = await this.storyModel.setExpressionCutout(characterId, emotion, expression.imagePath, cutoutPath);
+        } catch (error) {
+            await this.removeFile(cutoutPath);
+            throw error;
+        }
+        // Redrawn, uploaded or removed meanwhile: this cut-out belongs to no Expression.
+        if (previous === false) {
+            await this.removeFile(cutoutPath);
+            throw new ExpressionNotFoundError();
+        }
+        if (previous) await this.removeFile(previous);
         return this.saved(storyId);
     }
 

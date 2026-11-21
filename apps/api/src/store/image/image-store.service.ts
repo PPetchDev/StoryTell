@@ -135,6 +135,22 @@ export class ImageStoreService {
         return undefined;
     }
 
+    /**
+     * The extension for an uploaded cut-out (.scratch/stage-pictures/spec.md, "Upload a cut-out"):
+     * `png` or `webp`, only when the picture has at least one see-through pixel. Undefined for a
+     * JPEG, a fully opaque picture or bytes that won't decode.
+     */
+    static async seeThroughExtension(bytes: Buffer): Promise<'png' | 'webp' | undefined> {
+        const mimeType = ImageStoreService.sniffMimeType(bytes);
+        if (mimeType !== 'image/png' && mimeType !== 'image/webp') return undefined;
+        try {
+            const { isOpaque } = await sharp(bytes).stats();
+            return isOpaque ? undefined : mimeType === 'image/png' ? 'png' : 'webp';
+        } catch {
+            return undefined;
+        }
+    }
+
     /** Writes the bytes at `relativePath`, creating the folders on the way. */
     async write(relativePath: string, bytes: Buffer): Promise<void> {
         const absolutePath = this.resolve(relativePath);

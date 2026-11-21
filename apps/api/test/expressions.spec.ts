@@ -1,6 +1,7 @@
 import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import pg from 'pg';
+import sharp from 'sharp';
 
 import { ProviderOutageError } from '../src/errors/model-gateway.errors.js';
 import { EXPRESSION_LOOKS } from '../src/manager/expression/prompt.js';
@@ -48,6 +49,12 @@ async function filesUnder(dir: string): Promise<string[]> {
         .filter((entry) => entry.isFile())
         .map((entry) => path.relative(dir, path.join(entry.parentPath, entry.name)).split(path.sep).join('/'))
         .sort();
+}
+
+/** A real picture, 4 by 6 pixels, see-through or not (.scratch/stage-pictures/spec.md, "Upload a cut-out"). */
+function picture(format: 'png' | 'webp' | 'jpeg', seeThrough: boolean): Promise<Buffer> {
+    const image = sharp({ create: { width: 4, height: 6, channels: 4, background: { r: 200, g: 80, b: 40, alpha: seeThrough ? 0 : 1 } } });
+    return (format === 'png' ? image.png() : format === 'webp' ? image.webp({ lossless: true }) : image.jpeg()).toBuffer();
 }
 
 const EXPRESSION_PATH = /^expressions\/story-\d+\/character-\d+-joy-[0-9a-f]+\.png$/;
@@ -184,6 +191,56 @@ describe('Expressions on a Character', () => {
             const gone = await t.http.put('/api/stories/999999/characters/1/expressions/joy').attach('image', png('x'), 'face.png').expect(404);
             expect(gone.body.error.code).toBe('404.003.001');
             expect(await filesUnder(t.imageDir)).toEqual([]);
+        });
+    });
+
+    // .scratch/stage-pictures/spec.md, "Upload a cut-out"
+    describe('upload a cut-out', () => {
+        const cutout = (story: Story, emotion: string, bytes: Buffer) => t.http.put(`${expressionPath(story, emotion)}/cutout`).attach('image', bytes, 'cut.png');
+
+        it("keeps a see-through PNG as the Expression's cut-out, leaving its picture and square, with no model call; another replaces it", async () => {
+            const story = await createStory();
+            await upload(story, 'joy', png('mira-happy')).expect(200);
+            await t.http.put(`${expressionPath(story, 'joy')}/crop`).send({ x: 0.2, y: 0.1, size: 0.5 }).expect(200);
+            const first = await picture('png', true);
+
+            const { body } = await cutout(story, 'joy', first).expect(200);
+
+            const joy = (body as Story).characters[0].expressions[0];
+            expect(joy).toMatchObject({ emotion: 'joy', imagePath: expect.stringMatching(EXPRESSION_PATH), crop: { x: 0.2, y: 0.1, size: 0.5 } });
+            expect(joy.cutoutPath).toMatch(/^expressions\/story-\d+\/character-\d+-joy-[0-9a-f]+-cutout\.png$/);
+            expect(await readFile(path.join(t.imageDir, joy.imagePath))).toEqual(png('mira-happy'));
+            expect(await readFile(path.join(t.imageDir, joy.cutoutPath!))).toEqual(first);
+            expect((await t.http.get(`/api/images/${joy.cutoutPath}`).expect(200)).headers['content-type']).toBe('image/png');
+            expect(t.gateway.imageCalls()).toEqual([]);
+
+            // A WebP replaces it, and the PNG it replaced is deleted.
+            const second = (await cutout(story, 'joy', await picture('webp', true)).expect(200)).body as Story;
+            const replaced = second.characters[0].expressions[0];
+            expect(replaced.cutoutPath).toMatch(/-joy-[0-9a-f]+-cutout\.webp$/);
+            expect(await filesUnder(t.imageDir)).toEqual([joy.imagePath, replaced.cutoutPath!].sort());
+
+            // Removing the Expression deletes its cut-out too.
+            await t.http.delete(expressionPath(story, 'joy')).expect(200);
+            expect(await filesUnder(t.imageDir)).toEqual([]);
+        });
+
+        it('refuses a JPEG, an opaque picture, a file that is no picture, no file and no Expression, and writes nothing', async () => {
+            const story = await createStory();
+            expect((await cutout(story, 'joy', await picture('png', true)).expect(404)).body.error.code).toBe('404.003.022');
+            await upload(story, 'joy', png('mira-happy')).expect(200);
+
+            for (const bytes of [await picture('jpeg', false), await picture('png', false), await picture('webp', false)]) {
+                const { body } = await cutout(story, 'joy', bytes).expect(415);
+                expect(body.error).toMatchObject({ code: '415.002.014', message: 'A cut-out must be a PNG or WebP with a see-through background.' });
+            }
+            expect((await cutout(story, 'joy', Buffer.from('GIF89a not allowed')).expect(415)).body.error.code).toBe('415.002.009');
+            expect((await t.http.put(`${expressionPath(story, 'joy')}/cutout`).field('note', 'no file').expect(400)).body.error.code).toBe('400.002.008');
+            expect((await cutout(story, 'neutral', await picture('png', true)).expect(400)).body.error.code).toMatch(/^400\./);
+
+            const joy = (await getStory(story.id)).characters[0].expressions[0];
+            expect(joy.cutoutPath).toBeNull();
+            expect(await filesUnder(t.imageDir)).toEqual([joy.imagePath]);
         });
     });
 

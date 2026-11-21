@@ -33,6 +33,34 @@ export async function preparedForUpload(file: File): Promise<{ picture: Blob; fi
     return { picture: file, filename: file.name };
 }
 
+/** The API's upload limit (MAX_UPLOAD_MB). */
+const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
+
+/**
+ * A cut-out made elsewhere, ready to send (.scratch/stage-pictures/spec.md, "Upload a cut-out"): as it
+ * is, so its see-through background stays. Only one over the upload limit is drawn smaller, as a
+ * PNG with nothing filled in behind it. The API checks that it really is see-through.
+ */
+export async function preparedCutout(file: File): Promise<{ picture: Blob; filename: string }> {
+    if (file.size <= MAX_UPLOAD_BYTES) return { picture: file, filename: file.name };
+    try {
+        const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+        const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+        canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+        const context = canvas.getContext('2d');
+        if (!context) throw new Error('No 2D canvas');
+        context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+        bitmap.close();
+        const picture = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+        if (picture) return { picture, filename: 'cutout.png' };
+    } catch {
+        // Fall through: the original file, which the API refuses as too large.
+    }
+    return { picture: file, filename: file.name };
+}
+
 /** Whether the file is a WebP with more than one frame: its header says WEBP, and it has an ANIM chunk near the start. */
 export async function isAnimatedWebp(file: Blob): Promise<boolean> {
     try {

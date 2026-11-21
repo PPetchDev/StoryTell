@@ -94,3 +94,10 @@ export class NoPictureToCropError extends AppError {
         super('409.003.040', 'Add a picture first: there is no face to pick without one.');
     }
 }
+
+/** An uploaded cut-out that is not a PNG or WebP with see-through pixels: a JPEG, or a fully opaque picture such as a painted checkerboard. */
+export class NotSeeThroughError extends AppError {
+    constructor() {
+        super('415.002.014', 'A cut-out must be a PNG or WebP with a see-through background.');
+    }
+}

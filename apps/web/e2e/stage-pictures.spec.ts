@@ -206,3 +206,54 @@ test('Stop ends Draw all after the drawing under way', async ({ page, request })
     expect(nara.expressions.length).toBeLessThan(21);
     await expect(expressions.getByRole('button', { name: `Draw the ${21 - nara.expressions.length} missing Expressions of Nara` })).toBeVisible();
 });
+
+// .scratch/stage-pictures/spec.md, "Upload a cut-out": a see-through picture made elsewhere becomes the cut-out, free.
+test('Upload cut-out keeps a see-through PNG as the cut-out, and says why an opaque one is refused', async ({ page, request }) => {
+    const { storyId } = await storyWithNara(page, request);
+    await page.setViewportSize({ width: 360, height: 740 });
+    await page.goto(`/stories/${storyId}?tab=characters`);
+    const expressions = (await openCard(page, 'Character 1')).getByRole('group', { name: 'Expressions' });
+    await expressions.getByRole('list', { name: 'Intimate feelings' }).getByRole('button', { name: 'Teasing Expression, none yet' }).click();
+    const teasing = expressions.getByRole('group', { name: 'Teasing Expression' });
+    // No Expression yet: nothing to give a cut-out to.
+    await expect(teasing.getByRole('button', { name: 'Upload a cut-out for Teasing' })).toHaveCount(0);
+    await teasing.getByLabel('Picture for Teasing').setInputFiles({ name: 'teasing.png', mimeType: 'image/png', buffer: await picture(page, '#7a4cc2') });
+    await expect(teasing).toContainText('Not cut out: shows with its own background in the novel view.');
+    await expect(teasing.getByRole('button', { name: 'Upload a cut-out for Teasing' })).toBeVisible();
+
+    // An opaque PNG (a painted checkerboard, say) is refused in plain words.
+    await teasing.getByLabel('See-through cut-out for Teasing').setInputFiles({ name: 'flat.png', mimeType: 'image/png', buffer: await picture(page, '#203050') });
+    await expect(teasing.getByRole('alert')).toContainText('A cut-out must be a PNG or WebP with a see-through background.');
+
+    // A see-through one is kept as it is, and the Expression's own picture stays.
+    const seeThrough = Buffer.from(
+        (
+            await page.evaluate(() => {
+                const canvas = document.createElement('canvas');
+                canvas.width = 200;
+                canvas.height = 300;
+                const context = canvas.getContext('2d')!;
+                context.fillStyle = '#7a4cc2';
+                context.fillRect(50, 40, 100, 260);
+                return canvas.toDataURL('image/png');
+            })
+        ).split(',')[1],
+        'base64',
+    );
+    const before = ((await (await request.get(`/api/stories/${storyId}`)).json()).characters[0].expressions as { emotion: string; imagePath: string }[]).find((one) => one.emotion === 'teasing')!;
+    await teasing.getByLabel('See-through cut-out for Teasing').setInputFiles({ name: 'cut.png', mimeType: 'image/png', buffer: seeThrough });
+    await expect(teasing).toContainText('Cut out: stands on the Backdrop in the novel view.');
+    await expect(teasing.getByRole('alert')).toHaveCount(0);
+    const after = ((await (await request.get(`/api/stories/${storyId}`)).json()).characters[0].expressions as { emotion: string; imagePath: string; cutoutPath: string }[]).find((one) => one.emotion === 'teasing')!;
+    expect(after.imagePath).toBe(before.imagePath);
+    expect(after.cutoutPath).toMatch(/-teasing-[0-9a-f]+-cutout\.png$/);
+    expect(Buffer.from(await (await request.get(`/api/images/${after.cutoutPath}`)).body()).equals(seeThrough)).toBe(true);
+
+    for (const width of [360, 320]) {
+        await page.setViewportSize({ width, height: 740 });
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+        const box = await teasing.getByRole('button', { name: 'Upload a cut-out for Teasing' }).boundingBox();
+        expect(box!.height).toBeGreaterThanOrEqual(44);
+        expect(box!.x + box!.width).toBeLessThanOrEqual(width);
+    }
+});

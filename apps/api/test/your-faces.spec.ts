@@ -1,5 +1,6 @@
 import { readdir, rm } from 'node:fs/promises';
 import path from 'node:path';
+import sharp from 'sharp';
 
 import { FACE_EMOTIONS } from '../src/model/story/emotion.js';
 import { startTestApp, TestApp } from './harness/test-app.js';
@@ -150,6 +151,32 @@ describe('Your faces', () => {
             expect(left.filter((file) => file.startsWith(`expressions/story-${story.id}/`))).toEqual([]);
             expect(left).toEqual(expect.arrayContaining([copied.imagePath, copied.cutoutPath]));
         });
+    });
+
+    // .scratch/stage-pictures/spec.md, "Upload a cut-out"
+    it('the Role and a Persona take an uploaded see-through cut-out for an Expression they have, and refuse an opaque one', async () => {
+        const seeThrough = await sharp({ create: { width: 4, height: 6, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).png().toBuffer();
+        const opaque = await sharp({ create: { width: 4, height: 6, channels: 3, background: { r: 9, g: 9, b: 9 } } }).png().toBuffer();
+        const story = await storyWithRole();
+        const role = `/api/stories/${story.id}/role/expressions/anger`;
+        expect((await t.http.put(`${role}/cutout`).attach('image', seeThrough, 'cut.png').expect(404)).body.error.code).toBe('404.003.022');
+        await t.http.put(role).attach('image', png('mine'), 'mine.png').expect(200);
+        expect((await t.http.put(`${role}/cutout`).attach('image', opaque, 'cut.png').expect(415)).body.error.code).toBe('415.002.014');
+
+        const withCut = (await t.http.put(`${role}/cutout`).attach('image', seeThrough, 'cut.png').expect(200)).body as Story;
+        const anger = withCut.role.expressions.find((one) => one.emotion === 'anger')!;
+        expect(anger.cutoutPath).toMatch(/-cutout\.png$/);
+        expect(anger.imagePath).not.toBe(anger.cutoutPath);
+
+        const persona = (await t.http.post('/api/personas').send({ name: 'Rin' }).expect(201)).body as Persona;
+        await t.http.put(`/api/personas/${persona.id}/expressions/joy`).attach('image', png('mine'), 'mine.png').expect(200);
+        const withPersonaCut = (await t.http.put(`/api/personas/${persona.id}/expressions/joy/cutout`).attach('image', seeThrough, 'cut.png').expect(200)).body as Persona;
+        expect(withPersonaCut.expressions[0].cutoutPath).toMatch(/-cutout\.png$/);
+        expect(t.gateway.imageCalls()).toEqual([]);
+        const files = await filesUnder(t.imageDir);
+        expect(files).toContain(anger.cutoutPath);
+        expect(files).toContain(withPersonaCut.expressions[0].cutoutPath);
+        await t.http.delete(`/api/personas/${persona.id}`).expect(204);
     });
 
     describe("a Message's face", () => {

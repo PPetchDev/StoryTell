@@ -105,6 +105,27 @@ export class ExpressionApiController {
         return this.expressions.upload(storyId, characterId, emotion, file.buffer);
     }
 
+    @Put('cutout')
+    @UseFilters(UploadTooLargeFilter)
+    @UseInterceptors(FileInterceptor('image', { limits: { fileSize: MAX_UPLOAD_MB * 1024 * 1024, files: 1 } }))
+    @ApiConsumes('multipart/form-data')
+    @ApiBody({ type: UploadExpressionRequestBodyDTO })
+    @ApiOkResponse({
+        type: StoryResponseBodyDTO,
+        description:
+            "Keeps an uploaded see-through PNG or WebP as the Expression's cut-out for the Visual novel stage, replacing any there; free. " +
+            'Refused without the Expression (404), or for a picture with no see-through pixel (415.002.014).',
+    })
+    uploadCutout(
+        @Id('storyId') storyId: number,
+        @Id('characterId') characterId: number,
+        @Emotion() emotion: ExpressionEmotion,
+        @UploadedFile() file: UploadedImage | undefined,
+    ): Promise<StoryResponseBodyDTO> {
+        if (!file) throw new NoImageFileError();
+        return this.expressions.uploadCutout(storyId, characterId, emotion, file.buffer);
+    }
+
     @Delete()
     @ApiOkResponse({ type: StoryResponseBodyDTO, description: 'The Expression and its file are gone; the emotion shows the Portrait.' })
     remove(

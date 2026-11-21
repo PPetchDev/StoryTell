@@ -109,3 +109,15 @@ The user also wants more feelings for intimate scenes: one "love" covered tender
 ## Further Notes
 
 - Redrawing Nara's and Dulcie's Expressions on live needs Venice credit: about $1 per Character for all thirteen, with the cut-outs.
+
+## Upload a cut-out (2026-11-21)
+
+With Venice credit out, nothing can be cut out, and an uploaded Expression always shows whole, with its own background, on the novel stage. The user takes the background away elsewhere (ChatGPT) and wants to give the app that see-through picture as the Expression's cut-out.
+
+- **What:** each Expression that is there (a Character's, the Role's, a Persona's) gets "Upload cut-out". The picture becomes that Expression's cut-out, replacing any there. The Expression's own picture stays as it is, so its round face and face square don't change. It is free: no model call.
+- **API:** `PUT …/expressions/:emotion/cutout`, multipart `image`, for `stories/:storyId/characters/:characterId`, `stories/:storyId/role` and `personas/:personaId`. It answers what the Expression's other writes answer (the Story, or the Persona).
+  - The picture must be a PNG or WebP with see-through pixels. A JPEG, or a PNG with no see-through pixel (a fake checkerboard included), is refused with 415.002.014 "A cut-out must be a PNG or WebP with a see-through background."
+  - It is refused with no Expression for that emotion (404), with no file (400.002.008), with a file that is not a picture (415.002.009) and with one over the upload limit (413.002.010).
+  - The file is stored next to the Expression's (`…-cutout.png` or `.webp`), and the cut-out it replaces is deleted. If the Expression is redrawn, uploaded or removed meanwhile, the new file is deleted and the answer is 404.
+- **Web:** the Expression's panel shows "Upload cut-out" beside "Cut out · ~$0.01", also when it is already cut out (to replace that cut-out). The file is sent as it is, so its transparency is kept; only a picture over the upload limit is shrunk, to a PNG. The panel's hint then says "Cut out: stands on the Backdrop in the novel view." A refused picture shows the 415.002.014 message in plain words.
+- **Testing:** the API tests cover the Character, Role and Persona routes and every refusal. An e2e uploads an opaque PNG (refused in plain words) and then a see-through one in the Expressions card at 360 px. It checks that the panel says it is cut out, that the stored cut-out is the same bytes and that the Expression's own picture is unchanged. The novel stage already shows any `cutoutPath` as a cut-out, and that is tested elsewhere.

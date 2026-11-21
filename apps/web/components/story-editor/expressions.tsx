@@ -8,7 +8,7 @@ import { EMOTION_GRID, TILE_LABEL, tileLabel } from '@/components/portrait/emoti
 import { PortraitImage } from '@/components/portrait/portrait-image';
 import { ApiError, apiFetch, ApiUnreachableError } from '@/lib/api';
 import { ExpressionEndpoints, expressionEndpoints } from '@/lib/expression-endpoints';
-import { preparedForUpload } from '@/lib/cover';
+import { preparedCutout, preparedForUpload } from '@/lib/cover';
 import { EMOTION_LABEL, EVERYDAY_EMOTIONS, Expression, ExpressionDrawing, EXPRESSION_EMOTIONS, FaceEmotion, INTIMATE_EMOTIONS } from '@/lib/expressions';
 import { Character, PortraitCrop, referenceImageUrl, Story, storyApi } from '@/lib/story';
 import { SettingsResponse, usd } from '@/lib/types';
@@ -350,6 +350,7 @@ function ExpressionRow<T>({ owner, api, heading, emotion, expression, price, com
     const [cropError, setCropError] = useState<string | null>(null);
     const [cropping, setCropping] = useState(false);
     const fileInput = useRef<HTMLInputElement>(null);
+    const cutoutInput = useRef<HTMLInputElement>(null);
     const row = useRef<HTMLDivElement>(null);
     const undo = useUndo();
     const label = EMOTION_LABEL[emotion];
@@ -403,6 +404,21 @@ function ExpressionRow<T>({ owner, api, heading, emotion, expression, price, com
             const { picture, filename } = await preparedForUpload(file);
             return api.upload(emotion, picture, filename);
         });
+    };
+
+    /** A see-through picture made elsewhere becomes the cut-out, sent as it is so its transparency stays. */
+    const uploadCutout = async (event: ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        event.target.value = '';
+        if (!file) return;
+        await save(
+            'Uploading the cut-out…',
+            async () => {
+                const { picture, filename } = await preparedCutout(file);
+                return api.uploadCutout(emotion, picture, filename);
+            },
+            (message) => setError(`Couldn't use that cut-out for ${label}: ${message}`),
+        );
     };
 
     /** Reset acts at once, with an Undo that puts the picked square back (audit H3). */
@@ -476,7 +492,9 @@ function ExpressionRow<T>({ owner, api, heading, emotion, expression, price, com
                 )}
                 {!busy && expression && (
                     <span className="hint mt-0">
-                        {expression.cutoutPath ? 'Cut out: stands on the Backdrop in the novel view.' : 'Not cut out: shows with its own background in the novel view.'}
+                        {expression.cutoutPath
+                            ? 'Cut out: stands on the Backdrop in the novel view.'
+                            : 'Not cut out: shows with its own background in the novel view. Upload cut-out takes a see-through PNG or WebP made elsewhere, free.'}
                     </span>
                 )}
             </div>
@@ -533,6 +551,17 @@ function ExpressionRow<T>({ owner, api, heading, emotion, expression, price, com
                         {`Cut out · ~${usd(CUTOUT_PRICE_USD)}`}
                     </button>
                 )}
+                {expression && (
+                    <button
+                        type="button"
+                        className="button button-quiet"
+                        aria-label={`Upload a cut-out for ${label}`}
+                        disabled={busy !== null}
+                        onClick={() => cutoutInput.current?.click()}
+                    >
+                        Upload cut-out
+                    </button>
+                )}
                 {expression?.crop && (
                     <button
                         type="button"
@@ -567,6 +596,17 @@ function ExpressionRow<T>({ owner, api, heading, emotion, expression, price, com
                 tabIndex={-1}
                 onChange={(event) => void upload(event)}
             />
+            {expression && (
+                <input
+                    ref={cutoutInput}
+                    className="visually-hidden"
+                    type="file"
+                    accept="image/png,image/webp"
+                    aria-label={`See-through cut-out for ${label}`}
+                    tabIndex={-1}
+                    onChange={(event) => void uploadCutout(event)}
+                />
+            )}
             {error && (
                 <p className="field-error m-0 basis-full" role="alert">
                     {error}

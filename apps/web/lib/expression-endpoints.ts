@@ -11,6 +11,8 @@ export interface ExpressionEndpoints<T> {
     draw(emotion: FaceEmotion): Promise<T>;
     cutOut(emotion: FaceEmotion): Promise<T>;
     upload(emotion: FaceEmotion, picture: Blob, filename: string): Promise<T>;
+    /** A see-through picture made elsewhere, kept as the Expression's cut-out (.scratch/stage-pictures/spec.md, "Upload a cut-out"). */
+    uploadCutout(emotion: FaceEmotion, picture: Blob, filename: string): Promise<T>;
     setCrop(emotion: FaceEmotion, crop: PortraitCrop): Promise<T>;
     clearCrop(emotion: FaceEmotion): Promise<T>;
     remove(emotion: FaceEmotion): Promise<T>;
@@ -29,6 +31,11 @@ export function expressionEndpoints<T>(base: string): ExpressionEndpoints<T> {
             const form = new FormData();
             form.append('image', picture, filename);
             return apiFetch<T>(one(emotion), { method: 'PUT', body: form });
+        },
+        uploadCutout: (emotion, picture, filename) => {
+            const form = new FormData();
+            form.append('image', picture, filename);
+            return apiFetch<T>(`${one(emotion)}/cutout`, { method: 'PUT', body: form });
         },
         setCrop: (emotion, crop) => apiSend<T>('PUT', `${one(emotion)}/crop`, crop),
         clearCrop: (emotion) => apiSend<T>('DELETE', `${one(emotion)}/crop`),
