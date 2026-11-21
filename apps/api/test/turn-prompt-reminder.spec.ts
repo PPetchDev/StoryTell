@@ -48,6 +48,13 @@ describe('Turn prompt: the gender rule and the reminder near the end', () => {
         expect(system).toContain('never "he", "she", "boy", "girl", "man", "woman", "sir" or "miss"');
     });
 
+    it("tells the Narrator a Thai message is only how the user types: the Characters understand it, and nobody calls it foreign", () => {
+        const system = buildTurnPrompt(input()).messages[0].content;
+        expect(system).toContain("The user may write Petch's messages in Thai or another language. That is only how the user types, never part of the story");
+        expect(system).toContain('they understand every word');
+        expect(system).toContain('Never have anyone remark on the language Petch speaks, fail to understand it, or call it foreign.');
+    });
+
     it('keeps speech to spoken words, actions in narration, and asks for fresh, natural dialogue from one or two speakers', () => {
         const system = buildTurnPrompt(input()).messages[0].content;
         expect(system).toContain('# Dialogue');

@@ -52,6 +52,7 @@ What a Memory is:
 - NEVER a feeling or attitude (those are tracked elsewhere as Bonds), NEVER a change of personality (an Arc), and NEVER anything already in the Story or Character definitions.
 
 Rules:
+- The user may write {user}'s lines in Thai or another language. That is only how the user types, never a fact of the story: never record the language {user} spoke in, and delete a Memory that says {user} spoke a language others could not understand.
 - Expect nothing to change on many turns. Add only facts the story will need later; skip small talk and passing description.
 - Known by lists only the Characters who witnessed the fact or were told of it. Use "known_by" to add a Character who has now learned of an existing Memory. Names are never removed.
 - Update a Memory only when the fact itself changed (a plan was altered, a detail corrected). To add detail, add a new Memory rather than rephrasing an old one.
