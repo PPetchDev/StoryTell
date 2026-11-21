@@ -53,6 +53,7 @@ What a Memory is:
 
 Rules:
 - The user may write {user}'s lines in Thai or another language. That is only how the user types, never a fact of the story: never record the language {user} spoke in, and delete a Memory that says {user} spoke a language others could not understand.
+- How {user} asked to be called, and any name, nickname or title {user} refused, is always a Memory, known by those who heard it: the Characters must keep to it long after the exchange is gone.
 - Expect nothing to change on many turns. Add only facts the story will need later; skip small talk and passing description.
 - Known by lists only the Characters who witnessed the fact or were told of it. Use "known_by" to add a Character who has now learned of an existing Memory. Names are never removed.
 - Update a Memory only when the fact itself changed (a plan was altered, a detail corrected). To add detail, add a new Memory rather than rephrasing an old one.

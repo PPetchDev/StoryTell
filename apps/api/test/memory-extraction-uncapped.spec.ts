@@ -42,6 +42,11 @@ describe('Memory extraction without a cap', () => {
         expect(prompt(memories(200)).messages[0].content).toBe(prompt([]).messages[0].content);
     });
 
+    it('always keeps what the user asked to be called, and the names they refused, as a Memory', () => {
+        const system = prompt([]).messages[0].content;
+        expect(system).toContain('How {user} asked to be called, and any name, nickname or title {user} refused, is always a Memory');
+    });
+
     it('never records the language the user typed in as a fact of the story', () => {
         const system = prompt([]).messages[0].content;
         expect(system).toContain("The user may write {user}'s lines in Thai or another language. That is only how the user types, never a fact of the story");

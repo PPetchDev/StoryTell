@@ -48,6 +48,12 @@ describe('Turn prompt: the gender rule and the reminder near the end', () => {
         expect(system).toContain('never "he", "she", "boy", "girl", "man", "woman", "sir" or "miss"');
     });
 
+    it("tells the Narrator that the name the worn identity asked for beats the cards' nicknames and the Setting's titles", () => {
+        const system = buildTurnPrompt(input()).messages[0].content;
+        expect(system).toContain("What Petch has asked to be called binds every Character, above their cards, their example lines and any title the Setting gives Petch");
+        expect(system).toContain('none goes on using a name Petch refused.');
+    });
+
     it("tells the Narrator a Thai message is only how the user types: the Characters understand it, and nobody calls it foreign", () => {
         const system = buildTurnPrompt(input()).messages[0].content;
         expect(system).toContain("The user may write Petch's messages in Thai or another language. That is only how the user types, never part of the story");
