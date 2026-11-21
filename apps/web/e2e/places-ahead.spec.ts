@@ -80,3 +80,36 @@ test('a Place is added, described and drawn ahead: day first, evening after it; 
     await card.getByRole('button', { name: 'Remove', exact: true }).click();
     await expect(card.getByRole('listitem', { name: "Rin's tree-house" })).toHaveCount(0);
 });
+
+test('a picture made elsewhere is uploaded as a Place in any light, night before day, with no drawing', async ({ page, request }) => {
+    await page.goto('/settings');
+    const storyId = (await (await request.post('/api/stories', { data: { title: 'The Moonwood' } })).json()).id as number;
+    madeStories.push(storyId);
+    expect((await request.post(`/api/stories/${storyId}/places`, { data: { name: 'The harekin cottage' } })).ok()).toBe(true);
+
+    await page.goto(`/stories/${storyId}?tab=style`);
+    const card = await openCard(page, 'Places');
+    const place = card.getByRole('listitem', { name: 'The harekin cottage' });
+    await expect(place.getByRole('button', { name: 'Draw The harekin cottage, night' })).toBeDisabled();
+
+    // Night, with no day picture: the file picker opens for that light.
+    const chooser = page.waitForEvent('filechooser');
+    await place.getByRole('button', { name: 'Upload a picture of The harekin cottage, night' }).click();
+    const png = Buffer.from(await picture(page, '#1d2747'), 'base64');
+    await (await chooser).setFiles({ name: 'cottage-night.png', mimeType: 'image/png', buffer: png });
+
+    await expect(place.getByRole('img', { name: 'The harekin cottage, night' })).toBeVisible();
+    await expect(place.getByRole('img', { name: 'The harekin cottage, day' })).toHaveCount(0);
+    const pictures = (await (await request.get(`/api/stories/${storyId}/places`)).json()).places[0].pictures;
+    expect(pictures.day).toBeNull();
+    expect(pictures.night).toMatchObject({ status: 'ready' });
+    const { calls } = (await (await request.get(`${FAKE}/calls`)).json()) as { calls: Array<{ method: string; request: { kind?: string } }> };
+    expect(calls.filter((call) => call.method === 'generateImage' && call.request.kind === 'place_picture')).toEqual([]);
+
+    for (const width of [360, 320]) {
+        await page.setViewportSize({ width, height: 740 });
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+        const box = (await place.boundingBox())!;
+        expect(box.x + box.width).toBeLessThanOrEqual(width + 0.5);
+    }
+});

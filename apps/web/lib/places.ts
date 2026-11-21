@@ -43,5 +43,10 @@ export const placesApi = {
     change: (storyId: number, placeId: number, fields: { name?: string; looks?: string }) => apiSend<Places>('PATCH', `/stories/${storyId}/places/${placeId}`, fields),
     remove: (storyId: number, placeId: number) => apiSend<Places>('DELETE', `/stories/${storyId}/places/${placeId}`),
     draw: (storyId: number, placeId: number, light: PlaceLight) => apiSend<Places>('POST', `/stories/${storyId}/places/${placeId}/draw`, { light }),
+    upload: (storyId: number, placeId: number, light: PlaceLight, picture: Blob, filename: string) => {
+        const form = new FormData();
+        form.append('image', picture, filename);
+        return apiFetch<Places>(`/stories/${storyId}/places/${placeId}/pictures/${light}`, { method: 'PUT', body: form });
+    },
     removeMet: (storyId: number, key: string) => apiSend<Places>('POST', `/stories/${storyId}/places/met/remove`, { key }),
 };

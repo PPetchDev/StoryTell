@@ -38,6 +38,12 @@ export class DrawPlaceRequestBodyDTO {
     light: StageLight;
 }
 
+/** Swagger's picture of the multipart upload. */
+export class UploadPlaceRequestBodyDTO {
+    @ApiProperty({ type: 'string', format: 'binary', description: 'A PNG, JPEG or WebP picture, at most 15 MB.' })
+    image: unknown;
+}
+
 export class RemoveMetPlaceRequestBodyDTO {
     @ApiProperty({ description: 'The place as play wrote it (its key).' })
     @IsString()

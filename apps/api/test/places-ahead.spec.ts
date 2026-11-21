@@ -1,9 +1,10 @@
-import { access, readdir, rm } from 'node:fs/promises';
+import { access, readdir, readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 
 import { ProviderOutageError } from '../src/errors/model-gateway.errors.js';
 import { judgeDetailsSection } from '../src/manager/chat/details/details.js';
 import { StageManagerService } from '../src/manager/chat/stage/stage.service.js';
+import { StageModelService } from '../src/model/stage/stage.service.js';
 import { startTestApp, TestApp } from './harness/test-app.js';
 
 // .scratch/places-ahead/spec.md: a Story's places, named, described and drawn before play.
@@ -145,6 +146,53 @@ describe('Places drawn ahead (HTTP)', () => {
 
         const after = (await t.http.get(places(storyId)).expect(200)).body as Places;
         expect(after.places[0].pictures.day).toEqual(first.places[0].pictures.day);
+    });
+
+    it('takes an uploaded picture in any light, with no day picture and no call, in place of the old one', async () => {
+        const storyId = await createStory();
+        const { places: [house] } = (await t.http.post(places(storyId)).send({ name: 'The hut' }).expect(201)).body as Places;
+        const upload = (light: string, bytes: Buffer, name = 'hut.jpg') => t.http.put(`${places(storyId)}/${house.id}/pictures/${light}`).attach('image', bytes, name);
+
+        const night = (await upload('night', jpeg('night-1')).expect(200)).body as Places;
+        const firstPath = night.places[0].pictures.night!.imagePath!;
+        expect(night.places[0].pictures).toEqual({
+            day: null,
+            evening: null,
+            night: { status: 'ready', imagePath: expect.stringMatching(new RegExp(`^stage/story-${storyId}/place-[0-9a-f]+\.jpg$`)) },
+        });
+        expect(await readFile(path.join(t.imageDir, firstPath))).toEqual(jpeg('night-1'));
+
+        const again = (await upload('night', jpeg('night-2')).expect(200)).body as Places;
+        const secondPath = again.places[0].pictures.night!.imagePath!;
+        expect(secondPath).not.toBe(firstPath);
+        expect(await exists(path.join(t.imageDir, firstPath))).toBe(false);
+        expect(await readFile(path.join(t.imageDir, secondPath))).toEqual(jpeg('night-2'));
+        expect(t.gateway.imageCalls('place_picture')).toHaveLength(0);
+
+        // A drawn day replaced by an upload; evening can then be drawn from the uploaded day.
+        const day = (await upload('day', jpeg('day-up')).expect(200)).body as Places;
+        expect(day.places[0].pictures.day).toMatchObject({ status: 'ready' });
+        t.gateway.scriptImage('place_picture', picture('evening'));
+        await t.http.post(`${places(storyId)}/${house.id}/draw`).send({ light: 'evening' }).expect(201);
+        expect(t.gateway.imageCalls('place_picture')[0].referenceImages).toEqual([{ bytes: jpeg('day-up'), mimeType: 'image/jpeg' }]);
+    });
+
+    it('refuses an upload with no file, not a picture, a light it does not know, a Place not there, or while that light draws', async () => {
+        const storyId = await createStory();
+        const { places: [house] } = (await t.http.post(places(storyId)).send({ name: 'The hut' }).expect(201)).body as Places;
+        const url = (light: string, placeId = house.id) => `${places(storyId)}/${placeId}/pictures/${light}`;
+
+        expect((await t.http.put(url('day')).expect(400)).body.error.code).toBe('400.002.008');
+        expect((await t.http.put(url('day')).attach('image', Buffer.from('not a picture'), 'notes.txt').expect(415)).body.error.code).toBe('415.002.009');
+        await t.http.put(url('noon')).attach('image', jpeg('x'), 'x.jpg').expect(400);
+        await t.http.put(url('day', 999999)).attach('image', jpeg('x'), 'x.jpg').expect(404);
+
+        await t.app.get(StageModelService).claimPlaceDrawing(storyId, 'the hut', 'evening');
+        expect((await t.http.put(url('evening')).attach('image', jpeg('x'), 'x.jpg').expect(409)).body.error.code).toBe('409.003.162');
+
+        const after = (await t.http.get(places(storyId)).expect(200)).body as Places;
+        expect(after.places[0].pictures.day).toBeNull();
+        expect(await readdir(t.imageDir)).toEqual([]);
     });
 
     it('play uses a Place drawn ahead: the Judge names it, in any case, and nothing is drawn again', async () => {

@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 
 import { InvalidPlaceError, NoDayPlacePictureError, PlaceBeingDrawnError, PlaceNotFoundError } from '../../errors/story.errors.js';
+import { UnsupportedImageError } from '../../errors/image.errors.js';
 import { OutOfCreditError } from '../../errors/model-gateway.errors.js';
 import type { PlacePictureEntity, StageLight, StoryPlaceEntity } from '../../model/stage/stage.entities.js';
 import { StageModelService } from '../../model/stage/stage.service.js';
@@ -139,6 +140,32 @@ export class PlaceManagerService {
             await this.stage.undoPlaceDrawing(claim.id, claim.replaces);
             throw error;
         }
+        return this.view(storyId);
+    }
+
+    /**
+     * Stores an uploaded picture as the Place in a light, replacing any there. Any light can be
+     * uploaded, with or without a day picture; the type is read from the bytes. Refused while
+     * that light is being drawn.
+     */
+    async upload(storyId: number, placeId: number, light: StageLight, bytes: Buffer): Promise<PlacesView> {
+        await this.storyManager.getStory(storyId);
+        const place = await this.found(storyId, placeId);
+        const mimeType = ImageStoreService.sniffMimeType(bytes);
+        if (!mimeType) throw new UnsupportedImageError();
+        const claim = await this.stage.claimPlaceDrawing(storyId, place.placeKey, light);
+        if (claim === null) throw new PlaceBeingDrawnError();
+        const imagePath = `stage/story-${storyId}/place-${randomBytes(6).toString('hex')}.${ImageStoreService.extensionFor(mimeType)!}`;
+        try {
+            await this.imageStore.write(imagePath, bytes);
+            await this.stage.finishPlace(claim.id, imagePath);
+        } catch (error) {
+            await this.stage.undoPlaceDrawing(claim.id, claim.replaces);
+            await this.removeFiles([imagePath]);
+            throw error;
+        }
+        if (claim.replaces && claim.replaces !== imagePath) await this.removeFiles([claim.replaces]);
+        this.logger.log(`Story ${storyId}: took an uploaded picture of the Place "${place.placeKey}" (${light})`);
         return this.view(storyId);
     }
 

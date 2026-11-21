@@ -84,3 +84,18 @@ The author usually knows the main places before play: the home base, the capital
 - Rin's tree-house was drawn ahead on live, in all three lights, for $0.18: $0.06 a picture, the same for the evening and night edits as for day.
 - The Story's backdrop was then set to Place, but Chat 1 still showed the Cover. A Chat answered its stage, and with it the place picture, only with Dress the stage on.
 - Now a Chat with the switch off answers the place pictures already drawn, with no outfits and nothing drawn, so the Place backdrop and the novel view show them. With none drawn for its places, it answers no stage, as before.
+
+## Upload (2026-11-21)
+
+The Venice credit ran out, and the author wanted to make the pictures with another tool (Codex) from the prompts in `story-5-place-prompts.md`, then put them on the Places.
+
+- Each light of a Place has Upload beside Draw: the author's own PNG, JPEG or WebP picture, at most 15 MB, is that light's picture, replacing any there.
+- An upload costs nothing and calls no model.
+- Any light can be uploaded, night before day included. Draw evening and night still wait for a day picture, and an uploaded day counts: they are drawn as edits of it.
+- The browser turns the picture upright, cuts it to 2048 px on its longest side and sends it as JPEG, as for a Cover.
+- `PUT …/places/:placeId/pictures/:light` (multipart field `image`). It is refused:
+  - with no file (400.002.008);
+  - when the file is not a picture (415.002.009);
+  - when it is over 15 MB (413.002.010);
+  - while that light is being drawn (409.003.162).
+- An uploaded picture is a `place_picture` row like a drawn one, so play, the Place backdrop and every Chat use it the same way.

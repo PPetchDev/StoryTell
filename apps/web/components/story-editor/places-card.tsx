@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { ChangeEvent, useEffect, useRef, useState } from 'react';
 
 import { useConnection } from '@/components/connection';
 import { ApiError, ApiUnreachableError } from '@/lib/api';
+import { preparedForUpload } from '@/lib/cover';
 import { MetPlace, Place, PLACE_LIGHT_LABEL, PLACE_LIGHTS, PLACE_LOOKS_MAX, PLACE_NAME_MAX, PlaceLight, PlacePictures, Places, placesApi } from '@/lib/places';
 import { referenceImageUrl } from '@/lib/story';
 import { usd } from '@/lib/types';
@@ -75,7 +76,7 @@ export function PlacesCard({ storyId, loreNames }: PlacesCardProps) {
             <p className={NOTE}>
                 The places the story goes to, drawn before you play, for the novel view&apos;s stage and the Place backdrop. When a Chat is at
                 one, the app uses its name, so its picture shows at once. Day is drawn from the name and how it looks; evening and night are
-                drawn from day. On image credit, {each}.
+                drawn from day. On image credit, {each}. Or upload a picture you made elsewhere, in any light, free.
             </p>
             {loadError && <p className="field-error m-0 mb-2">{loadError}</p>}
             {data && (
@@ -158,8 +159,12 @@ function PlaceItem({ storyId, place, price, write }: { storyId: number; place: P
     const [name, setName] = useState(place.name);
     const [looks, setLooks] = useState(place.looks);
     const [error, setError] = useState<string | null>(null);
-    /** The light being drawn now from this page. */
+    /** The light being drawn or uploaded now from this page. */
     const [drawing, setDrawing] = useState<PlaceLight | null>(null);
+    const [uploading, setUploading] = useState(false);
+    /** The light the file picker is open for. */
+    const uploadLight = useRef<PlaceLight>('day');
+    const fileInput = useRef<HTMLInputElement>(null);
     useEffect(() => setName(place.name), [place.name]);
     useEffect(() => setLooks(place.looks), [place.looks]);
 
@@ -176,6 +181,23 @@ function PlaceItem({ storyId, place, price, write }: { storyId: number; place: P
         setDrawing(light);
         await write(() => placesApi.draw(storyId, place.id, light), setError);
         setDrawing(null);
+    };
+    const pickFile = (light: PlaceLight) => {
+        uploadLight.current = light;
+        fileInput.current?.click();
+    };
+    const upload = async (event: ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        event.target.value = '';
+        if (!file) return;
+        const light = uploadLight.current;
+        setError(null);
+        setDrawing(light);
+        setUploading(true);
+        const { picture, filename } = await preparedForUpload(file);
+        await write(() => placesApi.upload(storyId, place.id, light, picture, filename), setError);
+        setDrawing(null);
+        setUploading(false);
     };
     const drawLabel = price === null ? 'Draw' : `Draw · ${usd(price)}`;
 
@@ -216,36 +238,58 @@ function PlaceItem({ storyId, place, price, write }: { storyId: number; place: P
                                 <span className="font-semibold">{PLACE_LIGHT_LABEL[light]}</span>
                                 {busy ? (
                                     <span className="hint mt-0" role="status">
-                                        Drawing…
+                                        {uploading && drawing === light ? 'Uploading…' : 'Drawing…'}
                                     </span>
-                                ) : drawn ? (
-                                    <ConfirmButton
-                                        small
-                                        label="Draw again"
-                                        ariaLabel={`Draw ${place.name} again, ${PLACE_LIGHT_LABEL[light].toLowerCase()}`}
-                                        question={`Draw ${place.name} (${PLACE_LIGHT_LABEL[light].toLowerCase()}) again?`}
-                                        warning="The new picture replaces this one."
-                                        confirmLabel={price === null ? 'Draw again' : `Draw again · ${usd(price)}`}
-                                        disabled={drawing !== null}
-                                        onConfirm={() => draw(light)}
-                                    />
                                 ) : (
-                                    <button
-                                        type="button"
-                                        className="button button-quiet button-small"
-                                        aria-label={`Draw ${place.name}, ${PLACE_LIGHT_LABEL[light].toLowerCase()}`}
-                                        disabled={needsDay || drawing !== null}
-                                        onClick={() => void draw(light)}
-                                    >
-                                        {drawLabel}
-                                    </button>
+                                    <div className="flex flex-wrap gap-2">
+                                        {drawn ? (
+                                            <ConfirmButton
+                                                small
+                                                label="Draw again"
+                                                ariaLabel={`Draw ${place.name} again, ${PLACE_LIGHT_LABEL[light].toLowerCase()}`}
+                                                question={`Draw ${place.name} (${PLACE_LIGHT_LABEL[light].toLowerCase()}) again?`}
+                                                warning="The new picture replaces this one."
+                                                confirmLabel={price === null ? 'Draw again' : `Draw again · ${usd(price)}`}
+                                                disabled={drawing !== null}
+                                                onConfirm={() => draw(light)}
+                                            />
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                className="button button-quiet button-small"
+                                                aria-label={`Draw ${place.name}, ${PLACE_LIGHT_LABEL[light].toLowerCase()}`}
+                                                disabled={needsDay || drawing !== null}
+                                                onClick={() => void draw(light)}
+                                            >
+                                                {drawLabel}
+                                            </button>
+                                        )}
+                                        <button
+                                            type="button"
+                                            className="button button-quiet button-small"
+                                            aria-label={`Upload a picture of ${place.name}, ${PLACE_LIGHT_LABEL[light].toLowerCase()}`}
+                                            disabled={drawing !== null}
+                                            onClick={() => pickFile(light)}
+                                        >
+                                            Upload
+                                        </button>
+                                    </div>
                                 )}
-                                {needsDay && !busy && <span className="hint mt-0">After day</span>}
+                                {needsDay && !busy && <span className="hint mt-0">Draw after day</span>}
                             </div>
                         </li>
                     );
                 })}
             </ul>
+            <input
+                ref={fileInput}
+                className="visually-hidden"
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                aria-label={`Picture of ${place.name}`}
+                tabIndex={-1}
+                onChange={(event) => void upload(event)}
+            />
             {error && (
                 <p className="field-error m-0" role="alert">
                     {error}
