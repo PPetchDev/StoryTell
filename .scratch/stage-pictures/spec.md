@@ -31,6 +31,7 @@ The user also wants more feelings for intimate scenes: one "love" covered tender
     - Afterglow breathes slowly.
   - With reduced motion it stands still.
   - A picture without a cut-out shows as before, whole.
+  - It stands in front of the place picture, as a cut-out does. Until 2026-11-21 it was unpositioned, so the place picture (positioned, earlier in the page) covered it once its fade-in ended: an uploaded Expression showed for a moment and went.
 - **The Story editor.**
   - The six intimate feelings sit under their own heading, "Intimate scenes (18+)".
   - **Draw all 13** redraws every Expression in turn, with its price, and stops at the first failure. Since 2026-11-20 it runs on the server and draws only what is missing: `.scratch/expression-drawing/spec.md`.

@@ -114,3 +114,67 @@ test('Dress the stage draws the place behind the stage and Nara in her outfit, p
     await page.reload();
     await expect(page.locator('[data-backdrop] img')).toHaveAttribute('src', `/api/images/${stage.placePicturePath}`);
 });
+
+test('a whole Expression with no cut-out stands in front of the place, not behind it', async ({ page, request }) => {
+    await page.goto('/settings');
+    const storyId = (await (await request.post('/api/stories', { data: { title: 'The Steppe' } })).json()).id as number;
+    madeStories.push(storyId);
+    await request.patch(`/api/stories/${storyId}`, { data: { setting: 'A camp on the steppe.', opening: 'The fire is low.\n\n@Nara: Stay a while.' } });
+    await request.patch(`/api/stories/${storyId}/role`, { data: { name: 'Ash', description: 'A guest.' } });
+    const made = await request.post(`/api/stories/${storyId}/characters`, { data: { name: 'Nara', appearance: 'Tall, dark hair.', personality: 'Warm.', voice: 'Low.' } });
+    const naraId = ((await made.json()).characters as { id: number }[])[0].id;
+    // An uploaded Expression: an upload is never cut out, so the stage shows it whole.
+    await request.put(`/api/stories/${storyId}/characters/${naraId}/expressions/joy`, {
+        multipart: { image: { name: 'joy.png', mimeType: 'image/png', buffer: Buffer.from(await picture(page, '#ffc46b'), 'base64') } },
+    });
+    const chatId = (await (await request.post(`/api/stories/${storyId}/chats`)).json()).id as number;
+    await request.patch(`/api/stories/${storyId}/chats/${chatId}`, { data: { dressStage: true } });
+
+    // A turn into Nara's tent, her line Joy, and no outfit to draw.
+    const judge = JSON.stringify({
+        bond_changes: [],
+        arc_steps: [],
+        scene: { move_on: false, reason: 'not yet' },
+        details: { place: 'Nara’s tent', outfits: [] },
+        time_of_day: 'night',
+        expressions: [{ line: 1, emotion: 'joy' }],
+    });
+    await request.post(`${FAKE}/image`, { data: { kind: 'place_picture', replies: [{ imageBase64: await picture(page, '#203050'), mimeType: 'image/png' }] } });
+    await request.post(`${FAKE}/text`, { data: { kind: 'turn', replies: [{ text: 'The lamp gutters.\n\n@Nara: You came back.', model: 'glm-5.3' }] } });
+    await request.post(`${FAKE}/text`, { data: { kind: 'judge', replies: [judge] } });
+    await request.post(`${FAKE}/text`, { data: { kind: 'memory_extraction', replies: [NO_OPS] } });
+    await page.goto(`/stories/${storyId}/chats/${chatId}`);
+    await page.getByRole('form', { name: 'Composer' }).getByRole('textbox').fill('I missed you.');
+    await page.getByRole('form', { name: 'Composer' }).getByRole('button', { name: 'Send' }).click();
+    await expect.poll(async () => {
+        const chat = await (await request.get(`/api/stories/${storyId}/chats/${chatId}`)).json();
+        return chat.stage ? `${chat.stage.placePicturePath !== null}/${chat.stage.drawing}` : 'none';
+    }, { timeout: 20_000 }).toBe('true/0');
+    await page.reload();
+
+    await page.getByRole('button', { name: 'Visual novel view' }).click();
+    const root = page.getByRole('region', { name: 'Visual novel view' });
+    const box = root.getByRole('region', { name: 'Shown line' });
+    await expect(box.locator('[data-line]')).toContainText('The lamp gutters.');
+    await root.getByRole('button', { name: 'Next', exact: true }).click();
+    await expect(box.locator('[data-line]')).toContainText('You came back.');
+    const figure = root.locator('[data-stage-picture]');
+    await expect(figure).toHaveAttribute('src', /\/api\/images\/expressions\/.*joy/);
+    await expect(root.locator('[data-stage-place]')).toBeVisible();
+    await expect.poll(() => root.locator('[data-stage-place]').evaluate((place: HTMLImageElement) => place.complete && place.naturalWidth > 0)).toBe(true);
+
+    // Once its fade-in is over: while it runs the figure is a layer of its own and shows on top, which
+    // is why it showed for a moment and then went behind the place (2026-11-21).
+    await figure.evaluate((element) => Promise.all(element.getAnimations().map((animation) => animation.finished)));
+    // What is painted on top at the figure's middle: the place counts too (its pointer-events are off only for taps).
+    const onTop = await page.evaluate(() => {
+        const place = document.querySelector<HTMLElement>('[data-stage-place]')!;
+        const figure = document.querySelector<HTMLElement>('[data-stage-picture]')!;
+        place.style.pointerEvents = 'auto';
+        const r = figure.getBoundingClientRect();
+        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        place.style.pointerEvents = '';
+        return hit === figure ? 'figure' : hit === place ? 'place' : (hit?.tagName ?? 'nothing');
+    });
+    expect(onTop).toBe('figure');
+});

@@ -467,11 +467,13 @@ function SpeakerPicture({ step, cast, sprites }: { step: Extract<NovelStep, { ki
         );
         return <div className="absolute inset-0 flex justify-center overflow-hidden">{figure}</div>;
     }
+    // Positioned (`relative`), as the cut-out's wrapper is, so it paints over the place picture, which is
+    // positioned too and comes first; unpositioned, the place covered it once it loaded (2026-11-21).
     const picture = whole ? (
         // eslint-disable-next-line @next/next/no-img-element -- served by the API from the image folder
-        <img className="block h-full max-w-full object-contain object-bottom motion-safe:animate-fade-in" src={whole} alt={step.speakerName} data-stage-picture="" draggable={false} />
+        <img className="relative block h-full max-w-full object-contain object-bottom motion-safe:animate-fade-in" src={whole} alt={step.speakerName} data-stage-picture="" draggable={false} />
     ) : (
-        <span className="grid aspect-2/3 h-[min(100%,15rem)] place-items-center rounded-xl text-[4.5rem] leading-none font-bold text-on-character motion-safe:animate-fade-in" style={{ background: colour }} role="img" aria-label={step.speakerName} data-stage-picture="">
+        <span className="relative grid aspect-2/3 h-[min(100%,15rem)] place-items-center rounded-xl text-[4.5rem] leading-none font-bold text-on-character motion-safe:animate-fade-in" style={{ background: colour }} role="img" aria-label={step.speakerName} data-stage-picture="">
             {initialOf(step.speakerName)}
         </span>
     );
@@ -491,7 +493,7 @@ function YourFacePicture({ step }: { step: Extract<NovelStep, { kind: 'user' }> 
         </div>
     ) : (
         // eslint-disable-next-line @next/next/no-img-element -- served by the API from the image folder
-        <img className="block h-full max-w-full object-contain object-bottom motion-safe:animate-fade-in" src={src} alt={step.identityName} data-stage-picture="" data-your-face={face.emotion} draggable={false} />
+        <img className="relative block h-full max-w-full object-contain object-bottom motion-safe:animate-fade-in" src={src} alt={step.identityName} data-stage-picture="" data-your-face={face.emotion} draggable={false} />
     );
 }
 
