@@ -232,6 +232,31 @@ describe("The app's own background remover", () => {
             expect(gateway.cutoutPriceUsd()).toBe(0);
         });
 
+        it('goes to Venice when Venice is asked for by name, though its own remover is there', async () => {
+            const net = recordedFetch([{ bytes: Buffer.from('venice cut-out'), contentType: 'image/png' }]);
+            const { gateway, records } = gatewayUnderTest(net.fetch, { ownCutout: { available: () => true, removeBackground: async () => cut } });
+
+            const result = await gateway.generateImage({ ...request, cutoutBy: 'venice' });
+
+            expect(net.requests).toHaveLength(1);
+            expect(result).toMatchObject({ model: 'background-remove', costUsd: 0.03 });
+            expect(records).toEqual([expect.objectContaining({ host: 'venice', costUsd: 0.03 })]);
+            // By default it is still free here.
+            expect(gateway.cutoutPriceUsd()).toBe(0);
+            expect(gateway.ownCutoutAvailable()).toBe(true);
+        });
+
+        it('refuses its own remover asked for by name where the model file is missing, with no call and no record', async () => {
+            const net = recordedFetch([]);
+            const { gateway, records } = gatewayUnderTest(net.fetch, { ownCutout: { available: () => false, removeBackground: async () => cut } });
+
+            await expect(gateway.generateImage({ ...request, cutoutBy: 'own' })).rejects.toMatchObject({ code: '409.002.015' });
+
+            expect(net.requests).toEqual([]);
+            expect(records).toEqual([]);
+            expect(gateway.ownCutoutAvailable()).toBe(false);
+        });
+
         it("goes to Venice at Venice's price where the model file is missing", async () => {
             const net = recordedFetch([{ bytes: Buffer.from('venice cut-out'), contentType: 'image/png' }]);
             const { gateway, records } = gatewayUnderTest(net.fetch, { ownCutout: { available: () => false, removeBackground: async () => cut } });

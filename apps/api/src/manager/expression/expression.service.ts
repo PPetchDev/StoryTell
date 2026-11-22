@@ -7,7 +7,7 @@ import { CharacterNotFoundError, ExpressionNotFoundError, NoReferenceImageToDraw
 import { ExpressionEmotion } from '../../model/story/emotion.js';
 import { CharacterResponse, PortraitCrop } from '../../model/story/entities/character.entity.js';
 import { StoryModelService } from '../../model/story/story.service.js';
-import { ImageData, ModelGateway } from '../../service/model-gateway/model-gateway.js';
+import { CutoutMaker, ImageData, ModelGateway } from '../../service/model-gateway/model-gateway.js';
 import { ImageStoreService } from '../../store/image/image-store.service.js';
 import { StoryDetail, StoryManagerService } from '../story/story.service.js';
 import { expressionPrompt } from './prompt.js';
@@ -65,13 +65,15 @@ export class ExpressionManagerService {
      * one `image_cutout` call. Refused before the call without the Expression, or with the Venice
      * pool known to be used up; a failed call is the error.
      */
-    async cutOut(storyId: number, characterId: number, emotion: ExpressionEmotion): Promise<StoryDetail> {
+    async cutOut(storyId: number, characterId: number, emotion: ExpressionEmotion, by?: CutoutMaker): Promise<StoryDetail> {
         const character = await this.findCharacter(storyId, characterId);
         const expression = character.expressions.find((one) => one.emotion === emotion);
         if (!expression) throw new ExpressionNotFoundError();
-        if (await this.imageCreditOut()) throw new OutOfCreditError('image');
+        // Only Venice's remover spends image credit; the app's own costs nothing (.scratch/own-cutout/spec.md).
+        const paid = by === 'venice' || !this.gateway.ownCutoutAvailable();
+        if (paid && (await this.imageCreditOut())) throw new OutOfCreditError('image');
         const bytes = await this.imageStore.read(expression.imagePath);
-        await this.cutOutExpression(storyId, characterId, emotion, expression.imagePath, bytes, true);
+        await this.cutOutExpression(storyId, characterId, emotion, expression.imagePath, bytes, true, by);
         if (character.referenceImagePath && !character.referenceCutoutPath) {
             await this.cutOutReference(storyId, characterId, character.referenceImagePath, await this.imageStore.read(character.referenceImagePath));
         }
@@ -79,10 +81,10 @@ export class ExpressionManagerService {
     }
 
     /** Cuts out the picture now at `imagePath` and keeps it as that Expression's cut-out. Swallows a failure unless `rethrow`. */
-    private async cutOutExpression(storyId: number, characterId: number, emotion: ExpressionEmotion, imagePath: string, image: ImageData | Buffer, rethrow = false): Promise<void> {
+    private async cutOutExpression(storyId: number, characterId: number, emotion: ExpressionEmotion, imagePath: string, image: ImageData | Buffer, rethrow = false, by?: CutoutMaker): Promise<void> {
         let cutoutPath: string | null = null;
         try {
-            const cut = await this.cutOutImage(storyId, image);
+            const cut = await this.cutOutImage(storyId, image, by);
             cutoutPath = expressionImagePath(storyId, characterId, emotion, 'png').replace(/.png$/, '-cutout.png');
             await this.imageStore.write(cutoutPath, cut);
             const previous = await this.storyModel.setExpressionCutout(characterId, emotion, imagePath, cutoutPath);
@@ -112,9 +114,9 @@ export class ExpressionManagerService {
     }
 
     /** One `image_cutout` call; its PNG's bytes. */
-    private async cutOutImage(storyId: number, image: ImageData | Buffer): Promise<Buffer> {
+    private async cutOutImage(storyId: number, image: ImageData | Buffer, by?: CutoutMaker): Promise<Buffer> {
         const source: ImageData = Buffer.isBuffer(image) ? { bytes: image, mimeType: ImageStoreService.sniffMimeType(image) ?? 'image/jpeg' } : image;
-        const result = await this.gateway.generateImage({ kind: 'image_cutout', prompt: '', referenceImages: [source], servedFor: { storyId } });
+        const result = await this.gateway.generateImage({ kind: 'image_cutout', prompt: '', referenceImages: [source], ...(by ? { cutoutBy: by } : {}), servedFor: { storyId } });
         return result.image.bytes;
     }
 

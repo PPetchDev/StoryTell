@@ -154,19 +154,33 @@ test('the editor lists the intimate feelings under their own heading; an upload 
     // Desire is there, so Draw all draws only the other twenty (.scratch/expression-drawing/spec.md, .scratch/more-faces/spec.md).
     await expect(expressions.getByRole('button', { name: 'Draw the 20 missing Expressions of Nara' })).toBeVisible();
 
-    // The drawn Desire is cut out: no Cut out button.
+    // The drawn Desire is cut out, and can be cut out again by either maker (.scratch/own-cutout/spec.md, "A choice of two").
     await intimate.getByRole('button', { name: 'Desire Expression' }).click();
     const desire = expressions.getByRole('group', { name: 'Desire Expression' });
     await expect(desire).toContainText('Cut out: stands on the Backdrop in the novel view.');
-    await expect(desire.getByRole('button', { name: 'Cut out Desire' })).toHaveCount(0);
+    await expect(desire.getByRole('button', { name: 'Cut out Desire', exact: true })).toHaveText('Cut out · free');
+    await expect(desire.getByRole('button', { name: 'Cut out Desire with Venice' })).toHaveText('Venice cut-out · ~$0.03');
 
     // An uploaded Teasing is not; Cut out cuts it.
     await intimate.getByRole('button', { name: 'Teasing Expression, none yet' }).click();
     const teasing = expressions.getByRole('group', { name: 'Teasing Expression' });
     await teasing.getByLabel('Picture for Teasing').setInputFiles({ name: 'teasing.png', mimeType: 'image/png', buffer: await picture(page, '#7a4cc2') });
     await expect(teasing).toContainText('Not cut out: shows with its own background in the novel view.');
-    await teasing.getByRole('button', { name: 'Cut out Teasing' }).click();
+    const cutoutsAsked = async () =>
+        ((await (await request.get(`${FAKE}/calls`)).json()).calls as Array<{ method: string; request: { kind?: string; cutoutBy?: string } }>)
+            .filter((call) => call.method === 'generateImage' && call.request.kind === 'image_cutout')
+            .map((call) => call.request.cutoutBy ?? null);
+    const before = (await cutoutsAsked()).length;
+    await teasing.getByRole('button', { name: 'Cut out Teasing', exact: true }).click();
     await expect(teasing).toContainText('Cut out: stands on the Backdrop in the novel view.');
+    // The free one asks for the app's own remover; the other, over the cut-out now there, for Venice's.
+    expect((await cutoutsAsked()).slice(before)).toEqual(['own']);
+    const first = (await (await request.get(`/api/stories/${storyId}`)).json()).characters[0].expressions.find((one: { emotion: string }) => one.emotion === 'teasing').cutoutPath as string;
+    await teasing.getByRole('button', { name: 'Cut out Teasing with Venice' }).click();
+    await expect
+        .poll(async () => (await (await request.get(`/api/stories/${storyId}`)).json()).characters[0].expressions.find((one: { emotion: string }) => one.emotion === 'teasing').cutoutPath)
+        .not.toBe(first);
+    expect((await cutoutsAsked()).slice(before)).toEqual(['own', 'venice']);
 
     for (const width of [360, 320]) {
         await page.setViewportSize({ width, height: 740 });

@@ -13,7 +13,7 @@ import { ExpressionResponse } from '../../model/story/entities/character-express
 import { StoryModelService } from '../../model/story/story.service.js';
 import { FaceOwner } from '../../model/your-face/entities/identity-expression.entity.js';
 import { YourFaceModelService } from '../../model/your-face/your-face.service.js';
-import { ImageData, ModelGateway } from '../../service/model-gateway/model-gateway.js';
+import { CutoutMaker, ImageData, ModelGateway } from '../../service/model-gateway/model-gateway.js';
 import { ImageStoreService } from '../../store/image/image-store.service.js';
 import { ExpressionDrawing, emotionsToDraw } from '../expression/expression-drawing.service.js';
 import { expressionPrompt } from '../expression/prompt.js';
@@ -81,12 +81,14 @@ export class YourFaceManagerService {
     }
 
     /** Cuts out an Expression that is there: one `image_cutout` call; a failed call is the error. */
-    async cutOut(target: FaceTarget, emotion: FaceEmotion): Promise<StoryDetail | PersonaResponse> {
+    async cutOut(target: FaceTarget, emotion: FaceEmotion, by?: CutoutMaker): Promise<StoryDetail | PersonaResponse> {
         const owner = await this.find(target);
         const expression = owner.expressions.find((one) => one.emotion === emotion);
         if (!expression) throw new ExpressionNotFoundError();
-        if (await this.imageCreditOut()) throw new OutOfCreditError('image');
-        await this.cutOutExpression(owner, emotion, expression.imagePath, await this.imageStore.read(expression.imagePath), true);
+        // Only Venice's remover spends image credit; the app's own costs nothing (.scratch/own-cutout/spec.md).
+        const paid = by === 'venice' || !this.gateway.ownCutoutAvailable();
+        if (paid && (await this.imageCreditOut())) throw new OutOfCreditError('image');
+        await this.cutOutExpression(owner, emotion, expression.imagePath, await this.imageStore.read(expression.imagePath), true, by);
         return this.answer(target);
     }
 
@@ -254,7 +256,7 @@ export class YourFaceManagerService {
     }
 
     /** Cuts out the picture now at `imagePath` and keeps it as that Expression's cut-out. Swallows a failure unless `rethrow`. */
-    private async cutOutExpression(owner: Owner, emotion: FaceEmotion, imagePath: string, image: ImageData | Buffer, rethrow = false): Promise<void> {
+    private async cutOutExpression(owner: Owner, emotion: FaceEmotion, imagePath: string, image: ImageData | Buffer, rethrow = false, by?: CutoutMaker): Promise<void> {
         let cutoutPath: string | null = null;
         try {
             const source: ImageData = Buffer.isBuffer(image) ? { bytes: image, mimeType: ImageStoreService.sniffMimeType(image) ?? 'image/jpeg' } : image;
@@ -262,6 +264,7 @@ export class YourFaceManagerService {
                 kind: 'image_cutout',
                 prompt: '',
                 referenceImages: [source],
+                ...(by ? { cutoutBy: by } : {}),
                 ...(owner.storyId !== null ? { servedFor: { storyId: owner.storyId } } : {}),
             });
             cutoutPath = owner.pathFor(emotion, 'png').replace(/\.png$/, '-cutout.png');

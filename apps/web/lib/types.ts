@@ -57,6 +57,10 @@ export interface SettingsResponse {
     imageModels: ImageModelOption[];
     /** What cutting one picture out costs now: 0 with the app's own background remover (.scratch/own-cutout/spec.md). */
     cutoutPriceUsd?: number;
+    /** Whether a free cut-out, by the app's own remover, can be asked for. */
+    freeCutout?: boolean;
+    /** What a cut-out by Venice costs. */
+    veniceCutoutPriceUsd?: number;
 }
 
 /** The call kinds a UsageRecord is written under (apps/api's `CallKind`). */

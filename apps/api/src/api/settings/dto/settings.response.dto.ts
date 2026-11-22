@@ -119,4 +119,10 @@ export class SettingsResponseBodyDTO {
 
     @ApiProperty({ description: "What cutting one picture out costs now, in USD: 0 with the app's own background remover.", example: 0 })
     cutoutPriceUsd: number;
+
+    @ApiProperty({ description: "Whether the app's own background remover is set up here, so a free cut-out can be asked for (`?with=own`).", example: true })
+    freeCutout: boolean;
+
+    @ApiProperty({ description: "What a cut-out made by Venice costs, in USD (`?with=venice`).", example: 0.03 })
+    veniceCutoutPriceUsd: number;
 }

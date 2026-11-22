@@ -26,17 +26,28 @@ const OUT_OF_IMAGE_CREDIT = '402.001.004';
 /** What cutting one picture out costs until the API has said: Venice's price (.scratch/stage-pictures/spec.md). */
 const CUTOUT_PRICE_USD = 0.03;
 
-let prices: Promise<{ draw: number | null; cutout: number }> | undefined;
+interface Prices {
+    draw: number | null;
+    /** What a cut-out costs by default, as Draw all pays it. */
+    cutout: number;
+    /** Whether the free cut-out can be asked for, and what Venice's costs. */
+    freeCutout: boolean;
+    veniceCutout: number;
+}
+
+let prices: Promise<Prices> | undefined;
 
 /**
  * What one drawing costs (the Settings Snapshot model's 1K price) and what one cut-out costs (nothing
  * with the app's own background remover, .scratch/own-cutout/spec.md), read once per page load.
  */
-function loadPrices(): Promise<{ draw: number | null; cutout: number }> {
+function loadPrices(): Promise<Prices> {
     prices ??= apiFetch<SettingsResponse>('/settings').then(
-        ({ settings, imageModels, cutoutPriceUsd }) => ({
+        ({ settings, imageModels, cutoutPriceUsd, freeCutout, veniceCutoutPriceUsd }) => ({
             draw: imageModels.find((model) => model.id === settings.imageModel)?.sizes.find((size) => size.size === '1K')?.priceUsd ?? null,
             cutout: cutoutPriceUsd ?? CUTOUT_PRICE_USD,
+            freeCutout: freeCutout ?? false,
+            veniceCutout: veniceCutoutPriceUsd ?? CUTOUT_PRICE_USD,
         }),
         (error: unknown) => {
             prices = undefined;
@@ -50,20 +61,20 @@ export function loadDrawPrice(): Promise<number | null> {
     return loadPrices().then((loaded) => loaded.draw);
 }
 
-/** What one cut-out costs: Venice's price until the API has said otherwise. */
-export function useCutoutPrice(): number {
-    const [price, setPrice] = useState(CUTOUT_PRICE_USD);
+/** The cut-out's makers and prices: Venice alone, at its price, until the API has said otherwise. */
+export function useCutoutPrices(): Pick<Prices, 'cutout' | 'freeCutout' | 'veniceCutout'> {
+    const [loaded, setLoaded] = useState<Pick<Prices, 'cutout' | 'freeCutout' | 'veniceCutout'>>({ cutout: CUTOUT_PRICE_USD, freeCutout: false, veniceCutout: CUTOUT_PRICE_USD });
     useEffect(() => {
         let live = true;
         loadPrices().then(
-            (loaded) => live && setPrice(loaded.cutout),
+            (answer) => live && setLoaded(answer),
             () => {},
         );
         return () => {
             live = false;
         };
     }, []);
-    return price;
+    return loaded;
 }
 
 export function useDrawPrice(): number | null {
@@ -157,7 +168,7 @@ export function ExpressionSet<T>({ owner, api, commit, flush, onDrawn, reload }:
     const heading = owner.name;
     const byEmotion = new Map(owner.expressions.map((expression) => [expression.emotion, expression]));
     const price = useDrawPrice();
-    const cutoutPrice = useCutoutPrice();
+    const cutoutPrice = useCutoutPrices().cutout;
     /** The one emotion whose actions show; the rest are a tile each (docs/ui-audit-2026-11-13.md, H2). */
     const [open, setOpen] = useState<FaceEmotion | null>(null);
     const { reportUnreachable } = useConnection();
@@ -375,7 +386,7 @@ function ExpressionRow<T>({ owner, api, heading, emotion, expression, price, com
     /** Why the last square failed to save, shown in the cropper. */
     const [cropError, setCropError] = useState<string | null>(null);
     const [cropping, setCropping] = useState(false);
-    const cutoutPrice = useCutoutPrice();
+    const cutouts = useCutoutPrices();
     const fileInput = useRef<HTMLInputElement>(null);
     const cutoutInput = useRef<HTMLInputElement>(null);
     const row = useRef<HTMLDivElement>(null);
@@ -563,19 +574,36 @@ function ExpressionRow<T>({ owner, api, heading, emotion, expression, price, com
                         Pick the face
                     </button>
                 )}
-                {expression && !expression.cutoutPath && (
+                {/* A cut-out by either maker (.scratch/own-cutout/spec.md, "A choice of two"), also over one already there:
+                    the app's own is free and leaves no fringe; Venice's keeps white drawn on white with no outline. */}
+                {expression && (
                     <button
                         type="button"
                         className="button button-quiet"
                         aria-label={`Cut out ${label}`}
                         disabled={busy !== null}
                         onClick={() =>
-                            void save('Cutting out…', () => api.cutOut(emotion), (message) =>
+                            void save('Cutting out…', () => api.cutOut(emotion, cutouts.freeCutout ? 'own' : undefined), (message) =>
                                 setError(`Couldn't cut out the ${label} Expression: ${message}`),
                             )
                         }
                     >
-                        {cutoutPrice > 0 ? `Cut out · ~${usd(cutoutPrice)}` : 'Cut out · free'}
+                        {cutouts.freeCutout ? 'Cut out · free' : `Cut out · ~${usd(cutouts.veniceCutout)}`}
+                    </button>
+                )}
+                {expression && cutouts.freeCutout && (
+                    <button
+                        type="button"
+                        className="button button-quiet"
+                        aria-label={`Cut out ${label} with Venice`}
+                        disabled={busy !== null}
+                        onClick={() =>
+                            void save('Cutting out…', () => api.cutOut(emotion, 'venice'), (message) =>
+                                setError(`Couldn't cut out the ${label} Expression: ${message}`),
+                            )
+                        }
+                    >
+                        {`Venice cut-out · ~${usd(cutouts.veniceCutout)}`}
                     </button>
                 )}
                 {expression && (

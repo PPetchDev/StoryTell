@@ -74,6 +74,10 @@ export class CappedModelGateway extends ModelGateway {
     cutoutPriceUsd(): number {
         return this.inner.cutoutPriceUsd();
     }
+
+    ownCutoutAvailable(): boolean {
+        return this.inner.ownCutoutAvailable();
+    }
 }
 
 /** The gateway behind the cap: the fake in tests and e2e, which they script and inspect. */

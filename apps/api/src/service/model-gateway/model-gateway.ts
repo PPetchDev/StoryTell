@@ -62,6 +62,9 @@ export abstract class ModelGateway {
      * remover (.scratch/own-cutout/spec.md), else Venice's price. Makes no call.
      */
     abstract cutoutPriceUsd(): number;
+
+    /** Whether the app's own background remover is set up here, so a cut-out can be had for nothing. Makes no call. */
+    abstract ownCutoutAvailable(): boolean;
 }
 
 export type CreditPool = 'text' | 'image';
@@ -330,11 +333,21 @@ export interface ImageData {
     mimeType: string;
 }
 
+/**
+ * Who makes a cut-out (.scratch/own-cutout/spec.md, "A choice of two"): the app's own background
+ * remover, free, or Venice's, paid. Each is better on some pictures: the app's own leaves no fringe
+ * and no ground shadow; Venice's keeps a white part drawn on white with no outline around it.
+ */
+export const CUTOUT_MAKERS = ['own', 'venice'] as const;
+export type CutoutMaker = (typeof CUTOUT_MAKERS)[number];
+
 export interface ImageGenerationRequest {
     kind: ImageCallKind;
     prompt: string;
     /** At most MAX_REFERENCE_IMAGES. */
     referenceImages?: ImageData[];
+    /** For `image_cutout` only: who makes it. Left out: the app's own remover where it is set up, else Venice. */
+    cutoutBy?: CutoutMaker;
     servedFor?: ServedFor;
 }
 

@@ -7,6 +7,7 @@ import {
     ExceptionFilter,
     Param,
     ParseEnumPipe,
+    Query,
     ParseIntPipe,
     PayloadTooLargeException,
     Post,
@@ -16,12 +17,14 @@ import {
     UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiBody, ApiConsumes, ApiCreatedResponse, ApiOkResponse, ApiParam, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiConsumes, ApiCreatedResponse, ApiOkResponse, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 
 import { ImageTooLargeError, NoImageFileError } from '../../errors/image.errors.js';
 import { AppErrorFilter } from '../../filter/app-error.filter.js';
 import { ExpressionManagerService } from '../../manager/expression/expression.service.js';
 import { EXPRESSION_EMOTIONS } from '../../model/story/emotion.js';
+import { CUTOUT_MAKERS } from '../../service/model-gateway/model-gateway.js';
+import type { CutoutMaker } from '../../service/model-gateway/model-gateway.js';
 import type { ExpressionEmotion } from '../../model/story/emotion.js';
 import { PortraitCropRequestBodyDTO } from '../reference-image/dto/portrait-crop.request.dto.js';
 import { StoryResponseBodyDTO } from '../story/dto/story.response.dto.js';
@@ -47,6 +50,10 @@ export class UploadTooLargeFilter implements ExceptionFilter {
         new AppErrorFilter().catch(new ImageTooLargeError(MAX_UPLOAD_MB), host);
     }
 }
+
+/** `?with=own|venice`: who makes the cut-out (.scratch/own-cutout/spec.md); left out, the app's own where it is set up. */
+const With = () => Query('with', new ParseEnumPipe(Object.fromEntries(CUTOUT_MAKERS.map((maker) => [maker, maker])), { optional: true }));
+const WITH_QUERY = { name: 'with', required: false, enum: [...CUTOUT_MAKERS], description: "Who makes the cut-out: the app's own background remover (free) or Venice's (paid). Left out: the app's own where it is set up, else Venice." };
 
 /**
  * A Character's Expressions (.scratch/expressions/spec.md, "Authoring API"): one picture per
@@ -75,18 +82,20 @@ export class ExpressionApiController {
     }
 
     @Post('cutout')
+    @ApiQuery(WITH_QUERY)
     @ApiCreatedResponse({
         type: StoryResponseBodyDTO,
         description:
             'Takes the background away from the Expression for the Visual novel stage (.scratch/stage-pictures/spec.md), and from the Reference image ' +
-            'when it has no cut-out yet; a drawn Expression is cut out by itself. Refused without the Expression (404) or with the Venice pool used up (402.001.004).',
+            'when it has no cut-out yet; a drawn Expression is cut out by itself. An Expression that has a cut-out gets a new one. Refused without the Expression (404), with the Venice pool used up when Venice makes it (402.001.004), or when the app\'s own remover is asked for where it is not set up (409.002.015).',
     })
     cutOut(
         @Id('storyId') storyId: number,
         @Id('characterId') characterId: number,
         @Emotion() emotion: ExpressionEmotion,
+        @With() by: CutoutMaker | undefined,
     ): Promise<StoryResponseBodyDTO> {
-        return this.expressions.cutOut(storyId, characterId, emotion);
+        return this.expressions.cutOut(storyId, characterId, emotion, by);
     }
 
     @Put()

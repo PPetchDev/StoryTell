@@ -58,6 +58,7 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | `413.002.010` | `ImageTooLargeError` | An uploaded picture over the size limit (15 MB for a Cover). |
 | `422.002.011` | `SnapshotSizeNotOfferedError` | A Settings change that asks for a Snapshot size the Snapshot model is not drawn at, such as 2K for Seedream V4.5 edit. |
 | `415.002.014` | `NotSeeThroughError` | An uploaded Expression cut-out (`PUT .../expressions/:emotion/cutout`) that is not a PNG or WebP with see-through pixels: a JPEG, or a fully opaque picture such as a painted checkerboard. Nothing is stored. |
+| `409.002.015` | `OwnCutoutUnavailableError` | A cut-out asked for from the app's own background remover (`POST .../expressions/:emotion/cutout?with=own`) on a computer where it is not set up (its model file is missing). Nothing is stored and no call is made. |
 | `404.002.012` | `SnapshotPromptNotFoundError` | Draw Snapshot (`POST .../snapshots`) with a Snapshot prompt the Chat no longer holds: drawn already, replaced by a newer one, an hour old, or the API restarted. Nothing is drawn; write it again. |
 | `404.003.001` | `StoryNotFoundError` | No Story with that id. |
 | `404.003.002` | `CharacterNotFoundError` | No Character with that id in this Story, including an id outside the cast in a Chat's Sitting out set or a turn's `nudgeCharacterId` (nothing changes). |

@@ -101,3 +101,10 @@ export class NotSeeThroughError extends AppError {
         super('415.002.014', 'A cut-out must be a PNG or WebP with a see-through background.');
     }
 }
+
+/** The app's own background remover was asked for by name where it is not set up (its model file is missing). */
+export class OwnCutoutUnavailableError extends AppError {
+    constructor() {
+        super('409.002.015', "The app's own background remover is not set up on this computer.");
+    }
+}

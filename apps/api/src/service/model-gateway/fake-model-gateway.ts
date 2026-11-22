@@ -5,7 +5,6 @@ import {
     EmbeddingRequest,
     EmbeddingResult,
     ImageCallKind,
-    IMAGE_CUTOUT_PRICE_USD,
     ImageData,
     ImageGenerationRequest,
     ImageGenerationResult,
@@ -346,9 +345,13 @@ export class FakeModelGateway extends ModelGateway {
         return structuredClone(this.voices);
     }
 
-    /** Venice's price, as a gateway without the app's own remover answers. */
+    /** The fake has both cut-out makers, as the live app does, so tests and e2e see both buttons. */
     cutoutPriceUsd(): number {
-        return IMAGE_CUTOUT_PRICE_USD;
+        return 0;
+    }
+
+    ownCutoutAvailable(): boolean {
+        return true;
     }
 
     async remainingCredit(): Promise<RemainingCredit> {

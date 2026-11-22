@@ -126,6 +126,24 @@ describe('Stage pictures', () => {
         expect(t.gateway.imageCalls()).toHaveLength(1);
     });
 
+    // .scratch/own-cutout/spec.md, "A choice of two"
+    it('Cut out asks the maker named with ?with=, over a cut-out already there, and refuses an unknown maker', async () => {
+        const story = await createStory();
+        await t.http.put(expressionPath(story, 'teasing')).attach('image', png('mine'), 'mine.png').expect(200);
+        const makers = () => t.gateway.imageCalls().filter((call) => call.kind === 'image_cutout').map((call) => call.cutoutBy ?? null);
+
+        const first = ((await t.http.post(`${expressionPath(story, 'teasing')}/cutout?with=own`).expect(201)).body as Story).characters[0].expressions[0].cutoutPath;
+        const second = ((await t.http.post(`${expressionPath(story, 'teasing')}/cutout?with=venice`).expect(201)).body as Story).characters[0].expressions[0].cutoutPath;
+        await t.http.post(`${expressionPath(story, 'teasing')}/cutout`).expect(201);
+
+        // Named, named, and left to the gateway.
+        expect(makers()).toEqual(['own', 'venice', null]);
+        expect(second).not.toBeNull();
+        expect(second).not.toBe(first);
+        await t.http.post(`${expressionPath(story, 'teasing')}/cutout?with=canva`).expect(400);
+        expect(makers()).toHaveLength(3);
+    });
+
     it('a failed Cut out answers the error and keeps the Expression as it was', async () => {
         const story = await createStory();
         await t.http.put(expressionPath(story, 'longing')).attach('image', png('mine'), 'mine.png').expect(200);

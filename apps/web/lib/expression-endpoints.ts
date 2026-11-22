@@ -9,7 +9,8 @@ import type { PortraitCrop } from './story';
  */
 export interface ExpressionEndpoints<T> {
     draw(emotion: FaceEmotion): Promise<T>;
-    cutOut(emotion: FaceEmotion): Promise<T>;
+    /** `by`: the app's own background remover (free) or Venice's (paid); left out, the API's choice (.scratch/own-cutout/spec.md). */
+    cutOut(emotion: FaceEmotion, by?: 'own' | 'venice'): Promise<T>;
     upload(emotion: FaceEmotion, picture: Blob, filename: string): Promise<T>;
     /** A see-through picture made elsewhere, kept as the Expression's cut-out (.scratch/stage-pictures/spec.md, "Upload a cut-out"). */
     uploadCutout(emotion: FaceEmotion, picture: Blob, filename: string): Promise<T>;
@@ -26,7 +27,7 @@ export function expressionEndpoints<T>(base: string): ExpressionEndpoints<T> {
     const one = (emotion: FaceEmotion) => `${base}/expressions/${emotion}`;
     return {
         draw: (emotion) => apiSend<T>('POST', `${one(emotion)}/draw`),
-        cutOut: (emotion) => apiSend<T>('POST', `${one(emotion)}/cutout`),
+        cutOut: (emotion, by) => apiSend<T>('POST', `${one(emotion)}/cutout${by ? `?with=${by}` : ''}`),
         upload: (emotion, picture, filename) => {
             const form = new FormData();
             form.append('image', picture, filename);

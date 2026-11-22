@@ -65,6 +65,7 @@ import {
 import { defaultSleep, SleepFn } from './http.js';
 import { OpenRouterChatRequest, OpenRouterChatResult, SamplerRefusedError, TextBill } from './openrouter-client.js';
 import { TextHost } from './text-hosts.js';
+import { OwnCutoutUnavailableError } from '../../../errors/image.errors.js';
 import { OWN_CUTOUT_HOST, OWN_CUTOUT_MODEL } from './own-cutout.js';
 import { VeniceClient } from './venice-client.js';
 
@@ -507,7 +508,11 @@ export class RealModelGateway extends ModelGateway {
     }
 
     cutoutPriceUsd(): number {
-        return this.deps.ownCutout?.available() ? 0 : IMAGE_CUTOUT_PRICE_USD;
+        return this.ownCutoutAvailable() ? 0 : IMAGE_CUTOUT_PRICE_USD;
+    }
+
+    ownCutoutAvailable(): boolean {
+        return this.deps.ownCutout?.available() ?? false;
     }
 
     /**
@@ -517,7 +522,9 @@ export class RealModelGateway extends ModelGateway {
     private async cutOut(request: ImageGenerationRequest): Promise<ImageGenerationResult> {
         const source = request.referenceImages?.[0];
         if (!source || request.referenceImages!.length !== 1) throw new RangeError('image_cutout takes exactly one reference image');
-        const own = this.deps.ownCutout?.available() ? this.deps.ownCutout : undefined;
+        if (request.cutoutBy === 'own' && !this.ownCutoutAvailable()) throw new OwnCutoutUnavailableError();
+        // Asked for by name, else the app's own where it is set up.
+        const own = request.cutoutBy !== 'venice' && this.ownCutoutAvailable() ? this.deps.ownCutout : undefined;
         const image = own ? await own.removeBackground(source) : await this.deps.venice.removeBackground(source);
         const costUsd = own ? 0 : IMAGE_CUTOUT_PRICE_USD;
         const model = own ? OWN_CUTOUT_MODEL : IMAGE_CUTOUT_MODEL;

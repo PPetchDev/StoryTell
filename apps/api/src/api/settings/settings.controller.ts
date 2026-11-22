@@ -5,7 +5,7 @@ import { playModelOptions } from '../../manager/settings/play-model-options.js';
 import { SettingsManagerService } from '../../manager/settings/settings.service.js';
 import { SettingsResponse } from '../../model/settings/entities/settings.entity.js';
 import { SamplersPathDTO, UpdateSamplersRequestBodyDTO, UpdateSettingsRequestBodyDTO } from './dto/settings.request.dto.js';
-import { ModelGateway, SNAPSHOT_MODEL_PRICES, SnapshotModel, snapshotSizesOf } from '../../service/model-gateway/model-gateway.js';
+import { IMAGE_CUTOUT_PRICE_USD, ModelGateway, SNAPSHOT_MODEL_PRICES, SnapshotModel, snapshotSizesOf } from '../../service/model-gateway/model-gateway.js';
 import { ImageModelOptionDTO, SettingsResponseBodyDTO } from './dto/settings.response.dto.js';
 import { OwnerOnly } from '../auth/public.decorator.js';
 
@@ -55,6 +55,6 @@ export class SettingsApiController {
     }
 
     private respond(settings: SettingsResponse): SettingsResponseBodyDTO {
-        return { settings, playModels: playModelOptions(), imageModels: IMAGE_MODEL_OPTIONS, cutoutPriceUsd: this.gateway.cutoutPriceUsd() };
+        return { settings, playModels: playModelOptions(), imageModels: IMAGE_MODEL_OPTIONS, cutoutPriceUsd: this.gateway.cutoutPriceUsd(), freeCutout: this.gateway.ownCutoutAvailable(), veniceCutoutPriceUsd: IMAGE_CUTOUT_PRICE_USD };
     }
 }

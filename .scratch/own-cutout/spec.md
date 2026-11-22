@@ -78,3 +78,18 @@ Nothing changes in how a cut-out is asked for: "Cut out", "Draw all" and a dress
 - **Measured on the PC:** about 1.5 seconds a 1024 by 1536 picture. On the live VM (2 cores, 12 GB) the same model through rembg took about 5 seconds a picture and 1.4 GB at its peak.
 - **Checked by eye** on Ines (white background), Tamsin (pale grey) and Mireille (dark): no fringe, marks kept, gloves kept. The API's remover gives the same pixels as the prototype it was written from.
 - **Set-up on a computer:** put `isnet-anime.onnx` in the `models` folder beside the image folder. Nothing else.
+
+## A choice of two (2026-11-22, the same day)
+
+All 143 Expressions on live were recut with the app's own remover, and then each was measured against the cut-out it replaced. Eight Characters came out the same or better (Ines: no fringe; Morra and Tavri: no ground shadow). The Role, Rin, came out worse: about 5% of every picture gone. She is drawn on white with white tails and a white dress that have no outline against the background, so the clean-up that clears "background colour touching the see-through area" ate into them. Her 21 cut-outs were put back from the backup.
+
+So neither maker is right for every picture, and the author chooses:
+
+- **Two buttons on an Expression, side by side:** "Cut out · free" (the app's own remover) and "Venice cut-out · ~$0.03". Where the app's own remover is not set up there is one, as before, at Venice's price.
+- **Both are there whether or not the picture has a cut-out:** the new one replaces the old, so a poor cut-out is one press from the other maker's. (Before, the button went away once a picture had a cut-out.)
+- **The API takes `?with=own|venice`** on the three cut-out routes (a Character's, the Role's, a Persona's Expression). Left out, the gateway chooses as before: its own remover where set up, else Venice. Asking for its own where it is not set up is refused (409.002.015), with no call.
+- **Only Venice's cut-out needs image credit.** The check for an empty image pool no longer refuses a free cut-out.
+- **A cut-out nobody chose** (after a drawing, in "Draw all", a dressed stage's sprite) is still the app's own where set up. An author whose Character is white on white recuts those with Venice's button.
+- **Settings' answer says both:** whether a free cut-out can be asked for, and Venice's price.
+- **Tests:** the route passes the named maker to the gateway and refuses an unknown one; the gateway goes to Venice when Venice is named though its own remover is there, and refuses its own by name where the file is missing; in the editor each button asks for its maker and the second press replaces the first cut-out.
+- **Not done:** making the clean-up safe for white on white (it would need to tell fur from background without an outline); a per-Character default maker.

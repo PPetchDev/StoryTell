@@ -1,6 +1,6 @@
-import { Body, Controller, Delete, Get, Param, ParseEnumPipe, ParseIntPipe, Post, Put, UploadedFile, UseFilters, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseEnumPipe, ParseIntPipe, Post, Put, Query, UploadedFile, UseFilters, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiBody, ApiConsumes, ApiCreatedResponse, ApiOkResponse, ApiParam, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiConsumes, ApiCreatedResponse, ApiOkResponse, ApiParam, ApiTags, ApiQuery } from '@nestjs/swagger';
 
 import { NoImageFileError } from '../../errors/image.errors.js';
 import { YourFaceManagerService } from '../../manager/your-face/your-face.service.js';
@@ -14,8 +14,13 @@ import { MAX_UPLOAD_MB, UploadTooLargeFilter } from '../expression/expression.co
 import { PersonaResponseBodyDTO } from '../persona/dto/persona.response.dto.js';
 import { PortraitCropRequestBodyDTO } from '../reference-image/dto/portrait-crop.request.dto.js';
 import { StoryResponseBodyDTO } from '../story/dto/story.response.dto.js';
+import { CUTOUT_MAKERS } from '../../service/model-gateway/model-gateway.js';
+import type { CutoutMaker } from '../../service/model-gateway/model-gateway.js';
 
 const Id = (name: string) => Param(name, ParseIntPipe);
+/** `?with=own|venice`: who makes the cut-out (.scratch/own-cutout/spec.md); left out, the app's own where it is set up. */
+const With = () => Query('with', new ParseEnumPipe(Object.fromEntries(CUTOUT_MAKERS.map((maker) => [maker, maker])), { optional: true }));
+const WITH_QUERY = { name: 'with', required: false, enum: [...CUTOUT_MAKERS], description: "Who makes the cut-out: the app's own background remover (free) or Venice's (paid). Left out: the app's own where it is set up, else Venice." };
 const Emotion = () => Param('emotion', new ParseEnumPipe(Object.fromEntries(FACE_EMOTIONS.map((emotion) => [emotion, emotion]))));
 
 interface UploadedImage {
@@ -47,9 +52,10 @@ export class RoleExpressionApiController {
     }
 
     @Post('cutout')
+    @ApiQuery(WITH_QUERY)
     @ApiCreatedResponse({ type: StoryResponseBodyDTO, description: 'Takes the background away for the Visual novel stage.' })
-    cutOut(@Id('storyId') storyId: number, @Emotion() emotion: FaceEmotion): Promise<StoryResponseBodyDTO> {
-        return asStory(this.faces.cutOut({ storyId }, emotion));
+    cutOut(@Id('storyId') storyId: number, @Emotion() emotion: FaceEmotion, @With() by: CutoutMaker | undefined): Promise<StoryResponseBodyDTO> {
+        return asStory(this.faces.cutOut({ storyId }, emotion, by));
     }
 
     @Put()
@@ -132,9 +138,10 @@ export class PersonaExpressionApiController {
     }
 
     @Post('cutout')
+    @ApiQuery(WITH_QUERY)
     @ApiCreatedResponse({ type: PersonaResponseBodyDTO })
-    cutOut(@Id('personaId') personaId: number, @Emotion() emotion: FaceEmotion): Promise<PersonaResponseBodyDTO> {
-        return asPersona(this.faces.cutOut({ personaId }, emotion));
+    cutOut(@Id('personaId') personaId: number, @Emotion() emotion: FaceEmotion, @With() by: CutoutMaker | undefined): Promise<PersonaResponseBodyDTO> {
+        return asPersona(this.faces.cutOut({ personaId }, emotion, by));
     }
 
     @Put()
