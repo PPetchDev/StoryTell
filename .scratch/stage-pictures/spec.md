@@ -133,3 +133,7 @@ On the user's phone Tamsin's cut-out spilled past both sides of the stage and sh
 ## The phone's stage fills the screen (2026-11-22)
 
 Below `lg`, the novel stage runs edge to edge under the top bar: no side gutter, no gap above, no rounded corners. The box keeps an 8px margin from the screen's sides. A Snapshot step keeps its gutter. From `lg` up nothing changes.
+
+## A cut-out stands on the stage's foot (2026-11-22)
+
+Held to the stage's top and drawn smaller on a phone, the cut-out's feet ended above a short line's box: the figure floated. Now, where the figure is shorter than the stage (a phone), it is as wide as the stage and stands on the stage's foot, behind the box. Where it is taller (a wide stage), its top stays at the stage's top and the stage's foot cuts it below the knees, as before. Its size comes from the picture's own shape: `min(128% of the stage's height, the stage's width × height ÷ width)`.

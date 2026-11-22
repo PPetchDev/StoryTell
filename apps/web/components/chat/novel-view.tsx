@@ -444,6 +444,41 @@ export function NovelView(props: NovelViewProps) {
     );
 }
 
+/**
+ * A cut-out on the stage (.scratch/stage-pictures/spec.md): the figure alone, standing on the Backdrop.
+ * On a wide stage it is drawn 128% as tall as the stage, its top at the stage's top, so the stage's
+ * bottom edge cuts it below the knees. It is never wider than the stage: on a phone, where the stage
+ * is tall and narrow, it is drawn as wide as the stage and stands on the stage's foot, behind the
+ * box, so it never floats over a short line (2026-11-22). Its size is worked out from the picture's
+ * own shape, known once it has loaded (2 by 3 until then).
+ */
+function StageFigure({ src, alt, ...data }: { src: string; alt: string } & Record<`data-${string}`, string>) {
+    const [shape, setShape] = useState(1.5);
+    return (
+        <div className="absolute inset-0 flex flex-col items-center overflow-hidden" style={{ containerType: 'size' }}>
+            {/* eslint-disable-next-line @next/next/no-img-element -- served by the API from the image folder */}
+            <img
+                // `mt-auto` stands a figure shorter than the stage on its foot; one taller keeps its top at the stage's top.
+                className="stage-figure mt-auto block w-auto max-w-none shrink-0 select-none"
+                style={{ height: `min(128cqh, ${shape} * 100cqw)` }}
+                src={src}
+                alt={alt}
+                data-stage-picture=""
+                draggable={false}
+                onLoad={(event) => {
+                    const { naturalWidth, naturalHeight } = event.currentTarget;
+                    if (naturalWidth > 0 && naturalHeight > 0) setShape(naturalHeight / naturalWidth);
+                }}
+                ref={(image) => {
+                    // A picture already loaded from the cache fires no load event.
+                    if (image?.complete && image.naturalWidth > 0) setShape(image.naturalHeight / image.naturalWidth);
+                }}
+                {...data}
+            />
+        </div>
+    );
+}
+
 /** The large picture of a speech step: the whole Expression or Reference image, else a large initial on their colour. */
 function SpeakerPicture({ step, cast, sprites }: { step: Extract<NovelStep, { kind: 'speech' }>; cast: Cast; sprites?: ChatStage['outfits'][number]['sprites'] }) {
     const character = useCastCharacter(step.characterId);
@@ -451,24 +486,7 @@ function SpeakerPicture({ step, cast, sprites }: { step: Extract<NovelStep, { ki
     const { whole, cutout } = outfitPicture(sprites, step.emotion) ?? linePicture(character, step.emotion);
     const colour = characterColour(step.characterId, cast);
     if (whole && cutout) {
-        // A cut-out (.scratch/stage-pictures/spec.md): the figure alone, standing on the Backdrop from
-        // the knees up. The picture is drawn taller than the stage, its top at the stage's top, so
-        // the stage's bottom edge cuts it below the knees. Never wider than the stage: on a phone,
-        // where the stage is tall and narrow, it is drawn smaller inside that box, still held to
-        // the top, rather than past the stage's sides (2026-11-22).
-        const figure = (
-            // eslint-disable-next-line @next/next/no-img-element -- served by the API from the image folder
-            <img
-                className="stage-figure block h-[128%] w-auto max-w-full object-contain object-top select-none"
-                src={stageSrc(whole, true)}
-                alt={step.speakerName}
-                data-stage-picture=""
-                data-stage-cutout=""
-                data-emotion={step.emotion ?? 'neutral'}
-                draggable={false}
-            />
-        );
-        return <div className="absolute inset-0 flex justify-center overflow-hidden">{figure}</div>;
+        return <StageFigure src={stageSrc(whole, true)} alt={step.speakerName} data-stage-cutout="" data-emotion={step.emotion ?? 'neutral'} />;
     }
     // Held to the stage's top, as a cut-out is: on a phone the stage is taller than the picture is
     // wide, and at the bottom the box covered the face (2026-11-22).
@@ -492,10 +510,7 @@ function YourFacePicture({ step }: { step: Extract<NovelStep, { kind: 'user' }> 
     const cut = face.cutoutPath !== null;
     const src = stageSrc(referenceImageUrl(cut ? face.cutoutPath! : face.imagePath), cut);
     return cut ? (
-        <div className="absolute inset-0 flex justify-center overflow-hidden">
-            {/* eslint-disable-next-line @next/next/no-img-element -- served by the API from the image folder */}
-            <img className="stage-figure block h-[128%] w-auto max-w-full object-contain object-top select-none" src={src} alt={step.identityName} data-stage-picture="" data-your-face={face.emotion} draggable={false} />
-        </div>
+        <StageFigure src={src} alt={step.identityName} data-your-face={face.emotion} />
     ) : (
         // eslint-disable-next-line @next/next/no-img-element -- served by the API from the image folder
         <img className="relative block h-full max-w-full object-contain object-top motion-safe:animate-fade-in" src={src} alt={step.identityName} data-stage-picture="" data-your-face={face.emotion} draggable={false} />

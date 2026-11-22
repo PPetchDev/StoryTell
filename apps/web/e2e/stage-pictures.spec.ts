@@ -91,7 +91,8 @@ test('an intimate line stands cut out on the stage from the knees up, moving wit
     await expect(figure).toHaveAttribute('src', `/api/images/${nara.expressions[0].cutoutPath}?w=1280`);
     await expect(figure).toHaveAttribute('data-emotion', 'desire');
 
-    // Knee-up: the figure is taller than the stage, its top at the stage's top, cut off below.
+    // Knee-up on a wide stage: the figure is taller than the stage, its top at the stage's top, cut off below.
+    await page.setViewportSize({ width: 760, height: 700 });
     const stage = await figure.evaluate((element) => {
         const frame = element.closest('div')!.getBoundingClientRect();
         const box = element.getBoundingClientRect();
@@ -111,20 +112,19 @@ test('an intimate line stands cut out on the stage from the knees up, moving wit
         await page.setViewportSize({ width, height: 740 });
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
         await expect(figure).toBeVisible();
-        // On a tall, narrow phone stage the figure stays inside the stage's sides, drawn from its
-        // top, rather than spilling past them (2026-11-22).
+        // On a tall, narrow phone stage the figure is as wide as the stage, never past its sides,
+        // and stands on the stage's foot, behind the box, so it never floats over a short line (2026-11-22).
         const fit = await figure.evaluate((element: HTMLImageElement) => {
             const frame = element.parentElement!.getBoundingClientRect();
             const box = element.getBoundingClientRect();
-            const drawnWidth = Math.min(box.width, (box.height * element.naturalWidth) / element.naturalHeight);
-            return { left: box.left - frame.left, right: frame.right - box.right, drawnWidth, frameWidth: frame.width, frameHeight: frame.height, top: box.top - frame.top, fit: getComputedStyle(element).objectFit, at: getComputedStyle(element).objectPosition };
+            return { left: box.left - frame.left, right: frame.right - box.right, foot: frame.bottom - box.bottom, top: box.top - frame.top, frameHeight: frame.height, shape: box.height / box.width, own: element.naturalHeight / element.naturalWidth };
         });
-        expect(fit.left).toBeGreaterThanOrEqual(-0.5);
-        expect(fit.right).toBeGreaterThanOrEqual(-0.5);
-        expect(fit.drawnWidth).toBeLessThanOrEqual(fit.frameWidth + 0.5);
-        // It breathes and hops, so its top is near the stage's top, not on it.
-        expect(Math.abs(fit.top)).toBeLessThan(fit.frameHeight * 0.05);
-        expect(fit).toMatchObject({ fit: 'contain', at: '50% 0%' });
+        // It breathes and hops, so its edges are near the stage's, not on them.
+        expect(fit.left).toBeGreaterThan(-fit.frameHeight * 0.03);
+        expect(fit.right).toBeGreaterThan(-fit.frameHeight * 0.03);
+        expect(Math.abs(fit.foot)).toBeLessThan(fit.frameHeight * 0.05);
+        expect(fit.top).toBeGreaterThan(-fit.frameHeight * 0.05);
+        expect(Math.abs(fit.shape - fit.own)).toBeLessThan(0.05);
     }
 });
 
