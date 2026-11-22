@@ -2,54 +2,79 @@ import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
+import { buildJudgePrompt } from '../src/manager/chat/judge/judge-prompt.js';
+import { buildExtractionPrompt } from '../src/manager/chat/memory/memory-prompt.js';
 import { buildTurnPrompt } from '../src/manager/chat/turn/prompt.js';
 import { FetchLike } from '../src/service/model-gateway/real/http.js';
 import { OpenRouterClient } from '../src/service/model-gateway/real/openrouter-client.js';
 import vitestConfig from '../vitest.config.js';
 import { RecordedRequest } from './harness/recorded-fetch.js';
-import { EvalReport, formatScorecard, runEval, scores, startEvalRun, writeEvalReport } from './live/eval-run.js';
-import { EVAL_SCENES, EvalScene, REPEATED_PHRASE } from './live/eval-scenes.js';
+import { compare, EvalReport, formatScorecard, runEval, scenePromptProblems, Score, scores, startEvalRun, writeEvalReport } from './live/eval-run.js';
+import { EVAL_SCENES, EvalScene, JudgeScene, MemoryScene, REPEATED_PHRASE, TurnScene } from './live/eval-scenes.js';
 
 const GRADER_MODEL = 'deepseek/deepseek-v4-flash';
 const GIT = { commit: 'abc1234', dirty: false };
 
 /** A reply that passes the `format` scene: narration, one line by Mira, a finished sentence. */
 const GOOD = 'Mira looked up from the ledger and smiled.\n\n@Mira Vance: You came back. I was hoping you would.';
+/** An answer both the Judge's parser and the extraction's read, saying nothing changed. */
+const QUIET = '{"bond_changes":[],"arc_steps":[],"scene":{"reason":"nothing yet","move_on":false},"operations":[]}';
+
+type Role = 'play' | 'background' | 'grader';
 
 interface Answer {
     text?: string;
     cost?: number;
     status?: number;
+    /** Prompt tokens the host says it read from its cache. */
+    cached?: number;
 }
 
-/** A scripted OpenRouter: play calls and grader calls each answered by their own function. */
-function scriptedOpenRouter(answer: { play?: (index: number) => Answer; grader?: (index: number) => Answer } = {}) {
-    const requests: (RecordedRequest & { role: 'play' | 'grader' })[] = [];
-    const counts = { play: 0, grader: 0 };
+/**
+ * A scripted OpenRouter: play calls, background calls (the Judge, Memory extraction) and grader
+ * calls each answered by their own function. `delayMs` holds every answer back, so calls overlap.
+ */
+function scriptedOpenRouter(answer: Partial<Record<Role, (index: number) => Answer>> & { delayMs?: number } = {}) {
+    const requests: (RecordedRequest & { role: Role })[] = [];
+    const counts: Record<Role, number> = { play: 0, background: 0, grader: 0 };
+    const flight = { now: 0, peak: 0 };
     const fetchImpl: FetchLike = async (url, init) => {
         const body = typeof init.body === 'string' ? JSON.parse(init.body) : undefined;
-        const role = body?.model === GRADER_MODEL ? 'grader' : 'play';
+        const system: string = body?.messages?.[0]?.content ?? '';
+        const role: Role = body?.model !== GRADER_MODEL ? 'play' : system.startsWith('You check one reply') ? 'grader' : 'background';
         requests.push({ url, method: init.method ?? 'GET', headers: (init.headers ?? {}) as Record<string, string>, body, role });
-        const fallback: Answer = role === 'play' ? { text: GOOD } : { text: '{"checks":[{"name":"x","pass":true,"quote":"a quote"}]}' };
-        const { text = fallback.text, cost = 0.001, status = 200 } = { ...fallback, ...(answer[role]?.(counts[role]++) ?? {}) };
+        const fallback: Answer = role === 'play' ? { text: GOOD } : role === 'grader' ? { text: '{"checks":[{"name":"x","pass":true,"quote":"a quote"}]}' } : { text: QUIET };
+        const { text = fallback.text, cost = 0.001, status = 200, cached } = { ...fallback, ...(answer[role]?.(counts[role]++) ?? {}) };
+        flight.peak = Math.max(flight.peak, ++flight.now);
+        if (answer.delayMs) await new Promise((resolve) => setTimeout(resolve, answer.delayMs));
+        flight.now--;
         if (status !== 200) return new Response(JSON.stringify({ error: { message: 'Provider returned error', code: status } }), { status });
         const json = {
             id: `gen-${requests.length}`,
             choices: [{ message: { role: 'assistant', content: text }, finish_reason: 'stop' }],
-            usage: { prompt_tokens: 100, completion_tokens: 20, cost },
+            usage: { prompt_tokens: 100, completion_tokens: 20, cost, ...(cached === undefined ? {} : { prompt_tokens_details: { cached_tokens: cached } }) },
         };
         return new Response(JSON.stringify(json), { status: 200, headers: { 'content-type': 'application/json' } });
     };
-    return { requests, fetchImpl, client: new OpenRouterClient('sk-or-test-not-a-real-key', fetchImpl, async () => {}) };
+    return { requests, flight, fetchImpl, client: new OpenRouterClient('sk-or-test-not-a-real-key', fetchImpl, async () => {}) };
 }
 
 function scene(name: string): EvalScene {
     return EVAL_SCENES.find((one) => one.name === name)!;
 }
 
-function run(names: string[], script: Parameters<typeof scriptedOpenRouter>[0] = {}, options: { samples?: number; capUsd?: number } = {}) {
+function turnScene(name: string): TurnScene {
+    return scene(name) as TurnScene;
+}
+
+function run(
+    names: (string | EvalScene)[],
+    script: Parameters<typeof scriptedOpenRouter>[0] = {},
+    options: { samples?: number; capUsd?: number; concurrency?: number; spentUsd?: number } = {},
+) {
     const router = scriptedOpenRouter(script);
-    return runEval({ scenes: names.map(scene), model: 'glm-5.3', client: router.client, git: GIT, ...options }).then((report) => ({ report, ...router }));
+    const scenes = names.map((one) => (typeof one === 'string' ? scene(one) : one));
+    return runEval({ scenes, model: 'glm-5.3', client: router.client, git: GIT, samples: 3, ...options }).then((report) => ({ report, ...router }));
 }
 
 /** A check's passes out of its scored samples, from a report. */
@@ -57,6 +82,8 @@ function score(report: EvalReport, sceneName: string, check: string) {
     const row = scores(report).find((one) => one.scene === sceneName && one.check === check)!;
     return `${row.pass}/${row.scored}`;
 }
+
+const allNames = EVAL_SCENES.map((one) => one.name).join(', ');
 
 // Spec (prompt-evals): every answer here is scripted; nothing reaches OpenRouter.
 describe('The prompt eval run', () => {
@@ -78,13 +105,22 @@ describe('The prompt eval run', () => {
             expect(router.requests).toEqual([]);
         });
 
-        it('refuses no scene, an unknown scene, an unknown model, bad samples and a missing key, naming what it knows', async () => {
+        it('says, when it refuses for the spend flag, how many calls the named scenes would send and what they would cost', async () => {
+            // format: 2 play calls. voice: 2 play calls and 2 grader calls. No key is needed to say so.
+            const { router, started } = start({ EVAL_SCENES: 'format,voice', EVAL_SAMPLES: '2' });
+
+            await expect(started).rejects.toThrow(/Start it with --spend\. The named scenes would send 6 calls on GLM-5\.3: about \$0\.\d+, at most \$0\.\d+\./);
+            expect(router.requests).toEqual([]);
+        });
+
+        it('refuses no scene, an unknown scene, an unknown model, bad samples, bad parallel calls and a missing key, naming what it knows', async () => {
             const env = { EVAL_SPEND: 'yes', OPENROUTER_API_KEY: 'sk-or-test-not-a-real-key' };
 
-            await expect(start({ ...env }).started).rejects.toThrow('Name a scene: one of format, user, facts, repeats, voice, length, adult, or all.');
+            await expect(start({ ...env }).started).rejects.toThrow(`Name a scene: one of ${allNames}, or all.`);
             await expect(start({ ...env, EVAL_SCENES: 'weather' }).started).rejects.toThrow('Unknown scene "weather"');
-            await expect(start({ ...env, EVAL_SCENES: 'all', EVAL_MODEL: 'gpt-9' }).started).rejects.toThrow('Unknown model "gpt-9". Name one of glm-5.3, deepseek-v4-pro.');
+            await expect(start({ ...env, EVAL_SCENES: 'all', EVAL_MODEL: 'gpt-9' }).started).rejects.toThrow('Unknown model "gpt-9". Name one of glm-5.3, deepseek-v4-pro, or all.');
             await expect(start({ ...env, EVAL_SCENES: 'all', EVAL_SAMPLES: '0' }).started).rejects.toThrow('Samples is a whole number from 1 to 10.');
+            await expect(start({ ...env, EVAL_SCENES: 'all', EVAL_PARALLEL: '9' }).started).rejects.toThrow('Parallel calls is a whole number from 1 to 8.');
             await expect(start({ EVAL_SPEND: 'yes', EVAL_SCENES: 'all' }).started).rejects.toThrow('OPENROUTER_API_KEY is not set');
         });
 
@@ -110,9 +146,19 @@ describe('The prompt eval run', () => {
             expect(readFileSync(json, 'utf8') + readFileSync(scorecard, 'utf8')).not.toContain('sk-or-test');
         });
 
+        it('plays five samples a scene, four calls at a time, unless told otherwise', async () => {
+            const router = scriptedOpenRouter({ delayMs: 5 });
+
+            const { report } = await start({ EVAL_SPEND: 'yes', EVAL_SCENES: 'format,length', OPENROUTER_API_KEY: 'sk-or-test-not-a-real-key' }, router).started;
+
+            expect(report.samples).toBe(5);
+            expect(router.requests).toHaveLength(10);
+            expect(router.flight.peak).toBe(4);
+        });
+
         it('compares with the newest earlier report for the same model when asked for the last', async () => {
             const reportDir = dir();
-            const env = { EVAL_SPEND: 'yes', EVAL_SCENES: 'format', OPENROUTER_API_KEY: 'sk-or-test-not-a-real-key' };
+            const env = { EVAL_SPEND: 'yes', EVAL_SCENES: 'format', EVAL_SAMPLES: '3', OPENROUTER_API_KEY: 'sk-or-test-not-a-real-key' };
             await start(env, scriptedOpenRouter(), reportDir).started;
             await new Promise((resolve) => setTimeout(resolve, 5));
             // Now every reply breaks the format: an unknown speaker.
@@ -130,6 +176,30 @@ describe('The prompt eval run', () => {
 
             await expect(start(env).started).rejects.toThrow('No report at');
         });
+
+        it('with every play model asked for, plays the turn scenes on each, the Judge scenes once, and writes one scorecard with a column a model', async () => {
+            const router = scriptedOpenRouter({ play: (index) => (index < 2 ? {} : { text: '@Stranger: Who are you?' }) });
+            const env = { EVAL_SPEND: 'yes', EVAL_SCENES: 'format,judge-waits', EVAL_MODEL: 'all', EVAL_SAMPLES: '2', EVAL_PARALLEL: '1', OPENROUTER_API_KEY: 'sk-or-test-not-a-real-key' };
+
+            const { runs, sideBySide, report } = await start(env, router).started;
+
+            expect(router.requests.map((request) => `${request.role} ${(request.body as { model: string }).model}`)).toEqual([
+                'play z-ai/glm-5.3',
+                'play z-ai/glm-5.3',
+                `background ${GRADER_MODEL}`,
+                `background ${GRADER_MODEL}`,
+                'play deepseek/deepseek-v4-pro',
+                'play deepseek/deepseek-v4-pro',
+            ]);
+            expect(runs.map((one) => one.report.model)).toEqual(['glm-5.3', 'deepseek-v4-pro']);
+            expect(report).toBe(runs[0].report);
+            expect(runs.every((one) => existsSync(one.json) && existsSync(one.scorecard))).toBe(true);
+            const card = readFileSync(sideBySide!, 'utf8');
+            expect(card).toContain('| Scene | Check | Kind | GLM-5.3 | DeepSeek V4 Pro |');
+            expect(card).toContain('| format | parses | code | 2 of 2 | 0 of 2 |');
+            expect(card).toContain('| judge-waits | does not move on | code | 2 of 2 | - |');
+            expect(card).toContain('Total $0.00600');
+        });
     });
 
     it('builds each scene’s prompt with the real turn prompt builder and plays it three times, pinned to DeepInfra', async () => {
@@ -137,22 +207,33 @@ describe('The prompt eval run', () => {
 
         expect(requests).toHaveLength(6);
         for (const [index, name] of ['format', 'format', 'format', 'length', 'length', 'length'].entries()) {
-            const one = scene(name);
+            const one = turnScene(name);
             const prompt = buildTurnPrompt({ ...one.input, userText: one.userText });
             expect(requests[index].body).toMatchObject({ model: 'z-ai/glm-5.3', messages: prompt.messages, max_tokens: prompt.maxTokens, stop: prompt.stop });
             expect((requests[index].body as { provider: unknown }).provider).toMatchObject({ only: ['deepinfra'], allow_fallbacks: false });
         }
     });
 
-    it('the repeats scene’s prompt names the phrase the replies share, and the facts scene’s prompt lists the fact', () => {
-        const text = (name: string) =>
-            buildTurnPrompt({ ...scene(name).input, userText: scene(name).userText })
-                .messages.map((message) => message.content)
-                .join('\n');
+    describe('what a scene’s prompt must hold', () => {
+        it('every scene names words of the block it tests, and its built prompt holds them', () => {
+            expect(EVAL_SCENES.filter((one) => one.expects.length === 0).map((one) => one.name)).toEqual([]);
+            expect(scenePromptProblems(EVAL_SCENES)).toEqual([]);
+        });
 
-        expect(text('repeats')).toContain(`Already used in recent replies, so not again in this one: "${REPEATED_PHRASE}"`);
-        expect(text('facts')).toContain('# Established facts');
-        expect(text('facts')).toContain('nine years');
+        it('the repeats scene’s prompt names the phrase the replies share, and the facts scene’s prompt lists the fact', () => {
+            expect(scene('repeats').expects).toContain(`Already used in recent replies, so not again in this one: "${REPEATED_PHRASE}"`);
+            expect(scene('facts').expects).toEqual(expect.arrayContaining(['# Established facts', 'nine years']));
+        });
+
+        it('refuses, before any call, a scene whose prompt no longer holds what it names', async () => {
+            const router = scriptedOpenRouter();
+            const stale: EvalScene = { ...scene('facts'), expects: ['# Established facts', 'eleven winters'] };
+
+            const refused = runEval({ scenes: [scene('format'), stale], model: 'glm-5.3', client: router.client, git: GIT });
+
+            await expect(refused).rejects.toThrow('Scene "facts" no longer tests what it claims: its prompt does not hold "eleven winters".');
+            expect(router.requests).toEqual([]);
+        });
     });
 
     describe('code checks', () => {
@@ -166,6 +247,16 @@ describe('The prompt eval run', () => {
             { scene: 'repeats', check: 'drops the phrase', good: GOOD, bad: `She thought about it, and ${REPEATED_PHRASE}.\n\n@Mira Vance: Not yet.` },
             { scene: 'length', check: 'medium length', good: `${'The rain kept on against the glass. '.repeat(30)}\n\n@Mira Vance: Stay, then.`, bad: GOOD },
             { scene: 'adult', check: 'no refusal', good: GOOD, bad: 'I’m sorry, but I can’t write that scene.' },
+            { scene: 'secret', check: 'keeps the secret', good: '@Mira Vance: Spring? Ask me in spring.', bad: '@Mira Vance: I have a ticket to Lisbon, if you must know.' },
+            {
+                scene: 'directions',
+                check: 'no stage directions in speech',
+                good: 'Mira leaned on the counter.\n\n@Mira Vance: You are *very* late. Sit.',
+                bad: '@Mira Vance: You are late. *leans on the counter* Sit.',
+            },
+            { scene: 'directions', check: 'no stage directions in speech', good: GOOD, bad: '@Mira Vance: (smiling) You are late.' },
+            { scene: 'sitout', check: 'Tobias Hale stays silent', good: GOOD, bad: `${GOOD}\n\n@Tobias Hale: I would not presume to say.` },
+            { scene: 'thai', check: 'written in English', good: GOOD, bad: '@Mira Vance: คืนนี้ว่างค่ะ' },
         ];
 
         it.each(cases)('$scene: "$check" passes a reply that does it and fails one that does not', async ({ scene: name, check, good, bad }) => {
@@ -190,11 +281,34 @@ describe('The prompt eval run', () => {
             expect(body.model).toBe(GRADER_MODEL);
             expect(body.response_format).toEqual({ type: 'json_object' });
             const asked = body.messages.map((message) => message.content).join('\n');
-            expect(asked).toContain(scene('voice').userText);
+            expect(asked).toContain(turnScene('voice').userText);
             expect(asked).toContain(GOOD);
-            expect(asked).toContain(scene('voice').graded[0].criterion);
+            expect(asked).toContain(turnScene('voice').graded[0].criterion);
             expect(score(report, 'voice', 'sounds like Mira')).toBe('2/3');
             expect(report.scenes[0].samples[0].results.at(-1)).toEqual({ check: 'sounds like Mira', kind: 'graded', outcome: 'pass', reason: 'You came back.' });
+        });
+
+        it('a check about one Character’s speech shows the grader that Character’s speech lines apart, and tells it to judge only those', async () => {
+            const reply = 'Tobias cleared his throat. "Hardly my place to say," he murmured.\n\n@Mira Vance: You brought bread. Bold.\n\n@Mira Vance: Is any of it for me?';
+            const { requests } = await run(['voice'], { play: () => ({ text: reply }) }, { samples: 1 });
+
+            const asked = (requests.find((request) => request.role === 'grader')!.body as { messages: { content: string }[] }).messages.at(-1)!.content;
+            expect(asked).toContain('Mira Vance’s speech lines, the only words that count for a criterion about what Mira Vance says:\n- You brought bread. Bold.\n- Is any of it for me?');
+            expect(asked).toContain('Judge this one only on Mira Vance’s speech lines');
+        });
+
+        it('a check about a Character’s speech is "not graded", with no grader call, when that Character has no speech line', async () => {
+            // The first runs passed "sounds like Mira" on a reply like this: her words only quoted in the narration.
+            const { report, requests } = await run(['voice'], { play: () => ({ text: 'Mira laughed. "You brought bread. Bold," she said.' }) }, { samples: 1 });
+
+            expect(requests.filter((request) => request.role === 'grader')).toEqual([]);
+            expect(report.scenes[0].samples[0].results.at(-1)).toEqual({
+                check: 'sounds like Mira',
+                kind: 'graded',
+                outcome: 'not_graded',
+                reason: 'Mira Vance has no speech line to judge',
+            });
+            expect(score(report, 'voice', 'Mira Vance speaks')).toBe('0/1');
         });
 
         it('a scene with no graded checks sends no grader call', async () => {
@@ -214,6 +328,74 @@ describe('The prompt eval run', () => {
         });
     });
 
+    describe('Judge and Memory scenes', () => {
+        it('a Judge scene is built with the app’s Judge prompt builder and sent to the background model as the app sends it', async () => {
+            const { requests, report } = await run(['judge-waits'], {}, { samples: 2 });
+
+            const one = scene('judge-waits') as JudgeScene;
+            const prompt = buildJudgePrompt(one.input);
+            expect(requests.map((request) => request.role)).toEqual(['background', 'background']);
+            expect(requests[0].body).toMatchObject({
+                model: GRADER_MODEL,
+                messages: prompt.messages,
+                max_tokens: prompt.maxTokens,
+                response_format: { type: 'json_object' },
+                // The Judge's own temperature (the app's background samplers).
+                temperature: 0.3,
+            });
+            expect(report.calls.map((call) => call.role)).toEqual(['background', 'background']);
+            expect(report.scenes[0]).toMatchObject({ name: 'judge-waits', kind: 'judge' });
+        });
+
+        it('a Memory scene is built with the app’s extraction prompt builder, as JSON, with no sampler value', async () => {
+            const { requests } = await run(['memory-promise'], {}, { samples: 1 });
+
+            const prompt = buildExtractionPrompt((scene('memory-promise') as MemoryScene).input);
+            expect(requests[0].body).toMatchObject({ model: GRADER_MODEL, messages: prompt.messages, max_tokens: prompt.maxTokens, response_format: { type: 'json_object' } });
+            expect(requests[0].body).not.toHaveProperty('temperature');
+        });
+
+        const add = (text: string, knownBy: string[] = ['Mira Vance']) => JSON.stringify({ operations: [{ op: 'add', text, known_by: knownBy, cause: 'the promise' }] });
+        const promise = add('{user} promised Mira Vance to come by on Sunday and fix the shop door.');
+        const cases: { scene: string; check: string; good: string; bad: string }[] = [
+            { scene: 'judge-waits', check: 'does not move on', good: QUIET, bad: '{"scene":{"reason":"he asked","move_on":true}}' },
+            { scene: 'judge-moves', check: 'moves on', good: '{"scene":{"reason":"he asked her to dinner","move_on":true}}', bad: QUIET },
+            { scene: 'judge-quiet', check: 'no Arc step', good: QUIET, bad: '{"arc_steps":[{"character":"Mira Vance","step":"Lets her guard down","cause":"the rain"}]}' },
+            {
+                scene: 'judge-quiet',
+                check: 'keeps the Bond’s label',
+                good: '{"bond_changes":[{"from":"Mira Vance","to":"user","label":"Curious warmth","description":"A little warmer.","cause":"the tea"}]}',
+                bad: '{"bond_changes":[{"from":"Mira Vance","to":"user","label":"deep love","description":"She adores him.","cause":"the tea"}]}',
+            },
+            { scene: 'judge-facts', check: 'gives the nine years', good: '{"facts":[{"topic":"Mira’s years with the shop","fact":"nine years"}]}', bad: QUIET },
+            { scene: 'judge-secret', check: 'reveals nothing', good: '{"secrets_revealed":[]}', bad: '{"secrets_revealed":[1]}' },
+            { scene: 'memory-quiet', check: 'adds nothing', good: QUIET, bad: add('It rained harder than the day before.') },
+            { scene: 'memory-promise', check: 'adds the promise', good: promise, bad: QUIET },
+            { scene: 'memory-promise', check: 'writes {user}, never the name', good: promise, bad: add('Ash promised to fix the shop door on Sunday.') },
+            { scene: 'memory-promise', check: 'known only by those present', good: promise, bad: add('{user} promised to fix the shop door on Sunday.', ['Mira Vance', 'Tobias Hale']) },
+        ];
+
+        it.each(cases)('$scene: "$check" passes an answer that does it and fails one that does not', async ({ scene: name, check, good, bad }) => {
+            const passed = await run([name], { background: () => ({ text: good }) }, { samples: 1 });
+            const failed = await run([name], { background: () => ({ text: bad }) }, { samples: 1 });
+
+            expect(score(passed.report, name, check)).toBe('1/1');
+            expect(score(failed.report, name, check)).toBe('0/1');
+            expect(failed.report.scenes[0].samples[0].results.find((result) => result.check === check)!.reason).not.toBe('');
+        });
+
+        it.each([
+            ['judge-waits', 'reads as a judgement', 'does not move on'],
+            ['memory-promise', 'reads as an extraction', 'adds the promise'],
+        ])('%s: an answer the app’s parser cannot read fails "%s" and leaves the other checks not graded', async (name, readable, other) => {
+            const { report } = await run([name], { background: (index) => (index === 0 ? { text: 'Nothing changed, I think.' } : {}) }, { samples: 2 });
+
+            expect(score(report, name, readable)).toBe('1/2');
+            expect(scores(report).find((row) => row.check === other)).toMatchObject({ scored: 1, notScored: 1 });
+            expect(report.scenes[0].samples[0].results.find((result) => result.check === other)).toMatchObject({ outcome: 'not_graded', reason: 'the answer could not be read' });
+        });
+    });
+
     it('a failed play call is a failed sample with its error, apart from the score, and the run carries on', async () => {
         const { report } = await run(['format'], { play: (index) => (index === 1 ? { status: 400 } : {}) });
 
@@ -223,18 +405,45 @@ describe('The prompt eval run', () => {
         expect(formatScorecard(report)).toContain('- format, sample 2: the call failed:');
     });
 
-    it('stops before a call that would take the running total past the cap, and says so', async () => {
-        // Each call is billed $0.004; a turn's worst case is under a cent, so the cap is reached mid-run.
-        const { report, requests } = await run(['format', 'length'], { play: () => ({ cost: 0.004 }) }, { capUsd: 0.012 });
+    describe('the cap', () => {
+        it('stops before a call that would take the running total past the cap, and says so', async () => {
+            // Each call is billed $0.004; a turn's worst case is under a cent, so the cap is reached mid-run.
+            const { report, requests } = await run(['format', 'length'], { play: () => ({ cost: 0.004 }) }, { capUsd: 0.012 });
 
-        expect(report.stoppedAtCap).toBe(true);
-        expect(requests.length).toBeLessThan(6);
-        expect(report.totalUsd).toBeLessThanOrEqual(0.012);
-        expect(formatScorecard(report)).toContain('stopped at the cap: the scorecard is not complete');
+            expect(report.stoppedAtCap).toBe(true);
+            expect(requests.length).toBeLessThan(6);
+            expect(report.totalUsd).toBeLessThanOrEqual(0.012);
+            expect(formatScorecard(report)).toContain('stopped at the cap: the scorecard is not complete');
+        });
+
+        it('counts calls in flight at their worst case, so parallel calls cannot pass it together', async () => {
+            const { report, requests, flight } = await run(['format', 'length'], { play: () => ({ cost: 0.004 }), delayMs: 5 }, { capUsd: 0.012, concurrency: 4 });
+
+            expect(report.stoppedAtCap).toBe(true);
+            expect(report.totalUsd).toBeLessThanOrEqual(0.012);
+            // A turn's worst case is about $0.003: four in flight would need the whole cap at once.
+            expect(flight.peak).toBeLessThan(4);
+            expect(requests.length).toBeLessThan(6);
+        });
+
+        it('counts what the command already spent on another model', async () => {
+            const { report, requests } = await run(['format'], {}, { capUsd: 0.5, spentUsd: 0.4999 });
+
+            expect(requests).toEqual([]);
+            expect(report).toMatchObject({ stoppedAtCap: true, totalUsd: 0 });
+        });
     });
 
-    it('records the commit, each call’s model, tokens and cost, each reply and each result, and names its files by time and model', async () => {
-        const { report } = await run(['voice'], {}, { samples: 1 });
+    it('plays calls in parallel up to the number asked, and keeps each scene’s samples in order', async () => {
+        const texts = ['@Mira Vance: One.', '@Mira Vance: Two.', '@Mira Vance: Three.', '@Mira Vance: Four.', '@Mira Vance: Five.', '@Mira Vance: Six.'];
+        const { report, flight } = await run(['format', 'length'], { play: (index) => ({ text: texts[index] }), delayMs: 5 }, { concurrency: 3 });
+
+        expect(flight.peak).toBe(3);
+        expect(report.scenes.map((one) => one.samples.map((sample) => sample.text))).toEqual([texts.slice(0, 3), texts.slice(3)]);
+    });
+
+    it('records the commit, each call’s model, tokens, cached tokens and cost, each reply and each result, and names its files by time and model', async () => {
+        const { report } = await run(['voice'], { play: () => ({ cached: 60 }) }, { samples: 1 });
         const dir = mkdtempSync(path.join(tmpdir(), 'eval-'));
 
         const files = writeEvalReport(report, dir);
@@ -244,25 +453,62 @@ describe('The prompt eval run', () => {
         const written = JSON.parse(readFileSync(files.json, 'utf8')) as EvalReport;
         expect(written).toMatchObject({ commit: 'abc1234', dirty: false, model: 'glm-5.3', totalUsd: 0.002 });
         expect(written.calls).toEqual([
-            { scene: 'voice', role: 'play', model: 'z-ai/glm-5.3', finishReason: 'stop', promptTokens: 100, completionTokens: 20, costUsd: 0.001, error: null },
-            { scene: 'voice', role: 'grader', model: GRADER_MODEL, finishReason: 'stop', promptTokens: 100, completionTokens: 20, costUsd: 0.001, error: null },
+            { scene: 'voice', role: 'play', model: 'z-ai/glm-5.3', finishReason: 'stop', promptTokens: 100, completionTokens: 20, cachedTokens: 60, costUsd: 0.001, error: null },
+            { scene: 'voice', role: 'grader', model: GRADER_MODEL, finishReason: 'stop', promptTokens: 100, completionTokens: 20, cachedTokens: null, costUsd: 0.001, error: null },
         ]);
         expect(written.scenes[0].samples[0].text).toBe(GOOD);
     });
 
-    it('marks a check better or worse only when it moved by two samples in three, or fell from every sample passing', async () => {
-        const replies = (bad: number) => ({ play: (index: number) => ({ text: index < bad ? '@Stranger: Who are you?' : GOOD }) });
-        const card = async (before: number, after: number) => {
-            const earlier = (await run(['format'], replies(before))).report;
-            const now = (await run(['format'], replies(after))).report;
-            return formatScorecard(now, earlier).split('\n').find((line) => line.startsWith('| format | parses'))!;
-        };
+    it('the scorecard says what share of the prompt tokens the host read from its cache, counting only calls that reported one', async () => {
+        const cached = await run(['format'], { play: (index) => ({ cached: index === 0 ? 0 : 80 }) });
+        const silent = await run(['format']);
 
-        expect(await card(0, 0)).toContain('| 3 of 3 | 3 of 3 | unchanged |');
-        expect(await card(0, 1)).toContain('| 2 of 3 | 3 of 3 | worse |');
-        expect(await card(1, 2)).toContain('| 1 of 3 | 2 of 3 | unchanged |');
-        expect(await card(1, 3)).toContain('| 0 of 3 | 2 of 3 | worse |');
-        expect(await card(3, 1)).toContain('| 2 of 3 | 0 of 3 | better |');
-        expect(await card(2, 1)).toContain('| 2 of 3 | 1 of 3 | unchanged |');
+        expect(formatScorecard(cached.report)).toContain('The host read 160 of 300 prompt tokens from its cache (53%).');
+        expect(formatScorecard(silent.report)).not.toContain('from its cache');
+    });
+
+    describe('what moved since an earlier run', () => {
+        const row = (pass: number, scored: number): Score => ({ scene: 'format', check: 'parses', kind: 'code', pass, scored, notScored: 0 });
+
+        it('marks a check better or worse only when chance alone would rarely move it that far', () => {
+            // Five samples each: three samples' difference clears the bar, two do not.
+            expect(compare(row(2, 5), row(5, 5))).toBe('worse');
+            expect(compare(row(1, 5), row(4, 5))).toBe('worse');
+            expect(compare(row(5, 5), row(2, 5))).toBe('better');
+            expect(compare(row(2, 5), row(4, 5))).toBe('unchanged');
+            expect(compare(row(4, 5), row(4, 5))).toBe('unchanged');
+            // Three samples each: only all against none.
+            expect(compare(row(0, 3), row(3, 3))).toBe('worse');
+            expect(compare(row(3, 3), row(0, 3))).toBe('better');
+            expect(compare(row(0, 3), row(2, 3))).toBe('unchanged');
+            // Runs of different sizes compare by the same rule.
+            expect(compare(row(4, 10), row(3, 3))).toBe('worse');
+            expect(compare(row(9, 10), row(3, 3))).toBe('slipped');
+        });
+
+        it('marks a check that passed every sample and now fails some as slipped, when that is within chance', () => {
+            expect(compare(row(4, 5), row(5, 5))).toBe('slipped');
+            expect(compare(row(3, 5), row(5, 5))).toBe('slipped');
+            expect(compare(row(2, 3), row(3, 3))).toBe('slipped');
+        });
+
+        it('a check the earlier run did not have is new, and one either run could not score is unchanged', () => {
+            expect(compare(row(3, 3), undefined)).toBe('new');
+            expect(compare(row(0, 0), row(3, 3))).toBe('unchanged');
+        });
+
+        it('shows the earlier score and the change on the scorecard', async () => {
+            const replies = (bad: number) => ({ play: (index: number) => ({ text: index < bad ? '@Stranger: Who are you?' : GOOD }) });
+            const card = async (before: number, after: number) => {
+                const earlier = (await run(['format'], replies(before))).report;
+                const now = (await run(['format'], replies(after))).report;
+                return formatScorecard(now, earlier).split('\n').find((line) => line.startsWith('| format | parses'))!;
+            };
+
+            expect(await card(0, 0)).toContain('| 3 of 3 | 3 of 3 | unchanged |');
+            expect(await card(0, 1)).toContain('| 2 of 3 | 3 of 3 | slipped |');
+            expect(await card(0, 3)).toContain('| 0 of 3 | 3 of 3 | worse |');
+            expect(await card(3, 0)).toContain('| 3 of 3 | 0 of 3 | better |');
+        });
     });
 });

@@ -124,3 +124,79 @@ It spends real credit, so it never starts without `--spend`, and it stops before
 - **The fix was in the reply parser, not the prompt:** a speech line names a Character by their whole name, or by one word of it that only one Character has. A word two Characters share names neither.
 - **Run 2, same scenes, $0.024.** Every check 3 of 3; "user: parses" and "voice: Mira Vance speaks" marked better.
 - **Known weakness found:** "sounds like Mira" passed in run 1 on replies where Mira had no `@` line at all, because the grader read her quoted words in the narration. A graded check about speech should be read beside the code check that the Character speaks.
+
+## Upgrades (2026-11-22, second pass)
+
+The user asked what else the run could be made better with. Assessed against the code and the first runs, ranked by value against cost. Nothing here was run against a real model: every upgrade below is proved with scripted answers, and the first real run of the upgraded set needs the user's go-ahead.
+
+### What was weak
+
+1. **A scene could stop testing what it claims, silently.** A scene only works while the prompt still holds the block it is about (the fact, the repeated phrase). Reword the prompt builder and the scene passes for the wrong reason, on paid calls. Only two scenes had a test for it.
+2. **A graded check about speech read the whole reply.** "Sounds like Mira" passed on replies where Mira had no speech line (first runs).
+3. **Only the turn prompt was scored.** The Judge moves Scenes, sets Established facts and reveals Secrets; Memory extraction decides what the story carries. Both run on the background model after every turn, and a wrong answer there is a wrong Scene or a lost Memory a few turns later.
+4. **Seven scenes left recorded failures uncovered:** a Secret told early, a stage direction inside a speech line, a Character sitting out who speaks anyway, a voice lost to another Character's register after a long history, a reply in Thai because the user typed Thai.
+5. **Three samples, and a crude better/worse rule.** Two of three moving was called a change though chance alone does that one time in five; one sample slipping from three of three was called worse.
+6. **Nothing said what a run would cost before it spent.** The estimate was a paragraph in this spec, a quarter off.
+7. **Calls ran one at a time** (about three minutes a run).
+8. **The cost did not show what the host's cache gave back.**
+9. **Two play models meant two runs and two scorecards read side by side by eye.**
+10. **One reply per scene:** no conversation scored as a whole.
+
+### Built now
+
+- **A scene names what its prompt must hold.** Each scene lists a few words its built prompt must contain (the heading of the block it tests, the fact, the name sitting out). The run checks every named scene before the first call and refuses, naming the scene and the missing words, so no credit goes on a scene that no longer tests its thing. A test checks every scene the same way, so a prompt change that breaks one fails the normal test run.
+- **A graded check can be about one Character's speech.** The grader is then shown that Character's speech lines apart and told to judge only those. With no speech line there is nothing to judge: the check is "not graded" and no grader call is made for it. The code check that the Character speaks carries the failure.
+- **Judge scenes and Memory scenes.** A scene now has a kind: a turn (as before), a judgement or a Memory extraction. A judgement scene holds the Judge's own input and is built with the app's Judge prompt builder, sent to the background model as the app sends it (JSON mode, the Judge's own temperature), and read with the app's own parser; its checks read the parsed judgement. Memory scenes the same, with the extraction's builder and parser. An answer the parser cannot read fails one check ("reads as a judgement") and leaves the rest not graded. First scenes:
+  - Judge: a Scene's condition only promised is not met; the same condition done is met; small talk changes no Bond's label and adds no Arc step; a number said in the reply comes back as a fact; a Secret only hinted at is not revealed.
+  - Memory: small talk adds nothing; a promise is added, with `{user}` and never the user's name, known only by those present.
+- **Five new turn scenes,** all synthetic, every person an adult: a Secret kept for now stays untold when the user asks straight at it; no stage direction inside a speech line after a history full of them; a Character sitting out neither speaks nor acts; a Character keeps their own voice after a long history in another's register; the user types Thai and the reply is English with no remark on the language. This takes "Thai-language scenes" out of Out of Scope for this one case: the user types Thai, the rule is in the prompt, and one code check decides it.
+- **Five samples by default, and a change is marked by odds.** A check is better or worse only when chance alone would move it that far less than about one time in seven (Fisher's exact test on the two runs' passes, one-sided, 0.15), so the rule holds for any number of samples and for runs of different sizes. A check that passed every sample before and failed any now, without clearing that bar, is marked "slipped": look again with more samples. At three samples only all-to-none clears the bar, which is the honest reading of three samples.
+- **The cost before spending.** Without `--spend` the run still refuses, and its refusal now says how many calls the named scenes would send and what they would cost: an expected figure (calls sized as the first real run's were) and the most it could cost. No key, no network.
+- **Calls in parallel.** Four at a time by default, `--parallel` to change it. The cap counts calls in flight at their worst case, so parallel calls cannot pass it together.
+- **Cached tokens.** Each call records the prompt tokens the host read from its cache, and the scorecard says the share. Samples of one scene share a prompt, so this also shows whether the host's cache holds for the turn prompt.
+- **Both play models in one go.** `--model all` plays the turn scenes on each play model and writes one more scorecard with a column a model. Judge and Memory scenes run once, as they never use the play model. The cap covers the whole command, not each model.
+
+### Left out, and why
+
+- **Story so far scenes.** It has a pure builder and parser, but a scene needs a long synthetic history (thousands of tokens a call) and its commonest faults are already refused by code in the app. Next in line after the Judge and Memory scenes have had a real run.
+- **Character thoughts, Diary, Snapshot prompt, Story assistant.** As before: same shape, later.
+- **A conversation scored as a whole** (reply, then a turn on top of it, and so on). Each added turn multiplies the cost and the noise, and its checks can only be tuned against real replies. The failure it would catch that is on record (a voice lost over a long Chat) is covered more cheaply by the one-reply scene after a long history.
+- **Pooling several earlier runs for the comparison.** Worth it only once there are enough runs on one prompt; `--samples` does the same job today.
+- **A shared spend ledger with the smoke run.** Still a dozen lines each, still not worth changing the smoke run for.
+- **Automatic prompt rewriting.** Still out: the eval only measures.
+
+### Built (2026-11-22)
+
+Everything under "Built now" is in, proved through the one seam (the run with a scripted `fetch`): 57 tests, no call to a real model. Nothing in the running app changed; the run only reads the app's prompt builders, its parsers and the Judge's own sampler value.
+
+- **Nineteen scenes:** twelve turns (format, user, facts, repeats, voice, length, adult, secret, directions, sitout, drift, thai), five judgements (judge-waits, judge-moves, judge-quiet, judge-facts, judge-secret) and two Memory extractions (memory-quiet, memory-promise).
+- **"Sounds like Mira" now reads only Mira's speech lines,** in the voice scene and the drift scene.
+- **Commands:**
+
+```
+npm run eval:live -- all                          (spends nothing: says what the run would cost)
+npm run eval:live -- all --spend --model all      (each play model, one scorecard side by side)
+npm run eval:live -- all --spend --parallel 1     (one call at a time; four unless told)
+```
+
+- **What the upgraded run would cost,** as the run itself now says without `--spend`. Prices are the app's catalogue's, calls are sized on the first real run, and no cache discount is taken, so it errs high: it gives $0.040 for the seven first scenes at three samples, which really cost $0.024.
+  - every scene, five samples, GLM-5.3: 125 calls, about $0.12, at most $0.33;
+  - every scene, three samples (`--samples 3`): 75 calls, about $0.08, at most $0.20;
+  - every scene, five samples, DeepSeek V4 Pro: about $0.22;
+  - both play models side by side: 215 calls, about $0.34.
+- **Not yet known, and only a real run can say:**
+  - whether the new scenes' checks are fair to a good reply. A code check written against no real reply can be too strict ("keeps the secret" fails on any mention of a ticket; "no stage directions in speech" fails on any parenthesis in a speech line). The first real run is a check of the checks: read "What did not pass" before believing a low score.
+  - whether the Judge and Memory scenes are steady on the background model at its own temperature.
+  - whether the host takes four calls at once without a busy answer, and what that does to the cache share (parallel samples of one scene may each miss a cache the first has not yet written).
+- **A changed default to note:** five samples a scene, where it was three. `--samples 3` gives the old size.
+
+### First real run of the upgraded set (2026-11-22, with the user's go-ahead)
+
+`all --spend --samples 3` on GLM-5.3, four calls at a time: **$0.043 in 74 calls**, no failed call, no busy answer, every answer finished on its own.
+
+- **The cost line erred high, as said:** it gave about $0.075. The host read 68% of the prompt tokens from its cache, parallel calls and all.
+- **Every check passed 3 of 3 but one reply.** The new checks were not too strict on any real reply: read by eye, the replies of the secret, directions, sitout, drift and thai scenes pass for the right reason, and so do the judgements and extractions.
+- **The one failure is real, and it is the app's:** in one voice reply GLM-5.3 wrote `@Mira:` alone on a line, then a blank line, then her words, four times over. The reply parser reads a name with nothing after it as an empty speech line and drops it, and the words under the blank line become narration: in a Chat, Mira would say nothing and the Narrator would speak her lines. One reply in 36, so rare, but nothing in the app catches it. Not fixed here: it is the reply parser's to decide (a speech line with no words takes the paragraph after it), in its own change.
+- **The upgrade for the grader held:** on that reply "sounds like Mira" was "not graded" and no grader call was made, where the first runs would have passed it.
+- **What a clean sheet does not say:** twelve turn scenes at three samples passing says the prompt holds on short synthetic Stories. It does not say the scenes are hard enough: none of them has yet failed for the reason it was written. A scene earns its place the first time it catches something.
+- The report is with the earlier ones, under the main checkout's eval runs, so `--against last` finds it.

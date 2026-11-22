@@ -21,15 +21,25 @@ export interface CheckVerdict {
     reason: string;
 }
 
-export interface CodeCheck {
+/** A check answered by code, over whatever the scene's kind reads: a reply, a judgement, an extraction. */
+export interface Check<T> {
     name: string;
-    run(context: CheckContext): CheckVerdict;
+    run(context: T): CheckVerdict;
 }
+
+export type CodeCheck = Check<CheckContext>;
 
 export interface GradedCheck {
     name: string;
     /** One sentence the grader answers yes or no to, about the reply alone. */
     criterion: string;
+    /**
+     * A Character whose speech this criterion is about. The grader is shown their speech lines
+     * apart and judges only those; with no speech line there is nothing to judge, and the check is
+     * "not graded". Without it, a criterion about what someone says was passed on words quoted in
+     * the narration (.scratch/prompt-evals/spec.md, "First runs").
+     */
+    speechOf?: string;
 }
 
 /** How far outside the reply length's range a reply may run and still count: models miss by a little. */
@@ -66,6 +76,34 @@ export function speaks(name: string): CodeCheck {
         },
     };
 }
+
+/** A named Character has no `@Name:` line: one sitting out, whose line the app would have to drop. */
+export function staysSilent(name: string): CodeCheck {
+    return {
+        name: `${name} stays silent`,
+        run: ({ parsed }) => {
+            const lines = parsed.parts.filter((part) => part.kind === 'speech' && part.speakerName === name).length;
+            return { pass: lines === 0, reason: `${lines} speech lines` };
+        },
+    };
+}
+
+/** What follows the name on a speech line, as the model wrote it. */
+const SPEECH_LINE_WORDS = /^\s*\**@[^:\n@]{1,60}:\s*(.*)$/;
+/** An *asterisk action* of two words or more (one starred word is emphasis), or anything in parentheses. */
+const STAGE_DIRECTION = /\*[^*\s][^*]*\s[^*]*\*|\([^)]+\)/;
+
+/** A speech line holds only what is said aloud: no *asterisk action* and no (parenthesis) inside it. */
+export const speechIsOnlySpoken: CodeCheck = {
+    name: 'no stage directions in speech',
+    run: ({ text }) => {
+        for (const line of text.split('\n')) {
+            const found = STAGE_DIRECTION.exec(SPEECH_LINE_WORDS.exec(line)?.[1] ?? '');
+            if (found) return { pass: false, reason: `wrote "${found[0]}" inside a speech line` };
+        }
+        return { pass: true, reason: 'none' };
+    },
+};
 
 /** No line is written as the user's own character: the reply parser's guard never had to cut. */
 export const neverSpeaksAsTheUser: CodeCheck = {
@@ -119,3 +157,6 @@ export const noRefusal: CodeCheck = avoids(
     'no refusal',
     /\bI (?:can(?:'|’)?not|can(?:'|’)t|won(?:'|’)t|am unable to|(?:'|’)m unable to) (?:write|continue|help|assist|comply|create|provide)|\bI(?:'|’)m sorry,? but\b|\bas an AI\b|\bfade[sd]? to black\b|\bcontent (?:policy|guidelines)\b/i,
 );
+
+/** The story is told in English whatever language the user typed in: no Thai script in the reply. */
+export const writtenInEnglish: CodeCheck = avoids('written in English', /[฀-๿]+/);
