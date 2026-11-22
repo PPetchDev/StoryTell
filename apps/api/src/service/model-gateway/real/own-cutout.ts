@@ -29,6 +29,16 @@ const DOUBTED_BELOW = 200;
 /** The share of the picture's outer ring that must be one colour for the background to count as flat. */
 const FLAT_SHARE = 0.9;
 const FLAT_REACH = 14;
+/**
+ * A ground shadow is the background's own colour made darker: every channel down by much the same
+ * share, to between 40% and 88% of the background's. A mark is not: it is strongly coloured (a
+ * channel kept, another gone), nearly black, or pale with a channel still at the background's.
+ */
+const SHADOW_DARKEST = 0.4;
+const SHADOW_LIGHTEST = 0.88;
+const SHADOW_TINT = 0.35;
+/** The share of the figure's height, from its foot, where a shadow the model kept is looked for. */
+const SHADOW_BAND = 0.1;
 
 export interface Matte {
     /** The picture's colours, three bytes a pixel. */
@@ -45,8 +55,9 @@ export interface Matte {
  * - background colour the model doubted (inside a tiara's loop, between strands of hair) goes;
  * - background colour still touching the see-through area goes, the drawing's own outlines stopping the spread,
  *   so white gloves inside an outline stay.
- * A soft grey shadow on the ground is not a mark and stays out. On any other background the model's
- * matte is kept as it is. The answer is one byte of alpha a pixel.
+ * - the ground shadow goes: it is never taken for a mark, and at the figure's foot what the model kept
+ *   of it is cleared from the see-through area inward, the drawing's outlines stopping that too.
+ * On any other background the model's matte is kept as it is. The answer is one byte of alpha a pixel.
  */
 export function finishMatte({ rgb, alpha: modelAlpha, width, height }: Matte): Buffer {
     const count = width * height;
@@ -73,6 +84,18 @@ export function finishMatte({ rgb, alpha: modelAlpha, width, height }: Matte): B
     const flat = ring.filter((pixel) => off(pixel) <= FLAT_REACH).length / ring.length >= FLAT_SHARE;
     if (!flat) return alpha;
 
+    /** The background's colour made darker, with no colour of its own: a shadow on the ground. */
+    const shadowLike = (pixel: number) => {
+        let least = Infinity;
+        let most = 0;
+        for (let channel = 0; channel < 3; channel++) {
+            const share = rgb[pixel * 3 + channel] / Math.max(1, background[channel]);
+            if (share < least) least = share;
+            if (share > most) most = share;
+        }
+        return most <= SHADOW_LIGHTEST && most >= SHADOW_DARKEST && (most - least) / most < SHADOW_TINT;
+    };
+
     for (let pixel = 0; pixel < count; pixel++) {
         const distance = off(pixel);
         if (distance <= BACKGROUND_REACH) {
@@ -80,7 +103,8 @@ export function finishMatte({ rgb, alpha: modelAlpha, width, height }: Matte): B
             continue;
         }
         if (alpha[pixel] >= 128) continue;
-        // Drawn beside the figure: coloured or dark, never a soft grey shadow.
+        // Drawn beside the figure: coloured or dark, never a shadow on the ground.
+        if (shadowLike(pixel)) continue;
         const red = rgb[pixel * 3];
         const green = rgb[pixel * 3 + 1];
         const blue = rgb[pixel * 3 + 2];
@@ -109,6 +133,41 @@ export function finishMatte({ rgb, alpha: modelAlpha, width, height }: Matte): B
             if (next < 0 || next >= count || seen[next]) continue;
             seen[next] = 1;
             if (off(next) <= BACKGROUND_REACH) {
+                alpha[next] = 0;
+                queue[tail++] = next;
+            }
+        }
+    }
+
+    // What the model kept of a ground shadow: at the figure's foot, shadow colour reached from the
+    // see-through area goes. An outline is far darker than a shadow, so shoes inside one stay.
+    let top = height;
+    let bottom = -1;
+    for (let pixel = 0; pixel < count; pixel++) {
+        if (alpha[pixel] < 128) continue;
+        const y = (pixel / width) | 0;
+        if (y < top) top = y;
+        if (y > bottom) bottom = y;
+    }
+    if (bottom < 0) return alpha;
+    const band = Math.round(bottom - (bottom - top) * SHADOW_BAND);
+    seen.fill(0);
+    head = 0;
+    tail = 0;
+    for (let pixel = band * width; pixel < count; pixel++) {
+        if (alpha[pixel] < 128) {
+            seen[pixel] = 1;
+            queue[tail++] = pixel;
+        }
+    }
+    while (head < tail) {
+        const pixel = queue[head++];
+        const x = pixel % width;
+        const neighbours = [x > 0 ? pixel - 1 : -1, x < width - 1 ? pixel + 1 : -1, pixel - width, pixel + width];
+        for (const next of neighbours) {
+            if (next < band * width || next >= count || seen[next]) continue;
+            seen[next] = 1;
+            if (shadowLike(next) || off(next) <= BACKGROUND_REACH) {
                 alpha[next] = 0;
                 queue[tail++] = next;
             }

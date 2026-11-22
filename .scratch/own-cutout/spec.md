@@ -44,7 +44,8 @@ Nothing changes in how a cut-out is asked for: "Cut out", "Draw all" and a dress
 - **Available means the model file is there.** The model's path defaults to `models/isnet-anime.onnx` beside the image folder, as the speech folder defaults beside it; `CUTOUT_MODEL` can name another path. No file, no error: Venice makes the cut-out.
 - **The model** is `isnet-anime` (176 MB, from the rembg project's releases), run with onnxruntime inside the API process, loaded on the first cut-out and kept. It reads a 1024-pixel square and answers how much of each pixel is figure; that matte is scaled back to the picture's size. It is not in the repository.
 - **The clean-up runs only where the background is one flat colour**, read from the picture's outer ring (nine tenths of it within a small distance of its median colour). There:
-  - a pixel the model left out that is coloured or dark comes back: the marks drawn beside the figure. A soft grey one does not: a ground shadow.
+  - a pixel the model left out that is coloured or dark comes back: the marks drawn beside the figure.
+  - a ground shadow never does. A shadow is the background's own colour made darker: every channel down by much the same share (Morra's shadow on beige paper is darker beige, which a plain "is it coloured" test took for a mark, 2026-11-22). At the figure's foot (the lowest tenth of its height), what the model itself kept of a shadow is cleared from the see-through area inward; the drawing's outlines, far darker than a shadow, stop that, so shoes stay.
   - a pixel of the background's colour that the model was not sure of goes: the gap inside a loop.
   - a pixel of the background's colour that can be reached from the see-through area through others like it goes. The drawing's outlines stop the spread, which is what keeps white gloves.
 - **On any other background the model's matte is used as it is.**
@@ -53,7 +54,7 @@ Nothing changes in how a cut-out is asked for: "Cut out", "Draw all" and a dress
 - **The usage record** is written as for any image call, with the remover's model name, the host `local` and a cost of 0, in the image pool. No provider's credit is read or spent.
 - **Settings' answer carries the cut-out's price now** (0, or Venice's), so the web shows "Cut out · free" and prices "Draw all" without the fee. Until it has loaded, the web assumes Venice's price.
 - **A new dependency:** onnxruntime's Node package, in the API only.
-- **Known limits.** A white thought bubble on a white background loses its inside: only its outline is kept. A mark drawn in soft grey is taken for a shadow. A white part of the figure that touches the background with no outline between them can be eaten.
+- **Known limits.** A white thought bubble on a white background loses its inside: only its outline is kept. A mark drawn in soft grey, or in a darker shade of the background's own colour, is taken for a shadow. A part of the figure at its foot in the shadow's colour, with no outline around it, can be cleared with the shadow. A white part of the figure that touches the background with no outline between them can be eaten.
 
 ## Testing Decisions
 

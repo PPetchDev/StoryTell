@@ -80,6 +80,44 @@ describe("The app's own background remover", () => {
             expect(at(alpha, 37, 37)).toBe(0); // the gap in the loop
         });
 
+        it('leaves a ground shadow out on a coloured background: never a mark, and cleared at the foot where the model kept it, with outlined shoes left', () => {
+            const paper: Colour = [232, 208, 182];
+            const shadow: Colour = [171, 144, 117];
+            const sandal: Colour = [181, 131, 96];
+            const { rgb } = picture(W, H, paper, [
+                { at: [22, 4, 38, 44], colour: PINK },
+                // The shadow on the ground, wider than the figure.
+                { at: [10, 49, 50, 55], colour: shadow },
+                // A sandal the shadow's own colour, inside a dark outline, standing in the shadow.
+                { at: [24, 42, 36, 52], colour: OUTLINE },
+                { at: [26, 44, 34, 50], colour: sandal },
+                // A coloured mark up beside the figure.
+                { at: [46, 6, 54, 12], colour: YELLOW },
+            ]);
+            // The model took the figure, the sandal and the middle of the shadow.
+            const model = matte(W, H, [22, 4, 38, 52], [{ at: [16, 49, 44, 55], alpha: 255 }]);
+
+            const alpha = finishMatte({ rgb, alpha: model, width: W, height: H });
+
+            expect(at(alpha, 12, 52)).toBe(0); // shadow the model left out: not a mark
+            expect(at(alpha, 18, 52)).toBe(0); // shadow the model kept
+            expect(at(alpha, 42, 50)).toBe(0);
+            expect(at(alpha, 30, 53)).toBe(0); // and under the sandal
+            expect(at(alpha, 30, 47)).toBe(255); // the sandal
+            expect(at(alpha, 25, 47)).toBe(255); // its outline
+            expect(at(alpha, 30, 25)).toBe(255); // the figure
+            expect(at(alpha, 50, 9)).toBe(255); // the mark
+        });
+
+        it('keeps a pale mark with a channel still at the background’s, as a sweat drop is', () => {
+            const drop: Colour = [200, 226, 250];
+            const { rgb } = picture(W, H, WHITE, [{ at: [20, 15, 40, 50], colour: PINK }, { at: [46, 6, 54, 12], colour: drop }]);
+
+            const alpha = finishMatte({ rgb, alpha: matte(W, H, [20, 15, 40, 50]), width: W, height: H });
+
+            expect(at(alpha, 50, 9)).toBeGreaterThan(120);
+        });
+
         it('works the same on a dark flat background', () => {
             const dark: Colour = [22, 19, 30];
             const { rgb } = picture(W, H, dark, [{ at: [20, 15, 40, 50], colour: PINK }, { at: [46, 6, 54, 12], colour: YELLOW }]);

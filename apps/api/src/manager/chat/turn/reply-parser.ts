@@ -70,7 +70,9 @@ export function speakerOf<T extends CastName>(cast: T[], spoken: string): T | un
  *   the cast, by the whole name or by one word of it that only one Character has (`speakerOf`),
  *   and the canonical name is stamped
  * - a non-blank line directly under a speech line continues that speech
- * - a name alone on its line takes the next paragraph as its speech, across a blank line
+ * - a speech line with no words on it (`@Name:` alone) takes the next paragraph as its words,
+ *   blank line or not: GLM-5.3 wrote a whole reply that way (the prompt eval run, 2026-11-22),
+ *   and the Character's words were read as narration
  * - after a blank line, text is narration; consecutive narration lines merge
  * - an unknown speaker is kept by name, with no Character link
  * - the reply is cut at the first line written as the worn identity or "You" (the guard;
@@ -89,6 +91,8 @@ export function parseReply(text: string, cast: CastName[], identityName: string,
     let afterBlank = true;
     // True from a dropped speech line through the lines right under it, which continue it.
     let dropping = false;
+    // True from a speech line with no words on it until its words come: the next paragraph is that speaker's.
+    let awaitingWords = false;
 
     for (const line of text.split('\n')) {
         if (guard && userLine.test(line)) {
@@ -96,12 +100,17 @@ export function parseReply(text: string, cast: CastName[], identityName: string,
             break;
         }
         const speech = line.match(SPEECH_LINE);
-        if (dropping && !speech && line.trim()) continue;
-        dropping = false;
+        if (dropping && !speech && line.trim()) {
+            awaitingWords = false;
+            continue;
+        }
+        // A blank line ends what is dropped, unless the dropped name stood alone and its words are still to come.
+        if (speech || !awaitingWords) dropping = false;
         const last = parts[parts.length - 1];
         if (speech) {
             const spoken = speech[1].trim();
             const character = speakerOf(cast, spoken);
+            awaitingWords = speech[2].trim() === '';
             if (!character) unknownSpeakers.push(spoken);
             if (character && sittingOut.has(character.id)) {
                 if (!droppedSpeakers.includes(character.name)) droppedSpeakers.push(character.name);
@@ -116,12 +125,10 @@ export function parseReply(text: string, cast: CastName[], identityName: string,
                 text: speech[2],
             });
         } else if (line.trim()) {
-            // A line right under a speech line continues it; after a blank line it's narration.
-            // A name alone on its line ("@Mira:", a blank line, then her words) has said nothing yet:
-            // the paragraph after it is what she says, blank line or not. Without this the name was
-            // dropped as an empty line and the Narrator spoke her words (the prompt eval run, 2026-11-22).
-            if (last && last.kind === 'speech' && last.text.trim() === '') {
+            // The words of a name that stood alone; else a line right under a speech line continues it, and after a blank line it's narration.
+            if (awaitingWords && last?.kind === 'speech') {
                 last.text = line;
+                awaitingWords = false;
             } else if (last && (last.kind === 'narration' || !afterBlank)) {
                 last.text += (afterBlank ? '\n\n' : '\n') + line;
             } else {
