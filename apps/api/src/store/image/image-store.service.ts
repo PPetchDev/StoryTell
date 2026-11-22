@@ -25,8 +25,9 @@ const MIME_TYPES: Record<string, string> = {
 /**
  * The widths a thumbnail is made at (audit H33): a Gallery tile or a Home cover is at most about
  * 12rem wide, so 320 covers a phone's 2x screen and 640 a 3x one or the Story sheet's banner.
+ * 1280 is the novel stage's: a cut-out or a place across a phone's whole screen (2026-11-22).
  */
-export const THUMBNAIL_WIDTHS = [320, 640] as const;
+export const THUMBNAIL_WIDTHS = [320, 640, 1280] as const;
 export type ThumbnailWidth = (typeof THUMBNAIL_WIDTHS)[number];
 
 export interface StoredImage {

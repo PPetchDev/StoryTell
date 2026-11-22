@@ -452,11 +452,13 @@ function SpeakerPicture({ step, cast, sprites }: { step: Extract<NovelStep, { ki
     if (whole && cutout) {
         // A cut-out (.scratch/stage-pictures/spec.md): the figure alone, standing on the Backdrop from
         // the knees up. The picture is drawn taller than the stage, its top at the stage's top, so
-        // the stage's bottom edge cuts it below the knees.
+        // the stage's bottom edge cuts it below the knees. Never wider than the stage: on a phone,
+        // where the stage is tall and narrow, it is drawn smaller inside that box, still held to
+        // the top, rather than past the stage's sides (2026-11-22).
         const figure = (
             // eslint-disable-next-line @next/next/no-img-element -- served by the API from the image folder
             <img
-                className="stage-figure block h-[128%] w-auto max-w-none select-none"
+                className="stage-figure block h-[128%] w-auto max-w-full object-contain object-top select-none"
                 src={stageSrc(whole, true)}
                 alt={step.speakerName}
                 data-stage-picture=""
@@ -491,7 +493,7 @@ function YourFacePicture({ step }: { step: Extract<NovelStep, { kind: 'user' }> 
     return cut ? (
         <div className="absolute inset-0 flex justify-center overflow-hidden">
             {/* eslint-disable-next-line @next/next/no-img-element -- served by the API from the image folder */}
-            <img className="stage-figure block h-[128%] w-auto max-w-none select-none" src={src} alt={step.identityName} data-stage-picture="" data-your-face={face.emotion} draggable={false} />
+            <img className="stage-figure block h-[128%] w-auto max-w-full object-contain object-top select-none" src={src} alt={step.identityName} data-stage-picture="" data-your-face={face.emotion} draggable={false} />
         </div>
     ) : (
         // eslint-disable-next-line @next/next/no-img-element -- served by the API from the image folder

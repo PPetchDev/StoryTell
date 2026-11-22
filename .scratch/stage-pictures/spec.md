@@ -122,3 +122,10 @@ With Venice credit out, nothing can be cut out, and an uploaded Expression alway
   - The file is stored next to the Expression's (`…-cutout.png` or `.webp`), and the cut-out it replaces is deleted. If the Expression is redrawn, uploaded or removed meanwhile, the new file is deleted and the answer is 404.
 - **Web:** the Expression's panel shows "Upload cut-out" beside "Cut out · ~$0.03", also when it is already cut out (to replace that cut-out). The file is sent as it is, so its transparency is kept; only a picture over the upload limit is shrunk, to a PNG. The panel's hint then says "Cut out: stands on the Backdrop in the novel view." A refused picture shows the 415.002.014 message in plain words.
 - **Testing:** the API tests cover the Character, Role and Persona routes and every refusal. An e2e uploads an opaque PNG (refused in plain words) and then a see-through one in the Expressions card at 360 px. It checks that the panel says it is cut out, that the stored cut-out is the same bytes and that the Expression's own picture is unchanged. The novel stage already shows any `cutoutPath` as a cut-out, and that is tested elsewhere.
+
+## A cut-out fits the phone's stage, sharp (2026-11-22)
+
+On the user's phone Tamsin's cut-out spilled past both sides of the stage and showed blurred.
+
+- **Too wide:** the figure is drawn 128% as tall as the stage, from the knees up. On a tall, narrow phone stage that made it far wider than the stage. Now it is never wider than the stage: where 128% would be too wide, it is drawn smaller inside the same box, held to the top (`object-contain object-top`). On a wide stage nothing changes.
+- **Blurred:** the stage asked for the API's 640px WebP. A phone's 2.5x screen shows the stage about 900 pixels wide. The API now also makes a 1280px thumbnail (never wider than the picture: a 1025px cut-out stays 1025), and the stage asks for it, for cut-outs and places alike.

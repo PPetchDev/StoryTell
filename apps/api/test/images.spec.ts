@@ -76,6 +76,23 @@ describe('Images', () => {
         expect((await sharp(response.body as Buffer).metadata()).width).toBe(1);
     });
 
+    it('makes a 1280px thumbnail for the novel stage, no wider than the picture', async () => {
+        const response = await t.http
+            .get('/api/images/snapshots/big.png?w=1280')
+            .buffer(true)
+            .parse((res, done) => {
+                const chunks: Buffer[] = [];
+                res.on('data', (chunk: Buffer) => chunks.push(chunk));
+                res.on('end', () => done(null, Buffer.concat(chunks)));
+            })
+            .expect(200);
+
+        expect(response.headers['content-type']).toBe('image/webp');
+        const meta = await sharp(response.body as Buffer).metadata();
+        // The picture is 1200 wide, so the thumbnail is too: never enlarged.
+        expect(meta.width).toBe(1200);
+    });
+
     it('refuses a width it does not make', async () => {
         const response = await t.http.get('/api/images/snapshots/big.png?w=999').expect(400);
 
