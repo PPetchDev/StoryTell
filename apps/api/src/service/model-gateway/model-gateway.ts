@@ -56,6 +56,12 @@ export abstract class ModelGateway {
     abstract dubVoices(): Promise<DubVoices>;
 
     abstract remainingCredit(): Promise<RemainingCredit>;
+
+    /**
+     * What one cut-out costs now, for the editor's button: nothing with the app's own background
+     * remover (.scratch/own-cutout/spec.md), else Venice's price. Makes no call.
+     */
+    abstract cutoutPriceUsd(): number;
 }
 
 export type CreditPool = 'text' | 'image';

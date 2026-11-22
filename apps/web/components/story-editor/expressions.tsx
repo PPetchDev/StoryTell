@@ -23,22 +23,47 @@ type Commit<T = Story> = (run: () => Promise<T>, onError: (message: string) => v
 /** The error codes a draw is routed on (docs/error-codes.md). */
 const OUT_OF_IMAGE_CREDIT = '402.001.004';
 
-/** What cutting one picture out costs, as the API records it (.scratch/stage-pictures/spec.md). */
+/** What cutting one picture out costs until the API has said: Venice's price (.scratch/stage-pictures/spec.md). */
 const CUTOUT_PRICE_USD = 0.03;
 
-let drawPrice: Promise<number | null> | undefined;
+let prices: Promise<{ draw: number | null; cutout: number }> | undefined;
 
-/** What one drawing costs: the Settings Snapshot model's 1K price, read once per page load. */
-export function loadDrawPrice(): Promise<number | null> {
-    drawPrice ??= apiFetch<SettingsResponse>('/settings').then(
-        ({ settings, imageModels }) =>
-            imageModels.find((model) => model.id === settings.imageModel)?.sizes.find((size) => size.size === '1K')?.priceUsd ?? null,
+/**
+ * What one drawing costs (the Settings Snapshot model's 1K price) and what one cut-out costs (nothing
+ * with the app's own background remover, .scratch/own-cutout/spec.md), read once per page load.
+ */
+function loadPrices(): Promise<{ draw: number | null; cutout: number }> {
+    prices ??= apiFetch<SettingsResponse>('/settings').then(
+        ({ settings, imageModels, cutoutPriceUsd }) => ({
+            draw: imageModels.find((model) => model.id === settings.imageModel)?.sizes.find((size) => size.size === '1K')?.priceUsd ?? null,
+            cutout: cutoutPriceUsd ?? CUTOUT_PRICE_USD,
+        }),
         (error: unknown) => {
-            drawPrice = undefined;
+            prices = undefined;
             throw error;
         },
     );
-    return drawPrice;
+    return prices;
+}
+
+export function loadDrawPrice(): Promise<number | null> {
+    return loadPrices().then((loaded) => loaded.draw);
+}
+
+/** What one cut-out costs: Venice's price until the API has said otherwise. */
+export function useCutoutPrice(): number {
+    const [price, setPrice] = useState(CUTOUT_PRICE_USD);
+    useEffect(() => {
+        let live = true;
+        loadPrices().then(
+            (loaded) => live && setPrice(loaded.cutout),
+            () => {},
+        );
+        return () => {
+            live = false;
+        };
+    }, []);
+    return price;
 }
 
 export function useDrawPrice(): number | null {
@@ -132,6 +157,7 @@ export function ExpressionSet<T>({ owner, api, commit, flush, onDrawn, reload }:
     const heading = owner.name;
     const byEmotion = new Map(owner.expressions.map((expression) => [expression.emotion, expression]));
     const price = useDrawPrice();
+    const cutoutPrice = useCutoutPrice();
     /** The one emotion whose actions show; the rest are a tile each (docs/ui-audit-2026-11-13.md, H2). */
     const [open, setOpen] = useState<FaceEmotion | null>(null);
     const { reportUnreachable } = useConnection();
@@ -152,7 +178,7 @@ export function ExpressionSet<T>({ owner, api, commit, flush, onDrawn, reload }:
     const redraw = missing.length === 0;
     const toDraw = redraw ? all.length : missing.length;
     // Each drawing is cut out for the stage too (.scratch/stage-pictures/spec.md): about a cent more.
-    const allPrice = price === null ? null : toDraw * (price + CUTOUT_PRICE_USD);
+    const allPrice = price === null ? null : toDraw * (price + cutoutPrice);
     const allLabel =
         redraw ? `Redraw all ${toDraw}` : toDraw === all.length ? `Draw all ${toDraw}` : `Draw the ${toDraw} missing`;
     const drawingAll = run?.running
@@ -349,6 +375,7 @@ function ExpressionRow<T>({ owner, api, heading, emotion, expression, price, com
     /** Why the last square failed to save, shown in the cropper. */
     const [cropError, setCropError] = useState<string | null>(null);
     const [cropping, setCropping] = useState(false);
+    const cutoutPrice = useCutoutPrice();
     const fileInput = useRef<HTMLInputElement>(null);
     const cutoutInput = useRef<HTMLInputElement>(null);
     const row = useRef<HTMLDivElement>(null);
@@ -548,7 +575,7 @@ function ExpressionRow<T>({ owner, api, heading, emotion, expression, price, com
                             )
                         }
                     >
-                        {`Cut out · ~${usd(CUTOUT_PRICE_USD)}`}
+                        {cutoutPrice > 0 ? `Cut out · ~${usd(cutoutPrice)}` : 'Cut out · free'}
                     </button>
                 )}
                 {expression && (

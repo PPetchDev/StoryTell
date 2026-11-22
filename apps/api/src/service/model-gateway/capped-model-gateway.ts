@@ -70,6 +70,10 @@ export class CappedModelGateway extends ModelGateway {
     remainingCredit(): Promise<RemainingCredit> {
         return this.inner.remainingCredit();
     }
+
+    cutoutPriceUsd(): number {
+        return this.inner.cutoutPriceUsd();
+    }
 }
 
 /** The gateway behind the cap: the fake in tests and e2e, which they script and inspect. */

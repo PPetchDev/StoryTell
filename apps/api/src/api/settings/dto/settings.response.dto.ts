@@ -116,4 +116,7 @@ export class SettingsResponseBodyDTO {
 
     @ApiProperty({ description: 'The Snapshot models that can be chosen.', type: [ImageModelOptionDTO] })
     imageModels: ImageModelOptionDTO[];
+
+    @ApiProperty({ description: "What cutting one picture out costs now, in USD: 0 with the app's own background remover.", example: 0 })
+    cutoutPriceUsd: number;
 }

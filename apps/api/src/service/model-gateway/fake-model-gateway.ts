@@ -5,6 +5,7 @@ import {
     EmbeddingRequest,
     EmbeddingResult,
     ImageCallKind,
+    IMAGE_CUTOUT_PRICE_USD,
     ImageData,
     ImageGenerationRequest,
     ImageGenerationResult,
@@ -343,6 +344,11 @@ export class FakeModelGateway extends ModelGateway {
 
     async speechVoices(): Promise<SpeechVoice[]> {
         return structuredClone(this.voices);
+    }
+
+    /** Venice's price, as a gateway without the app's own remover answers. */
+    cutoutPriceUsd(): number {
+        return IMAGE_CUTOUT_PRICE_USD;
     }
 
     async remainingCredit(): Promise<RemainingCredit> {

@@ -15,6 +15,7 @@ import {
     EMBEDDING_MODEL,
     EmbeddingRequest,
     EmbeddingResult,
+    ImageData,
     ImageGenerationRequest,
     ImageGenerationResult,
     IMAGE_CUTOUT_MODEL,
@@ -64,6 +65,7 @@ import {
 import { defaultSleep, SleepFn } from './http.js';
 import { OpenRouterChatRequest, OpenRouterChatResult, SamplerRefusedError, TextBill } from './openrouter-client.js';
 import { TextHost } from './text-hosts.js';
+import { OWN_CUTOUT_HOST, OWN_CUTOUT_MODEL } from './own-cutout.js';
 import { VeniceClient } from './venice-client.js';
 
 /** How long a host that answered out of credit is passed over for the next one (.scratch/text-fallback/spec.md). */
@@ -104,6 +106,11 @@ export interface RealModelGatewayDeps {
      */
     textHosts: TextHost[];
     venice: VeniceClient;
+    /**
+     * The app's own background remover (.scratch/own-cutout/spec.md). Where it is there and its model
+     * file is too, a cut-out is made on this computer for nothing; else Venice makes it.
+     */
+    ownCutout?: { available(): boolean; removeBackground(image: ImageData): Promise<ImageData> };
     settings: { current(): Promise<GatewayModelSettings> };
     usage: { record(record: NewUsageRecord): Promise<void> };
     /** How long a credit reading is reused, so the banner doesn't hit the providers per page. */
@@ -499,17 +506,26 @@ export class RealModelGateway extends ModelGateway {
         return { image, model: modelName, costUsd };
     }
 
-    /** The one reference image with its background taken away (`image_cutout`), on Venice, in the image pool. */
+    cutoutPriceUsd(): number {
+        return this.deps.ownCutout?.available() ? 0 : IMAGE_CUTOUT_PRICE_USD;
+    }
+
+    /**
+     * The one reference image with its background taken away (`image_cutout`): by the app's own
+     * remover where it is set up, recorded at no cost, else on Venice, in the image pool.
+     */
     private async cutOut(request: ImageGenerationRequest): Promise<ImageGenerationResult> {
         const source = request.referenceImages?.[0];
         if (!source || request.referenceImages!.length !== 1) throw new RangeError('image_cutout takes exactly one reference image');
-        const image = await this.deps.venice.removeBackground(source);
-        const costUsd = IMAGE_CUTOUT_PRICE_USD;
+        const own = this.deps.ownCutout?.available() ? this.deps.ownCutout : undefined;
+        const image = own ? await own.removeBackground(source) : await this.deps.venice.removeBackground(source);
+        const costUsd = own ? 0 : IMAGE_CUTOUT_PRICE_USD;
+        const model = own ? OWN_CUTOUT_MODEL : IMAGE_CUTOUT_MODEL;
         await this.deps.usage.record({
             kind: request.kind,
             pool: 'image',
-            model: IMAGE_CUTOUT_MODEL,
-            host: VENICE_HOST,
+            model,
+            host: own ? OWN_CUTOUT_HOST : VENICE_HOST,
             promptTokens: null,
             completionTokens: null,
             images: 1,
@@ -518,7 +534,7 @@ export class RealModelGateway extends ModelGateway {
             chatId: request.servedFor?.chatId ?? null,
             messageId: request.servedFor?.messageId ?? null,
         });
-        return { image, model: IMAGE_CUTOUT_MODEL, costUsd };
+        return { image, model, costUsd };
     }
 
     /**

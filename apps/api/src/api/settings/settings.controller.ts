@@ -5,7 +5,7 @@ import { playModelOptions } from '../../manager/settings/play-model-options.js';
 import { SettingsManagerService } from '../../manager/settings/settings.service.js';
 import { SettingsResponse } from '../../model/settings/entities/settings.entity.js';
 import { SamplersPathDTO, UpdateSamplersRequestBodyDTO, UpdateSettingsRequestBodyDTO } from './dto/settings.request.dto.js';
-import { SNAPSHOT_MODEL_PRICES, SnapshotModel, snapshotSizesOf } from '../../service/model-gateway/model-gateway.js';
+import { ModelGateway, SNAPSHOT_MODEL_PRICES, SnapshotModel, snapshotSizesOf } from '../../service/model-gateway/model-gateway.js';
 import { ImageModelOptionDTO, SettingsResponseBodyDTO } from './dto/settings.response.dto.js';
 import { OwnerOnly } from '../auth/public.decorator.js';
 
@@ -24,12 +24,15 @@ const IMAGE_MODEL_OPTIONS: ImageModelOptionDTO[] = (Object.keys(IMAGE_MODEL_NAME
 @ApiTags('Settings')
 @Controller('settings')
 export class SettingsApiController {
-    constructor(private readonly settingsManager: SettingsManagerService) {}
+    constructor(
+        private readonly settingsManager: SettingsManagerService,
+        private readonly gateway: ModelGateway,
+    ) {}
 
     @Get()
     @ApiOkResponse({ type: SettingsResponseBodyDTO })
     async get(): Promise<SettingsResponseBodyDTO> {
-        return respond(await this.settingsManager.getSettings());
+        return this.respond(await this.settingsManager.getSettings());
     }
 
     // The Owner chooses Models, Sampling and credit settings for everyone (.scratch/accounts/spec.md: "Owner-only").
@@ -37,7 +40,7 @@ export class SettingsApiController {
     @Put()
     @ApiOkResponse({ type: SettingsResponseBodyDTO })
     async update(@Body() body: UpdateSettingsRequestBodyDTO): Promise<SettingsResponseBodyDTO> {
-        return respond(await this.settingsManager.updateSettings(body));
+        return this.respond(await this.settingsManager.updateSettings(body));
     }
 
     /** Sampling for one play model. "Reset to defaults" is this with all four null. */
@@ -48,10 +51,10 @@ export class SettingsApiController {
         @Param() path: SamplersPathDTO,
         @Body() body: UpdateSamplersRequestBodyDTO,
     ): Promise<SettingsResponseBodyDTO> {
-        return respond(await this.settingsManager.updateSamplers(path.playModel, body));
+        return this.respond(await this.settingsManager.updateSamplers(path.playModel, body));
     }
-}
 
-function respond(settings: SettingsResponse): SettingsResponseBodyDTO {
-    return { settings, playModels: playModelOptions(), imageModels: IMAGE_MODEL_OPTIONS };
+    private respond(settings: SettingsResponse): SettingsResponseBodyDTO {
+        return { settings, playModels: playModelOptions(), imageModels: IMAGE_MODEL_OPTIONS, cutoutPriceUsd: this.gateway.cutoutPriceUsd() };
+    }
 }

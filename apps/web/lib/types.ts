@@ -55,6 +55,8 @@ export interface SettingsResponse {
     settings: Settings;
     playModels: PlayModelOption[];
     imageModels: ImageModelOption[];
+    /** What cutting one picture out costs now: 0 with the app's own background remover (.scratch/own-cutout/spec.md). */
+    cutoutPriceUsd?: number;
 }
 
 /** The call kinds a UsageRecord is written under (apps/api's `CallKind`). */

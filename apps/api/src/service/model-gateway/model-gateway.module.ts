@@ -8,6 +8,7 @@ import { UsageRecordModelService } from '../../model/usage-record/usage-record.s
 import { AccountModelService } from '../../model/account/account.service.js';
 import { CappedModelGateway } from './capped-model-gateway.js';
 import { FakeModelGateway } from './fake-model-gateway.js';
+import { OwnCutout } from './real/own-cutout.js';
 import { SpendCap } from './spend-cap.js';
 import { ModelGateway } from './model-gateway.js';
 import { FetchLike } from './real/http.js';
@@ -58,6 +59,7 @@ function gatewayFor(config: AppConfig, fetchImpl: FetchLike, settings: SettingsM
         // .scratch/text-fallback/spec.md: TEXT_HOSTS, e.g. openrouter,venice,free; OpenRouter alone by default.
         textHosts: buildTextHosts(config.textHosts, keys, fetchImpl, venice),
         venice,
+        ownCutout: new OwnCutout(config.cutoutModelPath),
         settings: {
             current: async () => {
                 const current = await settings.get();

@@ -12,6 +12,11 @@ export abstract class AppConfig {
     /** Absolute path. The database stores image paths relative to this folder. */
     abstract readonly imageDir: string;
     /**
+     * Absolute path of the model file of the app's own background remover (.scratch/own-cutout/spec.md).
+     * Where the file is missing, cut-outs are made by Venice as before.
+     */
+    abstract readonly cutoutModelPath: string;
+    /**
      * Absolute path of the speech folder (Read aloud's audio and voice samples). Never inside the
      * image folder: the backup job copies that folder, and audio is not backed up.
      */
@@ -188,6 +193,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     const imageDir = path.resolve(env.IMAGE_DIR!);
     // Default: a folder named `speech` beside the image folder.
     const speechDir = env.SPEECH_DIR ? path.resolve(env.SPEECH_DIR) : path.join(path.dirname(imageDir), 'speech');
+    // Default: `models/isnet-anime.onnx` beside the image folder. A file, never a secret; missing is fine.
+    const cutoutModelPath = env.CUTOUT_MODEL ? path.resolve(env.CUTOUT_MODEL) : path.join(path.dirname(imageDir), 'models', 'isnet-anime.onnx');
     const fromImages = path.relative(imageDir, speechDir);
     if (fromImages === '' || (!fromImages.startsWith('..') && !path.isAbsolute(fromImages))) {
         throw new ConfigError(
@@ -228,6 +235,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
         vapid: readVapid(env),
         databaseUrl: env.DATABASE_URL!,
         imageDir,
+        cutoutModelPath,
         speechDir,
         modelGateway,
         textHosts,

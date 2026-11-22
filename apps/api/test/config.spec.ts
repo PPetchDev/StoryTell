@@ -9,6 +9,9 @@ const base = { PORT: '4001', DATABASE_URL: 'postgres://localhost/test', IMAGE_DI
 describe('Config: the speech folder', () => {
     it('defaults to a folder named speech beside the image folder', () => {
         expect(loadConfig(base).speechDir).toBe(path.resolve('/data/storytell/speech'));
+        // .scratch/own-cutout/spec.md: the remover's model file sits beside the image folder too.
+        expect(loadConfig(base).cutoutModelPath).toBe(path.resolve('/data/storytell/models/isnet-anime.onnx'));
+        expect(loadConfig({ ...base, CUTOUT_MODEL: '/opt/models/m.onnx' }).cutoutModelPath).toBe(path.resolve('/opt/models/m.onnx'));
     });
 
     it('takes SPEECH_DIR when it is set, as an absolute path', () => {
