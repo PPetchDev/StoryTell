@@ -12,7 +12,8 @@
         "typecheck": "tsc --noEmit -p tsconfig.json",
         "test": "vitest run",
         "test:watch": "vitest",
-        "smoke:live": "node scripts/smoke-live.mjs"
+        "smoke:live": "node scripts/smoke-live.mjs",
+        "eval:live": "node scripts/eval-live.mjs"
     },
     "dependencies": {
         "@nestjs/common": "^12.3.2",

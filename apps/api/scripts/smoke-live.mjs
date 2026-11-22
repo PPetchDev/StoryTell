@@ -13,7 +13,7 @@ const args = process.argv.slice(2);
 const candidates = args.filter((arg) => !arg.startsWith('--'));
 const apiDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-const child = spawn('npx', ['vitest', 'run', '--config', 'vitest.live.config.ts'], {
+const child = spawn('npx', ['vitest', 'run', '--config', 'vitest.live.config.ts', 'test/live/smoke.live.ts'], {
     cwd: apiDir,
     stdio: 'inherit',
     shell: process.platform === 'win32',
