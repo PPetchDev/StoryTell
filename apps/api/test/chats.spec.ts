@@ -3,6 +3,7 @@ import pg from 'pg';
 
 import { ModelRefusalError, ProviderOutageError } from '../src/errors/model-gateway.errors.js';
 import { NARRATOR_NOTES, PROMPT_LAYERS, TURN_PROMPT_TOKEN_BUDGET } from '../src/manager/chat/turn/prompt.js';
+import { speakerOf } from '../src/manager/chat/turn/reply-parser.js';
 import { FAKE_TEXT_MODEL } from '../src/service/model-gateway/fake-model-gateway.js';
 import { FetchLike } from '../src/service/model-gateway/real/http.js';
 import { TEST_KEYS } from './harness/gateway-under-test.js';
@@ -382,6 +383,28 @@ Nobody moves to help.`;
                 { kind: 'speech', characterId: null, speakerName: 'The Stranger', text: 'That is not quite true.', emotion: null },
                 { kind: 'narration', text: 'A cough from the stairwell.' },
             ]);
+        });
+
+        // The prompt eval run, 2026-11-22: GLM-5.3 wrote "@Mira:" for "Mira Vance" in 6 of 9 replies.
+        it('links a speech line that names a Character by one word of their name, unless two Characters share the word', async () => {
+            const story = await createStory();
+            const kai = story.characters[1];
+            const chat = await createChat(story.id);
+
+            const played = await send(story.id, chat.id, 'Who is at the door?', "@Kai: Only me.\n\n@o'rourke: And me again.\n\n@Kai O: Not a name.");
+
+            expect(lastAi(played).parts).toEqual([
+                { kind: 'speech', characterId: kai.id, speakerName: "Kai O'Rourke", text: 'Only me.', emotion: null },
+                { kind: 'speech', characterId: kai.id, speakerName: "Kai O'Rourke", text: 'And me again.', emotion: null },
+                { kind: 'speech', characterId: null, speakerName: 'Kai O', text: 'Not a name.', emotion: null },
+            ]);
+            const cast = [
+                { id: 1, name: 'Tamsin Valmont' },
+                { id: 2, name: 'Mireille Valmont' },
+            ];
+            expect(speakerOf(cast, 'Valmont')).toBeUndefined();
+            expect(speakerOf(cast, 'tamsin')).toBe(cast[0]);
+            expect(speakerOf(cast, 'Mireille Valmont')).toBe(cast[1]);
         });
 
         it.each([

@@ -50,9 +50,25 @@ export function userLinePattern(identityName: string): RegExp {
 }
 
 /**
+ * The Character a speech line names: their whole name in any case, else one word of it when that
+ * word belongs to one Character only. A model told to write "@Mira Vance:" often writes "@Mira:"
+ * where no earlier line shows it the full name (the prompt eval run, 2026-11-22: 6 of 9 replies);
+ * unlinked, the line had no picture, colour or voice. A word two Characters share ("Valmont" of
+ * Tamsin and Mireille Valmont) names neither.
+ */
+export function speakerOf<T extends CastName>(cast: T[], spoken: string): T | undefined {
+    const name = spoken.trim().toLowerCase();
+    const whole = cast.find((member) => member.name.toLowerCase() === name);
+    if (whole || name === '') return whole;
+    const sharing = cast.filter((member) => member.name.toLowerCase().split(/\s+/).includes(name));
+    return sharing.length === 1 ? sharing[0] : undefined;
+}
+
+/**
  * Splits a reply into narration and speech parts:
  * - an `@Name:` line starts a speech part; the name is matched case-insensitively against
- *   the cast and the canonical name is stamped
+ *   the cast, by the whole name or by one word of it that only one Character has (`speakerOf`),
+ *   and the canonical name is stamped
  * - a non-blank line directly under a speech line continues that speech
  * - after a blank line, text is narration; consecutive narration lines merge
  * - an unknown speaker is kept by name, with no Character link
@@ -84,7 +100,7 @@ export function parseReply(text: string, cast: CastName[], identityName: string,
         const last = parts[parts.length - 1];
         if (speech) {
             const spoken = speech[1].trim();
-            const character = cast.find((member) => member.name.toLowerCase() === spoken.toLowerCase());
+            const character = speakerOf(cast, spoken);
             if (!character) unknownSpeakers.push(spoken);
             if (character && sittingOut.has(character.id)) {
                 if (!droppedSpeakers.includes(character.name)) droppedSpeakers.push(character.name);
