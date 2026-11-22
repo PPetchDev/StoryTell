@@ -129,3 +129,7 @@ On the user's phone Tamsin's cut-out spilled past both sides of the stage and sh
 
 - **Too wide:** the figure is drawn 128% as tall as the stage, from the knees up. On a tall, narrow phone stage that made it far wider than the stage. Now it is never wider than the stage: where 128% would be too wide, it is drawn smaller inside the same box, held to the top (`object-contain object-top`). On a wide stage nothing changes.
 - **Blurred:** the stage asked for the API's 640px WebP. A phone's 2.5x screen shows the stage about 900 pixels wide. The API now also makes a 1280px thumbnail (never wider than the picture: a 1025px cut-out stays 1025), and the stage asks for it, for cut-outs and places alike.
+
+## The phone's stage fills the screen (2026-11-22)
+
+Below `lg`, the novel stage runs edge to edge under the top bar: no side gutter, no gap above, no rounded corners. The box keeps an 8px margin from the screen's sides. A Snapshot step keeps its gutter. From `lg` up nothing changes.

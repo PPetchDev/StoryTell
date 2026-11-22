@@ -106,6 +106,19 @@ test('Dress the stage draws the place behind the stage and Nara in her outfit, p
         await page.setViewportSize({ width, height: 740 });
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
         await expect(root.locator('[data-stage-place]')).toBeVisible();
+        // On a phone the place fills the screen edge to edge, from right under the top bar (2026-11-22).
+        const edges = await page.evaluate(() => {
+            const place = document.querySelector('[data-stage-place]')!.getBoundingClientRect();
+            const bar = document.querySelector('header')!.getBoundingClientRect();
+            const box = document.querySelector('[data-novel-box]')!.getBoundingClientRect();
+            return { left: place.left, right: window.innerWidth - place.right, gap: place.top - bar.bottom, boxLeft: box.left, boxRight: window.innerWidth - box.right };
+        });
+        expect(Math.abs(edges.left)).toBeLessThan(1);
+        expect(Math.abs(edges.right)).toBeLessThan(1);
+        expect(Math.abs(edges.gap)).toBeLessThan(1);
+        // The box keeps a small margin inside the screen.
+        expect(edges.boxLeft).toBeGreaterThanOrEqual(8);
+        expect(edges.boxRight).toBeGreaterThanOrEqual(8);
     }
 
     // "Place" as the Backdrop: the same picture behind the thread.

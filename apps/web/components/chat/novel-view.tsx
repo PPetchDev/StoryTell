@@ -29,7 +29,8 @@ import { STORY_TEXT_SIZE, useTextSize } from '@/lib/text-size';
  * stage (30% on a PC, where the picture may stand taller), scrolling inside.
  */
 const STAGE = [
-    'relative flex min-h-0 flex-1 flex-col pt-2',
+    // On a phone the stage fills the screen edge to edge, under the top bar (2026-11-22): no gutter, no gap, no rounded corners.
+    'relative flex min-h-0 flex-1 flex-col max-lg:-mx-4 lg:pt-2',
     'cursor-pointer select-none focus-ring-inset',
     COLUMN,
 ].join(' ');
@@ -305,7 +306,7 @@ export function NovelView(props: NovelViewProps) {
         </button>
     );
     const nav = (
-        <div className={`flex justify-between gap-2 ${step?.kind === 'snapshot' ? 'mt-1.5' : ''}`}>
+        <div className={`flex justify-between gap-2 ${step?.kind === 'snapshot' ? 'mt-1.5 max-lg:mx-4' : ''}`}>
             <button type="button" className={NAV_BUTTON} onClick={back} disabled={index <= 0 && !waiting}>
                 <ChevronLeftIcon size={18} />
                 Back
@@ -348,7 +349,7 @@ export function NovelView(props: NovelViewProps) {
                 onKeyDown={onKeyDown}
             >
                 {(pendingJobs > 0 || failedJobs > 0) && (
-                    <div className={`absolute right-0 z-raised flex flex-col items-end gap-1 top-2`}>
+                    <div className={`absolute right-0 z-raised flex flex-col items-end gap-1 top-2 max-lg:right-2`}>
                         {pendingJobs > 0 && (
                             <p className={`${CHIP} border-line bg-surface text-muted`} role="status">
                                 Drawing a Snapshot…
@@ -359,7 +360,7 @@ export function NovelView(props: NovelViewProps) {
                 )}
                 {step?.kind === 'snapshot' ? (
                     <>
-                        <div className="relative flex min-h-0 flex-1 items-end justify-center">
+                        <div className="relative flex min-h-0 flex-1 items-end justify-center max-lg:mx-4 max-lg:pt-2">
                             {/* eslint-disable-next-line @next/next/no-img-element -- served by the API from the image folder */}
                             <img key={step.key} className="block size-full object-contain motion-safe:animate-fade-in" src={snapshotImageUrl(step.snapshot)} alt={snapshotAlt(step.snapshot)} />
                             <button type="button" className="button button-quiet absolute right-2 bottom-2" onClick={() => props.onOpenSnapshot(step.snapshot)}>
@@ -371,7 +372,7 @@ export function NovelView(props: NovelViewProps) {
                 ) : (
                     <>
                         {/* The whole stage, the box over its foot (.scratch/novel-reading/spec.md): the picture is as tall as the screen allows. */}
-                        <div className="absolute inset-x-0 top-2 bottom-0 flex items-end justify-center overflow-hidden rounded-t-xl">
+                        <div className="absolute inset-x-0 top-0 bottom-0 flex items-end justify-center overflow-hidden lg:top-2 lg:rounded-t-xl">
                             {moment.placePicturePath && (
                                 // The place, drawn with no one in it, behind whoever speaks (.scratch/dressed-stage/spec.md).
                                 // eslint-disable-next-line @next/next/no-img-element -- served by the API from the image folder
@@ -398,7 +399,7 @@ export function NovelView(props: NovelViewProps) {
                         </div>
                         {step && (
                             <div
-                                className="relative z-raised mt-auto mb-1 flex max-h-[58%] min-h-0 cursor-auto flex-col gap-1 rounded-xl border border-line bg-surface/90 px-3.5 pt-3 pb-1.5 shadow-lg backdrop-blur-sm select-text lg:max-h-[40%]"
+                                className="relative z-raised mt-auto mb-1 flex max-h-[58%] max-lg:mx-2 min-h-0 cursor-auto flex-col gap-1 rounded-xl border border-line bg-surface/90 px-3.5 pt-3 pb-1.5 shadow-lg backdrop-blur-sm select-text lg:max-h-[40%]"
                                 data-novel-box=""
                             >
                                 {writeButton && <div className="absolute right-0 bottom-full mb-2">{writeButton}</div>}
