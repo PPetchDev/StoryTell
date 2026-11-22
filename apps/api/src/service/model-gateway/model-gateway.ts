@@ -314,10 +314,10 @@ export interface TextStreamResult extends TextCompletionResult {
 
 /**
  * Venice background-remove (.scratch/stage-pictures/spec.md). Its price is not on Venice's pricing page
- * (read 2026-11-18), so this is an estimate, recorded as the cost of each cut-out until a real one is seen.
+ * (read 2026-11-18). Measured on the Venice balance on 2026-11-22: 16 cut-outs took $0.48, so $0.03 each.
  */
 export const IMAGE_CUTOUT_MODEL = 'background-remove';
-export const IMAGE_CUTOUT_PRICE_USD = 0.01;
+export const IMAGE_CUTOUT_PRICE_USD = 0.03;
 
 export interface ImageData {
     bytes: Buffer;

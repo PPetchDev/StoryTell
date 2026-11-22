@@ -23,8 +23,8 @@ type Commit<T = Story> = (run: () => Promise<T>, onError: (message: string) => v
 /** The error codes a draw is routed on (docs/error-codes.md). */
 const OUT_OF_IMAGE_CREDIT = '402.001.004';
 
-/** What cutting one picture out costs, an estimate as the API records it (.scratch/stage-pictures/spec.md). */
-const CUTOUT_PRICE_USD = 0.01;
+/** What cutting one picture out costs, as the API records it (.scratch/stage-pictures/spec.md). */
+const CUTOUT_PRICE_USD = 0.03;
 
 let drawPrice: Promise<number | null> | undefined;
 

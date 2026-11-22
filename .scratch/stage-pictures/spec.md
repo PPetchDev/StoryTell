@@ -58,7 +58,7 @@ The user also wants more feelings for intimate scenes: one "love" covered tender
   - The Judge's meanings for the six begin "only in an intimate or sexual moment", and "love" loses "flirtatious, aroused, longing". This changes the Judge's system message once: the prompt cache restarts once.
 - **The cut-out call** is an image call kind, `image_cutout`, on `generateImage` with the one picture as its reference image and no prompt. It goes through the Monthly cap, the usage record and the fake like any image call.
   - Real: `POST /image/background-remove` on Venice, which answers a PNG with transparency.
-  - Its price is not on Venice's pricing page (read 2026-11-18), so $0.01 is recorded as an estimate (`IMAGE_CUTOUT_PRICE_USD`).
+  - Its price is not on Venice's pricing page (read 2026-11-18). $0.01 was the first estimate; on 2026-11-22 sixteen cut-outs took $0.48 from the Venice balance, so $0.03 is recorded (`IMAGE_CUTOUT_PRICE_USD`).
   - Unscripted in the fake, it succeeds with the fake PNG.
 - **Storage.**
   - `character_expression.cutout_path`.
@@ -120,5 +120,5 @@ With Venice credit out, nothing can be cut out, and an uploaded Expression alway
   - The picture must be a PNG or WebP with see-through pixels. A JPEG, or a PNG with no see-through pixel (a fake checkerboard included), is refused with 415.002.014 "A cut-out must be a PNG or WebP with a see-through background."
   - It is refused with no Expression for that emotion (404), with no file (400.002.008), with a file that is not a picture (415.002.009) and with one over the upload limit (413.002.010).
   - The file is stored next to the Expression's (`…-cutout.png` or `.webp`), and the cut-out it replaces is deleted. If the Expression is redrawn, uploaded or removed meanwhile, the new file is deleted and the answer is 404.
-- **Web:** the Expression's panel shows "Upload cut-out" beside "Cut out · ~$0.01", also when it is already cut out (to replace that cut-out). The file is sent as it is, so its transparency is kept; only a picture over the upload limit is shrunk, to a PNG. The panel's hint then says "Cut out: stands on the Backdrop in the novel view." A refused picture shows the 415.002.014 message in plain words.
+- **Web:** the Expression's panel shows "Upload cut-out" beside "Cut out · ~$0.03", also when it is already cut out (to replace that cut-out). The file is sent as it is, so its transparency is kept; only a picture over the upload limit is shrunk, to a PNG. The panel's hint then says "Cut out: stands on the Backdrop in the novel view." A refused picture shows the 415.002.014 message in plain words.
 - **Testing:** the API tests cover the Character, Role and Persona routes and every refusal. An e2e uploads an opaque PNG (refused in plain words) and then a see-through one in the Expressions card at 360 px. It checks that the panel says it is cut out, that the stored cut-out is the same bytes and that the Expression's own picture is unchanged. The novel stage already shows any `cutoutPath` as a cut-out, and that is tested elsewhere.
