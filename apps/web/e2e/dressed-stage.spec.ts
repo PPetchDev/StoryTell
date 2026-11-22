@@ -140,7 +140,7 @@ test('a whole Expression with no cut-out stands in front of the place, not behin
         expressions: [{ line: 1, emotion: 'joy' }],
     });
     await request.post(`${FAKE}/image`, { data: { kind: 'place_picture', replies: [{ imageBase64: await picture(page, '#203050'), mimeType: 'image/png' }] } });
-    await request.post(`${FAKE}/text`, { data: { kind: 'turn', replies: [{ text: 'The lamp gutters.\n\n@Nara: You came back.', model: 'glm-5.3' }] } });
+    await request.post(`${FAKE}/text`, { data: { kind: 'turn', replies: [{ text: `The lamp gutters.\n\n@Nara: You came back. ${'I kept the fire going every night, and the kettle warm, in case the wind turned and brought you home before the snow. '.repeat(3)}`, model: 'glm-5.3' }] } });
     await request.post(`${FAKE}/text`, { data: { kind: 'judge', replies: [judge] } });
     await request.post(`${FAKE}/text`, { data: { kind: 'memory_extraction', replies: [NO_OPS] } });
     await page.goto(`/stories/${storyId}/chats/${chatId}`);
@@ -177,4 +177,16 @@ test('a whole Expression with no cut-out stands in front of the place, not behin
         return hit === figure ? 'figure' : hit === place ? 'place' : (hit?.tagName ?? 'nothing');
     });
     expect(onTop).toBe('figure');
+
+    // On a phone the picture is held to the stage's top, so a long line's box doesn't cover the face:
+    // most of the drawn picture is above the box (2026-11-22).
+    const shown = await page.evaluate(() => {
+        const figure = document.querySelector<HTMLImageElement>('[data-stage-picture]')!;
+        const r = figure.getBoundingClientRect();
+        const drawn = Math.min(r.height, (r.width * figure.naturalHeight) / figure.naturalWidth);
+        const top = getComputedStyle(figure).objectPosition.endsWith(' 0%') ? r.top : r.bottom - drawn;
+        const boxTop = document.querySelector('[data-novel-box]')!.getBoundingClientRect().top;
+        return (boxTop - top) / drawn;
+    });
+    expect(shown).toBeGreaterThan(0.5);
 });
