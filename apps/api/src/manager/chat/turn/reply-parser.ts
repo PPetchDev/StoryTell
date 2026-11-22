@@ -54,14 +54,21 @@ export function userLinePattern(identityName: string): RegExp {
  * word belongs to one Character only. A model told to write "@Mira Vance:" often writes "@Mira:"
  * where no earlier line shows it the full name (the prompt eval run, 2026-11-22: 6 of 9 replies);
  * unlinked, the line had no picture, colour or voice. A word two Characters share ("Valmont" of
- * Tamsin and Mireille Valmont) names neither.
+ * Tamsin and Mireille Valmont) names neither. A name of several words that is no one's whole name
+ * goes by its first word, a Character's first name, when only one Character has it.
  */
 export function speakerOf<T extends CastName>(cast: T[], spoken: string): T | undefined {
     const name = spoken.trim().toLowerCase();
     const whole = cast.find((member) => member.name.toLowerCase() === name);
     if (whole || name === '') return whole;
     const sharing = cast.filter((member) => member.name.toLowerCase().split(/\s+/).includes(name));
-    return sharing.length === 1 ? sharing[0] : undefined;
+    if (sharing.length === 1) return sharing[0];
+    // Two names run together: "Tamsin Varro" for Tamsin Valmont, beside an Ines Varro (GLM-5.3 on live,
+    // 2026-11-23). The first name says who it is, when only one Character has it; the rest is the slip.
+    const words = name.split(/\s+/);
+    if (words.length < 2) return undefined;
+    const first = cast.filter((member) => member.name.toLowerCase().split(/\s+/)[0] === words[0]);
+    return first.length === 1 ? first[0] : undefined;
 }
 
 /**

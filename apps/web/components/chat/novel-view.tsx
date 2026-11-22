@@ -485,6 +485,10 @@ function SpeakerPicture({ step, cast, sprites }: { step: Extract<NovelStep, { ki
     // The outfit the Chat has them in, when the stage is dressed; else their Expressions.
     const { whole, cutout } = outfitPicture(sprites, step.emotion) ?? linePicture(character, step.emotion);
     const colour = characterColour(step.characterId, cast);
+    // A speaker who is no Character of the Story (a stranger, a name the model got wrong) has no
+    // picture and no colour of their own: the place stays, with nothing standing in front of it.
+    // The block with an initial showed as a blank slab behind the box (live, 2026-11-23).
+    if (step.characterId === null && !whole) return null;
     if (whole && cutout) {
         return <StageFigure src={stageSrc(whole, true)} alt={step.speakerName} data-stage-cutout="" data-emotion={step.emotion ?? 'neutral'} />;
     }

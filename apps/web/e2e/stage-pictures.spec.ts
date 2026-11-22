@@ -128,6 +128,36 @@ test('an intimate line stands cut out on the stage from the knees up, moving wit
     }
 });
 
+// Live, 2026-11-23: a name the model got wrong showed as a blank slab behind the box.
+test('a speaker who is no Character has nothing standing on the stage, and a name run together from two still finds its Character', async ({ page, request }) => {
+    const { storyId } = await storyWithNara(page, request);
+    await request.post(`${FAKE}/text`, { data: { kind: 'turn', replies: [{ text: ['A shape fills the door.', '@The Stranger: Who keeps this tent?', '@Nara Stranger: I do.'].join('\n\n'), model: 'glm-5.3' }] } });
+    await request.post(`${FAKE}/text`, { data: { kind: 'judge', replies: [JUDGE] } });
+    await request.post(`${FAKE}/text`, { data: { kind: 'memory_extraction', replies: [NO_OPS] } });
+    const chatId = (await (await request.post(`/api/stories/${storyId}/chats`)).json()).id as number;
+    expect((await request.post(`/api/stories/${storyId}/chats/${chatId}/messages`, { data: { text: 'I look up.' } })).ok()).toBe(true);
+    await expect.poll(async () => (await (await request.get(`/api/stories/${storyId}/chats/${chatId}`)).json()).messages.at(-1).judge?.status).toBe('done');
+
+    await page.goto(`/stories/${storyId}/chats/${chatId}`);
+    await page.getByRole('button', { name: 'Visual novel view' }).click();
+    const root = page.getByRole('region', { name: 'Visual novel view' });
+    const box = root.getByRole('region', { name: 'Shown line' });
+    await expect(box.locator('[data-line]')).toContainText('A shape fills the door.');
+
+    // The Stranger's line: their name over the words, and no picture or block in front of the place.
+    await root.getByRole('button', { name: 'Next', exact: true }).click();
+    await expect(box).toContainText('The Stranger');
+    await expect(box.locator('[data-line]')).toContainText('Who keeps this tent?');
+    await expect(root.locator('[data-stage-picture]')).toHaveCount(0);
+
+    // "Nara Stranger" is Nara: her first name, with a slip after it.
+    await root.getByRole('button', { name: 'Next', exact: true }).click();
+    await expect(box.locator('[data-line]')).toContainText('I do.');
+    await expect(box).toContainText('Nara');
+    await expect(box).not.toContainText('Nara Stranger');
+    await expect(root.locator('[data-stage-picture]')).toHaveCount(1);
+});
+
 test('with reduced motion the figure stands still', async ({ page, request }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     const { storyId } = await storyWithNara(page, request);

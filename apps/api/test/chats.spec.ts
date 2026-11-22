@@ -391,12 +391,13 @@ Nobody moves to help.`;
             const kai = story.characters[1];
             const chat = await createChat(story.id);
 
-            const played = await send(story.id, chat.id, 'Who is at the door?', "@Kai: Only me.\n\n@o'rourke: And me again.\n\n@Kai O: Not a name.");
+            const played = await send(story.id, chat.id, 'Who is at the door?', "@Kai: Only me.\n\n@o'rourke: And me again.\n\n@Kai Moon: A slip after the name.\n\n@Old Kai: Not a name.");
 
             expect(lastAi(played).parts).toEqual([
                 { kind: 'speech', characterId: kai.id, speakerName: "Kai O'Rourke", text: 'Only me.', emotion: null },
                 { kind: 'speech', characterId: kai.id, speakerName: "Kai O'Rourke", text: 'And me again.', emotion: null },
-                { kind: 'speech', characterId: null, speakerName: 'Kai O', text: 'Not a name.', emotion: null },
+                { kind: 'speech', characterId: kai.id, speakerName: "Kai O'Rourke", text: 'A slip after the name.', emotion: null },
+                { kind: 'speech', characterId: null, speakerName: 'Old Kai', text: 'Not a name.', emotion: null },
             ]);
             const cast = [
                 { id: 1, name: 'Tamsin Valmont' },
@@ -405,6 +406,13 @@ Nobody moves to help.`;
             expect(speakerOf(cast, 'Valmont')).toBeUndefined();
             expect(speakerOf(cast, 'tamsin')).toBe(cast[0]);
             expect(speakerOf(cast, 'Mireille Valmont')).toBe(cast[1]);
+            // Two names run together (live, 2026-11-23): the first name says who, when one Character has it.
+            const court = [...cast, { id: 3, name: 'Ines Varro' }, { id: 4, name: 'Ines of the Gate' }];
+            expect(speakerOf(court, 'Tamsin Varro')).toBe(court[0]);
+            expect(speakerOf(court, 'mireille varro')).toBe(court[1]);
+            expect(speakerOf(court, 'Ines Valmont')).toBeUndefined();
+            expect(speakerOf(court, 'Varro Tamsin')).toBeUndefined();
+            expect(speakerOf(court, 'The Stranger')).toBeUndefined();
         });
 
         // The prompt eval run, 2026-11-22: GLM-5.3 wrote the name alone, a blank line, then the words.
