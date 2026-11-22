@@ -70,6 +70,7 @@ export function speakerOf<T extends CastName>(cast: T[], spoken: string): T | un
  *   the cast, by the whole name or by one word of it that only one Character has (`speakerOf`),
  *   and the canonical name is stamped
  * - a non-blank line directly under a speech line continues that speech
+ * - a name alone on its line takes the next paragraph as its speech, across a blank line
  * - after a blank line, text is narration; consecutive narration lines merge
  * - an unknown speaker is kept by name, with no Character link
  * - the reply is cut at the first line written as the worn identity or "You" (the guard;
@@ -116,7 +117,12 @@ export function parseReply(text: string, cast: CastName[], identityName: string,
             });
         } else if (line.trim()) {
             // A line right under a speech line continues it; after a blank line it's narration.
-            if (last && (last.kind === 'narration' || !afterBlank)) {
+            // A name alone on its line ("@Mira:", a blank line, then her words) has said nothing yet:
+            // the paragraph after it is what she says, blank line or not. Without this the name was
+            // dropped as an empty line and the Narrator spoke her words (the prompt eval run, 2026-11-22).
+            if (last && last.kind === 'speech' && last.text.trim() === '') {
+                last.text = line;
+            } else if (last && (last.kind === 'narration' || !afterBlank)) {
                 last.text += (afterBlank ? '\n\n' : '\n') + line;
             } else {
                 parts.push({ kind: 'narration', text: line });

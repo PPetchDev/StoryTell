@@ -407,6 +407,27 @@ Nobody moves to help.`;
             expect(speakerOf(cast, 'Mireille Valmont')).toBe(cast[1]);
         });
 
+        // The prompt eval run, 2026-11-22: GLM-5.3 wrote the name alone, a blank line, then the words.
+        it('a name alone on its line takes the paragraph after it as that Character’s speech', async () => {
+            const story = await createStory();
+            const mira = story.characters[0];
+            const chat = await createChat(story.id);
+
+            const played = await send(
+                story.id,
+                chat.id,
+                'Did you bring it?',
+                'She looks at the bag.\n\n@Mira:\n\nToo much for one person.\nLucky for you.\n\nThe rain goes on.\n\n@Mira:\n@Mira: Sit.\n\n@Mira:',
+            );
+
+            expect(lastAi(played).parts).toEqual([
+                { kind: 'narration', text: 'She looks at the bag.' },
+                { kind: 'speech', characterId: mira.id, speakerName: 'Mira', text: 'Too much for one person.\nLucky for you.', emotion: null },
+                { kind: 'narration', text: 'The rain goes on.' },
+                { kind: 'speech', characterId: mira.id, speakerName: 'Mira', text: 'Sit.', emotion: null },
+            ]);
+        });
+
         it.each([
             ['Ash:', 'Ash: I step back.'],
             ['@Ash:', '@Ash: I step back.'],
