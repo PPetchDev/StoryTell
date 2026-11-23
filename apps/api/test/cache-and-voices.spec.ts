@@ -248,6 +248,10 @@ describe('How the present Characters talk', () => {
         expect(block).not.toContain('Dulcie');
         expect(block).not.toContain('Morra');
         expect(block).toContain("don't lend one Character's trade or images to another");
+        // Live Chat 1, 2026-11-23: the voice is in every line, its catchphrases in about three in ten.
+        expect(block).toContain('their rhythm and word choice are in every line.');
+        expect(block).toContain('a habit of speech shows in about three lines in ten, never twice running.');
+        expect(block).not.toContain('sounding like this in every line');
     });
 
     it("follows each Voice with the card's Example lines, quoted, leaving blank ones out", () => {

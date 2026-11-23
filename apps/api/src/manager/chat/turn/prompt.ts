@@ -401,7 +401,10 @@ You are the Narrator of an interactive story. You describe the Setting and actio
   Written: "I loved you when you came back. I loved you when you poked me. I loved you at dawn." Spoken: "I think I loved you the second you came back for that hatchet."
 - What a Character does (a look, a gesture, a blush) goes in a short narration line before or after the speech, and only when it adds something.
 - Keep each Character's voice distinct. Show it through their word choice and rhythm, as their Voice and Example lines do; never copy the card's descriptive words into the story as labels.
+- Plain talk first, habits second. About seven lines in ten are plain, natural talk: what this person, being who they are, would simply say in this moment. About three in ten carry one of their set habits of speech: a catchphrase, a pet word, a running bit, a stock phrase they reach for. Never the same habit in two lines running, nor in two replies running. A habit in every line stops being a voice and becomes a tic.
+- That is a rule about set phrases only, never about who they are. Their Personality is in every line, the plain ones too: a teasing Character teases in plain words, a blunt one is blunt, a shy one holds back. And a way of talking their card gives them as constant (a stammer, a drawl, formal speech, nicknames for everyone, a verbal ending) is their rhythm, not a habit: it stays in every line.
 - Don't repeat the same details turn after turn (ears, eyes, grins, how someone moves or sounds). Find a fresh detail or leave it out.
+- Name things. "Something" standing in for a feeling or a thought the narration won't name ("weighing something", "something in her voice") is a dodge: say what it is, or leave it out. At most one comparison ("like a…", "the way a… would") in a reply, and only where the plain word won't do.
 - Dashes, trailing off and stammering only for a Character whose Voice calls for them. Italics for emphasis rarely.
 - Most turns, one or two Characters speak, and a speaker may say several sentences. The others react in narration or stay quiet: bystanders don't remark on every moment, and nobody chimes in just to be funny.`;
 }
@@ -442,7 +445,7 @@ function styleLayer(story: PromptStory, identity: string): string {
     return [
         PROMPT_LAYERS.style,
         `- Write in English, ${povAndTense(story, identity)}.`,
-        `- Reply length: ${words.min}–${words.max} words in total.`,
+        `- Reply length: ${words.min}–${words.max} words in total. ${words.max} is a ceiling, not a target: stop when the moment has landed, and let most replies sit near the middle of the range.`,
         ...styleControlLines(story, identity).map((line) => `- ${line}`),
     ].join('\n');
 }
@@ -811,7 +814,10 @@ export function voicesReminder(
         ...voiced.map((character) => `- ${character.name}: ${character.voice.trim()}${examples(character.exampleLines)}`),
         "Each Character's comparisons and turns of phrase come from their own life: don't lend one Character's trade or images to another, or to the narration about them.",
         // Replayed, Tavri's halting came and went with her Arc ("her voice is steadier"): growing changes what she says, not how.
-        'As they change and grow in the story, what they say changes, not how they talk: keep each one sounding like this in every line.',
+        'As they change and grow in the story, what they say changes, not how they talk: their rhythm and word choice are in every line.',
+        // Live Chat 1, 2026-11-23: "for the record" and "I want it noted" in one reply in seven. Read as "in every line", a
+        // voice's marks became tics; the user's rule is seven lines plain to three with a habit.
+        'Their catchphrases and running bits are not: most of what anyone says is plain talk, and a habit of speech shows in about three lines in ten, never twice running.',
     ].join('\n');
 }
 

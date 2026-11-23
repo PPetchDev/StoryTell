@@ -143,6 +143,32 @@ export function avoids(name: string, pattern: RegExp): CodeCheck {
     };
 }
 
+/** The reply uses something at most a few times (a vague word, a comparison). `pattern` needs the `g` flag. */
+export function atMost(name: string, pattern: RegExp, most: number): CodeCheck {
+    return {
+        name,
+        run: ({ text }) => {
+            const found = text.match(pattern) ?? [];
+            return { pass: found.length <= most, reason: found.length === 0 ? 'none' : `${found.length}: ${found.slice(0, 4).map((one) => `"${one}"`).join(', ')}` };
+        },
+    };
+}
+
+/**
+ * A habit of speech (a catchphrase) is in at most `most` of a Character's speech lines in the reply:
+ * plain talk first, habits second (.scratch/natural-speech/plain-and-habits.md).
+ */
+export function habitInFewLines(name: string, speaker: string, habit: RegExp, most: number): CodeCheck {
+    return {
+        name,
+        run: ({ parsed }) => {
+            const lines = parsed.parts.filter((part) => part.kind === 'speech' && part.speakerName === speaker);
+            const with_ = lines.filter((part) => habit.test(part.text)).length;
+            return { pass: with_ <= most, reason: `in ${with_} of ${lines.length} lines` };
+        },
+    };
+}
+
 /** The reply ends on a finished sentence, not cut off mid-word. */
 export const endsCleanly: CodeCheck = {
     name: 'ends cleanly',

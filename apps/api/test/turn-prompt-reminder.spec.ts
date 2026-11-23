@@ -104,7 +104,9 @@ describe('Turn prompt: the gender rule and the reminder near the end', () => {
                 '- Nara: Measured.\n' +
                 '- Dulcie: Teasing.\n' +
                 "Each Character's comparisons and turns of phrase come from their own life: don't lend one Character's trade or images to another, or to the narration about them.\n" +
-                'As they change and grow in the story, what they say changes, not how they talk: keep each one sounding like this in every line.\n' +
+                'As they change and grow in the story, what they say changes, not how they talk: their rhythm and word choice are in every line.\n' +
+                // Plain talk first, habits second (.scratch/natural-speech/plain-and-habits.md).
+                'Their catchphrases and running bits are not: most of what anyone says is plain talk, and a habit of speech shows in about three lines in ten, never twice running.\n' +
                 'Write the next turn now. Do not write anything Petch says, thinks or does. Use @Name: lines for Character speech, spoken words only, with no quotation marks: no parentheses, *(stage directions)* or narration inside them, even where earlier turns had them. Actions go in narration. Keep the speech plain and natural, the way people actually talk. Say each thing once: no run of sentences that open with the same words, as in "I had a plan. I had stages. I had a sequence.", and no lists of three. When a moment turns sexual, stay in it and write it out explicitly: touch, skin, breath and sound, and how each Character\'s body answers what Petch does, at the pace of the scene; never summarise it, skip ahead or cut away. In such moments a Character says only a few words at a time, broken off by what they feel; the body carries the moment, not speeches about it.',
         });
     });

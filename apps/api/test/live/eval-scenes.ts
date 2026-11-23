@@ -4,11 +4,13 @@ import type { Extraction, ExtractionPromptInput } from '../../src/manager/chat/m
 import { PromptCharacter, PromptHistoryMessage, TurnPromptInput } from '../../src/manager/chat/turn/prompt.js';
 import { BACKGROUND_SCENES } from './eval-background-scenes.js';
 import {
+    atMost,
     avoids,
     Check,
     CodeCheck,
     endsCleanly,
     GradedCheck,
+    habitInFewLines,
     lengthIs,
     mentions,
     neverSpeaksAsTheUser,
@@ -121,6 +123,17 @@ const DRIFTED_HISTORY: PromptHistoryMessage[] = [
     { role: 'assistant', text: `${tobias}\n\n${mira}` },
 ]);
 
+/** Three replies in which Mira's catchphrase is in every line she speaks: the tic a long Chat grows. */
+const HABIT = 'for the record';
+const HABIT_HISTORY: PromptHistoryMessage[] = [
+    ['Ash asks whether the shop is still open.', `@${MIRA}: For the record, we closed an hour ago.\n\n@${MIRA}: And for the record, I saw you through the glass.`],
+    ['Ash asks what she is reading.', `@${MIRA}: For the record, it has a terrible ending.\n\n@${MIRA}: You would hate it, for the record.`],
+    ['Ash laughs and leans on the counter.', `@${MIRA}: For the record, you are in my light.\n\n@${MIRA}: I am not moving the lamp, for the record.`],
+].flatMap(([user, mira]): PromptHistoryMessage[] => [
+    { role: 'user', text: user },
+    { role: 'assistant', text: mira },
+]);
+
 const SOUNDS_LIKE_MIRA: GradedCheck = {
     name: 'sounds like Mira',
     criterion: 'Mira’s spoken lines are short and teasing with dry humour, and at least one of them is a question. She does not give long speeches or speak formally.',
@@ -216,7 +229,7 @@ const TURN_SCENES: TurnScene[] = [
         kind: 'turn',
         name: 'length',
         about: 'A medium reply is medium.',
-        expects: ['Reply length: 150–350 words'],
+        expects: ['Reply length: 150–350 words', '350 is a ceiling, not a target'],
         input: { ...base, story: { ...SMOKE_STORY.story, replyLength: ReplyLength.Medium } },
         userText: 'Ash shakes the rain off his coat and asks if he can wait out the storm inside.',
         checks: [lengthIs(ReplyLength.Medium), endsCleanly],
@@ -306,6 +319,40 @@ const TURN_SCENES: TurnScene[] = [
         userText: 'Ash turns to Mira, holds up the last of the bread and asks if she wants it.',
         checks: [speaks(MIRA), parsesAsAReply],
         graded: [SOUNDS_LIKE_MIRA],
+    },
+    {
+        kind: 'turn',
+        name: 'habit',
+        about: 'A catchphrase is a habit, not a tic: it is not in every line.',
+        expects: ['Plain talk first, habits second', 'a rule about set phrases only, never about who they are', 'about three lines in ten', 'For the record'],
+        input: {
+            ...base,
+            story: {
+                ...SMOKE_STORY.story,
+                characters: [{ ...SMOKE_STORY.story.characters[0], voice: 'Short, teasing sentences; fond of saying "for the record".', exampleLines: ['For the record, I was hoping you would come back.', 'Ask me properly, then.'] }],
+            },
+            history: HABIT_HISTORY,
+            // In the latest exchange, so the turn's closing reminder of how she talks is sent, as in a Chat.
+            present: [MIRA],
+        },
+        userText: 'Ash steps out of her light, sets a paper bag on the counter and asks if she has eaten.',
+        checks: [speaks(MIRA), habitInFewLines('the catchphrase in at most one line', MIRA, new RegExp(HABIT, 'i'), 1), parsesAsAReply],
+        // Fewer catchphrases must not mean less of her: the plain lines are still Mira's.
+        graded: [SOUNDS_LIKE_MIRA],
+    },
+    {
+        kind: 'turn',
+        name: 'plain',
+        about: 'The narration names things: no vague "something", at most one comparison.',
+        expects: ['Name things.', 'At most one comparison'],
+        input: base,
+        userText: 'Ash comes in out of the rain, quieter than usual, and stands by the poetry shelf without taking anything down.',
+        checks: [
+            atMost('at most one "something"', /\bsomething\b/gi, 1),
+            atMost('at most one comparison', /\blike an? \w+|\bthe way (?:she|he|a|an|one|someone|people)\b|\bas if\b|\bas though\b/gi, 1),
+            parsesAsAReply,
+        ],
+        graded: [],
     },
     {
         kind: 'turn',

@@ -42,7 +42,7 @@ function input(style: Partial<PromptLayersInput['story']> = {}): TurnPromptInput
 }
 
 const systemOf = (prompt: { messages: Array<{ content: string }> }) => prompt.messages[0].content;
-const STYLE_AS_BEFORE = '# Style\n- Write in English, second person for Ash ("you"), present tense.\n- Reply length: 150–350 words in total.\n\n#';
+const STYLE_AS_BEFORE = '# Style\n- Write in English, second person for Ash ("you"), present tense.\n- Reply length: 150–350 words in total. 350 is a ceiling, not a target: stop when the moment has landed, and let most replies sit near the middle of the range.\n\n#';
 
 describe('Style controls: the turn prompt (pure)', () => {
     it('says nothing at the middle values: the prompt equals one built without the fields, and the Style layer is the two lines it always was', () => {
@@ -54,7 +54,7 @@ describe('Style controls: the turn prompt (pure)', () => {
 
     it('adds one Style line per control off its middle value, in the order Pacing, balance, Difficulty, naming the worn identity', () => {
         const system = systemOf(buildTurnPrompt(input({ pacing: Pacing.Slow, balance: Balance.Action, difficulty: Difficulty.Hard })));
-        expect(system).toContain(`- Reply length: 150–350 words in total.\n- ${SLOW}\n- ${ACTION}\n- ${HARD}\n\n#`);
+        expect(system).toContain(`- Reply length: 150–350 words in total. 350 is a ceiling, not a target: stop when the moment has landed, and let most replies sit near the middle of the range.\n- ${SLOW}\n- ${ACTION}\n- ${HARD}\n\n#`);
         expect(styleControlLines({ pacing: Pacing.Fast, balance: Balance.Dialogue, difficulty: Difficulty.Easy }, 'Ash')).toEqual([FAST, DIALOGUE, EASY]);
         expect(styleControlLines({ balance: Balance.Dialogue }, 'Ash')).toEqual([DIALOGUE]);
     });
