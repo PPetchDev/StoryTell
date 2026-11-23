@@ -537,10 +537,32 @@ function proseLines(report: EvalReport, earlier?: EvalReport): string[] {
     ];
 }
 
+/**
+ * The checks of `report` that have passed every scored sample of every saved run, this one
+ * included, with how many of those runs scored them. A check nobody has seen fail on a real reply
+ * has not yet shown it can catch what it was written for (.scratch/prompt-evals/spec.md,
+ * "What a clean sheet does not say").
+ */
+export function neverFailed(report: EvalReport, saved: EvalReport[]): { scene: string; check: string; runs: number }[] {
+    const all = [report, ...saved.filter((one) => one.startedAt !== report.startedAt)].map((one) => scores(one));
+    return scores(report).flatMap((row) => {
+        const rows = all.flatMap((one) => one.filter((other) => other.scene === row.scene && other.check === row.check && other.scored > 0));
+        return rows.length > 0 && rows.every((one) => one.pass === one.scored) ? [{ scene: row.scene, check: row.check, runs: rows.length }] : [];
+    });
+}
+
+/** Every report saved in `dir`, whatever its model. */
+export function savedReports(dir: string): EvalReport[] {
+    if (!existsSync(dir)) return [];
+    return readdirSync(dir)
+        .filter((file) => file.startsWith('eval-') && file.endsWith('.json'))
+        .map((file) => JSON.parse(readFileSync(path.join(dir, file), 'utf8')) as EvalReport);
+}
+
 const passed = (row: Score): string => `${row.pass} of ${row.scored}${row.notScored ? ` (${row.notScored} not scored)` : ''}`;
 
 /** The scorecard: what the user reads. The played text stays in the JSON report. */
-export function formatScorecard(report: EvalReport, earlier?: EvalReport): string {
+export function formatScorecard(report: EvalReport, earlier?: EvalReport, saved?: EvalReport[]): string {
     const before = earlier ? scores(earlier) : [];
     const rows = scores(report);
     const cache = cacheLine(report.calls);
@@ -571,6 +593,17 @@ export function formatScorecard(report: EvalReport, earlier?: EvalReport): strin
         ),
     );
     if (failures.length > 0) lines.push('', '## What did not pass', '', ...failures);
+    const never = saved ? neverFailed(report, saved) : [];
+    if (never.length > 0) {
+        lines.push(
+            '',
+            '## Never failed yet',
+            '',
+            'These checks have passed every sample of every saved run, this one included. Nothing yet shows they catch what they were written for: a scene earns its place the first time it fails.',
+            '',
+            ...never.map((one) => `- ${one.scene}: ${one.check} (${one.runs} ${one.runs === 1 ? 'run' : 'runs'})`),
+        );
+    }
     return lines.filter((line, index) => line !== '' || lines[index - 1] !== '').join('\n');
 }
 
@@ -609,12 +642,12 @@ function stem(report: EvalReport): string {
 }
 
 /** Writes the full report as JSON and the scorecard as Markdown in `dir`, and answers their paths. */
-export function writeEvalReport(report: EvalReport, dir: string, earlier?: EvalReport): { json: string; scorecard: string } {
+export function writeEvalReport(report: EvalReport, dir: string, earlier?: EvalReport, saved?: EvalReport[]): { json: string; scorecard: string } {
     mkdirSync(dir, { recursive: true });
     const json = path.join(dir, `${stem(report)}.json`);
     const scorecard = path.join(dir, `${stem(report)}.md`);
     writeFileSync(json, `${JSON.stringify(report, null, 4)}\n`);
-    writeFileSync(scorecard, `${formatScorecard(report, earlier)}\n`);
+    writeFileSync(scorecard, `${formatScorecard(report, earlier, saved)}\n`);
     return { json, scorecard };
 }
 
@@ -722,8 +755,9 @@ export async function startEvalRun(
         if (scenes.length === 0) continue;
         const report = await runEval({ scenes, model, samples: request.samples, concurrency: request.parallel, spentUsd, client, git });
         spentUsd += report.totalUsd;
-        const files = writeEvalReport(report, deps.reportDir, earlier[index]);
-        deps.log(formatScorecard(report, earlier[index]));
+        const saved = savedReports(deps.reportDir);
+        const files = writeEvalReport(report, deps.reportDir, earlier[index], saved);
+        deps.log(formatScorecard(report, earlier[index], saved));
         deps.log(`Full report (with the played text): ${files.json}`);
         runs.push({ report, ...files });
     }

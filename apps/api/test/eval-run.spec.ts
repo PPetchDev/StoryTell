@@ -171,6 +171,24 @@ describe('The prompt eval run', () => {
             expect(card).toContain('| format | parses | code | 0 of 3 | 3 of 3 | worse |');
         });
 
+        it('lists the checks that have never failed in any saved run, this one included, with how many runs each has had', async () => {
+            const env = { EVAL_SPEND: 'yes', EVAL_SAMPLES: '1', OPENROUTER_API_KEY: 'sk-or-test-not-a-real-key' };
+            // An earlier run in which the format scene's reply had no line by Mira: "parses" and "Mira Vance speaks" failed, "ends cleanly" passed.
+            const first = start({ ...env, EVAL_SCENES: 'format' }, scriptedOpenRouter({ play: () => ({ text: '@Stranger: Who are you?' }) }));
+            await first.started;
+
+            const { scorecard } = await start({ ...env, EVAL_SCENES: 'format,length' }, scriptedOpenRouter(), first.reportDir).started;
+
+            const card = readFileSync(scorecard, 'utf8');
+            const never = card.slice(card.indexOf('## Never failed yet'));
+            expect(never).toContain('- format: ends cleanly (2 runs)');
+            expect(never).toContain('- length: ends cleanly (1 run)');
+            expect(never).not.toContain('format: parses');
+            expect(never).not.toContain('format: Mira Vance speaks');
+            // GOOD is too short for the length scene, so its length check failed in this very run.
+            expect(never).not.toContain('medium length');
+        });
+
         it('refuses a named earlier report that is not there', async () => {
             const env = { EVAL_SPEND: 'yes', EVAL_SCENES: 'format', OPENROUTER_API_KEY: 'sk-or-test-not-a-real-key', EVAL_AGAINST: path.join(tmpdir(), 'no-such-report.json') };
 
@@ -237,27 +255,43 @@ describe('The prompt eval run', () => {
     });
 
     describe('code checks', () => {
-        const cases: { scene: string; check: string; good: string; bad: string }[] = [
-            { scene: 'format', check: 'parses', good: GOOD, bad: '@Stranger: Who are you?' },
-            { scene: 'format', check: 'Mira Vance speaks', good: GOOD, bad: 'Mira said nothing at all.' },
-            { scene: 'format', check: 'ends cleanly', good: GOOD, bad: '@Mira Vance: You came back and I was' },
-            { scene: 'user', check: 'no line as the user', good: GOOD, bad: '@Mira Vance: Well?\n\n@Ash: I came to ask you out.' },
-            { scene: 'facts', check: 'says nine', good: '@Mira Vance: Nine years, give or take a flood.', bad: '@Mira Vance: Long enough.' },
-            { scene: 'facts', check: 'no other number of years', good: '@Mira Vance: Nine years.', bad: '@Mira Vance: Nine years. Or twenty years, some days.' },
-            { scene: 'repeats', check: 'drops the phrase', good: GOOD, bad: `She thought about it, and ${REPEATED_PHRASE}.\n\n@Mira Vance: Not yet.` },
-            { scene: 'length', check: 'medium length', good: `${'The rain kept on against the glass. '.repeat(30)}\n\n@Mira Vance: Stay, then.`, bad: GOOD },
-            { scene: 'adult', check: 'no refusal', good: GOOD, bad: 'I’m sorry, but I can’t write that scene.' },
-            { scene: 'secret', check: 'keeps the secret', good: '@Mira Vance: Spring? Ask me in spring.', bad: '@Mira Vance: I have a ticket to Lisbon, if you must know.' },
-            {
-                scene: 'directions',
-                check: 'no stage directions in speech',
-                good: 'Mira leaned on the counter.\n\n@Mira Vance: You are *very* late. Sit.',
-                bad: '@Mira Vance: You are late. *leans on the counter* Sit.',
-            },
-            { scene: 'directions', check: 'no stage directions in speech', good: GOOD, bad: '@Mira Vance: (smiling) You are late.' },
-            { scene: 'sitout', check: 'Tobias Hale stays silent', good: GOOD, bad: `${GOOD}\n\n@Tobias Hale: I would not presume to say.` },
-            { scene: 'thai', check: 'written in English', good: GOOD, bad: '@Mira Vance: คืนนี้ว่างค่ะ' },
-        ];
+        const LONG = `${'The rain kept on against the glass. '.repeat(30)}\n\n@Mira Vance: Stay, then.`;
+        /**
+         * For every code check, a reply it passes and a reply it must fail, by the check's name; a
+         * scene whose check needs its own replies names it as "scene: check". A check with no
+         * reply here is a check nobody has seen fail.
+         */
+        const pairs: Record<string, { good: string; bad: string }[]> = {
+            parses: [{ good: GOOD, bad: '@Stranger: Who are you?' }],
+            'Mira Vance speaks': [{ good: GOOD, bad: 'Mira said nothing at all.' }],
+            'ends cleanly': [{ good: GOOD, bad: '@Mira Vance: You came back and I was' }],
+            'no line as the user': [{ good: GOOD, bad: '@Mira Vance: Well?\n\n@Ash: I came to ask you out.' }],
+            'says nine': [{ good: '@Mira Vance: Nine years, give or take a flood.', bad: '@Mira Vance: Long enough.' }],
+            'no other number of years': [{ good: '@Mira Vance: Nine years.', bad: '@Mira Vance: Nine years. Or twenty years, some days.' }],
+            'drops the phrase': [{ good: GOOD, bad: `She thought about it, and ${REPEATED_PHRASE}.\n\n@Mira Vance: Not yet.` }],
+            'medium length': [{ good: LONG, bad: GOOD }],
+            'no refusal': [{ good: GOOD, bad: 'I’m sorry, but I can’t write that scene.' }],
+            'keeps the secret': [{ good: '@Mira Vance: Spring? Ask me in spring.', bad: '@Mira Vance: I have a ticket to Lisbon, if you must know.' }],
+            'no stage directions in speech': [
+                { good: 'Mira leaned on the counter.\n\n@Mira Vance: You are *very* late. Sit.', bad: '@Mira Vance: You are late. *leans on the counter* Sit.' },
+                { good: GOOD, bad: '@Mira Vance: (smiling) You are late.' },
+            ],
+            'Tobias Hale stays silent': [{ good: GOOD, bad: `${GOOD}\n\n@Tobias Hale: I would not presume to say.` }],
+            'the catchphrase in at most one line': [
+                { good: '@Mira Vance: For the record, no.\n\n@Mira Vance: Sit down, then.', bad: '@Mira Vance: For the record, no.\n\n@Mira Vance: Sit down, for the record.' },
+            ],
+            'at most one "something"': [{ good: GOOD, bad: 'Something moved in the back room. Something in her face changed.\n\n@Mira Vance: Well?' }],
+            'at most one comparison': [{ good: GOOD, bad: 'She watched him like a cat, as if he owed her money.\n\n@Mira Vance: Well?' }],
+            'written in English': [{ good: GOOD, bad: '@Mira Vance: คืนนี้ว่างค่ะ' }],
+        };
+        const turnChecks = EVAL_SCENES.flatMap((one) => (one.kind === 'turn' ? one.checks.map((check) => ({ scene: one.name, check: check.name })) : []));
+        const cases = turnChecks.flatMap(({ scene: name, check }) => (pairs[`${name}: ${check}`] ?? pairs[check] ?? []).map((pair) => ({ scene: name, check, ...pair })));
+
+        it('every code check of every turn scene has a reply it passes and a reply it must fail', () => {
+            const without = turnChecks.filter(({ scene: name, check }) => !cases.some((one) => one.scene === name && one.check === check));
+
+            expect(without).toEqual([]);
+        });
 
         it.each(cases)('$scene: "$check" passes a reply that does it and fails one that does not', async ({ scene: name, check, good, bad }) => {
             const passed = await run([name], { play: () => ({ text: good }) }, { samples: 1 });
@@ -374,6 +408,14 @@ describe('The prompt eval run', () => {
             { scene: 'memory-promise', check: 'writes {user}, never the name', good: promise, bad: add('Ash promised to fix the shop door on Sunday.') },
             { scene: 'memory-promise', check: 'known only by those present', good: promise, bad: add('{user} promised to fix the shop door on Sunday.', ['Mira Vance', 'Tobias Hale']) },
         ];
+
+        it('every check of every Judge and Memory scene has an answer it passes and an answer it must fail', () => {
+            const without = EVAL_SCENES.flatMap((one) => (one.kind === 'turn' ? [] : one.checks.map((check) => ({ scene: one.name, check: check.name })))).filter(
+                ({ scene: name, check }) => !cases.some((one) => one.scene === name && one.check === check),
+            );
+
+            expect(without).toEqual([]);
+        });
 
         it.each(cases)('$scene: "$check" passes an answer that does it and fails one that does not', async ({ scene: name, check, good, bad }) => {
             const passed = await run([name], { background: () => ({ text: good }) }, { samples: 1 });
