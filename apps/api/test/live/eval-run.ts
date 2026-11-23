@@ -11,9 +11,9 @@ import { BACKGROUND_MODEL, PLAY_MODEL_CATALOGUE, PLAY_MODELS, PlayModel, PromptM
 import { FetchLike } from '../../src/service/model-gateway/real/http.js';
 import { backgroundSamplers, TEXT_MODELS } from '../../src/service/model-gateway/real/model-table.js';
 import { OpenRouterClient } from '../../src/service/model-gateway/real/openrouter-client.js';
-import { Check, GradedCheck } from './eval-checks.js';
+import { Check, CheckContext, GradedCheck } from './eval-checks.js';
 import { proseOf, SceneProse } from './eval-prose.js';
-import { EVAL_SCENES, EvalScene, TurnScene } from './eval-scenes.js';
+import { ChatScene, EVAL_SCENES, EvalScene, TurnScene } from './eval-scenes.js';
 import { REPO_ROOT } from './smoke-run.js';
 
 /**
@@ -69,8 +69,10 @@ export interface EvalResult {
 }
 
 export interface EvalSample {
-    /** What the model wrote; null when the call failed. */
+    /** What the model wrote; null when the call failed. For a played Chat, the whole of it: each turn and its reply. */
     text: string | null;
+    /** A played Chat's replies, in turn order. */
+    replies?: string[];
     /** The typed error's message when the call failed. */
     error: string | null;
     results: EvalResult[];
@@ -139,7 +141,7 @@ function speechLines(parsed: ParsedReply, name: string): string[] {
  * What the grader is asked: the turn, the reply and the criteria, answered as JSON. A criterion
  * about one Character's speech is shown that Character's speech lines apart, and told to read only those.
  */
-export function buildGraderPrompt(scene: TurnScene, reply: string, checks: GradedCheck[] = scene.graded, parsed?: ParsedReply): PromptMessage[] {
+export function buildGraderPrompt(scene: Pick<TurnScene, 'input' | 'userText' | 'graded'>, reply: string, checks: GradedCheck[] = scene.graded, parsed?: ParsedReply): PromptMessage[] {
     const speakers = parsed ? [...new Set(checks.flatMap((check) => (check.speechOf ? [check.speechOf] : [])))] : [];
     const speech = speakers
         .map(
@@ -248,6 +250,33 @@ function background<T>(request: ModelRequest, readable: string, parse: (text: st
     };
 }
 
+/** One turn of a played Chat after `history`: sent as a turn is; its checks are the whole Chat's, made once every turn is played. */
+function chatTurn(scene: ChatScene, history: TurnScene['input']['history'], userText: string): Prepared {
+    const prompt = buildTurnPrompt({ ...scene.input, history, userText });
+    return {
+        on: 'play',
+        request: { messages: prompt.messages, maxTokens: prompt.maxTokens, stop: prompt.stop },
+        graded: scene.graded,
+        check: () => ({ results: [], ask: null, skipped: new Map() }),
+    };
+}
+
+/** A reply of about `tokens` tokens, to size a later turn's prompt before anything is played (about five characters a word). */
+const fillerReply = (tokens: number): string => 'word '.repeat(Math.round(tokens * 0.8)).trim();
+
+/** Every turn's request of a played Chat, with earlier replies taken at `replyShare` of what a reply may run to. */
+function chatRequests(scene: ChatScene, replyShare: number): ModelRequest[] {
+    const history = [...scene.input.history];
+    return scene.turns.map((userText) => {
+        const { request } = chatTurn(scene, [...history], userText);
+        history.push({ role: 'user', text: userText }, { role: 'assistant', text: fillerReply(request.maxTokens * replyShare) });
+        return request;
+    });
+}
+
+/** How many times a scene is played in a run of `samples`. */
+const samplesOf = (scene: EvalScene, samples: number): number => (scene.kind === 'chat' ? Math.min(samples, scene.mostSamples) : samples);
+
 /** The prompt a scene is played with, by the app's own builder for its kind, sent as the app sends it. */
 function prepare(scene: EvalScene): Prepared {
     if (scene.kind === 'judge') {
@@ -257,6 +286,8 @@ function prepare(scene: EvalScene): Prepared {
     if (scene.kind === 'memory') {
         return background({ ...buildExtractionPrompt(scene.input), json: true }, 'reads as an extraction', parseExtraction, scene.checks);
     }
+    // A played Chat is prepared as its first turn: what its prompt must hold is read there; the run plays it turn by turn.
+    if (scene.kind === 'chat') return chatTurn(scene, scene.input.history, scene.turns[0]);
     const prompt = buildTurnPrompt({ ...scene.input, userText: scene.userText });
     const cast = scene.input.story.characters.map((character, index) => ({ id: index + 1, name: character.name }));
     const identityName = scene.input.identity.name;
@@ -301,16 +332,27 @@ export function scenePromptProblems(scenes: EvalScene[]): string[] {
 export function estimateEval(scenes: EvalScene[], model: PlayModel, samples: number): { calls: number; expectedUsd: number; worstUsd: number } {
     const estimate = { calls: 0, expectedUsd: 0, worstUsd: 0 };
     const playPrice = PLAY_MODEL_CATALOGUE[model].priceUsdPerMillion;
-    const add = (on: 'play' | 'background', messages: PromptMessage[], maxTokens: number) => {
-        estimate.calls += samples;
+    const add = (on: 'play' | 'background', messages: PromptMessage[], maxTokens: number, times = samples, expectedFrom: PromptMessage[] = messages) => {
+        estimate.calls += times;
         estimate.expectedUsd +=
-            samples *
+            times *
             (on === 'play'
-                ? worstCaseUsd(playPrice, messages, maxTokens * EXPECTED.playWrites)
-                : worstCaseUsd(EXPECTED.backgroundPriceUsdPerMillion, messages, maxTokens * EXPECTED.backgroundWrites));
-        estimate.worstUsd += samples * worstCaseUsd(on === 'play' ? playPrice : BACKGROUND_PRICE_USD_PER_MILLION, messages, maxTokens);
+                ? worstCaseUsd(playPrice, expectedFrom, maxTokens * EXPECTED.playWrites)
+                : worstCaseUsd(EXPECTED.backgroundPriceUsdPerMillion, expectedFrom, maxTokens * EXPECTED.backgroundWrites));
+        estimate.worstUsd += times * worstCaseUsd(on === 'play' ? playPrice : BACKGROUND_PRICE_USD_PER_MILLION, messages, maxTokens);
     };
     for (const scene of scenes) {
+        if (scene.kind === 'chat') {
+            // Each turn's prompt holds the replies before it: at their expected length for the expected figure, at their cap for the worst.
+            const times = samplesOf(scene, samples);
+            const expected = chatRequests(scene, EXPECTED.playWrites);
+            chatRequests(scene, 1).forEach((request, turn) => add('play', request.messages, request.maxTokens, times, expected[turn].messages));
+            if (scene.graded.length > 0) {
+                const last = expected.at(-1)!;
+                add('background', buildGraderPrompt({ ...scene, userText: scene.turns.at(-1)! }, fillerReply(last.maxTokens * EXPECTED.playWrites)), GRADER_MAX_TOKENS, times);
+            }
+            continue;
+        }
         const prepared = prepare(scene);
         add(prepared.on, prepared.request.messages, prepared.request.maxTokens);
         if (scene.kind === 'turn' && scene.graded.length > 0) {
@@ -400,11 +442,16 @@ export async function runEval(options: {
         const checked = prepared.check(answer.text);
         const sample: EvalSample = { text: answer.text, error: null, results: checked.results };
         keep(sample);
-        if (prepared.graded.length === 0) return;
+        await grade(scene.name, prepared.graded, checked, sample);
+    };
+
+    /** Asks the grader about one reply's graded checks, and adds their results to the sample. */
+    const grade = async (name: string, checks: GradedCheck[], checked: Checked, sample: EvalSample): Promise<void> => {
+        if (checks.length === 0) return;
         // One grader call covers all of this reply's graded checks that have something to judge.
-        const graded = checked.ask ? await send(scene.name, 'grader', { messages: checked.ask.messages, maxTokens: GRADER_MAX_TOKENS, json: true }) : null;
+        const graded = checked.ask ? await send(name, 'grader', { messages: checked.ask.messages, maxTokens: GRADER_MAX_TOKENS, json: true }) : null;
         const grades = graded?.text ? parseGrades(graded.text, checked.ask!.checks) : new Map<string, { pass: boolean; quote: string }>();
-        for (const check of prepared.graded) {
+        for (const check of checks) {
             const grade = grades.get(check.name);
             const unread = checked.skipped.get(check.name) ?? (graded?.text === null ? 'the grader call failed' : 'the grader answer could not be read');
             sample.results.push(
@@ -415,11 +462,46 @@ export async function runEval(options: {
         }
     };
 
-    const played = options.scenes.map((scene) => ({ scene, prepared: prepare(scene), samples: new Array<EvalSample | undefined>(report.samples).fill(undefined) }));
+    /** One sample of a played Chat: a call a turn, each with the replies so far as its history, then the checks over all of it. */
+    const playChat = async (scene: ChatScene, keep: (sample: EvalSample) => void): Promise<void> => {
+        const cast = scene.input.story.characters.map((character, index) => ({ id: index + 1, name: character.name }));
+        const identityName = scene.input.identity.name;
+        const history = [...scene.input.history];
+        const replies: CheckContext[] = [];
+        for (const userText of scene.turns) {
+            const answer = await send(scene.name, 'play', chatTurn(scene, [...history], userText).request);
+            // A Chat with a turn missing cannot be scored as a whole: it is a failed sample, and stops here.
+            if (answer.text === null) return keep({ text: null, error: answer.error, results: [] });
+            replies.push({ text: answer.text, parsed: parseReply(answer.text, cast, identityName), identityName });
+            history.push({ role: 'user', text: userText }, { role: 'assistant', text: answer.text });
+        }
+        const sample: EvalSample = {
+            text: scene.turns.map((userText, turn) => `> ${userText}\n\n${replies[turn].text}`).join('\n\n'),
+            replies: replies.map((reply) => reply.text),
+            error: null,
+            results: scene.checks.map((check) => {
+                const verdict = check.run({ replies });
+                return codeResult(check.name, verdict.pass, verdict.reason);
+            }),
+        };
+        keep(sample);
+        // The graded checks read the reply to the last turn: what a long Chat has come to.
+        const last = replies.at(-1)!;
+        const skipped = new Map<string, string>();
+        for (const check of scene.graded) {
+            if (check.speechOf && speechLines(last.parsed, check.speechOf).length === 0) skipped.set(check.name, `${check.speechOf} has no speech line to judge`);
+        }
+        const asked = scene.graded.filter((check) => !skipped.has(check.name));
+        const ask = asked.length > 0 ? { checks: asked, messages: buildGraderPrompt({ ...scene, userText: scene.turns.at(-1)! }, last.text, asked, last.parsed) } : null;
+        await grade(scene.name, scene.graded, { results: [], ask, skipped }, sample);
+    };
+
+    const played = options.scenes.map((scene) => ({ scene, prepared: prepare(scene), samples: new Array<EvalSample | undefined>(samplesOf(scene, report.samples)).fill(undefined) }));
     const jobs = played.flatMap(({ scene, prepared, samples }) =>
         samples.map((_, index) => async () => {
             try {
-                await playOnce(scene, prepared, (sample) => (samples[index] = sample));
+                const keep = (sample: EvalSample) => (samples[index] = sample);
+                await (scene.kind === 'chat' ? playChat(scene, keep) : playOnce(scene, prepared, keep));
             } catch (error) {
                 if (!(error instanceof CapReached)) throw error;
             }
@@ -432,7 +514,7 @@ export async function runEval(options: {
             name: scene.name,
             about: scene.about,
             kind: scene.kind,
-            ...(scene.kind === 'turn' ? { names: [...scene.input.story.characters.map((character) => character.name), scene.input.identity.name] } : {}),
+            ...(scene.kind === 'turn' || scene.kind === 'chat' ? { names: [...scene.input.story.characters.map((character) => character.name), scene.input.identity.name] } : {}),
             samples: samples.filter((sample): sample is EvalSample => sample !== undefined),
         }))
         .filter((scene) => scene.samples.length > 0);
@@ -508,8 +590,8 @@ function cacheLine(calls: EvalCall[]): string | null {
 /** How worn each turn scene's replies read, from the played text: so an earlier report, written before this was counted, is read the same way. */
 export function prose(report: EvalReport): { scene: string; prose: SceneProse }[] {
     return report.scenes
-        .filter((scene) => (scene.kind ?? 'turn') === 'turn')
-        .map((scene) => ({ scene: scene.name, replies: scene.samples.flatMap((sample) => (sample.text === null ? [] : [sample.text])), names: scene.names ?? [] }))
+        .filter((scene) => (scene.kind ?? 'turn') === 'turn' || scene.kind === 'chat')
+        .map((scene) => ({ scene: scene.name, replies: scene.samples.flatMap((sample) => (sample.text === null ? [] : (sample.replies ?? [sample.text]))), names: scene.names ?? [] }))
         .filter((scene) => scene.replies.length > 0)
         .map((scene) => ({ scene: scene.scene, prose: proseOf(scene.replies, scene.names) }));
 }
@@ -570,7 +652,7 @@ export function formatScorecard(report: EvalReport, earlier?: EvalReport, saved?
         `# Prompt eval run: ${PLAY_MODEL_CATALOGUE[report.model].name}`,
         '',
         `Commit ${report.commit}${report.dirty ? ' with uncommitted changes' : ''}, ${report.samples} samples a scene, ${report.startedAt}.`,
-        report.scenes.some((scene) => scene.kind && scene.kind !== 'turn') ? `Judge and Memory scenes are played on the background model (${BACKGROUND.id}), whatever the play model.` : '',
+        report.scenes.some((scene) => scene.kind === 'judge' || scene.kind === 'memory') ? `Judge and Memory scenes are played on the background model (${BACKGROUND.id}), whatever the play model.` : '',
         earlier ? `Compared with the run of ${earlier.startedAt} (commit ${earlier.commit}${earlier.dirty ? ', with uncommitted changes' : ''}).` : '',
         '',
         `| Scene | Check | Kind | Passed |${earlier ? ' Before | Change |' : ''}`,
@@ -702,7 +784,7 @@ function asked(env: Record<string, string | undefined>): { scenes: EvalScene[]; 
 
 /** The scenes a model of the command plays: every scene on the first, and only the turns on the rest, as nothing else uses the play model. */
 function scenesFor(scenes: EvalScene[], index: number): EvalScene[] {
-    return index === 0 ? scenes : scenes.filter((scene) => scene.kind === 'turn');
+    return index === 0 ? scenes : scenes.filter((scene) => scene.kind === 'turn' || scene.kind === 'chat');
 }
 
 /** What the command would send and cost, in a sentence: said when it refuses for the spend flag. */

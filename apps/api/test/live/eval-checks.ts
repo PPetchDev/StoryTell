@@ -1,4 +1,5 @@
 import { ReplyLength } from '../../src/model/story/entities/story.entity.js';
+import { repeatedPhrases } from '../../src/manager/chat/speech/repeated-phrases.js';
 import { ParsedReply } from '../../src/manager/chat/turn/reply-parser.js';
 
 /**
@@ -186,3 +187,63 @@ export const noRefusal: CodeCheck = avoids(
 
 /** The story is told in English whatever language the user typed in: no Thai script in the reply. */
 export const writtenInEnglish: CodeCheck = avoids('written in English', /[฀-๿]+/);
+
+/** What a check of a played Chat reads: every reply of it, in order, each as a one-reply check reads it. */
+export interface ChatContext {
+    replies: CheckContext[];
+}
+
+export type ChatCheck = Check<ChatContext>;
+
+/** A one-reply check held by every reply of a played Chat; the reason names the turns that failed it. */
+export function everyReply(check: CodeCheck): ChatCheck {
+    return {
+        name: `every reply: ${check.name}`,
+        run: ({ replies }) => {
+            const failed = replies.flatMap((reply, index) => {
+                const verdict = check.run(reply);
+                return verdict.pass ? [] : [`turn ${index + 1}: ${verdict.reason}`];
+            });
+            return { pass: failed.length === 0, reason: failed.join('; ') || `all ${replies.length}` };
+        },
+    };
+}
+
+/** A one-reply check on the reply to one turn of a played Chat, counted from 1. */
+export function replyTo(turn: number, check: CodeCheck): ChatCheck {
+    return {
+        name: `turn ${turn}: ${check.name}`,
+        run: ({ replies }) => (replies[turn - 1] ? check.run(replies[turn - 1]) : { pass: false, reason: `no reply to turn ${turn}` }),
+    };
+}
+
+const wordsOnly = (text: string): string =>
+    ` ${text
+        .toLowerCase()
+        .replace(/’/g, "'")
+        .replace(/[^a-z0-9']+/g, ' ')
+        .trim()} `;
+
+/**
+ * A phrase the earlier replies of a played Chat already shared is not written again. Before each
+ * turn the app's own detector reads the replies so far, as the turn prompt does to name the
+ * phrases not to reuse; a reply that holds one of them all the same is the failure. `names` are
+ * the Chat's people, as the turn prompt gives them to the detector.
+ */
+export function dropsRepeatedPhrases(names: readonly string[]): ChatCheck {
+    return {
+        name: 'drops phrases the earlier replies shared',
+        run: ({ replies }) => {
+            const again: string[] = [];
+            for (let turn = 2; turn < replies.length; turn++) {
+                const named = repeatedPhrases(
+                    replies.slice(0, turn).map((reply) => reply.text),
+                    names,
+                );
+                const reply = wordsOnly(replies[turn].text);
+                for (const phrase of named) if (reply.includes(wordsOnly(phrase))) again.push(`turn ${turn + 1}: "${phrase}"`);
+            }
+            return { pass: again.length === 0, reason: again.join('; ') || 'none came back' };
+        },
+    };
+}

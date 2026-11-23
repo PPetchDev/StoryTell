@@ -6,9 +6,12 @@ import { BACKGROUND_SCENES } from './eval-background-scenes.js';
 import {
     atMost,
     avoids,
+    ChatCheck,
     Check,
     CodeCheck,
+    dropsRepeatedPhrases,
     endsCleanly,
+    everyReply,
     GradedCheck,
     habitInFewLines,
     lengthIs,
@@ -16,6 +19,7 @@ import {
     neverSpeaksAsTheUser,
     noRefusal,
     parsesAsAReply,
+    replyTo,
     speaks,
     speechIsOnlySpoken,
     staysSilent,
@@ -71,7 +75,26 @@ export interface MemoryScene extends SceneBase {
     checks: Check<Extraction>[];
 }
 
-export type EvalScene = TurnScene | JudgeScene | MemoryScene;
+/**
+ * A played Chat: the user's turns in order, each answered by the play model through the turn
+ * prompt with the replies so far as its history, and scored as a whole. The Judge does not run
+ * between its turns, so what the Judge would add as the Chat goes (facts, Bonds, Memories) stays
+ * as the scene gives it.
+ */
+export interface ChatScene extends SceneBase {
+    kind: 'chat';
+    /** As a turn scene's; its history is what came before the first turn. */
+    input: Omit<TurnPromptInput, 'userText'>;
+    /** The user's turns, in order. */
+    turns: string[];
+    checks: ChatCheck[];
+    /** Judged on the reply to the last turn. */
+    graded: GradedCheck[];
+    /** The most times it is played in a run: every sample is one call a turn. */
+    mostSamples: number;
+}
+
+export type EvalScene = TurnScene | ChatScene | JudgeScene | MemoryScene;
 
 const MIRA = 'Mira Vance';
 const TOBIAS = 'Tobias Hale';
@@ -371,4 +394,43 @@ const TURN_SCENES: TurnScene[] = [
     },
 ];
 
-export const EVAL_SCENES: EvalScene[] = [...TURN_SCENES, ...BACKGROUND_SCENES];
+const NINE_YEARS = { facts: [{ topic: 'Mira’s years running the bookshop', fact: 'nine years' }], slips: [] };
+const NO_OTHER_YEARS = avoids(
+    'no other number of years',
+    /\b(?:one|two|three|four|five|six|seven|eight|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|eighteen|twenty|thirty|\d+)\s+(?:years|summers|winters)\b/i,
+);
+
+const CHAT_SCENES: ChatScene[] = [
+    {
+        kind: 'chat',
+        name: 'evening',
+        about: 'Ten turns played in a row: the format, a fact, the phrases and Mira’s voice hold to the end.',
+        expects: ['# Established facts', 'nine years', 'Voice: Short, teasing sentences'],
+        input: { ...base, facts: NINE_YEARS },
+        turns: [
+            'Ash knocks on the bookshop door after closing and waves through the rain-streaked glass.',
+            'Ash shakes off his coat, runs a hand along the nearest shelf and asks Mira how long she has had the shop.',
+            'Ash holds up a paper bag from the bakery and says he brought too much for one person.',
+            'Ash asks what she was reading when he knocked.',
+            'Ash laughs, pulls up the stool by the counter and asks whether the ending is really that bad.',
+            'Ash tells her the ferry engine finally turned over today, after three weeks of him swearing at it.',
+            'Ash asks whether she ever thinks about closing the shop and doing something else.',
+            'Ash says the rain sounds as if it means to stay, and asks if she minds him waiting it out here.',
+            'Ash looks up at the old sign over the till and says he never asked properly: how many years has it been her name on it?',
+            'Ash finishes his tea, stands, and asks whether he can come by again tomorrow.',
+        ],
+        checks: [
+            everyReply(parsesAsAReply),
+            everyReply(neverSpeaksAsTheUser),
+            everyReply(speaks(MIRA)),
+            replyTo(2, mentions('says nine', /\bnine\b/i)),
+            replyTo(9, mentions('says nine', /\bnine\b/i)),
+            everyReply(NO_OTHER_YEARS),
+            dropsRepeatedPhrases([MIRA, 'Ash']),
+        ],
+        graded: [SOUNDS_LIKE_MIRA],
+        mostSamples: 2,
+    },
+];
+
+export const EVAL_SCENES: EvalScene[] = [...TURN_SCENES, ...CHAT_SCENES, ...BACKGROUND_SCENES];

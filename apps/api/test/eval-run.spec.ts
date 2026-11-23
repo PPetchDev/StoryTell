@@ -10,7 +10,8 @@ import { OpenRouterClient } from '../src/service/model-gateway/real/openrouter-c
 import vitestConfig from '../vitest.config.js';
 import { RecordedRequest } from './harness/recorded-fetch.js';
 import { compare, EvalReport, formatScorecard, runEval, scenePromptProblems, Score, scores, startEvalRun, writeEvalReport } from './live/eval-run.js';
-import { EVAL_SCENES, EvalScene, JudgeScene, MemoryScene, REPEATED_PHRASE, TurnScene } from './live/eval-scenes.js';
+import { dropsRepeatedPhrases, everyReply, parsesAsAReply } from './live/eval-checks.js';
+import { ChatScene, EVAL_SCENES, EvalScene, JudgeScene, MemoryScene, REPEATED_PHRASE, TurnScene } from './live/eval-scenes.js';
 
 const GRADER_MODEL = 'deepseek/deepseek-v4-flash';
 const GIT = { commit: 'abc1234', dirty: false };
@@ -410,7 +411,7 @@ describe('The prompt eval run', () => {
         ];
 
         it('every check of every Judge and Memory scene has an answer it passes and an answer it must fail', () => {
-            const without = EVAL_SCENES.flatMap((one) => (one.kind === 'turn' ? [] : one.checks.map((check) => ({ scene: one.name, check: check.name })))).filter(
+            const without = EVAL_SCENES.flatMap((one) => (one.kind === 'judge' || one.kind === 'memory' ? one.checks.map((check) => ({ scene: one.name, check: check.name })) : [])).filter(
                 ({ scene: name, check }) => !cases.some((one) => one.scene === name && one.check === check),
             );
 
@@ -435,6 +436,142 @@ describe('The prompt eval run', () => {
             expect(score(report, name, readable)).toBe('1/2');
             expect(scores(report).find((row) => row.check === other)).toMatchObject({ scored: 1, notScored: 1 });
             expect(report.scenes[0].samples[0].results.find((result) => result.check === other)).toMatchObject({ outcome: 'not_graded', reason: 'the answer could not be read' });
+        });
+    });
+
+    describe('a played Chat', () => {
+        const evening = scene('evening') as ChatScene;
+        /** Three turns of the evening, with only the check a test names. */
+        const mini = (checks: ChatScene['checks'], graded: ChatScene['graded'] = []): ChatScene => ({ ...evening, name: 'mini', turns: evening.turns.slice(0, 3), checks, graded });
+        const numbered = (index: number) => ({ text: `Mira set down cup ${index}.\n\n@Mira Vance: Reply ${index}.` });
+        const sent = (request: RecordedRequest) => (request.body as { messages: { content: string }[] }).messages;
+
+        it('plays the user’s turns in order through the turn prompt, each with the replies so far as its history, and keeps every reply', async () => {
+            const { report, requests } = await run([mini([everyReply(parsesAsAReply)])], { play: numbered }, { samples: 1 });
+
+            expect(requests.map((request) => request.role)).toEqual(['play', 'play', 'play']);
+            expect(sent(requests[0]).at(-1)!.content).toContain(evening.turns[0]);
+            expect(JSON.stringify(sent(requests[0]))).not.toContain('Reply 0.');
+            const third = JSON.stringify(sent(requests[2]));
+            expect(third).toContain('Reply 0.');
+            expect(third).toContain(evening.turns[1]);
+            expect(third).toContain('Reply 1.');
+            expect(sent(requests[2]).at(-1)!.content).toContain(evening.turns[2]);
+            expect(report.scenes[0]).toMatchObject({ name: 'mini', kind: 'chat' });
+            expect(report.scenes[0].samples[0].replies).toEqual([0, 1, 2].map((index) => numbered(index).text));
+            expect(report.scenes[0].samples[0].text).toContain(evening.turns[1]);
+            expect(score(report, 'mini', 'every reply: parses')).toBe('1/1');
+        });
+
+        it('a check every reply must hold fails on one reply, and says which turn', async () => {
+            const { report } = await run([mini([everyReply(parsesAsAReply)])], { play: (index) => (index === 1 ? { text: '@Stranger: Who are you?' } : numbered(index)) }, { samples: 1 });
+
+            expect(score(report, 'mini', 'every reply: parses')).toBe('0/1');
+            expect(report.scenes[0].samples[0].results[0].reason).toBe('turn 2: unknown speaker: Stranger');
+        });
+
+        it('a phrase the first replies shared fails the Chat when a later reply writes it again, and not when it is dropped', async () => {
+            const openings = ['The rain kept on.', 'A cart rattled past outside.', 'Somewhere a clock struck nine.'];
+            const stock = (index: number) => `${openings[index]} Her fingers drummed the worn oak counter.\n\n@Mira Vance: Reply ${index}.`;
+            const check = dropsRepeatedPhrases(['Mira Vance', 'Ash']);
+
+            const again = await run([mini([check])], { play: (index) => ({ text: stock(index) }) }, { samples: 1 });
+            const dropped = await run([mini([check])], { play: (index) => (index === 2 ? numbered(index) : { text: stock(index) }) }, { samples: 1 });
+
+            expect(score(again.report, 'mini', check.name)).toBe('0/1');
+            expect(again.report.scenes[0].samples[0].results[0].reason).toBe('turn 3: "Her fingers drummed the worn oak counter"');
+            expect(score(dropped.report, 'mini', check.name)).toBe('1/1');
+        });
+
+        it('sends one grader call a played Chat, about the reply to its last turn', async () => {
+            const { report, requests } = await run([mini([], evening.graded)], { play: numbered }, { samples: 1 });
+
+            const graders = requests.filter((request) => request.role === 'grader');
+            expect(graders).toHaveLength(1);
+            const asked = sent(graders[0]).at(-1)!.content;
+            expect(asked).toContain(evening.turns[2]);
+            expect(asked).toContain('- Reply 2.');
+            expect(asked).not.toContain('Reply 1.');
+            expect(score(report, 'mini', 'sounds like Mira')).toBe('1/1');
+        });
+
+        it('a call that fails part way is a failed sample with its error, and the Chat stops there', async () => {
+            const { report, requests } = await run([mini([everyReply(parsesAsAReply)])], { play: (index) => (index === 1 ? { status: 400 } : numbered(index)) }, { samples: 1 });
+
+            expect(requests).toHaveLength(2);
+            expect(report.scenes[0].samples[0]).toMatchObject({ text: null, results: [] });
+            expect(report.scenes[0].samples[0].error).not.toBeNull();
+        });
+
+        it('is played at most its own number of times, whatever the run’s samples', async () => {
+            const { report, requests } = await run([{ ...mini([everyReply(parsesAsAReply)]), mostSamples: 2 }], { play: numbered }, { samples: 3 });
+
+            expect(requests).toHaveLength(6);
+            expect(report.scenes[0].samples).toHaveLength(2);
+        });
+
+        it('is in the prose table, read over all its replies', async () => {
+            // Three replies of 13 words, each with one listed phrase.
+            const { report } = await run([mini([])], { play: () => ({ text: 'Mira took a deep breath.\n\n@Mira Vance: You came back. I was hoping you would.' }) }, { samples: 1 });
+
+            const card = formatScorecard(report);
+            expect(card.slice(card.indexOf('## Prose'))).toContain('| mini | 39 | 76.9 |');
+        });
+
+        it('says what it would send before spending: a call a turn, and one grader call, for each time it is played', async () => {
+            const router = scriptedOpenRouter();
+            const started = startEvalRun({ EVAL_SCENES: 'evening', EVAL_SAMPLES: '5' }, { fetch: router.fetchImpl, reportDir: mkdtempSync(path.join(tmpdir(), 'eval-')), log: () => {}, git: () => GIT });
+
+            // Ten turns and a grader call, played twice at most.
+            await expect(started).rejects.toThrow('would send 22 calls');
+        });
+
+        it('with every play model asked for, is played on each', async () => {
+            const router = scriptedOpenRouter();
+            const env = { EVAL_SPEND: 'yes', EVAL_SCENES: 'evening', EVAL_MODEL: 'all', EVAL_SAMPLES: '1', OPENROUTER_API_KEY: 'sk-or-test-not-a-real-key' };
+
+            await startEvalRun(env, { fetch: router.fetchImpl, reportDir: mkdtempSync(path.join(tmpdir(), 'eval-')), log: () => {}, git: () => GIT });
+
+            const models = router.requests.filter((request) => request.role === 'play').map((request) => (request.body as { model: string }).model);
+            expect(models.filter((model) => model === 'z-ai/glm-5.3')).toHaveLength(10);
+            expect(models.filter((model) => model === 'deepseek/deepseek-v4-pro')).toHaveLength(10);
+        });
+
+        /** Ten replies that pass every check of the evening: each its own words, nine years said to turns 2 and 9. */
+        const fine = [
+            'Mira unlocked the door.\n\n@Mira Vance: You are dripping. Come in.',
+            'She glanced at the shelf he touched.\n\n@Mira Vance: Nine years. Counting, are we?',
+            'She eyed the bag.\n\n@Mira Vance: Too much? Tragic. Hand it over.',
+            'She tilted the cover toward him.\n\n@Mira Vance: Poems. Bad ones.',
+            'She shut the book.\n\n@Mira Vance: Worse. Want to hear it?',
+            'She raised her mug.\n\n@Mira Vance: Three weeks of swearing. Did it help?',
+            'She looked round the shop.\n\n@Mira Vance: And do what, exactly?',
+            'Rain ran down the window.\n\n@Mira Vance: Mind? I was going to charge rent.',
+            'She followed his eyes to the sign.\n\n@Mira Vance: Nine. You asked already, you know.',
+            'She took his cup.\n\n@Mira Vance: Tomorrow? Bring more bread.',
+        ];
+        const but = (changes: Record<number, string>) => (index: number) => ({ text: changes[index] ?? fine[index] });
+        const stock = 'Her fingers drummed the worn oak counter.';
+        const cases: { check: string; bad: Record<number, string> }[] = [
+            { check: 'every reply: parses', bad: { 3: '@Stranger: Who are you?' } },
+            { check: 'every reply: no line as the user', bad: { 3: '@Mira Vance: Well?\n\n@Ash: I came to ask you out.' } },
+            { check: 'every reply: Mira Vance speaks', bad: { 4: 'Mira said nothing at all.' } },
+            { check: 'turn 2: says nine', bad: { 1: '@Mira Vance: Long enough.' } },
+            { check: 'turn 9: says nine', bad: { 8: '@Mira Vance: Long enough. You asked already.' } },
+            { check: 'every reply: no other number of years', bad: { 8: '@Mira Vance: Nine. Or twenty years, some days.' } },
+            { check: 'drops phrases the earlier replies shared', bad: { 4: `${stock}\n\n@Mira Vance: Worse.`, 5: `${stock}\n\n@Mira Vance: Did it help?`, 6: `${stock}\n\n@Mira Vance: And do what?` } },
+        ];
+
+        it('every check of the evening has a Chat it must fail', () => {
+            expect(evening.checks.map((check) => check.name).filter((name) => !cases.some((one) => one.check === name))).toEqual([]);
+        });
+
+        it.each(cases)('evening: "$check" passes a Chat that does it and fails one that does not', async ({ check, bad }) => {
+            const passed = await run(['evening'], { play: but({}) }, { samples: 1 });
+            const failed = await run(['evening'], { play: but(bad) }, { samples: 1 });
+
+            expect(score(passed.report, 'evening', check)).toBe('1/1');
+            expect(score(failed.report, 'evening', check)).toBe('0/1');
         });
     });
 
