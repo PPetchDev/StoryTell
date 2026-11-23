@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { parseEnv } from 'node:util';
 
+import { startGraderCheck } from './eval-grade.js';
 import { DEFAULT_EVAL_DIR, startEvalRun } from './eval-run.js';
 import { REPO_ROOT } from './smoke-run.js';
 
@@ -19,7 +20,8 @@ it(
         if (env.EVAL_SPEND === 'yes' && !env.OPENROUTER_API_KEY && existsSync(envFile)) {
             env.OPENROUTER_API_KEY = parseEnv(readFileSync(envFile, 'utf8')).OPENROUTER_API_KEY;
         }
-        await startEvalRun(env, {
+        // --grade checks the grader alone (eval-grade.ts); --label-sheet writes the replies to label by hand.
+        await (env.EVAL_GRADE ? startGraderCheck : startEvalRun)(env, {
             fetch: globalThis.fetch.bind(globalThis),
             reportDir: DEFAULT_EVAL_DIR,
             log: (line) => console.log(line),

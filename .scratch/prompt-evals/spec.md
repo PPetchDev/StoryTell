@@ -233,3 +233,41 @@ From [the research on harnesses](../../docs/research/story-quality-eval-harnesse
 - **Not on the side-by-side scorecard** (`--model all`): each model's own scorecard has its table.
 - **The repeated-phrases detector drops a hyphen** ("halffinished"): the app's own, cosmetic here.
 - Left for later, from the research: the "not X, but Y" patterns (ten plain patterns port easily; the rest need a part-of-speech tagger), and a line turning the number into a check once a few runs show what is normal.
+
+## The other three from the research (2026-11-23)
+
+Built the same day as the prose table, on the user's word to carry on. Everything below is proved with scripted answers (2,216 API tests pass); **none of it has been run against a real model**, and nothing was spent.
+
+### Every check has a reply it must fail (research gap 2)
+
+- A test now goes through every code check of every scene and refuses one with no known-good and known-bad reply. Thirteen checks had none (the `habit` and `plain` scenes whole, and the second and third checks of most scenes). All now have one, and every check failed its bad reply: none was too lax.
+- **"Never failed yet" on the scorecard.** The scorecard ends with the checks that have passed every sample of every saved run, this one included, each with how many runs it has had. A clean sheet no longer reads as proof: these are the checks that have not yet shown they catch anything.
+- **Left out:** distractors written into the scenes to make them harder. A harder scene can only be tuned against real replies, so it follows the next real run.
+
+### A played Chat (research gap 1)
+
+- **A fourth kind of scene:** the user's turns in order, each answered by the play model through the turn prompt with the replies so far as its history, scored as a whole. It takes "a conversation scored as a whole" out of Out of Scope.
+- **The first one, `evening`:** ten turns in the bookshop. Its checks: every reply parses, none is written as the user, Mira speaks in each; "nine years" is said when asked at turn 2 and again, asked another way, at turn 9, and no other number of years anywhere; no phrase the earlier replies shared comes back. The graded check, "sounds like Mira", reads the reply to the last turn.
+- **"Drops phrases the earlier replies shared"** uses the app's own Repeated phrases detector as the turn prompt does: before each turn it reads the replies so far, and a reply holding a phrase it named is the failure.
+- **Cost.** Each time it is played is ten play calls with a growing prompt, so it is played at most twice a run whatever `--samples` says. The run says, without `--spend`: 22 calls, about $0.06, at most $0.12. With it, `all` at five samples is 162 calls, about $0.22, **at most $0.50: the cap can now stop a full run short** if every call runs to its limit. `--samples 3` keeps clear of it.
+- **What it does not do:** the Judge does not run between its turns, so Established facts, Bonds and Memories stay as the scene gives them. A call that fails part way makes the whole Chat a failed sample. It is in the prose table, read over all its replies.
+
+### The grader check (research gap 3)
+
+```
+npm run eval:live -- --grade                      (spends nothing: says what it would cost)
+npm run eval:live -- --grade --spend
+npm run eval:live -- --label-sheet                (free: the saved runs' replies, to label by hand)
+npm run eval:live -- --grade --labels <file> --spend
+```
+
+- **Replies whose right verdict is known are sent to the grader alone,** each twice (`--samples` changes it), and a card says, check by check: how many cases it agreed with, how many fails it missed, how many passes it failed, and how many it answered both ways ("unsteady"). Each disagreement is listed with its label, why, and the words the grader judged on. No play model is called.
+- **Sixteen cases are written in** (`eval-grade.ts`), synthetic, every person an adult: for each of the five graded checks a reply that passes and two or three that must fail, one plainly and one in the way a grader is likely to miss (a decision given to Ash with no speech; teasing words that are only in the narration; a Secret hinted at, not said; Tobias acting with no speech line; the narration calling Ash's words foreign). A test refuses a graded check with no pass and no fail case.
+- **Hand labels.** `--label-sheet` writes `.data/eval-runs/labels-to-mark.json`: every reply a graded check read in the saved runs, once, with the criterion, `label` empty and the grader's own verdict left out so the reader is not led. Today that is 45 replies. Fill each `label` with `pass` or `fail`; `--labels` adds them to the sixteen. An entry not yet labelled is left out.
+- **Cost:** 32 calls, about $0.001, at most $0.03. The $0.50 cap holds here too.
+- **Not yet known:** whether the grader agrees. No threshold for "agrees enough" was found in the research; a check the grader gets wrong on a written-in case should be reworded or made a code check, as the spec already says. The research's other question, whether DeepSeek V4 Flash goes easy on DeepSeek V4 Pro's replies, needs the grader check run on labelled replies of both play models, which the label sheet now makes possible.
+
+### For the next real run (needs the user's go-ahead to spend)
+
+1. `npm run eval:live -- --grade --spend` first: under three cents, and it says whether the graded half of the scorecard can be believed.
+2. `npm run eval:live -- all --spend --samples 3 --against last`: the first run with the prose table, the played Chat and the never-failed list. Read "What did not pass" before believing a low score on `evening`: its checks have met no real reply.

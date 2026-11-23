@@ -33,17 +33,17 @@ export const EVAL_SAMPLES = 5;
 /** How many calls are in flight at once, unless told otherwise. */
 export const EVAL_PARALLEL = 4;
 /** The background model: the app's Judge and Memory extraction run on it, and so does the grader, which never reads its own play. */
-const BACKGROUND = TEXT_MODELS[BACKGROUND_MODEL];
+export const BACKGROUND = TEXT_MODELS[BACKGROUND_MODEL];
 /** Above the background model's list price on purpose: it only sizes the worst case against the cap. */
-const BACKGROUND_PRICE_USD_PER_MILLION = { input: 0.5, output: 2 };
-const GRADER_MAX_TOKENS = 400;
+export const BACKGROUND_PRICE_USD_PER_MILLION = { input: 0.5, output: 2 };
+export const GRADER_MAX_TOKENS = 400;
 /**
  * What a call is expected to cost, for the figure given before spending: from the first real run
  * (2026-11-22), where a play call wrote 309 tokens of the 900 it could, and the background model
  * billed about $0.1 a million tokens read and $0.2 a million written, writing a ninth of its cap.
  * No cache discount is taken, though that run had one, so the figure errs high.
  */
-const EXPECTED = {
+export const EXPECTED = {
     playWrites: 1 / 3,
     backgroundWrites: 1 / 4,
     backgroundPriceUsdPerMillion: { input: 0.1, output: 0.2 },
@@ -128,7 +128,7 @@ function promptTokens(messages: PromptMessage[]): number {
     return messages.reduce((sum, message) => sum + estimateTokens(message.content) + 4, 0);
 }
 
-function worstCaseUsd(price: Price, messages: PromptMessage[], maxTokens: number): number {
+export function worstCaseUsd(price: Price, messages: PromptMessage[], maxTokens: number): number {
     return (promptTokens(messages) * price.input + maxTokens * price.output) / 1_000_000;
 }
 
