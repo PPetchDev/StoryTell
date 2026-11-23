@@ -17,6 +17,11 @@ export abstract class AppConfig {
      */
     abstract readonly cutoutModelPath: string;
     /**
+     * Absolute path of the model file that enlarges a picture two times before a soft cut-out
+     * (.scratch/soft-cutout/spec.md). Where the file is missing, nothing is enlarged.
+     */
+    abstract readonly enlargeModelPath: string;
+    /**
      * Absolute path of the speech folder (Read aloud's audio and voice samples). Never inside the
      * image folder: the backup job copies that folder, and audio is not backed up.
      */
@@ -195,6 +200,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     const speechDir = env.SPEECH_DIR ? path.resolve(env.SPEECH_DIR) : path.join(path.dirname(imageDir), 'speech');
     // Default: `models/isnet-anime.onnx` beside the image folder. A file, never a secret; missing is fine.
     const cutoutModelPath = env.CUTOUT_MODEL ? path.resolve(env.CUTOUT_MODEL) : path.join(path.dirname(imageDir), 'models', 'isnet-anime.onnx');
+    // Default: `models/AnimeSharpV2_MoSR_Soft_x2.onnx` beside the image folder. Missing is fine.
+    const enlargeModelPath = env.ENLARGE_MODEL ? path.resolve(env.ENLARGE_MODEL) : path.join(path.dirname(imageDir), 'models', 'AnimeSharpV2_MoSR_Soft_x2.onnx');
     const fromImages = path.relative(imageDir, speechDir);
     if (fromImages === '' || (!fromImages.startsWith('..') && !path.isAbsolute(fromImages))) {
         throw new ConfigError(
@@ -236,6 +243,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
         databaseUrl: env.DATABASE_URL!,
         imageDir,
         cutoutModelPath,
+        enlargeModelPath,
         speechDir,
         modelGateway,
         textHosts,

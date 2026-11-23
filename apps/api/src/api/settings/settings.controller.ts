@@ -55,6 +55,6 @@ export class SettingsApiController {
     }
 
     private respond(settings: SettingsResponse): SettingsResponseBodyDTO {
-        return { settings, playModels: playModelOptions(), imageModels: IMAGE_MODEL_OPTIONS, cutoutPriceUsd: this.gateway.cutoutPriceUsd(), freeCutout: this.gateway.ownCutoutAvailable(), veniceCutoutPriceUsd: IMAGE_CUTOUT_PRICE_USD };
+        return { settings, playModels: playModelOptions(), imageModels: IMAGE_MODEL_OPTIONS, cutoutPriceUsd: this.gateway.cutoutPriceUsd(), freeCutout: this.gateway.ownCutoutAvailable(), softCutoutEnlarges: this.gateway.softCutoutEnlarges(), veniceCutoutPriceUsd: IMAGE_CUTOUT_PRICE_USD };
     }
 }

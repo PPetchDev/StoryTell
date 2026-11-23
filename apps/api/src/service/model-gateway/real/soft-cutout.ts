@@ -39,8 +39,18 @@ export interface Picture {
  */
 export function softCutout({ rgb, width, height }: Picture): Buffer | null {
     const count = width * height;
+    const bg = keyColour({ rgb, width, height });
+    if (!bg) return null;
+    const off = (pixel: number) => Math.max(Math.abs(rgb[pixel * 3] - bg[0]), Math.abs(rgb[pixel * 3 + 1] - bg[1]), Math.abs(rgb[pixel * 3 + 2] - bg[2]));
+    const neutral = Math.max(...bg) - Math.min(...bg);
+    return keyed({ rgb, width, height }, bg, off, neutral, count);
+}
 
-    // The background colour: the median of the picture's outer ring.
+/**
+ * The background colour a soft cut-out keys on: the median of the picture's outer ring, where nine
+ * tenths of the ring is that colour and it is tinted. `null` otherwise: the picture is not fit.
+ */
+export function keyColour({ rgb, width, height }: Picture): number[] | null {
     const margin = Math.max(2, Math.round(Math.min(width, height) * 0.015));
     const ring: number[] = [];
     for (let y = 0; y < height; y++) {
@@ -56,8 +66,10 @@ export function softCutout({ rgb, width, height }: Picture): Buffer | null {
     const off = (pixel: number) => Math.max(Math.abs(rgb[pixel * 3] - bg[0]), Math.abs(rgb[pixel * 3 + 1] - bg[1]), Math.abs(rgb[pixel * 3 + 2] - bg[2]));
     const flat = ring.filter((pixel) => off(pixel) <= FLAT_REACH).length / ring.length >= FLAT_SHARE;
     const neutral = Math.max(...bg) - Math.min(...bg);
-    if (!flat || neutral < LEAST_TINT) return null;
+    return flat && neutral >= LEAST_TINT ? bg : null;
+}
 
+function keyed({ rgb, width, height }: Picture, bg: number[], off: (pixel: number) => number, neutral: number, count: number): Buffer {
     const scale = Math.max(1, Math.min(3, Math.round(width / MEASURED_WIDTH)));
     /** Pixels in from the rough edge that are surely figure, and out from it where fine fur may still be. */
     const inside = 4 * scale;
@@ -282,13 +294,33 @@ export function softCutout({ rgb, width, height }: Picture): Buffer | null {
     return out;
 }
 
+/** A picture narrower than this is enlarged before it is cut out, where an enlarger is set up. */
+const ENLARGE_BELOW = 1200;
+
+/** `now`: made within the request. `later`: enlarged first, which takes minutes, so the request does not wait. */
+export type SoftCutoutPlan = 'now' | 'later';
+
 export class SoftCutout {
-    /** One picture at a time: a large picture keeps a core busy for seconds. */
+    /** One picture at a time: a large picture keeps a core busy for seconds, an enlargement for minutes. */
     private last: Promise<unknown> = Promise.resolve();
 
+    /** `enlarger`: where it is there and its model file is too, a small picture is enlarged two times first. */
+    constructor(private readonly enlarger?: { available(): boolean; enlarge(picture: Picture): Promise<Picture> }) {}
+
     /**
-     * The picture with its background taken away, as a PNG with transparency, the size it came in.
-     * Refused (SoftCutoutUnsuitableError) where the background is not one flat, tinted colour.
+     * How this picture's cut-out would be made, with nothing made yet. Refused
+     * (SoftCutoutUnsuitableError) where the background is not one flat, tinted colour.
+     */
+    async plan(image: ImageData): Promise<SoftCutoutPlan> {
+        const picture = await this.read(image.bytes);
+        if (!keyColour(picture)) throw new SoftCutoutUnsuitableError();
+        return this.enlargesThis(picture) ? 'later' : 'now';
+    }
+
+    /**
+     * The picture with its background taken away, as a lossless WebP with transparency: the size it came in,
+     * or two times that where it was enlarged first. Refused (SoftCutoutUnsuitableError) where the
+     * background is not one flat, tinted colour.
      */
     removeBackground(image: ImageData): Promise<ImageData> {
         const turn = this.last.then(() => this.cut(image.bytes));
@@ -296,12 +328,29 @@ export class SoftCutout {
         return turn;
     }
 
-    private async cut(bytes: Buffer): Promise<ImageData> {
+    /** Whether a small picture is enlarged first here. */
+    enlarges(): boolean {
+        return this.enlarger?.available() ?? false;
+    }
+
+    private enlargesThis(picture: Picture): boolean {
+        return picture.width < ENLARGE_BELOW && this.enlarges();
+    }
+
+    private async read(bytes: Buffer): Promise<Picture> {
         // Turned upright first, as a phone's photo says which way is up in its metadata.
         const upright = await sharp(bytes).rotate().removeAlpha().toColourspace('srgb').raw().toBuffer({ resolveWithObject: true });
-        const { width, height } = upright.info;
-        const rgba = softCutout({ rgb: upright.data, width, height });
+        return { rgb: upright.data, width: upright.info.width, height: upright.info.height };
+    }
+
+    private async cut(bytes: Buffer): Promise<ImageData> {
+        const drawn = await this.read(bytes);
+        // Refused before the minutes of an enlargement, not after.
+        if (!keyColour(drawn)) throw new SoftCutoutUnsuitableError();
+        const picture = this.enlargesThis(drawn) ? await this.enlarger!.enlarge(drawn) : drawn;
+        const rgba = softCutout(picture);
         if (!rgba) throw new SoftCutoutUnsuitableError();
-        return { bytes: await sharp(rgba, { raw: { width, height, channels: 4 } }).png().toBuffer(), mimeType: 'image/png' };
+        // Lossless WebP: a third of the PNG's size, which matters at two times the picture's size.
+        return { bytes: await sharp(rgba, { raw: { width: picture.width, height: picture.height, channels: 4 } }).webp({ lossless: true }).toBuffer(), mimeType: 'image/webp' };
     }
 }

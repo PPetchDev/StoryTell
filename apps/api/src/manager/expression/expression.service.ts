@@ -73,6 +73,11 @@ export class ExpressionManagerService {
         const paid = by === 'venice' || (by !== 'soft' && !this.gateway.ownCutoutAvailable());
         if (paid && (await this.imageCreditOut())) throw new OutOfCreditError('image');
         const bytes = await this.imageStore.read(expression.imagePath);
+        // Enlarged first, which takes minutes (.scratch/soft-cutout/spec.md): the request does not wait, and a failure is only logged.
+        if (by === 'soft' && (await this.gateway.softCutoutPlan(bytes)) === 'later') {
+            void this.cutOutExpression(storyId, characterId, emotion, expression.imagePath, bytes, false, by);
+            return this.saved(storyId);
+        }
         await this.cutOutExpression(storyId, characterId, emotion, expression.imagePath, bytes, true, by);
         if (character.referenceImagePath && !character.referenceCutoutPath) {
             await this.cutOutReference(storyId, characterId, character.referenceImagePath, await this.imageStore.read(character.referenceImagePath));
@@ -85,7 +90,9 @@ export class ExpressionManagerService {
         let cutoutPath: string | null = null;
         try {
             const cut = await this.cutOutImage(storyId, image, by);
-            cutoutPath = expressionImagePath(storyId, characterId, emotion, 'png').replace(/.png$/, '-cutout.png');
+            // A PNG from the app's own remover and Venice's, a WebP from the soft cut-out.
+            const extension = ImageStoreService.sniffMimeType(cut) === 'image/webp' ? 'webp' : 'png';
+            cutoutPath = expressionImagePath(storyId, characterId, emotion, extension).replace(/\.(png|webp)$/, '-cutout.$1');
             await this.imageStore.write(cutoutPath, cut);
             const previous = await this.storyModel.setExpressionCutout(characterId, emotion, imagePath, cutoutPath);
             // Redrawn or removed meanwhile: this cut-out belongs to no Expression.

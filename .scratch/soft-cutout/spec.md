@@ -35,7 +35,7 @@ An Expression has a third button, "Soft cut-out · free", beside "Cut out · fre
 - **No model.** A pure function from the picture's colours to a see-through picture, about a second for a 1664 by 2496 picture on the PC.
 - **Pixel distances scale with the picture's width**, measured on 832: a picture twice as wide gets a band twice as wide.
 - **The usage record** is written as for any image call: model `soft-key`, host `local`, cost 0, image pool. It needs no image credit.
-- **The answer is a PNG**, the size the picture came in, as the other makers answer.
+- **The answer is a lossless WebP**, about a third of a PNG's size. The stored cut-out keeps that type in its name (`-cutout.webp`), as an uploaded WebP cut-out does.
 
 ## Testing Decisions
 
@@ -49,10 +49,19 @@ An Expression has a third button, "Soft cut-out · free", beside "Cut out · fre
 
 - The highlight on Rin's black ears is close to her purple background, so thin slits and a bumpy edge are left there. They were patched by hand for the pictures on live; this maker does not do that.
 - A ground shadow drawn on the background is kept wherever it is far from the background's colour.
-- A PNG at 1664 by 2496 is about 4.3 MB; the hand-made ones on live are lossless WebP at 1.3 MB.
+
+## Enlarged first (2026-11-23, the same day)
+
+A picture drawn at 832 by 1248 shows its pixels on a tall stage. Rin's were enlarged two times by hand with the MoSR Soft model (`AnimeSharpV2_MoSR_Soft_x2.onnx`, 18 MB) before they were cut out: it keeps the soft look and the face as drawn. The soft cut-out now does the same.
+
+- **Where the model file is there**, a picture narrower than 1200 pixels is enlarged two times, and the cut-out is made from that. The Expression's own picture is not changed; only its cut-out is two times the size. The model's path defaults to `models/AnimeSharpV2_MoSR_Soft_x2.onnx` beside the image folder; `ENLARGE_MODEL` can name another. No file, nothing is enlarged, and no error.
+- **It takes minutes**, so the request does not wait: about 48 seconds a picture on the PC and 6 minutes 13 seconds on the live VM (2 cores), measured. The route answers at once with the Story as it is, the cut-out is made in the background, and it replaces the one there when it is done. A failure is logged and leaves the old cut-out.
+- **A picture that is not fit is still refused at once** (409.002.016), before anything is enlarged.
+- **One picture at a time**, in the order asked, with one core left for the app. Twenty-one pictures on the VM are over two hours. A restart of the API drops what is waiting: press again.
+- **Settings' answer says whether pictures are enlarged here** (`softCutoutEnlarges`), and the editor then says, after the button is pressed, that the cut-out comes in several minutes and shows after a reload.
+- **Tests:** the enlarger with a stand-in model (the size, tiles stitched with no seam, there only with its file); the maker's plan (`later` for a small picture, `now` for a wide one or with no model) and its answer at two times the size; a picture not fit refused with nothing enlarged; the route answering at once and the cut-out arriving later.
+- **Not done:** showing in the editor which pictures are still waiting; carrying the waiting ones over a restart; enlarging the Expression's own picture, or the Reference image.
 
 ## Out of Scope
-
-- Enlarging a picture two times before the cut-out (the MoSR Soft model). On the live VM (2 cores) one 832 by 1248 picture took more than 15 minutes, against 60 seconds on the PC, so it cannot run at cut-out time there.
 - Drawing a picture on a colour picked from outside its palette: the drawing prompts still ask for the Story's own background.
 - Making it the default maker for a fit picture.

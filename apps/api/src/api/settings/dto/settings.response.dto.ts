@@ -123,6 +123,9 @@ export class SettingsResponseBodyDTO {
     @ApiProperty({ description: "Whether the app's own background remover is set up here, so a free cut-out can be asked for (`?with=own`).", example: true })
     freeCutout: boolean;
 
+    @ApiProperty({ description: 'Whether a small picture is enlarged two times before its soft cut-out here (`?with=soft`): the cut-out then comes minutes after the request.', example: false })
+    softCutoutEnlarges: boolean;
+
     @ApiProperty({ description: "What a cut-out made by Venice costs, in USD (`?with=venice`).", example: 0.03 })
     veniceCutoutPriceUsd: number;
 }

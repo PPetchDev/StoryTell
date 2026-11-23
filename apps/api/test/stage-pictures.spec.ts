@@ -144,6 +144,44 @@ describe('Stage pictures', () => {
         expect(makers()).toHaveLength(3);
     });
 
+    // .scratch/soft-cutout/spec.md
+    it('a soft cut-out is made within the request, needing no image credit', async () => {
+        const story = await createStory();
+        await t.http.put(expressionPath(story, 'teasing')).attach('image', png('mine'), 'mine.png').expect(200);
+        t.gateway.setRemainingCredit({ image: { remainingUsd: 0, limitUsd: null } });
+
+        const cut = ((await t.http.post(`${expressionPath(story, 'teasing')}/cutout?with=soft`).expect(201)).body as Story).characters[0];
+
+        expect(cut.expressions[0].cutoutPath).toMatch(/-teasing-[0-9a-f]+-cutout\.png$/);
+        expect(t.gateway.imageCalls().filter((call) => call.kind === 'image_cutout').map((call) => call.cutoutBy)).toEqual(['soft']);
+
+        // The soft cut-out answers a WebP: the file keeps that type, and replaces the PNG.
+        const webp = Buffer.concat([Buffer.from('RIFF'), Buffer.from([0, 0, 0, 0]), Buffer.from('WEBPVP8L'), Buffer.from('soft')]);
+        t.gateway.scriptImage('image_cutout', { image: { bytes: webp, mimeType: 'image/webp' } });
+        const again = ((await t.http.post(`${expressionPath(story, 'teasing')}/cutout?with=soft`).expect(201)).body as Story).characters[0];
+        expect(again.expressions[0].cutoutPath).toMatch(/-teasing-[0-9a-f]+-cutout\.webp$/);
+        expect(await readFile(path.join(t.imageDir, again.expressions[0].cutoutPath!))).toEqual(webp);
+        expect((await filesUnder(t.imageDir)).filter((file) => file.includes('-cutout.'))).toHaveLength(1);
+    });
+
+    // .scratch/soft-cutout/spec.md, "Enlarged first"
+    it('where the picture is enlarged first, the request answers at once with the old cut-out and the new one comes later', async () => {
+        const story = await createStory();
+        await t.http.put(expressionPath(story, 'teasing')).attach('image', png('mine'), 'mine.png').expect(200);
+        t.gateway.softPlan = 'later';
+        let open!: () => void;
+        t.gateway.softCutoutGate = new Promise<void>((resolve) => (open = resolve));
+
+        const answered = ((await t.http.post(`${expressionPath(story, 'teasing')}/cutout?with=soft`).expect(201)).body as Story).characters[0];
+        expect(answered.expressions[0].cutoutPath).toBeNull();
+
+        open();
+        await expect
+            .poll(async () => ((await t.http.get(`/api/stories/${story.id}`).expect(200)).body as Story).characters[0].expressions[0].cutoutPath)
+            .toMatch(/-teasing-[0-9a-f]+-cutout\.png$/);
+        expect((await t.http.get('/api/settings').expect(200)).body).toMatchObject({ softCutoutEnlarges: true });
+    });
+
     it('a failed Cut out answers the error and keeps the Expression as it was', async () => {
         const story = await createStory();
         await t.http.put(expressionPath(story, 'longing')).attach('image', png('mine'), 'mine.png').expect(200);

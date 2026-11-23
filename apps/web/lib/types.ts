@@ -61,6 +61,8 @@ export interface SettingsResponse {
     freeCutout?: boolean;
     /** What a cut-out by Venice costs. */
     veniceCutoutPriceUsd?: number;
+    /** Whether a small picture is enlarged two times before its soft cut-out, which then comes minutes later (.scratch/soft-cutout/spec.md). */
+    softCutoutEnlarges?: boolean;
 }
 
 /** The call kinds a UsageRecord is written under (apps/api's `CallKind`). */

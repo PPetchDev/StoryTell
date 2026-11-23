@@ -65,6 +65,16 @@ export abstract class ModelGateway {
 
     /** Whether the app's own background remover is set up here, so a cut-out can be had for nothing. Makes no call. */
     abstract ownCutoutAvailable(): boolean;
+
+    /**
+     * How a soft cut-out of this picture would be made (.scratch/soft-cutout/spec.md): `now`, within
+     * the request, or `later`, where the picture is enlarged first and that takes minutes. Refused
+     * (409.002.016) for a picture that is not fit. Makes nothing and records nothing.
+     */
+    abstract softCutoutPlan(image: ImageData): Promise<'now' | 'later'>;
+
+    /** Whether a small picture is enlarged before its soft cut-out here. Makes no call. */
+    abstract softCutoutEnlarges(): boolean;
 }
 
 export type CreditPool = 'text' | 'image';

@@ -218,6 +218,8 @@ export class FakeModelGateway extends ModelGateway {
         this.speechReplies.clear();
         this.voices = structuredClone(FAKE_SPEECH_VOICES);
         this.credit = structuredClone(DEFAULT_CREDIT);
+        this.softPlan = 'now';
+        this.softCutoutGate = null;
     }
 
     async completeText(request: TextCompletionRequest): Promise<TextCompletionResult> {
@@ -274,6 +276,7 @@ export class FakeModelGateway extends ModelGateway {
         }
         const reply = this.imageReplies.get(request.kind)?.shift();
         // A cut-out nobody scripted succeeds (.scratch/stage-pictures/spec.md): every drawn Expression asks for one.
+        if (request.kind === 'image_cutout' && request.cutoutBy === 'soft' && this.softCutoutGate) await this.softCutoutGate;
         if (reply === undefined && request.kind === 'image_cutout') return { image: FAKE_PNG, model: 'fake-background-remove', costUsd: 0 };
         if (reply === undefined) {
             throw new Error(`FakeModelGateway: no scripted reply for image call "${request.kind}"`);
@@ -352,6 +355,21 @@ export class FakeModelGateway extends ModelGateway {
 
     ownCutoutAvailable(): boolean {
         return true;
+    }
+
+    /**
+     * How the fake answers `softCutoutPlan`: `now` unless a test sets it, as on a computer that
+     * enlarges nothing. With `later`, the cut-out's call waits on `softCutoutGate` where a test set one.
+     */
+    softPlan: 'now' | 'later' = 'now';
+    softCutoutGate: Promise<void> | null = null;
+
+    async softCutoutPlan(): Promise<'now' | 'later'> {
+        return this.softPlan;
+    }
+
+    softCutoutEnlarges(): boolean {
+        return this.softPlan === 'later';
     }
 
     async remainingCredit(): Promise<RemainingCredit> {

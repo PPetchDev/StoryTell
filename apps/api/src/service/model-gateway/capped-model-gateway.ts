@@ -1,6 +1,7 @@
 import {
     EmbeddingRequest,
     EmbeddingResult,
+    ImageData,
     ImageGenerationRequest,
     ImageGenerationResult,
     ModelGateway,
@@ -77,6 +78,14 @@ export class CappedModelGateway extends ModelGateway {
 
     ownCutoutAvailable(): boolean {
         return this.inner.ownCutoutAvailable();
+    }
+
+    softCutoutPlan(image: ImageData): Promise<'now' | 'later'> {
+        return this.inner.softCutoutPlan(image);
+    }
+
+    softCutoutEnlarges(): boolean {
+        return this.inner.softCutoutEnlarges();
     }
 }
 

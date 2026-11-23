@@ -114,7 +114,7 @@ export interface RealModelGatewayDeps {
      */
     ownCutout?: { available(): boolean; removeBackground(image: ImageData): Promise<ImageData> };
     /** The soft cut-out (.scratch/soft-cutout/spec.md): made on this computer for nothing, only when asked for by name. */
-    softCutout?: { removeBackground(image: ImageData): Promise<ImageData> };
+    softCutout?: { removeBackground(image: ImageData): Promise<ImageData>; plan?(image: ImageData): Promise<'now' | 'later'>; enlarges?(): boolean };
     settings: { current(): Promise<GatewayModelSettings> };
     usage: { record(record: NewUsageRecord): Promise<void> };
     /** How long a credit reading is reused, so the banner doesn't hit the providers per page. */
@@ -516,6 +516,15 @@ export class RealModelGateway extends ModelGateway {
 
     ownCutoutAvailable(): boolean {
         return this.deps.ownCutout?.available() ?? false;
+    }
+
+    async softCutoutPlan(image: ImageData): Promise<'now' | 'later'> {
+        if (!this.deps.softCutout) throw new SoftCutoutUnsuitableError();
+        return (await this.deps.softCutout.plan?.(image)) ?? 'now';
+    }
+
+    softCutoutEnlarges(): boolean {
+        return this.deps.softCutout?.enlarges?.() ?? false;
     }
 
     /**

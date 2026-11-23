@@ -12,6 +12,9 @@ describe('Config: the speech folder', () => {
         // .scratch/own-cutout/spec.md: the remover's model file sits beside the image folder too.
         expect(loadConfig(base).cutoutModelPath).toBe(path.resolve('/data/storytell/models/isnet-anime.onnx'));
         expect(loadConfig({ ...base, CUTOUT_MODEL: '/opt/models/m.onnx' }).cutoutModelPath).toBe(path.resolve('/opt/models/m.onnx'));
+        // .scratch/soft-cutout/spec.md: so does the model that enlarges a picture before a soft cut-out.
+        expect(loadConfig(base).enlargeModelPath).toBe(path.resolve('/data/storytell/models/AnimeSharpV2_MoSR_Soft_x2.onnx'));
+        expect(loadConfig({ ...base, ENLARGE_MODEL: '/opt/models/e.onnx' }).enlargeModelPath).toBe(path.resolve('/opt/models/e.onnx'));
     });
 
     it('takes SPEECH_DIR when it is set, as an absolute path', () => {

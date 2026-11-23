@@ -42,7 +42,7 @@ describe('Settings', () => {
         ]);
         expect(body.imageModels[1].label).toBe('Seedream V5 Pro edit (Venice, $0.06)');
         // .scratch/own-cutout/spec.md: the fake has both makers, as the live app does. A cut-out is free by default, and Venice's has its price.
-        expect(body).toMatchObject({ cutoutPriceUsd: 0, freeCutout: true, veniceCutoutPriceUsd: 0.03 });
+        expect(body).toMatchObject({ cutoutPriceUsd: 0, freeCutout: true, softCutoutEnlarges: false, veniceCutoutPriceUsd: 0.03 });
         // Each Snapshot model with the sizes it is offered at and what one Snapshot costs at each.
         expect(body.imageModels.map((m: { id: string; sizes: unknown }) => [m.id, m.sizes])).toEqual([
             ['seedream-v4-edit', [{ size: '1K', priceUsd: 0.05 }]],

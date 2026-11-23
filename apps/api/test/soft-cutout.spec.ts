@@ -1,6 +1,7 @@
 import sharp from 'sharp';
 
 import { FAKE_PNG } from '../src/service/model-gateway/fake-model-gateway.js';
+import { Enlarger, EnlargeModel } from '../src/service/model-gateway/real/enlarge.js';
 import { SOFT_CUTOUT_HOST, SOFT_CUTOUT_MODEL, SoftCutout, softCutout } from '../src/service/model-gateway/real/soft-cutout.js';
 import { gatewayUnderTest } from './harness/gateway-under-test.js';
 import { recordedFetch } from './harness/recorded-fetch.js';
@@ -83,10 +84,10 @@ describe('The soft cut-out', () => {
             return { bytes: await sharp(rgb, { raw: { width: W, height: H, channels: 3 } }).png().toBuffer(), mimeType: 'image/png' };
         };
 
-        it('answers a PNG the size of the picture, see-through outside the figure', async () => {
+        it('answers a lossless WebP the size of the picture, see-through outside the figure', async () => {
             const cut = await new SoftCutout().removeBackground(await encoded(PURPLE));
 
-            expect(cut.mimeType).toBe('image/png');
+            expect(cut.mimeType).toBe('image/webp');
             const { data, info } = await sharp(cut.bytes).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
             expect([info.width, info.height]).toEqual([W, H]);
             expect(alphaAt(data, 60, 60)).toBe(255);
@@ -97,7 +98,89 @@ describe('The soft cut-out', () => {
             const soft = new SoftCutout();
 
             await expect(soft.removeBackground(await encoded([254, 254, 254]))).rejects.toMatchObject({ code: '409.002.016' });
-            await expect(soft.removeBackground(await encoded(PURPLE))).resolves.toMatchObject({ mimeType: 'image/png' });
+            await expect(soft.removeBackground(await encoded(PURPLE))).resolves.toMatchObject({ mimeType: 'image/webp' });
+        });
+    });
+
+    describe('enlarged first', () => {
+        /** A stand-in for the model: every pixel of a tile becomes four of the same colour. */
+        const doubled: EnlargeModel = async (input, width, height) => {
+            const plane = width * height;
+            const out = new Float32Array(3 * plane * 4);
+            for (let channel = 0; channel < 3; channel++) {
+                for (let y = 0; y < height * 2; y++) {
+                    for (let x = 0; x < width * 2; x++) out[channel * plane * 4 + y * width * 2 + x] = input[channel * plane + (y >> 1) * width + (x >> 1)];
+                }
+            }
+            return out;
+        };
+        const here = import.meta.filename;
+        const encoded = async (width: number, height: number, background: Colour) => {
+            const rgb = Buffer.alloc(width * height * 3);
+            for (let pixel = 0; pixel < width * height; pixel++) rgb.set(background, pixel * 3);
+            for (let y = Math.round(height / 4); y < Math.round((height * 3) / 4); y++) {
+                for (let x = Math.round(width / 4); x < Math.round((width * 3) / 4); x++) rgb.set(BLACK, (y * width + x) * 3);
+            }
+            return { rgb, bytes: await sharp(rgb, { raw: { width, height, channels: 3 } }).png().toBuffer(), mimeType: 'image/png' };
+        };
+
+        it('the enlarger answers a picture two times the size, tile by tile with no seam, and is there only with its model file', async () => {
+            // Wider and taller than one tile, so tiles and their margins are stitched.
+            const width = 250;
+            const height = 230;
+            const rgb = Buffer.alloc(width * height * 3);
+            for (let pixel = 0; pixel < width * height; pixel++) rgb.set([pixel % 251, (pixel * 7) % 253, (pixel >> 3) % 255], pixel * 3);
+
+            const big = await new Enlarger(here, doubled).enlarge({ rgb, width, height });
+
+            expect([big.width, big.height]).toEqual([500, 460]);
+            for (const [x, y] of [[0, 0], [191, 191], [192, 192], [249, 229], [100, 200]]) {
+                const from = [...rgb.subarray((y * width + x) * 3, (y * width + x) * 3 + 3)];
+                for (const [dx, dy] of [[0, 0], [1, 1]]) {
+                    const at = ((y * 2 + dy) * big.width + x * 2 + dx) * 3;
+                    expect([...big.rgb.subarray(at, at + 3)]).toEqual(from);
+                }
+            }
+            expect(new Enlarger(here, doubled).available()).toBe(true);
+            expect(new Enlarger(here + '.missing', doubled).available()).toBe(false);
+        });
+
+        it('a small picture is cut out at two times its size, later; a wide one at its own size, now', async () => {
+            const soft = new SoftCutout(new Enlarger(here, doubled));
+            const small = await encoded(120, 120, PURPLE);
+            const wide = await encoded(1200, 40, PURPLE);
+
+            expect(await soft.plan(small)).toBe('later');
+            expect(await soft.plan(wide)).toBe('now');
+            const cut = await sharp((await soft.removeBackground(small)).bytes).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+            expect([cut.info.width, cut.info.height]).toEqual([240, 240]);
+            expect(cut.data[(120 * 240 + 120) * 4 + 3]).toBe(255);
+            expect(cut.data[(4 * 240 + 4) * 4 + 3]).toBe(0);
+            expect((await sharp((await soft.removeBackground(wide)).bytes).metadata()).width).toBe(1200);
+            expect(soft.enlarges()).toBe(true);
+        });
+
+        it('without the model file nothing is enlarged', async () => {
+            const soft = new SoftCutout(new Enlarger(here + '.missing', doubled));
+            const small = await encoded(120, 120, PURPLE);
+
+            expect(await soft.plan(small)).toBe('now');
+            expect((await sharp((await soft.removeBackground(small)).bytes).metadata()).width).toBe(120);
+            expect(soft.enlarges()).toBe(false);
+        });
+
+        it('a picture that is not fit is refused before anything is enlarged', async () => {
+            let enlarged = 0;
+            const counting: EnlargeModel = async (...tile) => {
+                enlarged++;
+                return doubled(...tile);
+            };
+            const soft = new SoftCutout(new Enlarger(here, counting));
+            const onWhite = await encoded(120, 120, [254, 254, 254]);
+
+            await expect(soft.plan(onWhite)).rejects.toMatchObject({ code: '409.002.016' });
+            await expect(soft.removeBackground(onWhite)).rejects.toMatchObject({ code: '409.002.016' });
+            expect(enlarged).toBe(0);
         });
     });
 

@@ -38,7 +38,7 @@ export function gatewayUnderTest(
         /** The app's own background remover; none by default, as without its model file. */
         ownCutout?: { available(): boolean; removeBackground(image: { bytes: Buffer; mimeType: string }): Promise<{ bytes: Buffer; mimeType: string }> };
         /** The soft cut-out; none by default. */
-        softCutout?: { removeBackground(image: { bytes: Buffer; mimeType: string }): Promise<{ bytes: Buffer; mimeType: string }> };
+        softCutout?: { removeBackground(image: { bytes: Buffer; mimeType: string }): Promise<{ bytes: Buffer; mimeType: string }>; plan?(image: { bytes: Buffer; mimeType: string }): Promise<'now' | 'later'>; enlarges?(): boolean };
         /** How long a balance reading is reused; 0 (read every time) by default. */
         creditCacheMs?: number;
     } = {},

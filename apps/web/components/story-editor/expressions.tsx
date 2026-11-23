@@ -33,6 +33,8 @@ interface Prices {
     /** Whether the free cut-out can be asked for, and what Venice's costs. */
     freeCutout: boolean;
     veniceCutout: number;
+    /** Whether a small picture is enlarged before its soft cut-out, so that one comes minutes later. */
+    softEnlarges: boolean;
 }
 
 let prices: Promise<Prices> | undefined;
@@ -43,11 +45,12 @@ let prices: Promise<Prices> | undefined;
  */
 function loadPrices(): Promise<Prices> {
     prices ??= apiFetch<SettingsResponse>('/settings').then(
-        ({ settings, imageModels, cutoutPriceUsd, freeCutout, veniceCutoutPriceUsd }) => ({
+        ({ settings, imageModels, cutoutPriceUsd, freeCutout, veniceCutoutPriceUsd, softCutoutEnlarges }) => ({
             draw: imageModels.find((model) => model.id === settings.imageModel)?.sizes.find((size) => size.size === '1K')?.priceUsd ?? null,
             cutout: cutoutPriceUsd ?? CUTOUT_PRICE_USD,
             freeCutout: freeCutout ?? false,
             veniceCutout: veniceCutoutPriceUsd ?? CUTOUT_PRICE_USD,
+            softEnlarges: softCutoutEnlarges ?? false,
         }),
         (error: unknown) => {
             prices = undefined;
@@ -62,8 +65,8 @@ export function loadDrawPrice(): Promise<number | null> {
 }
 
 /** The cut-out's makers and prices: Venice alone, at its price, until the API has said otherwise. */
-export function useCutoutPrices(): Pick<Prices, 'cutout' | 'freeCutout' | 'veniceCutout'> {
-    const [loaded, setLoaded] = useState<Pick<Prices, 'cutout' | 'freeCutout' | 'veniceCutout'>>({ cutout: CUTOUT_PRICE_USD, freeCutout: false, veniceCutout: CUTOUT_PRICE_USD });
+export function useCutoutPrices(): Pick<Prices, 'cutout' | 'freeCutout' | 'veniceCutout' | 'softEnlarges'> {
+    const [loaded, setLoaded] = useState<Pick<Prices, 'cutout' | 'freeCutout' | 'veniceCutout' | 'softEnlarges'>>({ cutout: CUTOUT_PRICE_USD, freeCutout: false, veniceCutout: CUTOUT_PRICE_USD, softEnlarges: false });
     useEffect(() => {
         let live = true;
         loadPrices().then(
@@ -383,6 +386,8 @@ function ExpressionRow<T>({ owner, api, heading, emotion, expression, price, com
     const busy = ownBusy ?? (locked ? 'Waiting for Draw all…' : null);
     /** Shown in the row as it is. */
     const [error, setError] = useState<string | null>(null);
+    /** Said after a soft cut-out was asked for where a small picture is enlarged first: that one comes minutes later. */
+    const [later, setLater] = useState(false);
     /** Why the last square failed to save, shown in the cropper. */
     const [cropError, setCropError] = useState<string | null>(null);
     const [cropping, setCropping] = useState(false);
@@ -617,7 +622,7 @@ function ExpressionRow<T>({ owner, api, heading, emotion, expression, price, com
                         onClick={() =>
                             void save('Cutting out…', () => api.cutOut(emotion, 'soft'), (message) =>
                                 setError(`Couldn't cut out the ${label} Expression: ${message}`),
-                            )
+                            ).then((asked) => setLater(asked && cutouts.softEnlarges))
                         }
                     >
                         Soft cut-out · free
@@ -682,6 +687,11 @@ function ExpressionRow<T>({ owner, api, heading, emotion, expression, price, com
             {error && (
                 <p className="field-error m-0 basis-full" role="alert">
                     {error}
+                </p>
+            )}
+            {later && !error && (
+                <p className="m-0 basis-full text-sm text-muted" role="status">
+                    A small picture is enlarged two times before its soft cut-out. That takes several minutes, one picture at a time; reload this page to see it.
                 </p>
             )}
             <div className="basis-full empty:hidden">
