@@ -271,3 +271,39 @@ npm run eval:live -- --grade --labels <file> --spend
 
 1. `npm run eval:live -- --grade --spend` first: under three cents, and it says whether the graded half of the scorecard can be believed.
 2. `npm run eval:live -- all --spend --samples 3 --against last`: the first run with the prose table, the played Chat and the never-failed list. Read "What did not pass" before believing a low score on `evening`: its checks have met no real reply.
+
+## First real runs of the three (2026-11-23, late, with the user's go-ahead)
+
+Spent in all: $0.087 ($0.084 on the full run, $0.004 on four grader checks).
+
+### The grader check found two faults in the grader, and both are mended
+
+- **First run, 16 cases twice: 15 agreed, none unsteady, $0.0008.** The miss: "Tobias takes no part" passed a reply in which Tobias wipes his hands and shakes his head, and the grader quoted that very sentence as what it judged on. The check had passed every sample of the two real runs before, so those passes said nothing.
+- **Mended by wording the criterion as one thing to find** ("It fails if the narration shows Tobias doing anything or saying anything, even one gesture"), where it had been three things denied at once. Asked three times a case: 3 of 3.
+- **That same run showed a second fault:** "leaves Ash to the user" passed the reply where Ash is given a decision, one time in three, again quoting the sentence that broke it. So the fault was not one criterion: now and then the grader answered `"pass": true` to mean "found it".
+- **Mended in the grader's own instruction:** the JSON now asks for the quoted words first and the verdict after, and says what each verdict means ("true only when the reply meets the criterion, and false when the words you quoted break it"). Asked five times a case: **80 of 80 agreed, none unsteady, $0.002.**
+- **What that does not say:** the instruction was tuned on these sixteen cases, so they no longer test it. The hand-labelled replies (`--label-sheet`, 45 waiting) are the honest test.
+
+### The full run (GLM-5.3, three samples, 106 calls, $0.084, 72% of prompt tokens from the cache)
+
+- Every check passed but one sample of `plain` ("something" twice). The played Chat passed all eight of its checks in both plays. It cost a third of what the run said beforehand ($0.22 expected): the cache again.
+- The graded checks in this run were asked with the old instruction; the next run is the first with the new one.
+- **"Never failed yet" lists 58 of 65 checks.** Seven have ever failed.
+
+### What reading the played Chat showed, that no check sees
+
+Both plays were read by eye. Each of these is in both, unless said:
+
+1. **Mira takes the scene over.** The user's turns stay small talk to the end (the ferry engine, the sign over the till, "can I come by tomorrow"). By turn 9 Mira has asked Ash to dinner herself, taken his hand and asked him upstairs for the night, and each reply ends by pressing him to answer ("So. Come up. Say yes back."; "Go on. Properly this time."). The Story's setup invites a romance; it does not ask the Narrator to run it past what the user does.
+2. **The place moved without the user.** In the second play they are in the flat upstairs by turn 9, so when the user "looks up at the old sign over the till" the reply has to patch it ("the sign downstairs, visible in his mind").
+3. **A Secret was told unasked** (second play, turn 9): Mira brings out the note she kept. It is a plain Secret on her card, not a levelled one, so no rule was broken; nothing in the eval says whether that is wanted.
+4. **Her voice changed and the grader passed it.** Turn 1 has two or three short lines. Turns 9 and 10 have six or seven speech lines each, some of them speeches, "the dryness gone out of her voice". "Sounds like Mira" passed both: there are still short lines and questions among them.
+5. **Every reply closes the same way:** a last line by Mira that hands the turn back with a question, most starting "So." The phrase detector cannot see it: the words differ.
+6. One garbled sentence ("looking up a little less than usual wasn't needed").
+- The facts held: "nine years" at turn 2 and turn 9, no other number. Every speech line was written `@Mira:`, which the parser now reads.
+
+### What this suggests next (nothing here is built)
+
+- A check on the played Chat that the Narrator does not run ahead of the user: graded, over the whole Chat, with cases in the grader check before it is believed.
+- A code check that the number of speech lines a reply does not grow turn over turn, and one that the replies do not all end on a question to the user.
+- The place a played Chat is in, kept as the app keeps it (the Judge between turns), so a move the user did not make shows.

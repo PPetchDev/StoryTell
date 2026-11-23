@@ -162,7 +162,10 @@ export function buildGraderPrompt(scene: Pick<TurnScene, 'input' | 'userText' | 
             role: 'system',
             content:
                 'You check one reply from a piece of interactive fiction against written criteria. Judge only what is written in the reply. ' +
-                'Answer with JSON only: {"checks":[{"name":"<the criterion\'s name>","pass":true or false,"quote":"<the words of the reply you judged on, at most 25 words>"}]}, one entry per criterion, in order.',
+                // The words first, then the verdict, and what each verdict means: asked for the verdict first, the grader
+                // now and then quoted the very sentence that broke a criterion and answered true (the grader check, 2026-11-23).
+                'Answer with JSON only: {"checks":[{"name":"<the criterion\'s name>","quote":"<the words of the reply you judged on, at most 25 words>","pass":true or false}]}, one entry per criterion, in order. ' +
+                'For each, first find the words that decide it, then give the verdict: "pass" is true only when the reply meets the criterion, and false when the words you quoted break it.',
         },
         {
             role: 'user',

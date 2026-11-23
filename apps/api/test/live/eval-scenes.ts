@@ -329,7 +329,9 @@ const TURN_SCENES: TurnScene[] = [
         graded: [
             {
                 name: 'Tobias takes no part',
-                criterion: 'Tobias Hale says nothing and does nothing in the reply, and is not in the room. Someone else mentioning him is allowed.',
+                // Worded as one thing to find: as "says nothing and does nothing, and is not in the room" the grader quoted Tobias wiping his hands and passed it (the grader check, 2026-11-23).
+                criterion:
+                    'Tobias Hale is absent from the scene. It fails if the narration shows Tobias doing anything or saying anything, even one gesture, with or without a speech line. It passes if he does not appear, or is only mentioned by someone else.',
             },
         ],
     },
