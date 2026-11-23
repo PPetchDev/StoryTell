@@ -201,3 +201,35 @@ npm run eval:live -- all --spend --parallel 1     (one call at a time; four unle
 - **The upgrade for the grader held:** on that reply "sounds like Mira" was "not graded" and no grader call was made, where the first runs would have passed it.
 - **What a clean sheet does not say:** twelve turn scenes at three samples passing says the prompt holds on short synthetic Stories. It does not say the scenes are hard enough: none of them has yet failed for the reason it was written. A scene earns its place the first time it catches something.
 - The report is with the earlier ones, under the main checkout's eval runs, so `--against last` finds it.
+
+## Prose (2026-11-23)
+
+From [the research on harnesses](../../docs/research/story-quality-eval-harnesses.md), gap 4: the scorecard said whether a reply kept the rules, never how worn it read. No outside harness was worth taking whole; this is the first of four ideas borrowed from it.
+
+### Built
+
+- **A prose table at the foot of the scorecard,** one line a turn scene, over all of its samples together:
+  - *Overused a thousand:* the words and three-word phrases models overuse against human writing, counted in a thousand words of reply. The lists are sam-paech/slop-score's (MIT; copied under `apps/api/test/live/slop-lists/` with its notice): 1,648 words and 430 phrases. A phrase is three content words in a row with the common words between them left out, so "took a deep breath" is found as "took deep breath".
+  - *Most found:* the five found most, each with its count.
+  - *Shared between samples:* phrases two or more samples of the scene share, by the app's own Repeated phrases detector. A phrase in most samples means the model has a stock answer for that scene.
+- **A number, not a check.** Nothing passes or fails on it. With `--against` the earlier run's number sits beside this one's; no "better" or "worse" is marked, as nothing yet says how far chance alone moves it.
+- **Read from the played text, when the scorecard is written.** So a report from before this was built is read the same way, and `--against last` works from the first run. No model call, no cost.
+- **A scene's own people are not counted.** "elara" is on the list: worn when a model picks the name freely, no fault when the Story named the Character. A report now keeps each turn scene's names for this; an older report has none, and is read without.
+- **Left out of the table:** Judge and Memory scenes (their answers are JSON), and a scene whose every call failed.
+- Six tests through the run with scripted replies; nothing was run against a real model, and nothing was spent.
+
+### What the saved runs say (GLM-5.3, read again with this, free)
+
+- Scenes run from 0 to about 15 a thousand; most sit between 5 and 13.
+- What is found is mild, and almost all single words: "leaned", "nodded", "glanced", "paused", "streaked", "ticked", "doorframe". A listed phrase was found once in four runs ("leaned back chair").
+- "streaked" is partly the user's own "rain-streaked glass" said back, not the model's habit.
+- The shared phrases are the more telling half: "Too much for one person" is in the voice scene in every run, and "The bell above the bookshop door" opens several scenes.
+
+### Not in it, and not yet known
+
+- **The number is not slop-score's own score.** That one also weighs "not X, but Y" patterns and scales against its leaderboard. This is the plain count of its words and phrases; the two are not on one scale.
+- **A scene writes 600 to 900 words at three samples, so one word found moves the number by more than one.** Read a scene's number beside its words; believe a change only when it holds over runs, or with more samples.
+- **Whether the lists suit this app.** They were built from general fiction, in English. "leaned" and "nodded" are on it and are how any scene is told. If the number turns out to follow reply length or scene kind more than prose, the list wants trimming to the phrases, or to the words this app's models overuse.
+- **Not on the side-by-side scorecard** (`--model all`): each model's own scorecard has its table.
+- **The repeated-phrases detector drops a hyphen** ("halffinished"): the app's own, cosmetic here.
+- Left for later, from the research: the "not X, but Y" patterns (ten plain patterns port easily; the rest need a part-of-speech tagger), and a line turning the number into a check once a few runs show what is normal.

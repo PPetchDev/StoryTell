@@ -12,6 +12,7 @@ import { FetchLike } from '../../src/service/model-gateway/real/http.js';
 import { backgroundSamplers, TEXT_MODELS } from '../../src/service/model-gateway/real/model-table.js';
 import { OpenRouterClient } from '../../src/service/model-gateway/real/openrouter-client.js';
 import { Check, GradedCheck } from './eval-checks.js';
+import { proseOf, SceneProse } from './eval-prose.js';
 import { EVAL_SCENES, EvalScene, TurnScene } from './eval-scenes.js';
 import { REPO_ROOT } from './smoke-run.js';
 
@@ -100,7 +101,8 @@ export interface EvalReport {
     totalUsd: number;
     /** True when the run stopped short because the next call could have passed the cap. */
     stoppedAtCap: boolean;
-    scenes: { name: string; about: string; kind: EvalScene['kind']; samples: EvalSample[] }[];
+    /** `names`: a turn scene's own people, whose names are no fault in its prose; reports from before the prose table have none. */
+    scenes: { name: string; about: string; kind: EvalScene['kind']; names?: string[]; samples: EvalSample[] }[];
     calls: EvalCall[];
 }
 
@@ -426,7 +428,13 @@ export async function runEval(options: {
     await inParallel(options.concurrency ?? 1, jobs);
     // Each scene's samples in the order they were started; a scene the cap left with none is left out.
     report.scenes = played
-        .map(({ scene, samples }) => ({ name: scene.name, about: scene.about, kind: scene.kind, samples: samples.filter((sample): sample is EvalSample => sample !== undefined) }))
+        .map(({ scene, samples }) => ({
+            name: scene.name,
+            about: scene.about,
+            kind: scene.kind,
+            ...(scene.kind === 'turn' ? { names: [...scene.input.story.characters.map((character) => character.name), scene.input.identity.name] } : {}),
+            samples: samples.filter((sample): sample is EvalSample => sample !== undefined),
+        }))
         .filter((scene) => scene.samples.length > 0);
     return report;
 }
@@ -497,6 +505,38 @@ function cacheLine(calls: EvalCall[]): string | null {
     return `The host read ${cached.toLocaleString('en-US')} of ${sent.toLocaleString('en-US')} prompt tokens from its cache (${Math.round((cached / sent) * 100)}%).`;
 }
 
+/** How worn each turn scene's replies read, from the played text: so an earlier report, written before this was counted, is read the same way. */
+export function prose(report: EvalReport): { scene: string; prose: SceneProse }[] {
+    return report.scenes
+        .filter((scene) => (scene.kind ?? 'turn') === 'turn')
+        .map((scene) => ({ scene: scene.name, replies: scene.samples.flatMap((sample) => (sample.text === null ? [] : [sample.text])), names: scene.names ?? [] }))
+        .filter((scene) => scene.replies.length > 0)
+        .map((scene) => ({ scene: scene.scene, prose: proseOf(scene.replies, scene.names) }));
+}
+
+/** The prose table: a number to watch from run to run, never a pass or a fail. */
+function proseLines(report: EvalReport, earlier?: EvalReport): string[] {
+    const rows = prose(report);
+    if (rows.length === 0) return [];
+    const before = earlier ? prose(earlier) : [];
+    return [
+        '',
+        '## Prose',
+        '',
+        'Overused words and phrases a thousand words, over all of a scene’s samples (sam-paech/slop-score’s lists), and phrases two or more samples share. Not a check: a number to compare between runs.',
+        '',
+        `| Scene | Words | Overused a thousand |${earlier ? ' Before |' : ''} Most found | Shared between samples |`,
+        `|---|---|---|${earlier ? '---|' : ''}---|---|`,
+        ...rows.map(({ scene, prose: now }) => {
+            const then = before.find((one) => one.scene === scene)?.prose;
+            const versus = earlier ? ` ${then ? then.slopPerThousand.toFixed(1) : '-'} |` : '';
+            const found = now.hits.map((hit) => `${hit.phrase} (${hit.count})`).join(', ') || '-';
+            const shared = now.shared.map((phrase) => `"${phrase}"`).join('; ') || '-';
+            return `| ${scene} | ${now.words} | ${now.slopPerThousand.toFixed(1)} |${versus} ${found} | ${shared} |`;
+        }),
+    ];
+}
+
 const passed = (row: Score): string => `${row.pass} of ${row.scored}${row.notScored ? ` (${row.notScored} not scored)` : ''}`;
 
 /** The scorecard: what the user reads. The played text stays in the JSON report. */
@@ -521,6 +561,7 @@ export function formatScorecard(report: EvalReport, earlier?: EvalReport): strin
         '',
         `Total $${report.totalUsd.toFixed(5)} of a $${report.capUsd.toFixed(2)} cap, in ${report.calls.length} calls${report.stoppedAtCap ? ' (stopped at the cap: the scorecard is not complete)' : ''}.`,
         ...(cache ? [cache] : []),
+        ...proseLines(report, earlier),
     ];
     const failures = report.scenes.flatMap((scene) =>
         scene.samples.flatMap((sample, index) =>

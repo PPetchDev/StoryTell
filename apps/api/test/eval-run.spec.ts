@@ -467,6 +467,79 @@ describe('The prompt eval run', () => {
         expect(formatScorecard(silent.report)).not.toContain('from its cache');
     });
 
+    describe('prose', () => {
+        /** The line of the scorecard's prose table for a scene. */
+        const proseLine = (card: string, sceneName: string) =>
+            card
+                .slice(card.indexOf('## Prose'))
+                .split('\n')
+                .find((line) => line.startsWith(`| ${sceneName} |`));
+
+        it('scores each turn scene’s replies for overused words and phrases, a thousand words, and names the ones found', async () => {
+            // 13 words once the "@Mira Vance:" prefix is off; "took (a) deep breath" is one listed phrase: 1 in 13 is 76.9 a thousand.
+            const worn = 'Mira took a deep breath.\n\n@Mira Vance: You came back. I was hoping you would.';
+            const { report } = await run(['format'], { play: () => ({ text: worn }) });
+
+            const line = proseLine(formatScorecard(report), 'format');
+
+            expect(line).toContain('| 76.9 |');
+            expect(line).toContain('took deep breath (3)');
+        });
+
+        it('a reply with no listed word or phrase scores nothing', async () => {
+            const { report } = await run(['format']);
+
+            expect(proseLine(formatScorecard(report), 'format')).toContain('| 0.0 |');
+        });
+
+        it('a listed name is counted when the model chose it, and not when the scene’s own Character bears it', async () => {
+            // "elara" is on the list. 16 words once the prefix is off: 1 in 16 is 62.5 a thousand.
+            const reply = 'Elara looked up from the ledger and smiled.\n\n@Elara Voss: You came back. I was hoping you would.';
+            const format = turnScene('format');
+            const hers: TurnScene = {
+                ...format,
+                name: 'hers',
+                expects: [],
+                input: { ...format.input, story: { ...format.input.story, characters: format.input.story.characters.map((character) => ({ ...character, name: 'Elara Voss' })) } },
+            };
+
+            const { report } = await run(['format', hers], { play: () => ({ text: reply }) });
+            const card = formatScorecard(report);
+
+            expect(proseLine(card, 'format')).toContain('| 62.5 |');
+            expect(proseLine(card, 'format')).toContain('elara (3)');
+            expect(proseLine(card, 'hers')).toContain('| 0.0 |');
+        });
+
+        it('names a phrase that several samples of a scene share, and none when each sample says its own', async () => {
+            const openings = ['The rain kept on.', 'A cart rattled past outside.', 'Somewhere a clock struck nine.'];
+            const stock = (index: number) => ({ text: `${openings[index]} Her fingers drummed the worn oak counter.\n\n@Mira Vance: You came back.` });
+            const fresh = (index: number) => ({ text: `${openings[index]}\n\n@Mira Vance: ${['Sit.', 'Tea?', 'Late again.'][index]}` });
+
+            const shared = proseLine(formatScorecard((await run(['format'], { play: stock })).report), 'format');
+            const own = proseLine(formatScorecard((await run(['format'], { play: fresh })).report), 'format');
+
+            expect(shared).toContain('"Her fingers drummed the worn oak counter"');
+            expect(own).toMatch(/\| - \|$/);
+        });
+
+        it('shows the earlier run’s number beside this one’s, read from the earlier run’s played text', async () => {
+            const worn = 'Mira took a deep breath.\n\n@Mira Vance: You came back. I was hoping you would.';
+            const earlier = (await run(['format'], { play: () => ({ text: worn }) })).report;
+            // A report written before the prose table has no names on its scenes.
+            for (const one of earlier.scenes) delete one.names;
+            const now = (await run(['format'])).report;
+
+            expect(proseLine(formatScorecard(now, earlier), 'format')).toContain('| 0.0 | 76.9 |');
+        });
+
+        it('leaves Judge and Memory scenes out, and a scene whose every call failed', async () => {
+            const { report } = await run(['judge-quiet', 'format'], { play: () => ({ status: 500 }) });
+
+            expect(formatScorecard(report)).not.toContain('## Prose');
+        });
+    });
+
     describe('what moved since an earlier run', () => {
         const row = (pass: number, scored: number): Score => ({ scene: 'format', check: 'parses', kind: 'code', pass, scored, notScored: 0 });
 
