@@ -51,9 +51,9 @@ export class UploadTooLargeFilter implements ExceptionFilter {
     }
 }
 
-/** `?with=own|venice`: who makes the cut-out (.scratch/own-cutout/spec.md); left out, the app's own where it is set up. */
+/** `?with=own|venice|soft`: who makes the cut-out (.scratch/own-cutout/spec.md, .scratch/soft-cutout/spec.md); left out, the app's own where it is set up. */
 const With = () => Query('with', new ParseEnumPipe(Object.fromEntries(CUTOUT_MAKERS.map((maker) => [maker, maker])), { optional: true }));
-const WITH_QUERY = { name: 'with', required: false, enum: [...CUTOUT_MAKERS], description: "Who makes the cut-out: the app's own background remover (free) or Venice's (paid). Left out: the app's own where it is set up, else Venice." };
+const WITH_QUERY = { name: 'with', required: false, enum: [...CUTOUT_MAKERS], description: "Who makes the cut-out: the app's own background remover (free), Venice's (paid), or the soft cut-out (free; only for a picture on one flat, tinted colour, refused with 409.002.016 otherwise). Left out: the app's own where it is set up, else Venice." };
 
 /**
  * A Character's Expressions (.scratch/expressions/spec.md, "Authoring API"): one picture per

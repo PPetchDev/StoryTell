@@ -65,8 +65,9 @@ import {
 import { defaultSleep, SleepFn } from './http.js';
 import { OpenRouterChatRequest, OpenRouterChatResult, SamplerRefusedError, TextBill } from './openrouter-client.js';
 import { TextHost } from './text-hosts.js';
-import { OwnCutoutUnavailableError } from '../../../errors/image.errors.js';
+import { OwnCutoutUnavailableError, SoftCutoutUnsuitableError } from '../../../errors/image.errors.js';
 import { OWN_CUTOUT_HOST, OWN_CUTOUT_MODEL } from './own-cutout.js';
+import { SOFT_CUTOUT_MODEL } from './soft-cutout.js';
 import { VeniceClient } from './venice-client.js';
 
 /** How long a host that answered out of credit is passed over for the next one (.scratch/text-fallback/spec.md). */
@@ -112,6 +113,8 @@ export interface RealModelGatewayDeps {
      * file is too, a cut-out is made on this computer for nothing; else Venice makes it.
      */
     ownCutout?: { available(): boolean; removeBackground(image: ImageData): Promise<ImageData> };
+    /** The soft cut-out (.scratch/soft-cutout/spec.md): made on this computer for nothing, only when asked for by name. */
+    softCutout?: { removeBackground(image: ImageData): Promise<ImageData> };
     settings: { current(): Promise<GatewayModelSettings> };
     usage: { record(record: NewUsageRecord): Promise<void> };
     /** How long a credit reading is reused, so the banner doesn't hit the providers per page. */
@@ -523,11 +526,13 @@ export class RealModelGateway extends ModelGateway {
         const source = request.referenceImages?.[0];
         if (!source || request.referenceImages!.length !== 1) throw new RangeError('image_cutout takes exactly one reference image');
         if (request.cutoutBy === 'own' && !this.ownCutoutAvailable()) throw new OwnCutoutUnavailableError();
+        const soft = request.cutoutBy === 'soft' ? this.deps.softCutout : undefined;
+        if (request.cutoutBy === 'soft' && !soft) throw new SoftCutoutUnsuitableError();
         // Asked for by name, else the app's own where it is set up.
-        const own = request.cutoutBy !== 'venice' && this.ownCutoutAvailable() ? this.deps.ownCutout : undefined;
+        const own = soft ?? (request.cutoutBy !== 'venice' && this.ownCutoutAvailable() ? this.deps.ownCutout : undefined);
         const image = own ? await own.removeBackground(source) : await this.deps.venice.removeBackground(source);
         const costUsd = own ? 0 : IMAGE_CUTOUT_PRICE_USD;
-        const model = own ? OWN_CUTOUT_MODEL : IMAGE_CUTOUT_MODEL;
+        const model = soft ? SOFT_CUTOUT_MODEL : own ? OWN_CUTOUT_MODEL : IMAGE_CUTOUT_MODEL;
         await this.deps.usage.record({
             kind: request.kind,
             pool: 'image',

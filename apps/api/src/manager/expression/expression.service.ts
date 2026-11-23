@@ -70,7 +70,7 @@ export class ExpressionManagerService {
         const expression = character.expressions.find((one) => one.emotion === emotion);
         if (!expression) throw new ExpressionNotFoundError();
         // Only Venice's remover spends image credit; the app's own costs nothing (.scratch/own-cutout/spec.md).
-        const paid = by === 'venice' || !this.gateway.ownCutoutAvailable();
+        const paid = by === 'venice' || (by !== 'soft' && !this.gateway.ownCutoutAvailable());
         if (paid && (await this.imageCreditOut())) throw new OutOfCreditError('image');
         const bytes = await this.imageStore.read(expression.imagePath);
         await this.cutOutExpression(storyId, characterId, emotion, expression.imagePath, bytes, true, by);

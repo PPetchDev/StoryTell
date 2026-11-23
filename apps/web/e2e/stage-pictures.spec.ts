@@ -211,6 +211,14 @@ test('the editor lists the intimate feelings under their own heading; an upload 
         .poll(async () => (await (await request.get(`/api/stories/${storyId}`)).json()).characters[0].expressions.find((one: { emotion: string }) => one.emotion === 'teasing').cutoutPath)
         .not.toBe(first);
     expect((await cutoutsAsked()).slice(before)).toEqual(['own', 'venice']);
+    // The soft cut-out (.scratch/soft-cutout/spec.md) is a third maker, asked for by name, over the one there.
+    const second = (await (await request.get(`/api/stories/${storyId}`)).json()).characters[0].expressions.find((one: { emotion: string }) => one.emotion === 'teasing').cutoutPath as string;
+    await expect(teasing.getByRole('button', { name: 'Soft cut-out for Teasing' })).toHaveText('Soft cut-out · free');
+    await teasing.getByRole('button', { name: 'Soft cut-out for Teasing' }).click();
+    await expect
+        .poll(async () => (await (await request.get(`/api/stories/${storyId}`)).json()).characters[0].expressions.find((one: { emotion: string }) => one.emotion === 'teasing').cutoutPath)
+        .not.toBe(second);
+    expect((await cutoutsAsked()).slice(before)).toEqual(['own', 'venice', 'soft']);
 
     for (const width of [360, 320]) {
         await page.setViewportSize({ width, height: 740 });

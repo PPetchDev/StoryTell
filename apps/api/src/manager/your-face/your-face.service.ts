@@ -86,7 +86,7 @@ export class YourFaceManagerService {
         const expression = owner.expressions.find((one) => one.emotion === emotion);
         if (!expression) throw new ExpressionNotFoundError();
         // Only Venice's remover spends image credit; the app's own costs nothing (.scratch/own-cutout/spec.md).
-        const paid = by === 'venice' || !this.gateway.ownCutoutAvailable();
+        const paid = by === 'venice' || (by !== 'soft' && !this.gateway.ownCutoutAvailable());
         if (paid && (await this.imageCreditOut())) throw new OutOfCreditError('image');
         await this.cutOutExpression(owner, emotion, expression.imagePath, await this.imageStore.read(expression.imagePath), true, by);
         return this.answer(target);

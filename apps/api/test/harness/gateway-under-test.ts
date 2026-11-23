@@ -37,6 +37,8 @@ export function gatewayUnderTest(
         textHosts?: TextHostName[];
         /** The app's own background remover; none by default, as without its model file. */
         ownCutout?: { available(): boolean; removeBackground(image: { bytes: Buffer; mimeType: string }): Promise<{ bytes: Buffer; mimeType: string }> };
+        /** The soft cut-out; none by default. */
+        softCutout?: { removeBackground(image: { bytes: Buffer; mimeType: string }): Promise<{ bytes: Buffer; mimeType: string }> };
         /** How long a balance reading is reused; 0 (read every time) by default. */
         creditCacheMs?: number;
     } = {},
@@ -60,6 +62,7 @@ export function gatewayUnderTest(
         textHosts: buildTextHosts(options.textHosts ?? (options.textOnVenice ? ['venice'] : ['openrouter']), TEST_KEYS, fetchImpl, venice, sleep),
         venice,
         ownCutout: options.ownCutout,
+        softCutout: options.softCutout,
         settings: { current: async () => ({ ...settings }) },
         usage: {
             record: async (record) => {

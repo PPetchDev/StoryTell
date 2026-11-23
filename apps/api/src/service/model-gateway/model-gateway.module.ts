@@ -9,6 +9,7 @@ import { AccountModelService } from '../../model/account/account.service.js';
 import { CappedModelGateway } from './capped-model-gateway.js';
 import { FakeModelGateway } from './fake-model-gateway.js';
 import { OwnCutout } from './real/own-cutout.js';
+import { SoftCutout } from './real/soft-cutout.js';
 import { SpendCap } from './spend-cap.js';
 import { ModelGateway } from './model-gateway.js';
 import { FetchLike } from './real/http.js';
@@ -60,6 +61,7 @@ function gatewayFor(config: AppConfig, fetchImpl: FetchLike, settings: SettingsM
         textHosts: buildTextHosts(config.textHosts, keys, fetchImpl, venice),
         venice,
         ownCutout: new OwnCutout(config.cutoutModelPath),
+        softCutout: new SoftCutout(),
         settings: {
             current: async () => {
                 const current = await settings.get();

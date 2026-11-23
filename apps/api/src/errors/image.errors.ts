@@ -108,3 +108,10 @@ export class OwnCutoutUnavailableError extends AppError {
         super('409.002.015', "The app's own background remover is not set up on this computer.");
     }
 }
+
+/** The soft cut-out was asked for a picture whose background is not one flat, tinted colour (.scratch/soft-cutout/spec.md). */
+export class SoftCutoutUnsuitableError extends AppError {
+    constructor() {
+        super('409.002.016', 'A soft cut-out needs a picture drawn on one flat colour that is not white, grey or black.');
+    }
+}

@@ -337,8 +337,10 @@ export interface ImageData {
  * Who makes a cut-out (.scratch/own-cutout/spec.md, "A choice of two"): the app's own background
  * remover, free, or Venice's, paid. Each is better on some pictures: the app's own leaves no fringe
  * and no ground shadow; Venice's keeps a white part drawn on white with no outline around it.
+ * A third, the soft cut-out (.scratch/soft-cutout/spec.md), free and with no model: only for a picture
+ * drawn on one flat, tinted colour, and only when asked for by name.
  */
-export const CUTOUT_MAKERS = ['own', 'venice'] as const;
+export const CUTOUT_MAKERS = ['own', 'venice', 'soft'] as const;
 export type CutoutMaker = (typeof CUTOUT_MAKERS)[number];
 
 export interface ImageGenerationRequest {

@@ -606,6 +606,23 @@ function ExpressionRow<T>({ owner, api, heading, emotion, expression, price, com
                         {`Venice cut-out · ~${usd(cutouts.veniceCutout)}`}
                     </button>
                 )}
+                {/* The soft cut-out (.scratch/soft-cutout/spec.md): for a picture drawn on one flat colour the figure does not use. */}
+                {expression && (
+                    <button
+                        type="button"
+                        className="button button-quiet"
+                        aria-label={`Soft cut-out for ${label}`}
+                        title="For a picture drawn on one flat colour that is not white, grey or black: a smooth edge, fine fur kept."
+                        disabled={busy !== null}
+                        onClick={() =>
+                            void save('Cutting out…', () => api.cutOut(emotion, 'soft'), (message) =>
+                                setError(`Couldn't cut out the ${label} Expression: ${message}`),
+                            )
+                        }
+                    >
+                        Soft cut-out · free
+                    </button>
+                )}
                 {expression && (
                     <button
                         type="button"

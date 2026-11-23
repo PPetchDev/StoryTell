@@ -10,7 +10,7 @@ import type { PortraitCrop } from './story';
 export interface ExpressionEndpoints<T> {
     draw(emotion: FaceEmotion): Promise<T>;
     /** `by`: the app's own background remover (free) or Venice's (paid); left out, the API's choice (.scratch/own-cutout/spec.md). */
-    cutOut(emotion: FaceEmotion, by?: 'own' | 'venice'): Promise<T>;
+    cutOut(emotion: FaceEmotion, by?: 'own' | 'venice' | 'soft'): Promise<T>;
     upload(emotion: FaceEmotion, picture: Blob, filename: string): Promise<T>;
     /** A see-through picture made elsewhere, kept as the Expression's cut-out (.scratch/stage-pictures/spec.md, "Upload a cut-out"). */
     uploadCutout(emotion: FaceEmotion, picture: Blob, filename: string): Promise<T>;
