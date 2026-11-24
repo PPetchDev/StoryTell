@@ -39,12 +39,24 @@ export class VeniceTextClient extends OpenRouterClient {
     static buildVeniceBody(request: OpenRouterChatRequest): Record<string, unknown> {
         const model = VENICE_TEXT_MODELS[request.model.id];
         if (!model) throw new RangeError(`No Venice model for ${request.model.id}`);
+        // A model that can't turn reasoning off (GLM-5.3: the model table gives it an effort, not
+        // `enabled: false`) must not be told to on Venice either. Told `disable_thinking`, GLM-5.3 wrote
+        // its planning into the reply itself ("Let me think about where the story stands…") and ran out
+        // of tokens before the story: two replies of live Chat 1, 2026-11-23. Measured the next day on
+        // the turn prompt: `disable_thinking` and `reasoning_effort: none` both leak; the least effort,
+        // with Venice stripping what thinking there is, gives a clean reply on about 15 reasoning tokens,
+        // streamed or not. Left to think freely it spent 900 to 3,200 tokens first.
+        const reasoning = request.model.reasoning;
+        const cannotTurnOff = 'effort' in reasoning && reasoning.effort !== 'none';
         const body: Record<string, unknown> = {
             model: model.id,
             messages: request.messages,
-            // Venice's own system prompt stays out, and thinking stays off, as on OpenRouter.
-            venice_parameters: { include_venice_system_prompt: false, disable_thinking: true },
+            // Venice's own system prompt stays out, and thinking stays off, or as low as the model goes.
+            venice_parameters: cannotTurnOff
+                ? { include_venice_system_prompt: false, strip_thinking_response: true }
+                : { include_venice_system_prompt: false, disable_thinking: true },
         };
+        if (cannotTurnOff) body.reasoning_effort = 'low';
         if (request.maxTokens !== undefined) body.max_tokens = request.maxTokens;
         if (request.json) body.response_format = { type: 'json_object' };
         if (request.model.stopStrings && request.stop?.length) body.stop = request.stop;

@@ -55,6 +55,28 @@ describe('Text on Venice (contract)', () => {
         expect(records).toEqual([expect.objectContaining({ kind: 'turn', pool: 'text', model: 'deepseek-v4-pro', host: 'venice', promptTokens: 1000, completionTokens: 100, costUsd: 0.0021 })]);
     });
 
+    // Live Chat 1, 2026-11-23: told to turn thinking off, GLM-5.3 on Venice wrote its planning as the reply.
+    it('asks GLM-5.3, which cannot turn reasoning off, for the least effort with its thinking stripped, never for thinking off', async () => {
+        const { fetchImpl, sent } = scripted([{ json: { ...reply('@Mira: The lamp.', 0.0025), model: 'z-ai-glm-5-3' } }, { json: { ...reply('{"ok":true}'), model: 'deepseek-v4-flash' } }]);
+        const { gateway } = gatewayUnderTest(fetchImpl, { settings: { playModel: 'glm-5.3' }, textOnVenice: true });
+
+        const result = await gateway.completeText({ kind: 'turn', messages: [{ role: 'user', content: 'Hi.' }], maxTokens: 900, stop: ['\nAsh:'] });
+        await gateway.completeText({ kind: 'judge', messages: [{ role: 'user', content: 'Judge.' }], json: true });
+
+        expect(result.text).toBe('@Mira: The lamp.');
+        expect(sent[0].body).toEqual({
+            model: 'z-ai-glm-5-3',
+            messages: [{ role: 'user', content: 'Hi.' }],
+            venice_parameters: { include_venice_system_prompt: false, strip_thinking_response: true },
+            reasoning_effort: 'low',
+            max_tokens: 900,
+            stop: ['\nAsh:'],
+        });
+        // DeepSeek can turn it off, and is still told to.
+        expect(sent[1].body).toMatchObject({ model: 'deepseek-v4-flash', venice_parameters: { include_venice_system_prompt: false, disable_thinking: true } });
+        expect(sent[1].body).not.toHaveProperty('reasoning_effort');
+    });
+
     it('sends background calls to Venice V4 Flash, and records the list price when no cost comes back', async () => {
         const { fetchImpl, sent } = scripted([{ json: { ...reply('{"ok":true}'), model: 'deepseek-v4-flash' } }]);
         const { gateway, records } = gatewayUnderTest(fetchImpl, { textOnVenice: true });
