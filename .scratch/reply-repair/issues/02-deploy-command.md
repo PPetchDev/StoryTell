@@ -42,6 +42,6 @@ Built 2026-11-24: `npm run vm:deploy`. Eighteen tests with a scripted git and a 
 - **A dropped connection is not a failed deploy.** `deploy.sh` runs detached so the deploy survives a drop; the command now says so, and says not to deploy again until it has ended. Run again, it only reports.
 - **On Windows it uses the OpenSSH that Windows ships,** when there: the `scp` Git Bash puts first on PATH may read `C:\…` as a host named C (found by reading, in review; not reproduced).
 - **Settings** are in `.env.vm` (git-ignored); `.env.example` has the block.
-- **Tried for real:** the refusal of a dirty tree. See below for the rest.
-- **Not tested:** the half that talks to git, ssh and the eval reports' folder for real; only the decisions are. The first real deploy with it is its test.
+- **Tried for real (2026-11-24):** the refusal of a dirty tree; "Live already runs" for the commit live had; and a whole deploy of this ticket's own commit, f70a128, from Git Bash on the PC: upload, the VM's script, "Live runs f70a128; health answers 200."
+- **Not tried for real:** the stop for an unmeasured prompt change (that commit changed no prompt builder), a dropped connection, and a deploy script that fails. Those are held by the scripted tests only.
 - **Known and left:** any eval report of the commit counts as "measured", even one scene at one sample. The spec asks for "a run of that exact commit", and a stricter rule needs to know what a full run is.
