@@ -53,6 +53,9 @@ import { SnapshotCharacterEntity } from '../../model/snapshot/entities/snapshot-
 import { SnapshotEntity } from '../../model/snapshot/entities/snapshot.entity.js';
 
 // Every entity must be listed here, or @InjectRepository fails at boot.
+import { ReplacedReplyEntity } from '../../model/reply-record/entities/replaced-reply.entity.js';
+import { RepairRecordEntity } from '../../model/reply-record/entities/repair-record.entity.js';
+
 export const entities = [
     StoryEntity,
     RoleEntity,
@@ -110,4 +113,6 @@ export const entities = [
     PushSubscriptionEntity,
     ChatRecapEntity,
     BookChapterEntity,
+    RepairRecordEntity,
+    ReplacedReplyEntity,
 ];

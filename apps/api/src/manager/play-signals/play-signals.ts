@@ -1,7 +1,6 @@
 import { AUTHOR_MODEL } from '../../model/chat/entities/message.entity.js';
-import { overusedIn } from '../chat/speech/overused.js';
-import { holdsPhrase, repeatedPhrases } from '../chat/speech/repeated-phrases.js';
-import { FaultPart, replyFaults } from '../chat/turn/reply-faults.js';
+import type { ReplacedReplyCounts } from '../../model/reply-record/reply-record.service.js';
+import { CountedPart, REPLIES_BEFORE, replyCounts, replyText } from '../chat/turn/reply-counts.js';
 
 /**
  * The play-signals report (.scratch/reply-repair/spec.md, "5. The play-signals report"): what the
@@ -19,9 +18,10 @@ import { FaultPart, replyFaults } from '../chat/turn/reply-faults.js';
  * Counted though it should not be: the Messages a Branch copied, again in the Branch; a line by a
  * Character deleted since, as an unknown speaker's; a reply the user edited, as the model's.
  *
- * And it undercounts Regenerates badly: a replaced reply is kept only while its Message is the
- * newest of its Chat, and is dropped when the next Message is sent. The spec took every replaced
- * reply to be kept. Until something is recorded when a reply is replaced, this reads what is left.
+ * A replaced reply itself is kept only while its Message is the newest of its Chat: the app drops
+ * it when the next Message is sent. So what this reads of one is the record made when it was
+ * replaced (`replaced_reply`: counts, and none of its words), which the app has kept since
+ * 2026-11-24. A Regenerate before that left nothing to count.
  */
 
 /** Runs one read-only SQL statement and answers its rows. */
@@ -57,40 +57,22 @@ export interface SignalGroup {
 
 /** Below this many replies a rate says nothing, and none is printed. */
 export const FEWEST_FOR_A_RATE = 20;
-/** How many replies before one are read for a phrase it shares with them. */
-const REPLIES_BEFORE = 3;
-
-interface StoredPart extends FaultPart {
-    speakerName?: string | null;
-}
-
 const emptyTally = (): Tally => ({ replies: 0, noSpeechLine: 0, unknownSpeaker: 0, stageDirectionInSpeech: 0, sharedPhrase: 0, words: 0, overused: 0 });
 
-/** A reply as the turn prompt's history writes it, for the phrase and word counts. */
-function textOf(parts: readonly StoredPart[]): string {
-    return parts.map((part) => (part.kind === 'speech' ? `@${part.speakerName ?? ''}: ${part.text}` : part.text)).join('\n\n');
-}
-
-/** Counts one reply into `tally`. `before` are the replies before it in its Chat; `names` are the Story's own people. */
-function count(tally: Tally, parts: readonly StoredPart[], before: readonly string[], names: readonly string[]): void {
-    const faults = replyFaults(parts);
-    const text = textOf(parts);
-    const overused = overusedIn([text], names);
-    // A phrase the replies before it already shared, written again: what the turn prompt names as not to be reused.
-    const shared = repeatedPhrases(before, names).some((phrase) => holdsPhrase(text, phrase));
+function count(tally: Tally, counts: ReplacedReplyCounts): void {
     tally.replies++;
-    if (faults.noSpeechLine) tally.noSpeechLine++;
-    if (faults.unknownSpeaker) tally.unknownSpeaker++;
-    if (faults.stageDirectionInSpeech) tally.stageDirectionInSpeech++;
-    if (shared) tally.sharedPhrase++;
-    tally.words += overused.words;
-    tally.overused += [...overused.found.values()].reduce((sum, count) => sum + count, 0);
+    if (counts.noSpeechLine) tally.noSpeechLine++;
+    if (counts.unknownSpeaker) tally.unknownSpeaker++;
+    if (counts.stageDirection) tally.stageDirectionInSpeech++;
+    if (counts.sharedPhrase) tally.sharedPhrase++;
+    tally.words += counts.words;
+    tally.overused += counts.overused;
 }
 
 /** A stored `jsonb` or `json_agg` value, which a driver may hand back parsed or as text. */
-function partsOf(value: unknown): StoredPart[] {
+function partsOf(value: unknown): CountedPart[] {
     const parsed = typeof value === 'string' ? (JSON.parse(value) as unknown) : value;
-    return Array.isArray(parsed) ? (parsed as StoredPart[]) : [];
+    return Array.isArray(parsed) ? (parsed as CountedPart[]) : [];
 }
 
 const weekOf = `to_char(date_trunc('week', %s AT TIME ZONE 'UTC'), 'YYYY-MM-DD')`;
@@ -116,11 +98,13 @@ export async function playSignals(query: SignalQuery, options: { userId?: number
         `SELECT s."id" AS "storyId", (SELECT r."name" FROM "role" r WHERE r."story_id" = s."id") AS "roleName", (SELECT json_agg(ch."name") FROM "character" ch WHERE ch."story_id" = s."id") AS "names" FROM "story" s`,
     );
     const namesOf = new Map(people.map((row) => [Number(row.storyId), [...((typeof row.names === 'string' ? JSON.parse(row.names) : row.names) ?? []), row.roleName].filter((name): name is string => typeof name === 'string' && name !== '')]));
-    const versions = await query(
-        `SELECT v."message_id" AS "messageId", v."model", v."parts", ${weekOf.replace('%s', 'v."written_at"')} AS "week"
-           FROM "reply_version" v JOIN "message" m ON m."id" = v."message_id" JOIN "chat" c ON c."id" = m."chat_id" JOIN "story" s ON s."id" = c."story_id"
+    // What was recorded of each reply a Regenerate replaced: the reply itself is dropped when the next Message is sent.
+    const replacedRows = await query(
+        `SELECT r."message_id" AS "messageId", r."model", r."no_speech_line" AS "noSpeechLine", r."unknown_speaker" AS "unknownSpeaker", r."stage_direction" AS "stageDirection",
+                r."shared_phrase" AS "sharedPhrase", r."words", r."overused"
+           FROM "replaced_reply" r JOIN "message" m ON m."id" = r."message_id" JOIN "chat" c ON c."id" = m."chat_id" JOIN "story" s ON s."id" = c."story_id"
           WHERE m."kind" = 'ai' AND m."model" IS NOT NULL AND m."model" <> $1 AND NOT m."reach_out" AND NOT m."epilogue" ${owner}
-          ORDER BY v."message_id", v."ordinal"`,
+          ORDER BY r."message_id", r."id"`,
         params,
     );
 
@@ -130,8 +114,8 @@ export async function playSignals(query: SignalQuery, options: { userId?: number
         if (!groups.has(key)) groups.set(key, { week, model, aiMessages: 0, regenerated: 0, kept: emptyTally(), replaced: emptyTally() });
         return groups.get(key)!;
     };
-    const replacedOf = new Map<number, typeof versions>();
-    for (const version of versions) replacedOf.set(Number(version.messageId), [...(replacedOf.get(Number(version.messageId)) ?? []), version]);
+    const replacedOf = new Map<number, typeof replacedRows>();
+    for (const row of replacedRows) replacedOf.set(Number(row.messageId), [...(replacedOf.get(Number(row.messageId)) ?? []), row]);
 
     // The replies before each one in its Chat, as shown now: what a new reply had to avoid repeating.
     let chat: unknown = null;
@@ -147,11 +131,19 @@ export async function playSignals(query: SignalQuery, options: { userId?: number
         group.aiMessages++;
         if (replaced.length > 0) group.regenerated++;
         const names = namesOf.get(Number(message.storyId)) ?? [];
-        count(group.kept, parts, before, names);
-        // A replaced reply was written after the same replies as the one kept in its place. It is counted under the
-        // model that wrote it, in its Message's week: a version's own time is its Message's (it is stamped so when put away).
-        for (const version of replaced) count(groupOf(String(message.week), String(version.model)).replaced, partsOf(version.parts), before, names);
-        before = [...before, textOf(parts)].slice(-REPLIES_BEFORE);
+        count(group.kept, replyCounts(parts, before, names));
+        // A replaced reply is counted under the model that wrote it, in its Message's week: a Regenerate keeps the Message's time.
+        for (const row of replaced) {
+            count(groupOf(String(message.week), String(row.model)).replaced, {
+                noSpeechLine: row.noSpeechLine === true,
+                unknownSpeaker: row.unknownSpeaker === true,
+                stageDirection: row.stageDirection === true,
+                sharedPhrase: row.sharedPhrase === true,
+                words: Number(row.words),
+                overused: Number(row.overused),
+            });
+        }
+        before = [...before, replyText(parts)].slice(-REPLIES_BEFORE);
     }
     return [...groups.values()].sort((a, b) => b.week.localeCompare(a.week) || a.model.localeCompare(b.model));
 }
@@ -181,7 +173,7 @@ export function formatPlaySignals(groups: readonly SignalGroup[], options: { min
     }
     lines.push(
         '',
-        'Regenerates are undercounted: a replaced reply is kept only while its Message is the newest of its Chat, and is dropped when the next Message is sent.',
+        'A replaced reply is counted from 2026-11-24, when the app began to record one: a Regenerate before that left nothing to count.',
         'An edit of an AI Message is not counted: the app keeps no trace of one.',
         'A line written as the user is not counted: the reply parser cuts it before a reply is stored.',
         'A line by a Character deleted since reads as an unknown speaker’s.',

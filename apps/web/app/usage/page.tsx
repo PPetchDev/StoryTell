@@ -6,7 +6,7 @@ import { BackupBanner } from '@/components/backup-banner';
 import { useAccount } from '@/lib/account';
 import { useApiQuery } from '@/components/connection';
 import { ErrorState, Loading } from '@/components/query-state';
-import { CALL_KIND_LABEL, CreditPool, NamedSpend, POOL_LABEL, PoolUsage, TEXT_HOST_LABEL, UsageResponse, usd } from '@/lib/types';
+import { CALL_KIND_LABEL, CreditPool, NamedSpend, POOL_LABEL, PoolUsage, REPAIR_KIND_LABEL, RepairCount, TEXT_HOST_LABEL, UsageResponse, usd } from '@/lib/types';
 
 /**
  * Label and value, the label muted: the label over its value on a phone, so the value has the
@@ -234,6 +234,49 @@ function PoolCard({ pool, usage, member }: { pool: CreditPool; usage: PoolUsage;
     );
 }
 
+/**
+ * What the app mended in replies this month (.scratch/reply-repair/spec.md, "6. Repair counts"): a
+ * repair made, or one it weighed and left as written. Nothing of this shows in the Chat itself.
+ */
+function RepairsCard({ repairs }: { repairs: RepairCount[] }) {
+    return (
+        <section className="card" aria-labelledby="repairs">
+            <h2 id="repairs">Replies mended</h2>
+            {repairs.length === 0 ? (
+                <p className="muted mb-0">No reply needed mending this month.</p>
+            ) : (
+                <table className="mt-2 w-full border-collapse text-md tabular-nums" aria-label="Replies mended by kind">
+                    <thead>
+                        <tr className="text-sm text-muted">
+                            <th scope="col" className="pb-1 text-left font-normal">
+                                What
+                            </th>
+                            <th scope="col" className="pb-1 text-right font-normal">
+                                Mended
+                            </th>
+                            <th scope="col" className="pb-1 pl-4 text-right font-normal">
+                                Left
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {repairs.map((repair) => (
+                            <tr key={`${repair.kind} ${repair.model}`} className="border-t border-line">
+                                <th scope="row" className="py-1.5 pr-2 text-left align-top font-normal [overflow-wrap:anywhere]">
+                                    {REPAIR_KIND_LABEL[repair.kind] ?? repair.kind}
+                                    {repair.model !== null && <span className="block text-sm text-muted">{repair.model}</span>}
+                                </th>
+                                <td className="py-1.5 text-right align-top">{repair.made}</td>
+                                <td className="py-1.5 pl-4 text-right align-top">{repair.refused}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            )}
+        </section>
+    );
+}
+
 export default function UsagePage() {
     const { isOwner } = useAccount();
     const usage = useApiQuery<UsageResponse>('/usage');
@@ -250,6 +293,7 @@ export default function UsagePage() {
                     {POOLS.map((pool) => (
                         <PoolCard key={pool} pool={pool} usage={usage.data.pools[pool]} member={usage.data.monthlyCap !== null} />
                     ))}
+                    <RepairsCard repairs={usage.data.repairs ?? []} />
                     {/* Once for both pools, not under each (M15). Their sizes are the Owner's (.scratch/accounts/spec.md). */}
                     {usage.data.monthlyCap === null && (
                         <p className="mt-0 text-md">

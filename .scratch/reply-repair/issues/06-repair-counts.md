@@ -1,7 +1,7 @@
 # Repair counts on the Usage page
 
 Type: task
-Status: ready-for-agent
+Status: done
 Blocked by: 01
 Needs: no model
 Spec: [Reply repair](../spec.md), "6. Repair counts"
@@ -27,3 +27,15 @@ One record for each repair the app makes or refuses, and a small table on the Us
 
 - The user's phone is 360 pixels wide; e2e runs at 390. Measure the table's rows at 360 and 320 too.
 - Nothing about a repair is shown in the Chat itself.
+
+## Comments
+
+Built 2026-11-24, with the replaced-reply record of ticket 05 in the same migration. Six API tests through the HTTP API and six e2e checks of the page, written red first; reviewed on two axes and the findings fixed.
+
+- **A repair record outlives its Message.** Found in review: with the Message as a cascading foreign key, a rewind (an edit of the user's Message, a Regenerate further up) lowered the month's count. The Message is now set to NULL when it goes; the Chat still takes its records with it.
+- **A count never costs a turn.** Found in review: an insert that failed would have lost a paid reply or left the turn half done. Both records are written after the reply is stored, and a failure is logged and let go.
+- **A Member sees the counts by kind alone,** with no play model named, as with spend by model: which models there are is the Owner's to see.
+- **"Refused" is every repair weighed and not made:** a guard said no, nothing could be placed, or a Line repair failed or came late. They are not told apart.
+- **A Regenerate counts again.** The replaced reply's repairs stay counted beside the new reply's, and a pressing note read again by the Regenerate is counted again: each was done.
+- **The page:** a "Replies mended" card under the pools: what, mended, left. It reads at 360 and 320 pixels with nothing off the side (the table's box and the page's width are checked, not each row).
+- **Not tested:** the migration's way back; a record from an earlier month being left out; a Member's own counts apart from another's; the turn going on when a count cannot be written.

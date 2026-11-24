@@ -61,6 +61,8 @@ import { MemoryModelService } from '../../model/memory/memory.service.js';
 import { PersonaModelService } from '../../model/persona/persona.service.js';
 import { SnapshotModelService } from '../../model/snapshot/snapshot.service.js';
 import { firstSpeakerName, PushAlertsManagerService } from '../push/push-alerts.service.js';
+import { RepairKind } from '../../model/reply-record/entities/repair-record.entity.js';
+import { RepairOutcome, ReplyRecordModelService } from '../../model/reply-record/reply-record.service.js';
 import { UsageRecordModelService } from '../../model/usage-record/usage-record.service.js';
 import { SettingsModelService } from '../../model/settings/settings.service.js';
 import { StoryEntity } from '../../model/story/entities/story.entity.js';
@@ -126,6 +128,7 @@ import { documentQuery } from '../document/document-search.js';
 import { DocumentSearchManagerService, DocumentsInPlay, hasDocumentPassages } from './document-search.service.js';
 import { TurnMemoryRecord } from '../../model/chat/chat.service.js';
 import { CastName, historyPartsText, ParseOptions, parseReply, partsToText, releasedText, ReplyPart, withoutEchoedUserText } from './turn/reply-parser.js';
+import { REPLIES_BEFORE, replyCounts, replyText } from './turn/reply-counts.js';
 import { repairSpeechLines } from './turn/speech-line-repair.js';
 import { TurnStoppedError, TurnStream } from './turn/turn-stream.js';
 import { Dice } from '../../service/dice/dice.js';
@@ -448,6 +451,7 @@ export class ChatManagerService {
         private readonly storyModel: StoryModelService,
         private readonly settingsModel: SettingsModelService,
         private readonly ledger: LedgerModelService,
+        private readonly replyRecords: ReplyRecordModelService,
         private readonly memoryModel: MemoryModelService,
         private readonly beliefModel: BeliefModelService,
         private readonly personaModel: PersonaModelService,
@@ -875,14 +879,14 @@ export class ChatManagerService {
      * that open the same way is sent back alone, in parallel, to be said the way its Character would
      * say it. A repair that fails, is late or is no better leaves the line as written.
      */
-    private async repairSpeech(story: StoryEntity, chatId: number, parts: ReplyPart[]): Promise<ReplyPart[]> {
+    private async repairSpeech(story: StoryEntity, chatId: number, parts: ReplyPart[]): Promise<{ parts: ReplyPart[]; outcomes: RepairOutcome[] }> {
         const flagged = parts.flatMap((part, index) => {
             if (part.kind !== 'speech') return [];
             const { aside, spoken } = spokenPart(part.text);
             const found = spoken === null ? [] : repeatedOpenings(spoken);
             return spoken !== null && found.length > 0 ? [{ part, index, found, aside, spoken }] : [];
         });
-        if (flagged.length === 0) return parts;
+        if (flagged.length === 0) return { parts, outcomes: [] };
         const repaired = [...parts];
         await Promise.all(
             flagged.map(async ({ part, index, found, aside, spoken }) => {
@@ -905,7 +909,8 @@ export class ChatManagerService {
         );
         const changed = repaired.filter((part, index) => part !== parts[index]).length;
         this.logger.log(`Chat ${chatId}: repaired ${changed} of ${flagged.length} speech lines with repeated openings`);
-        return repaired;
+        // One outcome a line sent back: kept, or refused by a guard, late or failed.
+        return { parts: repaired, outcomes: flagged.map(({ index }) => ({ kind: RepairKind.Line, made: repaired[index] !== parts[index] })) };
     }
 
     /** Spec: "Start both background calls in parallel, with their status set to pending." */
@@ -1938,6 +1943,8 @@ export class ChatManagerService {
         // Each Character in the moment thinks first, from only what they know (.scratch/character-minds/spec.md). Never on an Epilogue.
         const thoughts =
             asEpilogue || !chat.characterThoughts ? [] : await this.thinkFirst(story, chat, { identity, state, memories, held, entries, history, userText, nudge, sittingOut });
+        // What a Character pressed the user for in the newest reply, told once; only a turn with a Message of the user's reads it.
+        const pressingRead = userText === null ? [] : pressingOf(state.detailChanges, newestAiMessage(chat)?.id ?? null, story.characters);
         const prompt = buildTurnPrompt({
             story,
             identity,
@@ -1951,7 +1958,7 @@ export class ChatManagerService {
             // The facts, and the slips of the newest reply before this one (.scratch/story-quality/spec.md).
             facts: promptFacts(state.detailChanges, newestAiMessage(chat)?.id ?? null),
             // And what a Character pressed the user for in that reply, told once (.scratch/reply-repair/spec.md).
-            pressing: pressingOf(state.detailChanges, newestAiMessage(chat)?.id ?? null, story.characters),
+            pressing: pressingRead,
             // Who holds what (.scratch/story-items/spec.md), after the facts.
             items: currentItems(state.detailChanges),
             // What each Character may now tell, and what they have told (.scratch/secret-reveals/spec.md).
@@ -2026,13 +2033,37 @@ export class ChatManagerService {
                     : `Chat ${chat.id}: Speech-line repair left the reply as written (no quotation could be given to a Character)`,
             );
         }
-        const parts: ReplyPart[] = await this.repairSpeech(story, chat.id, mended.parts);
+        const spoken = await this.repairSpeech(story, chat.id, mended.parts);
+        const parts: ReplyPart[] = spoken.parts;
+        // What was done to this reply, counted for the Usage page once it has a Message (.scratch/reply-repair/spec.md, "6. Repair counts").
+        const repairs: RepairOutcome[] = [
+            ...(mended.considered ? [{ kind: RepairKind.SpeechLines, made: mended.moved > 0 }] : []),
+            ...spoken.outcomes,
+            ...pressingRead.map(() => ({ kind: RepairKind.PressingNote, made: true })),
+        ];
         // A Stop that came while the reply was parsed or repaired still stores nothing.
         if (stream?.signal.aborted) throw new TurnStoppedError();
         let aiMessageId: number;
         if (replacing) {
+            // What the replaced reply came to, in counts: the reply itself is dropped when the next Message is sent, and it is
+            // the best evidence there is of a bad reply (.scratch/reply-repair/spec.md, "5. The play-signals report"). Worked
+            // out before the reply is put away, and against the play model's own replies before it, as the report reads the kept ones.
+            const playReply = (message: MessageEntity) => message.kind === MessageKind.Ai && message.model !== AUTHOR_MODEL && !message.reachOut && !message.epilogue;
+            const replaced = replacing.epilogue
+                ? null
+                : replyCounts(
+                      replacing.parts.map((part) => part.toResponse()),
+                      chat.messages.filter((message) => playReply(message) && message.position < replacing.position).slice(-REPLIES_BEFORE).map((message) => replyText(message.parts.map((part) => part.toResponse()))),
+                      [identity.name, ...story.characters.map((character) => character.name)],
+                  );
             // Regenerate: the new reply is the Message's last Reply version.
             await this.chatModel.replaceReply(replacing, result.model, parts, MAX_REPLY_VERSIONS, documents.record, memoryRecord);
+            // Only once it is replaced, and never at the turn's cost: a count that cannot be written is logged and let go.
+            if (replaced) {
+                await this.replyRecords
+                    .recordReplaced({ userId: story.userId, chatId: chat.id, messageId: replacing.id, model: replacing.model ?? result.model, writtenAt: replacing.createdAt }, replaced)
+                    .catch((error) => this.logger.warn(`Chat ${chat.id}: the replaced reply's counts were not recorded: ${String(error)}`));
+            }
             aiMessageId = replacing.id;
         } else {
             aiMessageId = (
@@ -2042,6 +2073,10 @@ export class ChatManagerService {
             await this.chatModel.dropReplyVersions(chat.id);
         }
         await this.usageModel.claimForReply(chat.id, costsFrom, aiMessageId);
+        // A count that cannot be written never costs the turn: the reply is stored, and the rest of the turn goes on.
+        await this.replyRecords
+            .recordRepairs({ userId: story.userId, chatId: chat.id, messageId: aiMessageId, model: result.model }, repairs)
+            .catch((error) => this.logger.warn(`Chat ${chat.id}: the reply's repairs were not recorded: ${String(error)}`));
         // Kept with the reply they were thought for; a reply written again keeps only its own.
         await this.chatModel.setThoughts(aiMessageId, thoughts.map((thought) => ({ characterId: thought.characterId, text: thought.text })));
         // Last, and only once stored: the client's final parts are the stored Message.

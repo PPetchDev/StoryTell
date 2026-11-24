@@ -187,7 +187,27 @@ export interface UsageResponse {
     pools: Record<CreditPool, PoolUsage>;
     /** A Member's Monthly cap (.scratch/accounts/spec.md); null for the Owner. */
     monthlyCap: { capUsd: number; spentUsd: number; reached: boolean } | null;
+    /** This month's repairs to replies, by kind and play model (.scratch/reply-repair/spec.md); left out by an API from before them. */
+    repairs?: RepairCount[];
 }
+
+export type RepairKind = 'speech_lines' | 'line' | 'pressing_note';
+
+/** The repairs of one kind and play model: how many the app made, and how many it weighed and left. */
+export interface RepairCount {
+    kind: RepairKind;
+    /** The play model that wrote the replies; null for a Member, whose counts are of every model together. */
+    model: string | null;
+    made: number;
+    refused: number;
+}
+
+/** What each repair is, in the user's words. */
+export const REPAIR_KIND_LABEL: Record<RepairKind, string> = {
+    speech_lines: 'Quoted speech given back to its Character',
+    line: 'A line said again more plainly',
+    pressing_note: 'A Character told not to ask again',
+};
 
 /** The Venice pool is named for everything it pays for; its id stays `image` (.scratch/dictation/spec.md). */
 export const POOL_LABEL: Record<CreditPool, string> = { text: 'Text', image: 'Images and audio (Venice)' };

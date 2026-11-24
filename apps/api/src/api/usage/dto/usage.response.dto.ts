@@ -1,3 +1,5 @@
+import { RepairKind } from '../../../model/reply-record/entities/repair-record.entity.js';
+import type { RepairCount } from '../../../model/reply-record/reply-record.service.js';
 import { ApiProperty } from '@nestjs/swagger';
 
 import { MonthlyCapUsage, PoolUsage, UsageSummary } from '../../../manager/usage/usage.service.js';
@@ -145,6 +147,20 @@ export class MonthlyCapUsageDTO implements MonthlyCapUsage {
     reached: boolean;
 }
 
+export class RepairCountDTO implements RepairCount {
+    @ApiProperty({ description: 'What was done to the reply.', enum: RepairKind, example: RepairKind.Line })
+    kind: RepairKind;
+
+    @ApiProperty({ description: 'The play model that wrote the reply; null for a Member, whose counts are of every model together.', example: 'glm-5.3', nullable: true, type: String })
+    model: string | null;
+
+    @ApiProperty({ description: 'Repairs made.', example: 12 })
+    made: number;
+
+    @ApiProperty({ description: 'Repairs weighed and not made: a guard refused them, or nothing could be placed.', example: 3 })
+    refused: number;
+}
+
 export class UsageResponseBodyDTO implements UsageSummary {
     @ApiProperty({ description: 'The month the spend covers, as YYYY-MM.', example: '2026-11' })
     month: string;
@@ -157,4 +173,10 @@ export class UsageResponseBodyDTO implements UsageSummary {
 
     @ApiProperty({ description: "A Member's Monthly cap; null for the Owner (.scratch/accounts/spec.md).", type: MonthlyCapUsageDTO, nullable: true })
     monthlyCap: MonthlyCapUsageDTO | null;
+
+    @ApiProperty({
+        description: "This month's repairs to replies, by kind and play model: how many the app made, and how many it weighed and refused. The Owner sees everyone's, a Member their own.",
+        type: () => [RepairCountDTO],
+    })
+    repairs: RepairCountDTO[];
 }

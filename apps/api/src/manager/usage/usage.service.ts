@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 import { AccountModelService } from '../../model/account/account.service.js';
 import { AccountRole } from '../../model/account/entities/account.entity.js';
+import { RepairCount, ReplyRecordModelService } from '../../model/reply-record/reply-record.service.js';
 import { SettingsModelService } from '../../model/settings/settings.service.js';
 import { startOfMonthUtc } from '../../service/model-gateway/spend-cap.js';
 import { KindSpend, NamedSpend, PromptCacheSpend, UsageRecordModelService } from '../../model/usage-record/usage-record.service.js';
@@ -53,12 +54,25 @@ export interface UsageSummary {
     pools: Record<CreditPool, PoolUsage>;
     /** A Member's cap; null for the Owner, who has none. */
     monthlyCap: MonthlyCapUsage | null;
+    /** This month's repairs to replies (.scratch/reply-repair/spec.md), by kind and play model: the Owner sees everyone's, a Member their own. */
+    repairs: RepairCount[];
+}
+
+/** The counts of each kind, every play model together. */
+function acrossModels(repairs: readonly RepairCount[]): RepairCount[] {
+    const byKind = new Map<string, RepairCount>();
+    for (const repair of repairs) {
+        const sum = byKind.get(repair.kind) ?? { kind: repair.kind, model: null, made: 0, refused: 0 };
+        byKind.set(repair.kind, { ...sum, made: sum.made + repair.made, refused: sum.refused + repair.refused });
+    }
+    return [...byKind.values()];
 }
 
 @Injectable()
 export class UsageManagerService {
     constructor(
         private readonly usageModel: UsageRecordModelService,
+        private readonly replyRecords: ReplyRecordModelService,
         private readonly settingsModel: SettingsModelService,
         private readonly gateway: ModelGateway,
         private readonly accounts: AccountModelService,
@@ -72,11 +86,12 @@ export class UsageManagerService {
         const account = this.accounts.current();
         const member = account.role === AccountRole.Member;
         const monthStart = member ? startOfMonthUtc(now) : new Date(now.getFullYear(), now.getMonth(), 1);
-        const [spend, settings, ownerCredit, named] = await Promise.all([
+        const [spend, settings, ownerCredit, named, repairs] = await Promise.all([
             this.usageModel.spendSince(monthStart, member ? account.id : undefined),
             this.settingsModel.get(),
             this.gateway.remainingCredit(),
             member ? null : this.usageModel.spendByModelSince(monthStart),
+            this.replyRecords.repairCountsSince(monthStart, member ? account.id : undefined),
         ]);
         const credit = member ? { text: { remainingUsd: null }, image: { remainingUsd: null } } : ownerCredit;
 
@@ -116,6 +131,8 @@ export class UsageManagerService {
                 image: pool('image', settings.imageCreditCapUsd, settings.imageLowCreditPercent),
             },
             monthlyCap: member && account.monthlyCapUsd !== null ? this.capUsage(account.monthlyCapUsd, spend.text.spentUsd + spend.image.spentUsd) : null,
+            // Which models there are is the Owner's to see, as with spend by model: a Member's counts are by kind alone.
+            repairs: member ? acrossModels(repairs) : repairs,
         };
     }
 

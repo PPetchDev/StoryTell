@@ -49,21 +49,21 @@ describe('The play-signals report', () => {
         await t.http.post(`/api/stories/${storyId}/characters`).send({ name: 'Nara', appearance: 'Tall.', personality: 'Warm.', voice: 'Short.' }).expect(201);
         chatId = (await t.http.post(`/api/stories/${storyId}/chats`).expect(201)).body.id;
 
-        // Three replies. The last is first written with no speech line; the user Regenerates it, and the reply kept in
-        // its place has Nara speaking. Only a Chat's newest AI Message keeps its replaced replies: sending the next
-        // Message drops them, so the Regenerate has to be the last thing done here.
+        // Three replies. The second is first written with no speech line; the user Regenerates it, and the reply kept in
+        // its place has Nara speaking. Then the user plays on: the app drops the replaced reply itself there, and what
+        // is left of it is the record made when it was replaced.
         const send = async (text: string, reply: string) => {
             script(reply);
             await t.http.post(`/api/stories/${storyId}/chats/${chatId}/messages`).send({ text }).expect(201);
             await settle(storyId, chatId);
         };
         await send('I sit.', 'Nara fills the kettle.\n\n@Nara: Tea?');
-        await send('Thanks.', '@Stranger: Evening.');
         await send('Yes.', 'Nara fills the kettle and says nothing at all.');
-        const last = (await t.http.get(`/api/stories/${storyId}/chats/${chatId}`).expect(200)).body.messages.at(-1).id;
+        const second = (await t.http.get(`/api/stories/${storyId}/chats/${chatId}`).expect(200)).body.messages.at(-1).id;
         script('@Nara: Here. *hands it over* Careful.');
-        await t.http.post(`/api/stories/${storyId}/chats/${chatId}/messages/${last}/regenerate`).expect(200);
+        await t.http.post(`/api/stories/${storyId}/chats/${chatId}/messages/${second}/regenerate`).expect(200);
         await settle(storyId, chatId);
+        await send('Thanks.', '@Stranger: Evening.');
     });
 
     afterAll(async () => {
@@ -113,10 +113,17 @@ describe('The play-signals report', () => {
         expect(formatPlaySignals([])).toContain('No AI Messages by a play model.');
     });
 
-    it('says that it undercounts: a replaced reply is kept only while its Message is the Chat’s newest', async () => {
-        expect(formatPlaySignals(await playSignals(query))).toContain(
-            'Regenerates are undercounted: a replaced reply is kept only while its Message is the newest of its Chat, and is dropped when the next Message is sent.',
-        );
+    it('keeps of a replaced reply only counts: its record has no column that could hold its words', async () => {
+        const columns = (await source.query(`SELECT "column_name" AS "name", "data_type" AS "type" FROM information_schema.columns WHERE "table_name" = 'replaced_reply' ORDER BY "column_name"`)) as { name: string; type: string }[];
+
+        expect(columns.map((column) => column.name)).toEqual(['chat_id', 'id', 'message_id', 'model', 'no_speech_line', 'overused', 'replaced_at', 'shared_phrase', 'stage_direction', 'unknown_speaker', 'user_id', 'words', 'written_at']);
+        // The one text column is the play model's name.
+        expect(columns.filter((column) => column.type === 'text').map((column) => column.name)).toEqual(['model']);
+        expect(await source.query('SELECT count(*)::int AS "n" FROM "reply_version"')).toEqual([{ n: 0 }]);
+    });
+
+    it('says from when replaced replies are counted', async () => {
+        expect(formatPlaySignals(await playSignals(query))).toContain('A replaced reply is counted from 2026-11-24, when the app began to record one: a Regenerate before that left nothing to count.');
     });
 
     it('gives no share of nothing: a week and model with replaced replies only prints no percentage', () => {

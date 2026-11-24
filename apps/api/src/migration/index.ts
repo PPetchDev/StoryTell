@@ -70,6 +70,7 @@ import { MoreFaces1764530000000 } from './1764530000000-MoreFaces.js';
 import { MoreEmotions1764540000000 } from './1764540000000-MoreEmotions.js';
 import { StoryPlaces1764550000000 } from './1764550000000-StoryPlaces.js';
 import { PressingNotes1764560000000 } from './1764560000000-PressingNotes.js';
+import { ReplyRecords1764570000000 } from './1764570000000-ReplyRecords.js';
 import { UsageMessage1764330000000 } from './1764330000000-UsageMessage.js';
 import { MessageBookmarks1764340000000 } from './1764340000000-MessageBookmarks.js';
 import { PushSubscriptions1764350000000 } from './1764350000000-PushSubscriptions.js';
@@ -169,4 +170,5 @@ export const migrations = [
     MoreEmotions1764540000000,
     StoryPlaces1764550000000,
     PressingNotes1764560000000,
+    ReplyRecords1764570000000,
 ];

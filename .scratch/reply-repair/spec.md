@@ -145,6 +145,7 @@ Six pieces, each deployable alone, in this order:
 
 ### 6. Repair counts
 
+- **(As built: see ticket 06's comments. The Message is not a cascading key, a Member's counts name no model, and the same migration adds the replaced-reply record ticket 05 turned out to need.)**
 - **A repair record:** one row for each repair made or refused, with its kind (speech lines, a line, a pressing note read), whether it was made, the play model, the Chat and the AI Message. One new table, one migration. A Line repair still records its model call as a usage record; the repair record is the count, not the cost.
 - **The Usage page** gains a small table: for the period shown, each kind's repairs made and refused, by play model.
 - A deleted Chat takes its repair records with it.

@@ -12,6 +12,7 @@ import { ReplaceRuleModelModule } from '../../model/replace-rule/replace-rule.mo
 import { SettingsModelModule } from '../../model/settings/settings.module.js';
 import { SnapshotModelModule } from '../../model/snapshot/snapshot.module.js';
 import { StoryModelModule } from '../../model/story/story.module.js';
+import { ReplyRecordModelModule } from '../../model/reply-record/reply-record.module.js';
 import { UsageRecordModelModule } from '../../model/usage-record/usage-record.module.js';
 import { ReadAloudManagerModule } from '../read-aloud/read-aloud.module.js';
 import { ChatManagerService } from './chat.service.js';
@@ -35,7 +36,7 @@ import { StageModelModule } from '../../model/stage/stage.module.js';
 import { ImageStoreModule } from '../../store/image/image-store.module.js';
 
 @Module({
-    imports: [ChatModelModule, BranchModelModule, StoryModelModule, SettingsModelModule, LedgerModelModule, MemoryModelModule, PersonaModelModule, SnapshotModelModule, DocumentModelModule, SavedReplyModelModule, ReplaceRuleModelModule, ReadAloudManagerModule, UsageRecordModelModule, StageModelModule, ImageStoreModule, YourFaceModelModule],
+    imports: [ChatModelModule, BranchModelModule, StoryModelModule, SettingsModelModule, LedgerModelModule, MemoryModelModule, PersonaModelModule, SnapshotModelModule, DocumentModelModule, SavedReplyModelModule, ReplaceRuleModelModule, ReadAloudManagerModule, UsageRecordModelModule, ReplyRecordModelModule, StageModelModule, ImageStoreModule, YourFaceModelModule],
     providers: [ChatManagerService, DocumentSearchManagerService, JudgeManagerService, BeliefManagerService, MemoryEmbeddingManagerService, MemoryExtractionManagerService, MemoryManagerService, SuggestedRepliesManagerService, WriteForMeManagerService, ThaiReadingManagerService, DiaryManagerService, ThoughtsManagerService, SpeechRepairManagerService, StorySoFarManagerService, ChaptersManagerService, ChatTranscriptManagerService, StageManagerService],
     exports: [ChatManagerService, MemoryManagerService, BeliefManagerService, StorySoFarManagerService, ChaptersManagerService, ChatTranscriptManagerService],
 })

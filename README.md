@@ -334,8 +334,9 @@ prints no reply's words, no title and no name, and it runs in a read-only transa
 sudo -u storytell -H bash -lc 'cd /srv/storytell/app/apps/api && ENV_FILE=/etc/storytell/api.env node dist/play-signals.js'
 ```
 
-`--user <id>` reads one account; `--min <n>` gives a rate from `n` replies up (20 unless told). It
-undercounts Regenerates: a replaced reply is kept only while its Message is the newest of its Chat.
+`--user <id>` reads one account; `--min <n>` gives a rate from `n` replies up (20 unless told). A
+replaced reply is counted from 2026-11-24, when the app began to keep its counts (never its words)
+at the moment it is replaced; the reply itself is dropped when the next Message is sent.
 
 ### Deploying a commit
 
