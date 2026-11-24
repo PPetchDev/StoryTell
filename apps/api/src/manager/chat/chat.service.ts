@@ -126,6 +126,7 @@ import { documentQuery } from '../document/document-search.js';
 import { DocumentSearchManagerService, DocumentsInPlay, hasDocumentPassages } from './document-search.service.js';
 import { TurnMemoryRecord } from '../../model/chat/chat.service.js';
 import { CastName, historyPartsText, ParseOptions, parseReply, partsToText, releasedText, ReplyPart, withoutEchoedUserText } from './turn/reply-parser.js';
+import { repairSpeechLines } from './turn/speech-line-repair.js';
 import { TurnStoppedError, TurnStream } from './turn/turn-stream.js';
 import { Dice } from '../../service/dice/dice.js';
 import { Roll, ROLL_SIDES, ROLL_TARGETS, RollStat } from './roll.js';
@@ -2007,7 +2008,22 @@ export class ChatManagerService {
         // A reply that opened by saying the user's message back (seen on live) keeps only its own words.
         const unechoed = withoutEchoedUserText(reply.parts, userText);
         if (unechoed.echoed) this.logger.warn(`Chat ${chat.id}: the reply opened with the user's own message; dropped that`);
-        const parts: ReplyPart[] = await this.repairSpeech(story, chat.id, unechoed.parts);
+        // Speech-line repair (.scratch/reply-repair/spec.md): a reply with no speech line has its quoted speech moved onto speech lines, where code can tell who spoke.
+        const out = new Set(options.sittingOut);
+        const mended = repairSpeechLines(
+            unechoed.parts,
+            story.characters.filter((character) => !out.has(character.id)),
+            identity.name,
+        );
+        if (mended.considered) {
+            // Before and after, so a repair on live can be judged later; one left alone says so.
+            this.logger.log(
+                mended.moved > 0
+                    ? `Chat ${chat.id}: Speech-line repair kept ${JSON.stringify({ moved: mended.moved, written: partsToText(unechoed.parts), kept: partsToText(mended.parts) })}`
+                    : `Chat ${chat.id}: Speech-line repair left the reply as written (no quotation could be given to a Character)`,
+            );
+        }
+        const parts: ReplyPart[] = await this.repairSpeech(story, chat.id, mended.parts);
         // A Stop that came while the reply was parsed or repaired still stores nothing.
         if (stream?.signal.aborted) throw new TurnStoppedError();
         let aiMessageId: number;
