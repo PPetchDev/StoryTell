@@ -1,7 +1,7 @@
 # A pressing check that answers the same way twice
 
 Type: task
-Status: ready-for-agent
+Status: done
 Blocked by: none
 Needs: a real grader check and one real play to finish (about $0.10; the user's go-ahead)
 Spec: [Reply repair](../spec.md), "3. A steady pressing check"
@@ -33,3 +33,15 @@ The eval's "does not press the same demand" asks the grader to count replies, an
 
 - The six real Chats (two of 2026-11-23, four of 2026-11-24) are in the eval reports outside the repository. Label them reply by reply in the labels file there; commit none of their words.
 - The rule's numbers came from those six Chats. Change them if the labelled Chats say otherwise, and say why in the spec.
+
+## Comments
+
+Built 2026-11-24. Tests through the eval run and the grader check with scripted answers, written red first; reviewed on two axes and the findings fixed. The real runs are written up in the prompt-evals spec, "A pressing check asked of each reply, and a grader at temperature 0".
+
+- **Asking reply by reply did not steady the grader by itself.** At the host's own temperature it agreed on 43 of 80 replies and answered both ways on 31. What steadied it was temperature 0, now on every grader call: 62 of 80, 4 unsteady.
+- **By Chat, the check came to its label on 10 of 10 Chats, three asks each** (the ticket asked for five asks a case; three were run).
+- **Not met as written:** "agrees on every written-in case". Reply by reply, 18 of 80 still differ, and the grader over-calls pressing. Chat by Chat, it agrees on all. The check is not marked unsteady; its over-calling is written in the spec.
+- **The labels on the six real Chats are Claude's.** They are in the labels file outside the repository; none of their words is committed. The grader check's card quotes the opening of each reply it disagreed on, so the card stays outside the repository too.
+- **The second evening, `unasked`,** takes the asking out of the Voice and of Ash's own card as well as the example lines: found in review, since the example line alone left two more invitations.
+- **Found by it:** with nothing on the cards inviting it, the Character pressed once in twenty replies; with the cards as they were, five in twenty.
+- **Left:** the card shows agreement reply by reply only; whether the rule applied to the grader's verdicts matches a Chat's own label was worked out by hand for the spec, and is not on the card.

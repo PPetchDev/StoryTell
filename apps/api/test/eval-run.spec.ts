@@ -442,7 +442,7 @@ describe('The prompt eval run', () => {
     describe('a played Chat', () => {
         const evening = scene('evening') as ChatScene;
         /** Three turns of the evening, with only the check a test names. */
-        const mini = (checks: ChatScene['checks'], graded: ChatScene['graded'] = []): ChatScene => ({ ...evening, name: 'mini', turns: evening.turns.slice(0, 3), checks, graded, gradedChat: [] });
+        const mini = (checks: ChatScene['checks'], graded: ChatScene['graded'] = []): ChatScene => ({ ...evening, name: 'mini', turns: evening.turns.slice(0, 3), checks, graded, gradedChat: [], gradedReplies: [] });
         const numbered = (index: number) => ({ text: `Mira set down cup ${index}.\n\n@Mira Vance: Reply ${index}.` });
         const sent = (request: RecordedRequest) => (request.body as { messages: { content: string }[] }).messages;
 
@@ -544,7 +544,7 @@ describe('The prompt eval run', () => {
             const router = scriptedOpenRouter();
             const started = startEvalRun({ EVAL_SCENES: 'evening', EVAL_SAMPLES: '5' }, { fetch: router.fetchImpl, reportDir: mkdtempSync(path.join(tmpdir(), 'eval-')), log: () => {}, git: () => GIT });
 
-            // Ten turns and two grader calls (the last reply, the whole Chat), played twice at most.
+            // Ten turns and two grader calls (the last reply, and a verdict a reply), played twice at most.
             await expect(started).rejects.toThrow('would send 24 calls');
         });
 
@@ -582,6 +582,63 @@ describe('The prompt eval run', () => {
             { check: 'turn 9: says nine', bad: { 8: '@Mira Vance: Long enough. You asked already.' } },
             { check: 'drops phrases the earlier replies shared', bad: { 4: `${stock}\n\n@Mira Vance: Worse.`, 5: `${stock}\n\n@Mira Vance: Did it help?`, 6: `${stock}\n\n@Mira Vance: And do what?` } },
         ];
+
+        describe('a check asked of each reply', () => {
+            const pressing = evening.gradedReplies[0];
+            /** A grader answer that serves both of the evening's grader calls: the last reply's checks, and a verdict a reply. */
+            const verdicts = (yes: boolean[]) => ({
+                text: JSON.stringify({ checks: [{ name: 'x', quote: 'q', pass: true }], replies: yes.map((one, index) => ({ reply: index + 1, quote: `close ${index + 1}`, yes: one })) }),
+            });
+            const pressedAt = (...turns: number[]) => verdicts(evening.turns.map((_, index) => turns.includes(index + 1)));
+
+            it('sends one grader call a played Chat, with every turn and its reply and the one question, and reads a verdict a reply', async () => {
+                const { report, requests } = await run([{ ...mini([]), gradedReplies: [pressing] }], { play: numbered, grader: () => verdicts([false, true, false]) }, { samples: 1 });
+
+                const graders = requests.filter((request) => request.role === 'grader');
+                expect(graders).toHaveLength(1);
+                const asked = sent(graders[0]).at(-1)!.content;
+                expect(asked.indexOf(evening.turns[0])).toBeLessThan(asked.indexOf('Reply 0.'));
+                expect(asked).toContain(evening.turns[2]);
+                expect(asked).toContain('Reply 2.');
+                expect(asked).toContain(pressing.question);
+                expect(score(report, 'mini', pressing.name)).toBe('1/1');
+                expect(report.scenes[0].samples[0].results.at(-1)).toEqual({ check: pressing.name, kind: 'graded', outcome: 'pass', reason: 'turn 2 of 3: "close 2"' });
+            });
+
+            it('the grader only answers reply by reply; code counts: three replies in a row fail the Chat, and so does half of them', async () => {
+                const play = (grader: ReturnType<typeof verdicts>) => run(['evening'], { play: but({}), grader: () => grader }, { samples: 1 });
+
+                const inARow = await play(pressedAt(5, 6, 7));
+                const half = await play(pressedAt(1, 3, 5, 7, 9));
+                const apart = await play(pressedAt(2, 5, 9));
+                const twoInARow = await play(pressedAt(5, 6));
+
+                expect(score(inARow.report, 'evening', pressing.name)).toBe('0/1');
+                expect(inARow.report.scenes[0].samples[0].results.at(-1)!.reason).toBe('turns 5, 6, 7 of 10: "close 5"; "close 6"; "close 7"');
+                expect(score(half.report, 'evening', pressing.name)).toBe('0/1');
+                expect(score(apart.report, 'evening', pressing.name)).toBe('1/1');
+                expect(score(twoInARow.report, 'evening', pressing.name)).toBe('1/1');
+            });
+
+            it('is not graded when the grader left a reply out or could not be read: never a pass or a fail', async () => {
+                const short = await run([{ ...mini([]), gradedReplies: [pressing] }], { play: numbered, grader: () => verdicts([false, true]) }, { samples: 1 });
+                const unread = await run([{ ...mini([]), gradedReplies: [pressing] }], { play: numbered, grader: () => ({ text: 'They all seem fine.' }) }, { samples: 1 });
+
+                expect(short.report.scenes[0].samples[0].results.at(-1)).toEqual({ check: pressing.name, kind: 'graded', outcome: 'not_graded', reason: 'the grader gave 2 verdicts for 3 replies' });
+                expect(unread.report.scenes[0].samples[0].results.at(-1)).toMatchObject({ outcome: 'not_graded' });
+            });
+
+            it('the evening asks it in place of the whole-Chat check, and a second evening has a Character with no asking line on her card', () => {
+                expect(evening.gradedChat).toEqual([]);
+                expect(evening.gradedReplies.map((check) => check.name)).toEqual(['does not keep pressing']);
+                const unasked = scene('unasked') as ChatScene;
+                expect(unasked.turns).toEqual(evening.turns);
+                expect(unasked.gradedReplies).toEqual(evening.gradedReplies);
+                const prompt = (one: ChatScene) => buildTurnPrompt({ ...one.input, userText: one.turns[0] }).messages.map((message) => message.content).join(' ');
+                expect(prompt(evening)).toContain('Ask me properly');
+                expect(prompt(unasked)).not.toMatch(/ask me|asks questions|ask mira out/i);
+            });
+        });
 
         it('every check of the evening has a Chat it must fail', () => {
             expect(evening.checks.map((check) => check.name).filter((name) => !cases.some((one) => one.check === name))).toEqual([]);

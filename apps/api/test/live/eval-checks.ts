@@ -247,3 +247,41 @@ export function dropsRepeatedPhrases(names: readonly string[]): ChatCheck {
         },
     };
 }
+
+/** What the grader said of one reply of a played Chat: yes or no to the check's question, and the words it judged on. */
+export interface ReplyVerdict {
+    yes: boolean;
+    quote: string;
+}
+
+/**
+ * A check of a played Chat that the grader answers reply by reply, one yes or no each, and code
+ * turns into a pass or a fail. Asked to judge a whole Chat by a count ("in four or more of the
+ * replies…"), the grader answered both ways on the same Chat (the grader check, 2026-11-24): it
+ * reads well and counts badly. So it only reads.
+ */
+export interface PerReplyCheck {
+    name: string;
+    /** One yes-or-no question about a single reply, where "yes" is the fault. */
+    question: string;
+    /** What the verdicts, one a reply in turn order, come to. */
+    rule(verdicts: ReplyVerdict[]): CheckVerdict;
+}
+
+/**
+ * A fault may show now and then, and not as a habit: the Chat fails when three replies in a row
+ * have it, or half the replies or more. The reason names the turns and the words judged on.
+ */
+export function nowAndThen(verdicts: ReplyVerdict[]): CheckVerdict {
+    const turns = verdicts.flatMap((verdict, index) => (verdict.yes ? [index + 1] : []));
+    let longest = 0;
+    let row = 0;
+    for (const verdict of verdicts) {
+        row = verdict.yes ? row + 1 : 0;
+        longest = Math.max(longest, row);
+    }
+    const pass = longest < 3 && turns.length * 2 < verdicts.length;
+    if (turns.length === 0) return { pass, reason: `none of ${verdicts.length}` };
+    const quotes = turns.map((turn) => `"${verdicts[turn - 1].quote}"`).join('; ');
+    return { pass, reason: `${turns.length === 1 ? 'turn' : 'turns'} ${turns.join(', ')} of ${verdicts.length}: ${quotes}` };
+}

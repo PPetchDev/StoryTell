@@ -373,3 +373,39 @@ Counted by eye: replies whose last line presses Ash to ask, say or decide the un
 
 - Whether replies that end "where the moment does" read better or flatter in real play. That is the user's to judge on live; the rule is one bullet to take out again.
 - Whether DeepSeek V4 Pro behaves the same: every play so far is GLM-5.3.
+
+## A pressing check asked of each reply, and a grader at temperature 0 (2026-11-24, later)
+
+Ticket 03 of [Reply repair](../reply-repair/spec.md). Spent: $0.084 ($0.074 on one play of `evening` and `unasked`, $0.010 on two grader checks).
+
+### Built
+
+- **A kind of graded check where the grader answers one yes-or-no question a reply and code does the counting** (`gradedReplies`). One grader call a played Chat; a verdict missing or unreadable makes the check "not graded".
+- **"Does not keep pressing"** replaces "does not press the same demand" in `evening`. The question, of each reply: does its close press Ash to ask, say or decide a thing their turn was not about? The rule: the Chat fails when three replies in a row do, or half of them or more.
+- **A second evening, `unasked`,** with the same ten turns and nothing on the cards that invites asking: no "Ask me properly, then." among Mira's example lines, no "asks questions she already knows the answer to" in her Voice, and Ash is "a regular at the bookshop", not a man who "worked up the nerve to ask Mira out".
+- **The grader check takes cases labelled reply by reply** (`faults`): each reply is a case of its own on the card. Four written-in Chats; the label sheet lists a played Chat's replies with a label to fill for each.
+- A full run is now 200 calls: about $0.31, **at most $0.70, well over the $0.50 cap**. Played Chats are a third of that. `--samples 3` is still the size to use, and naming scenes is cheaper still.
+
+### What the real grader showed, and what mended it
+
+- **Asked reply by reply at the host's own temperature, the grader was no steadier:** 43 of 80 replies agreed with their label, and it answered both ways on 31. "Ask me properly." alone was a pass one time in three.
+- **At temperature 0: 62 of 80 agree, 4 unsteady,** and the other six graded checks are all steady again (a second check had begun to waver in the run before). Every grader call is now made at temperature 0: it reads, it does not write.
+- **By Chat, which is what the scorecard shows: 10 of 10 Chats came to their label, in all three asks each.** Four written-in (two pass, two fail) and the six real plays.
+- **What that does not say:**
+  - All six real plays are labelled a fail, so no real Chat tests whether the check passes one it should. The two written-in passes do.
+  - The 18 replies that still differ lean one way: the grader calls a reply pressing twice as often as the label does (12 to 6). In one real Chat it said all ten press where the label says five. The rule's margins absorb it; a Chat near the line could be failed wrongly.
+  - The labels on the real plays are Claude's, made reading each close, and the margins are judgement calls ("Take your time. I've got all night." was labelled pressing). The user's own labels are the test that counts.
+
+### One real play (GLM-5.3, two samples each, $0.074)
+
+| Scene | Replies that press, of ten | The check |
+|---|---|---|
+| `evening`, first play | 3, in a row: "Ask me properly…" at turns 7, 8, 9 | fail |
+| `evening`, second play | 2, apart | pass |
+| `unasked`, first play | 0 | pass |
+| `unasked`, second play | 1 | pass |
+
+- **Most of the pressing that is left is the Story's own doing.** With nothing on the cards inviting it, Mira pressed once in twenty replies. With the catchphrase, the Voice and Ash's errand as written, five in twenty, three of them her example line said three turns running.
+- So the rule added to the turn prompt holds where the cards do not pull against it, and a card that gives a Character an asking catchphrase will still get it said too often. That is the habit rule's ground ("never the same habit in two replies running"), and the pressing notes of ticket 04 name the thing for the next turn.
+- Two plays a scene is thin: this is the direction, not the size.
+- "Sounds like Mira" failed one `evening` play on a long last speech, as before.

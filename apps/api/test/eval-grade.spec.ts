@@ -3,7 +3,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import { FetchLike } from '../src/service/model-gateway/real/http.js';
-import { GRADER_CASES, GraderCase, startGraderCheck } from './live/eval-grade.js';
+import { OpenRouterClient } from '../src/service/model-gateway/real/openrouter-client.js';
+import { formatGraderCard, GRADER_CASES, GraderCase, runGraderCheck, startGraderCheck } from './live/eval-grade.js';
 import { EvalReport } from './live/eval-run.js';
 import { ChatScene, EVAL_SCENES } from './live/eval-scenes.js';
 
@@ -42,7 +43,7 @@ const line = (card: string, check: string) => card.split('\n').find((one) => one
 // Spec (prompt-evals, "The grader check"): every answer here is scripted; nothing reaches OpenRouter.
 describe('The grader check', () => {
     it('has, for every graded check of every scene, a reply labelled pass and a reply labelled fail', () => {
-        const graded = EVAL_SCENES.flatMap((scene) => (scene.kind === 'turn' || scene.kind === 'chat' ? [...scene.graded, ...(scene.kind === 'chat' ? scene.gradedChat : [])].map((check) => check.name) : []));
+        const graded = EVAL_SCENES.flatMap((scene) => (scene.kind === 'turn' || scene.kind === 'chat' ? [...scene.graded, ...(scene.kind === 'chat' ? [...scene.gradedChat, ...scene.gradedReplies] : [])].map((check) => check.name) : []));
         const without = [...new Set(graded)].filter((check) => !(['pass', 'fail'] as const).every((label) => GRADER_CASES.some((one) => one.check === check && one.label === label)));
 
         expect(without).toEqual([]);
@@ -145,18 +146,95 @@ describe('The grader check', () => {
     });
 
     it('a case about a whole Chat is asked with the turns it answers and its replies, and its one check', async () => {
-        const chat: GraderCase = { scene: 'evening', check: 'does not press the same demand', label: 'fail', reply: '', replies: ['@Mira Vance: Ask me properly.', '@Mira Vance: Nine years. Now ask me properly.'] };
+        const chat: GraderCase = { scene: 'slow', check: 'keeps the slow burn', label: 'fail', reply: '', replies: ['@Mira Vance: In.', '@Mira Vance: I have liked you since June. Stay tonight.'] };
         const { grader, started } = start({ ...KEY, EVAL_LABELS: labels([chat]), EVAL_SAMPLES: '1' });
 
         await started;
 
         const asked = grader.asked.at(-1)!;
-        const evening = EVAL_SCENES.find((scene) => scene.name === 'evening') as ChatScene;
-        expect(asked).toContain(evening.turns[0]);
-        expect(asked).toContain(evening.turns[1]);
-        expect(asked).not.toContain(evening.turns[2]);
-        expect(asked).toContain('Nine years. Now ask me properly.');
-        expect(asked).toContain('1. "does not press the same demand"');
+        const slow = EVAL_SCENES.find((scene) => scene.name === 'slow') as ChatScene;
+        expect(asked).toContain(slow.turns[0]);
+        expect(asked).toContain(slow.turns[1]);
+        expect(asked).not.toContain(slow.turns[2]);
+        expect(asked).toContain('I have liked you since June. Stay tonight.');
+        expect(asked).toContain('1. "keeps the slow burn"');
+    });
+
+    describe('a check asked of each reply', () => {
+        const replies = ['@Mira Vance: In.', '@Mira Vance: Nine years. Now ask me properly.', '@Mira Vance: Tragic. Hand it over.'];
+        const chat: GraderCase = { scene: 'evening', check: 'does not keep pressing', label: 'pass', reply: '', replies, faults: [false, true, false] };
+        /** A grader that says of every reply that it does not press. */
+        const neverPressed: FetchLike = async (_url, init) => {
+            const body = JSON.parse(String(init.body)) as { messages: { content: string }[] };
+            asked.push(body.messages.map((message) => message.content).join('\n'));
+            const text = JSON.stringify({ replies: replies.map((_, index) => ({ reply: index + 1, quote: `close ${index + 1}`, yes: false })) });
+            const json = { id: 'gen', choices: [{ message: { role: 'assistant', content: text }, finish_reason: 'stop' }], usage: { prompt_tokens: 100, completion_tokens: 20, cost: 0.0001 } };
+            return new Response(JSON.stringify(json), { status: 200, headers: { 'content-type': 'application/json' } });
+        };
+        const asked: string[] = [];
+
+        it('asks once a time about the whole Chat, and counts each reply as a case of its own on the card', async () => {
+            asked.length = 0;
+            const report = await runGraderCheck({ cases: [chat], repeats: 2, client: new OpenRouterClient('sk-or-test-not-a-real-key', neverPressed, async () => {}), git: GIT });
+
+            expect(asked).toHaveLength(2);
+            expect(asked[0]).toContain('Nine years. Now ask me properly.');
+            expect(asked[0]).toContain('a thing their turn was not about');
+            // Three replies: two labelled as not pressing, which the grader agreed with; one labelled as pressing, which it missed.
+            expect(line(formatGraderCard(report), 'does not keep pressing')).toBe('| evening | does not keep pressing | 3 | 2 of 3 | 1 | 0 | 0 | 0 |');
+            expect(formatGraderCard(report)).toContain('- evening, does not keep pressing: labelled fail (turn 2: @Mira Vance: Nine years. Now ask me properly.); the grader said pass on "close 2", then pass on "close 2".');
+        });
+
+        it('leaves out an entry labelled reply by reply for a check that is not asked of each reply, and one with a reply still to label', async () => {
+            const file = labels([
+                { scene: 'voice', check: 'sounds like Mira', reply: '@Mira Vance: Tea?', faults: [false] },
+                { ...chat, label: undefined, faults: [false, null, false] },
+            ]);
+            const { grader, started } = start({ ...KEY, EVAL_LABELS: file, EVAL_SAMPLES: '1' });
+
+            await started;
+
+            expect(grader.asked).toHaveLength(GRADER_CASES.length);
+        });
+
+        it('works a hand-labelled Chat’s own label out from its replies’ labels, by the scene’s rule', async () => {
+            const file = labels([{ ...chat, label: undefined }]);
+            const { grader, started } = start({ ...KEY, EVAL_LABELS: file, EVAL_SAMPLES: '1' });
+
+            await started;
+
+            expect(grader.asked).toHaveLength(GRADER_CASES.length + 1);
+        });
+
+        it('refuses a case whose labels do not come to one a reply', async () => {
+            const file = labels([{ ...chat, faults: [false, true] }]);
+
+            await expect(start({ ...KEY, EVAL_LABELS: file }).started).rejects.toThrow('needs one label a reply: 3 replies, 2 labels');
+        });
+
+        it('every written-in case of such a check says of each reply whether it presses, and its label is what the scene’s rule makes of that', () => {
+            const cases = GRADER_CASES.filter((one) => one.faults);
+            const evening = EVAL_SCENES.find((scene) => scene.name === 'evening') as ChatScene;
+
+            expect(cases.length).toBeGreaterThanOrEqual(3);
+            for (const one of cases) {
+                expect(one.faults).toHaveLength(one.replies!.length);
+                expect(one.label).toBe(evening.gradedReplies[0].rule(one.faults!.map((yes, index) => ({ yes, quote: String(index) }))).pass ? 'pass' : 'fail');
+            }
+        });
+
+        it('the label sheet lists a played Chat’s replies with a label to fill for each', async () => {
+            const reportDir = mkdtempSync(path.join(tmpdir(), 'grade-'));
+            const sample = { text: 'x', replies, error: null, results: [{ check: 'does not keep pressing', kind: 'graded', outcome: 'pass', reason: '' }] };
+            const saved = { startedAt: '2026-11-24T00:00:00.000Z', scenes: [{ name: 'evening', about: '', kind: 'chat', samples: [sample] }], calls: [] } as unknown as EvalReport;
+            writeFileSync(path.join(reportDir, 'eval-2026-11-24T00-00-00-000Z-glm-5.3.json'), JSON.stringify(saved));
+
+            const { sheet } = await start({ EVAL_GRADE: 'sheet' }, scriptedGrader(), reportDir).started;
+
+            expect(JSON.parse(readFileSync(sheet!, 'utf8'))).toEqual([
+                { scene: 'evening', check: 'does not keep pressing', criterion: expect.stringContaining('a thing their turn was not about'), label: null, reply: '', replies, faults: [null, null, null] },
+            ]);
+        });
     });
 
     it('stops before a call that could take the total past the cap, and says so', async () => {

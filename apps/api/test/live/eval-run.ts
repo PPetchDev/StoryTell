@@ -11,7 +11,7 @@ import { BACKGROUND_MODEL, PLAY_MODEL_CATALOGUE, PLAY_MODELS, PlayModel, PromptM
 import { FetchLike } from '../../src/service/model-gateway/real/http.js';
 import { backgroundSamplers, TEXT_MODELS } from '../../src/service/model-gateway/real/model-table.js';
 import { OpenRouterClient } from '../../src/service/model-gateway/real/openrouter-client.js';
-import { Check, CheckContext, GradedCheck } from './eval-checks.js';
+import { Check, CheckContext, GradedCheck, PerReplyCheck, ReplyVerdict } from './eval-checks.js';
 import { proseOf, SceneProse } from './eval-prose.js';
 import { ChatScene, EVAL_SCENES, EvalScene, TurnScene } from './eval-scenes.js';
 import { REPO_ROOT } from './smoke-run.js';
@@ -37,6 +37,13 @@ export const BACKGROUND = TEXT_MODELS[BACKGROUND_MODEL];
 /** Above the background model's list price on purpose: it only sizes the worst case against the cap. */
 export const BACKGROUND_PRICE_USD_PER_MILLION = { input: 0.5, output: 2 };
 export const GRADER_MAX_TOKENS = 400;
+/**
+ * The grader reads, it does not write: asked at the host's own temperature it answered both ways
+ * on plain cases ("Ask me properly." was a pass one time in three; the grader check, 2026-11-24).
+ */
+export const GRADER_SAMPLERS: SamplerValues = { temperature: 0 };
+/** A verdict a reply runs longer: a played Chat has ten replies or so. */
+export const PER_REPLY_MAX_TOKENS = 900;
 /**
  * What a call is expected to cost, for the figure given before spending: from the first real run
  * (2026-11-22), where a play call wrote 309 tokens of the 900 it could, and the background model
@@ -179,10 +186,15 @@ export function buildGraderPrompt(scene: Pick<TurnScene, 'input' | 'userText' | 
     ];
 }
 
+/** A played Chat as the grader is shown it: every turn of the user's and the reply to it, numbered, in order. */
+function playedChat(identity: string, turns: readonly string[], replies: readonly string[]): string {
+    return replies.map((reply, turn) => `Turn ${turn + 1}. ${identity}’s turn, written by the user:\n${turns[turn]}\n\nReply ${turn + 1}:\n${reply}`).join('\n\n');
+}
+
 /** What the grader is asked about a whole played Chat: every turn and its reply, in order, and the criteria. */
 export function buildChatGraderPrompt(scene: Pick<ChatScene, 'input'>, turns: readonly string[], replies: readonly string[], checks: GradedCheck[]): PromptMessage[] {
     const identity = scene.input.identity.name;
-    const chat = replies.map((reply, turn) => `Turn ${turn + 1}. ${identity}’s turn, written by the user:\n${turns[turn]}\n\nReply ${turn + 1}:\n${reply}`).join('\n\n');
+    const chat = playedChat(identity, turns, replies);
     const criteria = checks.map((check, index) => `${index + 1}. "${check.name}": ${check.criterion}`).join('\n');
     return [
         {
@@ -191,6 +203,44 @@ export function buildChatGraderPrompt(scene: Pick<ChatScene, 'input'>, turns: re
         },
         { role: 'user', content: `The user plays ${identity}.\n\n${chat}\n\nCriteria:\n${criteria}` },
     ];
+}
+
+/** What the grader is asked for a check of each reply: every turn and its reply, and the one question, answered once a reply. */
+export function buildReplyGraderPrompt(scene: Pick<ChatScene, 'input'>, turns: readonly string[], replies: readonly string[], check: PerReplyCheck): PromptMessage[] {
+    const identity = scene.input.identity.name;
+    const chat = playedChat(identity, turns, replies);
+    return [
+        {
+            role: 'system',
+            content:
+                'You check a played conversation from a piece of interactive fiction, one reply at a time. Judge only what is written in each reply, never the user’s turns, and judge each reply by itself. ' +
+                'Answer with JSON only: {"replies":[{"reply":<the reply\'s number>,"quote":"<the words of that reply you judged on, at most 15 words>","yes":true or false}]}, one entry for every reply, in order. ' +
+                'For each, first find the words that decide it, then answer: "yes" is true only when the answer to the question is yes for that reply.',
+        },
+        { role: 'user', content: `The user plays ${identity}.\n\n${chat}\n\nThe question, asked of each of the ${replies.length} replies:\n${check.question}` },
+    ];
+}
+
+/** The grader's verdict for each of `count` replies, in order; or, in words, why they cannot be used: one missing spoils the count. */
+export function parseReplyVerdicts(text: string, count: number): ReplyVerdict[] | string {
+    const body = /\{[\s\S]*\}/.exec(text)?.[0];
+    let entries: unknown;
+    try {
+        entries = body ? (JSON.parse(body) as { replies?: unknown }).replies : undefined;
+    } catch {
+        entries = undefined;
+    }
+    if (!Array.isArray(entries)) return 'the grader answer could not be read';
+    const verdicts = new Map<number, ReplyVerdict>();
+    for (const [index, entry] of entries.entries()) {
+        const { reply, yes, quote } = (entry ?? {}) as { reply?: unknown; yes?: unknown; quote?: unknown };
+        if (typeof yes !== 'boolean') continue;
+        // By its number where the grader gave one, else by its place.
+        const turn = typeof reply === 'number' && Number.isInteger(reply) ? reply : index + 1;
+        if (turn >= 1 && turn <= count && !verdicts.has(turn)) verdicts.set(turn, { yes, quote: typeof quote === 'string' ? quote : '' });
+    }
+    if (verdicts.size !== count) return `the grader gave ${verdicts.size} verdicts for ${count} replies`;
+    return Array.from({ length: count }, (_, index) => verdicts.get(index + 1)!);
 }
 
 /** The grader's verdicts by check name; a check it did not answer readably is left out. */
@@ -377,6 +427,10 @@ export function estimateEval(scenes: EvalScene[], model: PlayModel, samples: num
                 const reply = fillerReply(expected.at(-1)!.maxTokens * EXPECTED.playWrites);
                 add('background', buildChatGraderPrompt(scene, scene.turns, scene.turns.map(() => reply), scene.gradedChat), GRADER_MAX_TOKENS, times);
             }
+            for (const check of scene.gradedReplies) {
+                const reply = fillerReply(expected.at(-1)!.maxTokens * EXPECTED.playWrites);
+                add('background', buildReplyGraderPrompt(scene, scene.turns, scene.turns.map(() => reply), check), PER_REPLY_MAX_TOKENS, times);
+            }
             continue;
         }
         const prepared = prepare(scene);
@@ -475,7 +529,7 @@ export async function runEval(options: {
     const grade = async (name: string, checks: GradedCheck[], checked: Checked, sample: EvalSample): Promise<void> => {
         if (checks.length === 0) return;
         // One grader call covers all of this reply's graded checks that have something to judge.
-        const graded = checked.ask ? await send(name, 'grader', { messages: checked.ask.messages, maxTokens: GRADER_MAX_TOKENS, json: true }) : null;
+        const graded = checked.ask ? await send(name, 'grader', { messages: checked.ask.messages, maxTokens: GRADER_MAX_TOKENS, json: true, samplers: GRADER_SAMPLERS }) : null;
         const grades = graded?.text ? parseGrades(graded.text, checked.ask!.checks) : new Map<string, { pass: boolean; quote: string }>();
         for (const check of checks) {
             const grade = grades.get(check.name);
@@ -523,6 +577,17 @@ export async function runEval(options: {
         // And the checks about the whole Chat, in one more grader call.
         const whole = { checks: scene.gradedChat, messages: buildChatGraderPrompt(scene, scene.turns, sample.replies!, scene.gradedChat) };
         await grade(scene.name, scene.gradedChat, { results: [], ask: whole, skipped: new Map() }, sample);
+        // And the checks asked of each reply: the grader answers reply by reply, the scene's rule counts.
+        for (const check of scene.gradedReplies) {
+            const answer = await send(scene.name, 'grader', { messages: buildReplyGraderPrompt(scene, scene.turns, sample.replies!, check), maxTokens: PER_REPLY_MAX_TOKENS, json: true, samplers: GRADER_SAMPLERS });
+            const verdicts = answer.text === null ? 'the grader call failed' : parseReplyVerdicts(answer.text, sample.replies!.length);
+            if (typeof verdicts === 'string') {
+                sample.results.push({ check: check.name, kind: 'graded', outcome: 'not_graded', reason: verdicts });
+                continue;
+            }
+            const verdict = check.rule(verdicts);
+            sample.results.push({ check: check.name, kind: 'graded', outcome: verdict.pass ? 'pass' : 'fail', reason: verdict.reason });
+        }
     };
 
     const played = options.scenes.map((scene) => ({ scene, prepared: prepare(scene), samples: new Array<EvalSample | undefined>(samplesOf(scene, report.samples)).fill(undefined) }));

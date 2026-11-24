@@ -5,18 +5,22 @@ import { parseReply } from '../../src/manager/chat/turn/reply-parser.js';
 import { PromptMessage } from '../../src/service/model-gateway/model-gateway.js';
 import { FetchLike } from '../../src/service/model-gateway/real/http.js';
 import { OpenRouterClient } from '../../src/service/model-gateway/real/openrouter-client.js';
-import { GradedCheck } from './eval-checks.js';
+import { GradedCheck, PerReplyCheck } from './eval-checks.js';
 import {
     BACKGROUND,
     BACKGROUND_PRICE_USD_PER_MILLION,
     buildChatGraderPrompt,
     buildGraderPrompt,
+    buildReplyGraderPrompt,
     EVAL_CAP_USD,
     EvalRunRefused,
     EXPECTED,
     gitState,
     GRADER_MAX_TOKENS,
+    GRADER_SAMPLERS,
     parseGrades,
+    parseReplyVerdicts,
+    PER_REPLY_MAX_TOKENS,
     savedReports,
     worstCaseUsd,
 } from './eval-run.js';
@@ -42,6 +46,13 @@ export interface GraderCase {
      * (as many turns as there are replies). `reply` is then left empty.
      */
     replies?: string[];
+    /**
+     * For a check asked of each reply: whether each of `replies` has the fault the question asks
+     * about. Every reply is then a case of its own on the card. `label` is what the scene's rule
+     * makes of the whole: a test holds the written-in cases to that, and a hand-labelled entry that
+     * gives none has it worked out.
+     */
+    faults?: boolean[];
     /** Why the label is what it is, for whoever reads a disagreement. */
     why?: string;
 }
@@ -168,24 +179,25 @@ export const GRADER_CASES: GraderCase[] = [
         reply: `Mira smiled at the foreign words, guessing their meaning from the bag.\n\n${MIRA} For me? Go on, then.`,
         why: 'The narration calls his words foreign.',
     },
-    // Whole Chats: the replies to the scene's first turns, in order.
+    // Whole Chats: the replies to the scene's first turns, in order. For a check asked of each reply, `faults` says of each whether it presses.
     {
         scene: 'evening',
-        check: 'does not press the same demand',
+        check: 'does not keep pressing',
         label: 'pass',
         reply: '',
         replies: [
             `Mira unlocked the door and stood aside.\n\n${MIRA} You are dripping on my mat. In.`,
-            `She watched his hand on the shelf.\n\n${MIRA} Nine years. Did you come out in this to ask me that, or something else?`,
+            `She watched his hand on the shelf.\n\n${MIRA} Nine years. Counting, are we?`,
             `She took the bag and looked inside.\n\n${MIRA} Too much for one? Tragic. I will take the almond one off your hands.`,
             `She turned the cover toward him.\n\n${MIRA} Poems. Bad ones. The good ones never get returned.`,
             `She shut the book and slid it across.\n\n${MIRA} Worse than bad. Read the last page and tell me I am wrong.`,
         ],
-        why: 'She asks once what he came for, then follows each thing he talks about.',
+        faults: [false, false, false, false, false],
+        why: 'She follows each thing he talks about.',
     },
     {
         scene: 'evening',
-        check: 'does not press the same demand',
+        check: 'does not keep pressing',
         label: 'fail',
         reply: '',
         replies: [
@@ -195,11 +207,12 @@ export const GRADER_CASES: GraderCase[] = [
             `${MIRA} Poems. You do not care what I am reading. Ask me properly.`,
             `${MIRA} The ending is fine. Yours is taking all night. Ask me properly, then.`,
         ],
+        faults: [true, true, true, true, true],
         why: 'Every reply ends by demanding the same question, whatever he said.',
     },
     {
         scene: 'evening',
-        check: 'does not press the same demand',
+        check: 'does not keep pressing',
         label: 'fail',
         reply: '',
         replies: [
@@ -209,7 +222,23 @@ export const GRADER_CASES: GraderCase[] = [
             `She turned the cover toward him.\n\n${MIRA} Poems. And that makes three questions that are not the one you walked here with. Try again.`,
             `She shut the book.\n\n${MIRA} Worse than bad. So is waiting. Whenever you are ready to say the thing, I am right here.`,
         ],
+        faults: [false, true, true, true, true],
         why: 'She answers each topic, but four replies in a row close by pressing him for the same unsaid thing, each in other words.',
+    },
+    {
+        scene: 'evening',
+        check: 'does not keep pressing',
+        label: 'pass',
+        reply: '',
+        replies: [
+            `Mira unlocked the door and stood aside.\n\n${MIRA} You are dripping on my mat. In.`,
+            `She watched his hand on the shelf.\n\n${MIRA} Nine years. But you did not walk here in this to ask me that. Go on, say it.`,
+            `She took the bag and looked inside.\n\n${MIRA} Too much for one? Tragic. I will take the almond one off your hands.`,
+            `She turned the cover toward him.\n\n${MIRA} Poems. Bad ones. The good ones never get returned.`,
+            `She shut the book.\n\n${MIRA} Worse than bad. Now, the thing you came to say. Out with it.`,
+        ],
+        faults: [false, true, false, false, true],
+        why: 'She presses twice, three turns apart, and follows him in between: now and then, not a habit.',
     },
     {
         scene: 'slow',
@@ -263,10 +292,19 @@ export interface GradeReport {
     cases: (GraderCase & { verdicts: Verdict[]; quotes: string[] })[];
 }
 
-/** What the grader is asked about a case: its one check alone, as the run asks it; or why there is nothing to ask. */
-function asked(one: GraderCase): { check: GradedCheck; messages: PromptMessage[] } | { problem: string } | { nothing: string } {
+/** What the grader is asked about a case: its one check alone, as the run asks it (`each` for a check asked of every reply of a Chat); or why there is nothing to ask. */
+function asked(one: GraderCase): { check: GradedCheck; messages: PromptMessage[] } | { each: PerReplyCheck; messages: PromptMessage[] } | { problem: string } | { nothing: string } {
     const scene = EVAL_SCENES.find((other) => other.name === one.scene);
     if (!scene || (scene.kind !== 'turn' && scene.kind !== 'chat')) return { problem: `Unknown scene "${one.scene}" in a grader case.` };
+    const each = scene.kind === 'chat' ? scene.gradedReplies.find((other) => other.name === one.check) : undefined;
+    if (each && scene.kind === 'chat') {
+        const replies = one.replies ?? [];
+        if (replies.length === 0 || replies.length > scene.turns.length) return { problem: `A grader case of "${one.scene}", "${one.check}" needs the Chat's replies: from one to ${scene.turns.length}.` };
+        if (one.faults?.length !== replies.length) {
+            return { problem: `A grader case of "${one.scene}", "${one.check}" needs one label a reply: ${replies.length} replies, ${one.faults?.length ?? 0} labels.` };
+        }
+        return { each, messages: buildReplyGraderPrompt(scene, scene.turns.slice(0, replies.length), replies, each) };
+    }
     const whole = scene.kind === 'chat' ? scene.gradedChat.find((other) => other.name === one.check) : undefined;
     const check = whole ?? scene.graded.find((other) => other.name === one.check);
     if (!check) return { problem: `Scene "${one.scene}" has no graded check "${one.check}".` };
@@ -297,9 +335,10 @@ export function estimateGrade(cases: GraderCase[], repeats: number): { calls: nu
     for (const one of cases) {
         const ask = asked(one);
         if (!('messages' in ask)) continue;
+        const maxTokens = 'each' in ask ? PER_REPLY_MAX_TOKENS : GRADER_MAX_TOKENS;
         estimate.calls += repeats;
-        estimate.expectedUsd += repeats * worstCaseUsd(EXPECTED.backgroundPriceUsdPerMillion, ask.messages, GRADER_MAX_TOKENS * EXPECTED.backgroundWrites);
-        estimate.worstUsd += repeats * worstCaseUsd(BACKGROUND_PRICE_USD_PER_MILLION, ask.messages, GRADER_MAX_TOKENS);
+        estimate.expectedUsd += repeats * worstCaseUsd(EXPECTED.backgroundPriceUsdPerMillion, ask.messages, maxTokens * EXPECTED.backgroundWrites);
+        estimate.worstUsd += repeats * worstCaseUsd(BACKGROUND_PRICE_USD_PER_MILLION, ask.messages, maxTokens);
     }
     return estimate;
 }
@@ -320,7 +359,21 @@ export async function runGraderCheck(options: { cases: GraderCase[]; client: Ope
     };
     for (const one of options.cases) {
         const ask = asked(one);
+        // A check asked of each reply: every reply is a case of its own, labelled by whether it has the fault.
+        const perReply =
+            'each' in ask
+                ? one.replies!.map((reply, index) => ({
+                      scene: one.scene,
+                      check: one.check,
+                      label: (one.faults![index] ? 'fail' : 'pass') as Label,
+                      reply,
+                      why: `turn ${index + 1}: ${reply.replace(/\s+/g, ' ').slice(0, 90)}`,
+                      verdicts: [] as Verdict[],
+                      quotes: [] as string[],
+                  }))
+                : null;
         const result = { ...one, verdicts: [] as Verdict[], quotes: [] as string[] };
+        const maxTokens = perReply ? PER_REPLY_MAX_TOKENS : GRADER_MAX_TOKENS;
         for (let time = 0; time < report.repeats && !report.stoppedAtCap; time++) {
             if (!('messages' in ask)) {
                 result.verdicts.push('not_graded');
@@ -328,23 +381,36 @@ export async function runGraderCheck(options: { cases: GraderCase[]; client: Ope
                 continue;
             }
             // The cap, as the run counts it: nothing is sent that could take the total past it.
-            if (report.totalUsd + worstCaseUsd(BACKGROUND_PRICE_USD_PER_MILLION, ask.messages, GRADER_MAX_TOKENS) > report.capUsd) {
+            if (report.totalUsd + worstCaseUsd(BACKGROUND_PRICE_USD_PER_MILLION, ask.messages, maxTokens) > report.capUsd) {
                 report.stoppedAtCap = true;
                 break;
             }
             report.calls++;
             try {
-                const answer = await options.client.chat({ model: BACKGROUND, messages: ask.messages, maxTokens: GRADER_MAX_TOKENS, json: true });
+                const answer = await options.client.chat({ model: BACKGROUND, messages: ask.messages, maxTokens, json: true, samplers: GRADER_SAMPLERS });
                 report.totalUsd = Math.round((report.totalUsd + answer.costUsd) * 1e9) / 1e9;
+                if (perReply) {
+                    const verdicts = parseReplyVerdicts(answer.text, perReply.length);
+                    for (const [index, each] of perReply.entries()) {
+                        // "Yes" is the fault, so a yes is a fail for that reply.
+                        each.verdicts.push(typeof verdicts === 'string' ? 'not_graded' : verdicts[index].yes ? 'fail' : 'pass');
+                        each.quotes.push(typeof verdicts === 'string' ? verdicts : verdicts[index].quote);
+                    }
+                    continue;
+                }
+                if (!('check' in ask)) continue;
                 const grade = parseGrades(answer.text, [ask.check]).get(ask.check.name);
                 result.verdicts.push(grade ? (grade.pass ? 'pass' : 'fail') : 'not_graded');
                 result.quotes.push(grade ? grade.quote : 'the grader answer could not be read');
             } catch (error) {
-                result.verdicts.push('not_graded');
-                result.quotes.push(`the grader call failed: ${(error as Error).message}`);
+                for (const each of perReply ?? [result]) {
+                    each.verdicts.push('not_graded');
+                    each.quotes.push(`the grader call failed: ${(error as Error).message}`);
+                }
             }
         }
-        if (result.verdicts.length > 0) report.cases.push(result);
+        if (perReply) report.cases.push(...perReply.filter((each) => each.verdicts.length > 0));
+        else if (result.verdicts.length > 0) report.cases.push(result);
     }
     return report;
 }
@@ -385,19 +451,29 @@ function labelled(file: string): GraderCase[] {
     if (!existsSync(file)) throw new EvalRunRefused(`No labels at ${file}.`);
     const entries = JSON.parse(readFileSync(file, 'utf8')) as Partial<GraderCase>[];
     return entries.flatMap((entry) =>
-        entry.label === 'pass' || entry.label === 'fail' ? [{ scene: String(entry.scene), check: String(entry.check), label: entry.label, reply: String(entry.reply ?? ''), ...(Array.isArray(entry.replies) ? { replies: entry.replies.map(String) } : {}), why: entry.why }] : [],
+        {
+            const scene = EVAL_SCENES.find((other) => other.name === entry.scene);
+            const each = scene?.kind === 'chat' ? scene.gradedReplies.find((other) => other.name === entry.check) : undefined;
+            const text = { scene: String(entry.scene), check: String(entry.check), reply: String(entry.reply ?? ''), ...(Array.isArray(entry.replies) ? { replies: entry.replies.map(String) } : {}), why: entry.why };
+            if (!each) return entry.label === 'pass' || entry.label === 'fail' ? [{ ...text, label: entry.label }] : [];
+            // A check asked of each reply is labelled reply by reply: the entry counts once every reply has its label, and the Chat's own label is the rule's.
+            const faults = Array.isArray(entry.faults) && entry.faults.every((one) => typeof one === 'boolean') ? entry.faults : null;
+            if (!faults) return [];
+            const label: Label = each.rule(faults.map((yes) => ({ yes, quote: '' }))).pass ? 'pass' : 'fail';
+            return [{ ...text, faults, label }];
+        },
     );
 }
 
 /**
  * A sheet to label by hand, from the replies of the runs saved in `dir`: every reply a graded
  * check read, with `label` left empty and the grader's own verdict left out, so the reader is not
- * led. Free: nothing is sent anywhere. Fill each `label` with "pass" or "fail" and hand the file
- * back with --labels.
+ * led. Free: nothing is sent anywhere. Fill each `label` with "pass" or "fail" (for a check asked
+ * of each reply, each `faults` entry with true or false instead) and hand the file back with --labels.
  */
 export function writeLabelSheet(dir: string): { file: string; replies: number } {
     const seen = new Set<string>();
-    const sheet: { scene: string; check: string; criterion: string; label: null; reply: string; replies?: string[] }[] = [];
+    const sheet: { scene: string; check: string; criterion: string; label: null; reply: string; replies?: string[]; faults?: null[] }[] = [];
     for (const report of savedReports(dir)) {
         for (const scene of report.scenes) {
             const known = EVAL_SCENES.find((other) => other.name === scene.name);
@@ -406,6 +482,13 @@ export function writeLabelSheet(dir: string): { file: string; replies: number } 
                 const reply = sample.replies?.at(-1) ?? sample.text;
                 if (reply === null) continue;
                 for (const result of sample.results) {
+                    const each = known.kind === 'chat' && sample.replies ? known.gradedReplies.find((other) => other.name === result.check) : undefined;
+                    if (each && result.kind === 'graded') {
+                        const key = `${scene.name}|${each.name}|${sample.replies!.join('\n\n')}`;
+                        if (!seen.has(key)) sheet.push({ scene: scene.name, check: each.name, criterion: each.question, label: null, reply: '', replies: sample.replies, faults: sample.replies!.map(() => null) });
+                        seen.add(key);
+                        continue;
+                    }
                     // A check about the whole Chat is labelled on all its replies; any other on the one reply it read.
                     const whole = known.kind === 'chat' && sample.replies ? known.gradedChat.find((other) => other.name === result.check) : undefined;
                     const check = whole ?? known.graded.find((other) => other.name === result.check);
@@ -435,7 +518,7 @@ export async function startGraderCheck(
 ): Promise<{ report: GradeReport | null; card: string | null; sheet: string | null }> {
     if (env.EVAL_GRADE === 'sheet') {
         const sheet = writeLabelSheet(deps.reportDir);
-        deps.log(`${sheet.replies} replies to label, from the saved runs: ${sheet.file}\nGive each "label" the word pass or fail, then: npm run eval:live -- --grade --labels <that file> --spend`);
+        deps.log(`${sheet.replies} replies to label, from the saved runs: ${sheet.file}\nGive each "label" the word pass or fail (for an entry with "faults", true or false for each reply instead), then: npm run eval:live -- --grade --labels <that file> --spend`);
         return { report: null, card: null, sheet: sheet.file };
     }
     const repeats = env.EVAL_SAMPLES ? Number(env.EVAL_SAMPLES) : GRADE_REPEATS;

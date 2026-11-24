@@ -15,10 +15,12 @@ import {
     GradedCheck,
     habitInFewLines,
     lengthIs,
+    nowAndThen,
     mentions,
     neverSpeaksAsTheUser,
     noRefusal,
     parsesAsAReply,
+    PerReplyCheck,
     replyTo,
     speaks,
     speechIsOnlySpoken,
@@ -92,6 +94,8 @@ export interface ChatScene extends SceneBase {
     graded: GradedCheck[];
     /** Judged on the whole Chat: every turn and its reply, in order. */
     gradedChat: GradedCheck[];
+    /** Asked of each reply by the grader, and counted in code. */
+    gradedReplies: PerReplyCheck[];
     /** The most times it is played in a run: every sample is one call a turn. */
     mostSamples: number;
 }
@@ -403,14 +407,15 @@ const NINE_YEARS = { facts: [{ topic: 'Mira’s years running the bookshop', fac
 /**
  * From the first real play of `evening` (2026-11-23): from the fourth turn on, every reply closed
  * with Mira pressing Ash to "ask properly", whatever his turn had been about. The turn prompt lets
- * a Character make advances unasked; a Character stuck on one demand is another thing.
+ * a Character make advances unasked; a Character stuck on one demand is another thing. Asked of
+ * each reply, and counted in code: as one question about the whole Chat the grader answered both
+ * ways on the same Chat.
  */
-const NOT_PRESSING: GradedCheck = {
-    name: 'does not press the same demand',
-    criterion:
-        // Unsteady on the real grader (the grader check, 2026-11-24): it answers both ways on two of five cases, as it has to count replies.
-        // A wording that spelt the counting out ("go through the replies one by one") was worse: four of five unsteady. Read a result by eye.
-        'It fails if, in four or more of the replies, a Character presses Ash for the same thing (to ask a question, to say something, to make a move) although Ash’s turn was about something else. It passes if a Character asks for it once or twice and otherwise follows what Ash talks about.',
+const NOT_PRESSING: PerReplyCheck = {
+    name: 'does not keep pressing',
+    question:
+        'Does this reply’s close, its last line or two, press Ash to ask, say or decide a thing their turn was not about? Answering what Ash asked, teasing him about what he said, or an ordinary question about it is not pressing.',
+    rule: nowAndThen,
 };
 
 /** What the slow-burn pacing line asks: no hurry toward a resolution, a confession or a change of scene. */
@@ -420,6 +425,20 @@ const SLOW_BURN: GradedCheck = {
         'It fails if a Character declares their feelings, asks Ash on a date, invites Ash to stay the night, or takes the scene to another place, when no turn of Ash’s before it asked for that. It passes if there is only talk, teasing, flirting or a passing touch.',
 };
 
+/** Ten turns of small talk in the bookshop: nothing in them asks Mira for more than an answer. */
+const EVENING_TURNS = [
+    'Ash knocks on the bookshop door after closing and waves through the rain-streaked glass.',
+    'Ash shakes off his coat, runs a hand along the nearest shelf and asks Mira how long she has had the shop.',
+    'Ash holds up a paper bag from the bakery and says he brought too much for one person.',
+    'Ash asks what she was reading when he knocked.',
+    'Ash laughs, pulls up the stool by the counter and asks whether the ending is really that bad.',
+    'Ash tells her the ferry engine finally turned over today, after three weeks of him swearing at it.',
+    'Ash asks whether she ever thinks about closing the shop and doing something else.',
+    'Ash says the rain sounds as if it means to stay, and asks if she minds him waiting it out here.',
+    'Ash looks up at the old sign over the till and says he never asked properly: how many years has it been her name on it?',
+    'Ash finishes his tea, stands, and asks whether he can come by again tomorrow.',
+];
+
 const CHAT_SCENES: ChatScene[] = [
     {
         kind: 'chat',
@@ -427,18 +446,7 @@ const CHAT_SCENES: ChatScene[] = [
         about: 'Ten turns played in a row: the format, a fact, the phrases and Mira’s voice hold to the end.',
         expects: ['# Established facts', 'nine years', 'Voice: Short, teasing sentences', 'Never press Ash for the same thing'],
         input: { ...base, facts: NINE_YEARS },
-        turns: [
-            'Ash knocks on the bookshop door after closing and waves through the rain-streaked glass.',
-            'Ash shakes off his coat, runs a hand along the nearest shelf and asks Mira how long she has had the shop.',
-            'Ash holds up a paper bag from the bakery and says he brought too much for one person.',
-            'Ash asks what she was reading when he knocked.',
-            'Ash laughs, pulls up the stool by the counter and asks whether the ending is really that bad.',
-            'Ash tells her the ferry engine finally turned over today, after three weeks of him swearing at it.',
-            'Ash asks whether she ever thinks about closing the shop and doing something else.',
-            'Ash says the rain sounds as if it means to stay, and asks if she minds him waiting it out here.',
-            'Ash looks up at the old sign over the till and says he never asked properly: how many years has it been her name on it?',
-            'Ash finishes his tea, stands, and asks whether he can come by again tomorrow.',
-        ],
+        turns: EVENING_TURNS,
         checks: [
             everyReply(parsesAsAReply),
             everyReply(neverSpeaksAsTheUser),
@@ -449,7 +457,30 @@ const CHAT_SCENES: ChatScene[] = [
             dropsRepeatedPhrases([MIRA, 'Ash']),
         ],
         graded: [SOUNDS_LIKE_MIRA],
-        gradedChat: [NOT_PRESSING],
+        gradedChat: [],
+        gradedReplies: [NOT_PRESSING],
+        mostSamples: 2,
+    },
+    {
+        kind: 'chat',
+        name: 'unasked',
+        about: 'The evening again, with nothing on the cards that invites asking: what pressing is left is the prompt’s, not the Story’s.',
+        expects: ['Never press Ash for the same thing', 'Tragic. Hand it over.'],
+        // "Ask me properly, then." is one of Mira's example lines, and the real plays of 2026-11-23 and 24 reached for it as her catchphrase.
+        // Her Voice ("asks questions she already knows the answer to") and Ash's own card ("worked up the nerve to ask Mira out") invite it too.
+        input: {
+            ...base,
+            story: {
+                ...SMOKE_STORY.story,
+                characters: [{ ...SMOKE_STORY.story.characters[0], voice: 'Short, teasing sentences; dry understatement.', exampleLines: ['You came back. I was hoping you would.', 'Tragic. Hand it over.'] }],
+            },
+            identity: { name: 'Ash', description: 'Ash Rowe, 34 years old, a ferry mechanic and a regular at the bookshop.' },
+        },
+        turns: EVENING_TURNS,
+        checks: [everyReply(parsesAsAReply), everyReply(neverSpeaksAsTheUser), everyReply(speaks(MIRA))],
+        graded: [],
+        gradedChat: [],
+        gradedReplies: [NOT_PRESSING],
         mostSamples: 2,
     },
     {
@@ -470,6 +501,7 @@ const CHAT_SCENES: ChatScene[] = [
         checks: [everyReply(parsesAsAReply), everyReply(neverSpeaksAsTheUser), everyReply(speaks(MIRA)), dropsRepeatedPhrases([MIRA, 'Ash'])],
         graded: [],
         gradedChat: [SLOW_BURN],
+        gradedReplies: [],
         mostSamples: 2,
     },
 ];
