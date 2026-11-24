@@ -325,6 +325,23 @@ and systemd runs `storytell-api` and `storytell-web`. The files for it are in `s
 ### Deploying a commit
 
 ```bash
+npm run vm:deploy                  # the checked-out commit; or: npm run vm:deploy -- <ref>
+```
+
+It reads where the VM is from `.env.vm` (git-ignored; copy the VM block of `.env.example`). It
+refuses uncommitted changes to tracked files and a commit that is not pushed, archives the commit,
+uploads it with `scripts/vm/deploy.sh`, runs that script on the VM, and ends by saying which commit
+live runs and what health answers.
+
+If the commits going live change a prompt builder (the turn prompt, the Judge, Memory extraction,
+Story so far, Line repair) and no prompt eval run measured that exact commit with a clean tree, it
+stops and names the files. Run the eval first (`npm run eval:live -w apps/api -- all --spend
+--samples 3`; it spends credit), or go ahead on purpose with `npm run vm:deploy -- --unmeasured`.
+It never starts an eval run itself.
+
+By hand, the same steps:
+
+```bash
 git archive --format=tar.gz -o release.tar.gz <commit>
 scp release.tar.gz scripts/vm/deploy.sh ubuntu@<vm>:/tmp/
 ssh -o ServerAliveInterval=30 ubuntu@<vm> "bash /tmp/deploy.sh <commit>"
