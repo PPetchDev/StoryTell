@@ -1,4 +1,4 @@
-import { ReplyLength } from '../../src/model/story/entities/story.entity.js';
+import { Pacing, ReplyLength } from '../../src/model/story/entities/story.entity.js';
 import type { buildJudgePrompt, parseJudgement } from '../../src/manager/chat/judge/judge-prompt.js';
 import type { Extraction, ExtractionPromptInput } from '../../src/manager/chat/memory/memory-prompt.js';
 import { PromptCharacter, PromptHistoryMessage, TurnPromptInput } from '../../src/manager/chat/turn/prompt.js';
@@ -90,6 +90,8 @@ export interface ChatScene extends SceneBase {
     checks: ChatCheck[];
     /** Judged on the reply to the last turn. */
     graded: GradedCheck[];
+    /** Judged on the whole Chat: every turn and its reply, in order. */
+    gradedChat: GradedCheck[];
     /** The most times it is played in a run: every sample is one call a turn. */
     mostSamples: number;
 }
@@ -397,10 +399,26 @@ const TURN_SCENES: TurnScene[] = [
 ];
 
 const NINE_YEARS = { facts: [{ topic: 'Mira’s years running the bookshop', fact: 'nine years' }], slips: [] };
-const NO_OTHER_YEARS = avoids(
-    'no other number of years',
-    /\b(?:one|two|three|four|five|six|seven|eight|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|eighteen|twenty|thirty|\d+)\s+(?:years|summers|winters)\b/i,
-);
+
+/**
+ * From the first real play of `evening` (2026-11-23): from the fourth turn on, every reply closed
+ * with Mira pressing Ash to "ask properly", whatever his turn had been about. The turn prompt lets
+ * a Character make advances unasked; a Character stuck on one demand is another thing.
+ */
+const NOT_PRESSING: GradedCheck = {
+    name: 'does not press the same demand',
+    criterion:
+        // Unsteady on the real grader (the grader check, 2026-11-24): it answers both ways on two of five cases, as it has to count replies.
+        // A wording that spelt the counting out ("go through the replies one by one") was worse: four of five unsteady. Read a result by eye.
+        'It fails if, in four or more of the replies, a Character presses Ash for the same thing (to ask a question, to say something, to make a move) although Ash’s turn was about something else. It passes if a Character asks for it once or twice and otherwise follows what Ash talks about.',
+};
+
+/** What the slow-burn pacing line asks: no hurry toward a resolution, a confession or a change of scene. */
+const SLOW_BURN: GradedCheck = {
+    name: 'keeps the slow burn',
+    criterion:
+        'It fails if a Character declares their feelings, asks Ash on a date, invites Ash to stay the night, or takes the scene to another place, when no turn of Ash’s before it asked for that. It passes if there is only talk, teasing, flirting or a passing touch.',
+};
 
 const CHAT_SCENES: ChatScene[] = [
     {
@@ -427,10 +445,31 @@ const CHAT_SCENES: ChatScene[] = [
             everyReply(speaks(MIRA)),
             replyTo(2, mentions('says nine', /\bnine\b/i)),
             replyTo(9, mentions('says nine', /\bnine\b/i)),
-            everyReply(NO_OTHER_YEARS),
+            // Not "no other number of years" in every reply: over ten turns Mira says "two years" and "six years" of other things (real play, 2026-11-24).
             dropsRepeatedPhrases([MIRA, 'Ash']),
         ],
         graded: [SOUNDS_LIKE_MIRA],
+        gradedChat: [NOT_PRESSING],
+        mostSamples: 2,
+    },
+    {
+        kind: 'chat',
+        name: 'slow',
+        about: 'A Story set to slow burn stays one over six turns of small talk: no confession, no invitation, no change of place.',
+        expects: ['Pacing: slow burn.'],
+        input: { ...base, story: { ...SMOKE_STORY.story, pacing: Pacing.Slow } },
+        turns: [
+            'Ash knocks on the bookshop door after closing and waves through the rain-streaked glass.',
+            'Ash holds up a paper bag from the bakery and says he brought too much for one person.',
+            'Ash asks what she was reading when he knocked.',
+            'Ash tells her the ferry engine finally turned over today, after three weeks of him swearing at it.',
+            'Ash asks whether she ever thinks about closing the shop and doing something else.',
+            'Ash says the rain sounds as if it means to stay, and asks if she minds him waiting it out here.',
+        ],
+        // "Mira speaks" earns its place here: in the first real play a whole Chat had no @Name: line, every word of hers in quotation marks in the narration.
+        checks: [everyReply(parsesAsAReply), everyReply(neverSpeaksAsTheUser), everyReply(speaks(MIRA)), dropsRepeatedPhrases([MIRA, 'Ash'])],
+        graded: [],
+        gradedChat: [SLOW_BURN],
         mostSamples: 2,
     },
 ];

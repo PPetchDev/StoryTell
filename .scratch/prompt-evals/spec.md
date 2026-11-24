@@ -307,3 +307,39 @@ Both plays were read by eye. Each of these is in both, unless said:
 - A check on the played Chat that the Narrator does not run ahead of the user: graded, over the whole Chat, with cases in the grader check before it is believed.
 - A code check that the number of speech lines a reply does not grow turn over turn, and one that the replies do not all end on a question to the user.
 - The place a played Chat is in, kept as the app keeps it (the Judge between turns), so a move the user did not make shows.
+
+## Checks on a whole played Chat (2026-11-24)
+
+Built on the user's word, from what reading the first played Chat showed. Spent: $0.063 ($0.052 on one play of `slow` and `evening` at two samples, $0.011 on grader checks).
+
+### What changed in the plan, and why
+
+The reading had called it "Mira takes the scene over". The turn prompt asks for that: "Characters act on their desires ... without waiting to be asked: one who wants Ash flirts, touches, teases and makes advances when the moment allows." So an advance is no fault, and no check was written against it. Two things in those Chats do go against the prompt, and each has a check now:
+
+1. **A Character stuck on one demand.** From the fourth turn on, every reply closed with Mira pressing Ash to "ask properly" or "say the thing", whatever his turn had been about.
+2. **The slow-burn pacing line**, which the Story can set and nothing tested: "don't hurry toward a resolution, a confession or a change of scene."
+
+### Built
+
+- **A played Chat can have checks graded on the whole of it** (`gradedChat`): one more grader call, shown every turn and its reply in order. The cost said before spending counts it.
+- **`evening` has "does not press the same demand".**
+- **A second played Chat, `slow`:** six turns of small talk under the slow-burn line, with "keeps the slow burn" (no declaration, date, invitation to stay or change of place that no turn of Ash's asked for).
+- **The grader check takes whole Chats:** a case can hold the replies to a scene's first turns. Six are written in, a pass and two fails for each new check; the label sheet lists whole-Chat entries with their replies.
+- A full run is now 178 calls at five samples: about $0.25, **at most $0.57, over the $0.50 cap**. The first full run cost a third of its estimate, so the cap is unlikely to bite, but `--samples 3` is the safe size.
+
+### What the real grader says of the two new checks
+
+- **"Keeps the slow burn": 3 of 3 cases, steady,** at three and at five asks a case.
+- **"Does not press the same demand": unsteady, and left marked so in the scene.** It has to count replies. On five cases (three written, and the two real Chats of 2026-11-23, labelled fail by Claude on reading them) it agreed on three and answered both ways on two. The two real Chats it failed every time. A wording that spelt the counting out was worse (four of five unsteady) and was taken back. **Read this check's result by eye until it is rebuilt.** The likely rebuild: ask the grader about each reply's closing line alone, one yes or no, and count in code.
+
+### One real play of both (GLM-5.3, two samples, $0.052)
+
+- **`slow`: the slow burn held in both plays** by the grader, and by eye there is no confession, invitation or move. Mira still presses "say it" in most replies, which the slow-burn check rightly does not count.
+- **`slow`, first play: not one `@Name:` line in six replies.** Every word of Mira's was in quotation marks inside the narration, so in the app the Narrator would have spoken all of it and Mira nothing. The first reply set the shape and five more copied it. "Parses" passed, as a reply with no speech line parses. The scene now also checks that Mira speaks in every reply, which this play fails. One play in six so far; whether the slow-burn line makes it likelier is not known.
+- **`evening`: "no other number of years" failed both plays, wrongly.** Mira said "took me two years to stop shelving things where he'd put them" and "fixing engines for what, six years?". Over ten turns other spans of years are bound to come up, so the check is gone from the played Chat; "says nine" at turns 2 and 9 carries the fact, and passed.
+- **`evening`, second play:** "sounds like Mira" failed on the last reply, the first fail that check has had, and "does not press the same demand" failed, quoting "Ask me properly, then" from four replies.
+
+### Where this leaves the harness
+
+- It now finds things: the missing `@Name:` lines, the pressing loop, and a voice check that can fail. Three plays ago every line was a pass.
+- The pressing loop is in every real Chat played so far (six of six by eye). It is the first thing worth changing in the turn prompt, and the harness can now say whether a change helps, by eye today and by a rebuilt check after.

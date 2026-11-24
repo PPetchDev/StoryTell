@@ -5,7 +5,7 @@ import path from 'node:path';
 import { FetchLike } from '../src/service/model-gateway/real/http.js';
 import { GRADER_CASES, GraderCase, startGraderCheck } from './live/eval-grade.js';
 import { EvalReport } from './live/eval-run.js';
-import { EVAL_SCENES } from './live/eval-scenes.js';
+import { ChatScene, EVAL_SCENES } from './live/eval-scenes.js';
 
 const GIT = { commit: 'abc1234', dirty: false };
 const KEY = { EVAL_GRADE: 'yes', EVAL_SPEND: 'yes', OPENROUTER_API_KEY: 'sk-or-test-not-a-real-key' };
@@ -42,7 +42,7 @@ const line = (card: string, check: string) => card.split('\n').find((one) => one
 // Spec (prompt-evals, "The grader check"): every answer here is scripted; nothing reaches OpenRouter.
 describe('The grader check', () => {
     it('has, for every graded check of every scene, a reply labelled pass and a reply labelled fail', () => {
-        const graded = EVAL_SCENES.flatMap((scene) => (scene.kind === 'turn' || scene.kind === 'chat' ? scene.graded.map((check) => check.name) : []));
+        const graded = EVAL_SCENES.flatMap((scene) => (scene.kind === 'turn' || scene.kind === 'chat' ? [...scene.graded, ...(scene.kind === 'chat' ? scene.gradedChat : [])].map((check) => check.name) : []));
         const without = [...new Set(graded)].filter((check) => !(['pass', 'fail'] as const).every((label) => GRADER_CASES.some((one) => one.check === check && one.label === label)));
 
         expect(without).toEqual([]);
@@ -86,7 +86,8 @@ describe('The grader check', () => {
     });
 
     it('a grader that agrees with every label leaves nothing to list', async () => {
-        const byReply = new Map(GRADER_CASES.map((one) => [one.reply, one.label === 'pass']));
+        // A whole Chat is known by its last reply.
+        const byReply = new Map(GRADER_CASES.map((one) => [one.replies?.at(-1) ?? one.reply, one.label === 'pass']));
         const { started } = start(KEY, scriptedGrader((_index, asked) => [...byReply].find(([reply]) => asked.includes(reply))![1]));
 
         const text = readFileSync((await started).card!, 'utf8');
@@ -141,6 +142,21 @@ describe('The grader check', () => {
             await expect(unknown.started).rejects.toThrow('Scene "voice" has no graded check "is lovely".\nUnknown scene "nowhere" in a grader case.');
             expect(unknown.grader.asked).toEqual([]);
         });
+    });
+
+    it('a case about a whole Chat is asked with the turns it answers and its replies, and its one check', async () => {
+        const chat: GraderCase = { scene: 'evening', check: 'does not press the same demand', label: 'fail', reply: '', replies: ['@Mira Vance: Ask me properly.', '@Mira Vance: Nine years. Now ask me properly.'] };
+        const { grader, started } = start({ ...KEY, EVAL_LABELS: labels([chat]), EVAL_SAMPLES: '1' });
+
+        await started;
+
+        const asked = grader.asked.at(-1)!;
+        const evening = EVAL_SCENES.find((scene) => scene.name === 'evening') as ChatScene;
+        expect(asked).toContain(evening.turns[0]);
+        expect(asked).toContain(evening.turns[1]);
+        expect(asked).not.toContain(evening.turns[2]);
+        expect(asked).toContain('Nine years. Now ask me properly.');
+        expect(asked).toContain('1. "does not press the same demand"');
     });
 
     it('stops before a call that could take the total past the cap, and says so', async () => {

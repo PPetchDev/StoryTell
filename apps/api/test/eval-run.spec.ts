@@ -42,7 +42,7 @@ function scriptedOpenRouter(answer: Partial<Record<Role, (index: number) => Answ
     const fetchImpl: FetchLike = async (url, init) => {
         const body = typeof init.body === 'string' ? JSON.parse(init.body) : undefined;
         const system: string = body?.messages?.[0]?.content ?? '';
-        const role: Role = body?.model !== GRADER_MODEL ? 'play' : system.startsWith('You check one reply') ? 'grader' : 'background';
+        const role: Role = body?.model !== GRADER_MODEL ? 'play' : system.startsWith('You check ') ? 'grader' : 'background';
         requests.push({ url, method: init.method ?? 'GET', headers: (init.headers ?? {}) as Record<string, string>, body, role });
         const fallback: Answer = role === 'play' ? { text: GOOD } : role === 'grader' ? { text: '{"checks":[{"name":"x","pass":true,"quote":"a quote"}]}' } : { text: QUIET };
         const { text = fallback.text, cost = 0.001, status = 200, cached } = { ...fallback, ...(answer[role]?.(counts[role]++) ?? {}) };
@@ -442,7 +442,7 @@ describe('The prompt eval run', () => {
     describe('a played Chat', () => {
         const evening = scene('evening') as ChatScene;
         /** Three turns of the evening, with only the check a test names. */
-        const mini = (checks: ChatScene['checks'], graded: ChatScene['graded'] = []): ChatScene => ({ ...evening, name: 'mini', turns: evening.turns.slice(0, 3), checks, graded });
+        const mini = (checks: ChatScene['checks'], graded: ChatScene['graded'] = []): ChatScene => ({ ...evening, name: 'mini', turns: evening.turns.slice(0, 3), checks, graded, gradedChat: [] });
         const numbered = (index: number) => ({ text: `Mira set down cup ${index}.\n\n@Mira Vance: Reply ${index}.` });
         const sent = (request: RecordedRequest) => (request.body as { messages: { content: string }[] }).messages;
 
@@ -495,6 +495,28 @@ describe('The prompt eval run', () => {
             expect(score(report, 'mini', 'sounds like Mira')).toBe('1/1');
         });
 
+        it('a check about the whole Chat sends one more grader call, with every turn and its reply in order, and reads its answer', async () => {
+            const whole = { name: 'keeps to the weather', criterion: 'Nobody speaks of anything but the weather.' };
+            const { report, requests } = await run([{ ...mini([]), gradedChat: [whole] }], { play: numbered, grader: () => ({ text: '{"checks":[{"name":"keeps to the weather","quote":"Reply 1.","pass":false}]}' }) }, { samples: 1 });
+
+            const graders = requests.filter((request) => request.role === 'grader');
+            expect(graders).toHaveLength(1);
+            const asked = sent(graders[0]).at(-1)!.content;
+            expect(asked.indexOf(evening.turns[0])).toBeLessThan(asked.indexOf('Reply 0.'));
+            expect(asked.indexOf('Reply 0.')).toBeLessThan(asked.indexOf(evening.turns[1]));
+            expect(asked).toContain(evening.turns[2]);
+            expect(asked).toContain('Reply 2.');
+            expect(asked).toContain(whole.criterion);
+            expect(score(report, 'mini', whole.name)).toBe('0/1');
+            expect(report.scenes[0].samples[0].results.at(-1)).toEqual({ check: whole.name, kind: 'graded', outcome: 'fail', reason: 'Reply 1.' });
+        });
+
+        it('the slow scene is played under the slow-burn pacing line', () => {
+            const slow = scene('slow') as ChatScene;
+
+            expect(buildTurnPrompt({ ...slow.input, userText: slow.turns[0] }).messages.map((message) => message.content).join('\n')).toContain('Pacing: slow burn.');
+        });
+
         it('a call that fails part way is a failed sample with its error, and the Chat stops there', async () => {
             const { report, requests } = await run([mini([everyReply(parsesAsAReply)])], { play: (index) => (index === 1 ? { status: 400 } : numbered(index)) }, { samples: 1 });
 
@@ -522,8 +544,8 @@ describe('The prompt eval run', () => {
             const router = scriptedOpenRouter();
             const started = startEvalRun({ EVAL_SCENES: 'evening', EVAL_SAMPLES: '5' }, { fetch: router.fetchImpl, reportDir: mkdtempSync(path.join(tmpdir(), 'eval-')), log: () => {}, git: () => GIT });
 
-            // Ten turns and a grader call, played twice at most.
-            await expect(started).rejects.toThrow('would send 22 calls');
+            // Ten turns and two grader calls (the last reply, the whole Chat), played twice at most.
+            await expect(started).rejects.toThrow('would send 24 calls');
         });
 
         it('with every play model asked for, is played on each', async () => {
@@ -558,7 +580,6 @@ describe('The prompt eval run', () => {
             { check: 'every reply: Mira Vance speaks', bad: { 4: 'Mira said nothing at all.' } },
             { check: 'turn 2: says nine', bad: { 1: '@Mira Vance: Long enough.' } },
             { check: 'turn 9: says nine', bad: { 8: '@Mira Vance: Long enough. You asked already.' } },
-            { check: 'every reply: no other number of years', bad: { 8: '@Mira Vance: Nine. Or twenty years, some days.' } },
             { check: 'drops phrases the earlier replies shared', bad: { 4: `${stock}\n\n@Mira Vance: Worse.`, 5: `${stock}\n\n@Mira Vance: Did it help?`, 6: `${stock}\n\n@Mira Vance: And do what?` } },
         ];
 

@@ -138,6 +138,15 @@ function speechLines(parsed: ParsedReply, name: string): string[] {
 }
 
 /**
+ * How the grader answers. The words first, then the verdict, and what each verdict means: asked
+ * for the verdict first, it now and then quoted the very sentence that broke a criterion and
+ * answered true (the grader check, 2026-11-23).
+ */
+const GRADER_ANSWER =
+    'Answer with JSON only: {"checks":[{"name":"<the criterion\'s name>","quote":"<the words you judged on, at most 25 words>","pass":true or false}]}, one entry per criterion, in order. ' +
+    'For each, first find the words that decide it, then give the verdict: "pass" is true only when the criterion is met, and false when the words you quoted break it.';
+
+/**
  * What the grader is asked: the turn, the reply and the criteria, answered as JSON. A criterion
  * about one Character's speech is shown that Character's speech lines apart, and told to read only those.
  */
@@ -161,16 +170,26 @@ export function buildGraderPrompt(scene: Pick<TurnScene, 'input' | 'userText' | 
         {
             role: 'system',
             content:
-                'You check one reply from a piece of interactive fiction against written criteria. Judge only what is written in the reply. ' +
-                // The words first, then the verdict, and what each verdict means: asked for the verdict first, the grader
-                // now and then quoted the very sentence that broke a criterion and answered true (the grader check, 2026-11-23).
-                'Answer with JSON only: {"checks":[{"name":"<the criterion\'s name>","quote":"<the words of the reply you judged on, at most 25 words>","pass":true or false}]}, one entry per criterion, in order. ' +
-                'For each, first find the words that decide it, then give the verdict: "pass" is true only when the reply meets the criterion, and false when the words you quoted break it.',
+                `You check one reply from a piece of interactive fiction against written criteria. Judge only what is written in the reply. ${GRADER_ANSWER}`,
         },
         {
             role: 'user',
             content: `The user plays ${scene.input.identity.name}. The user wrote:\n${scene.userText}\n\nThe reply:\n${reply}\n\n${speech}Criteria:\n${criteria}`,
         },
+    ];
+}
+
+/** What the grader is asked about a whole played Chat: every turn and its reply, in order, and the criteria. */
+export function buildChatGraderPrompt(scene: Pick<ChatScene, 'input'>, turns: readonly string[], replies: readonly string[], checks: GradedCheck[]): PromptMessage[] {
+    const identity = scene.input.identity.name;
+    const chat = replies.map((reply, turn) => `Turn ${turn + 1}. ${identity}’s turn, written by the user:\n${turns[turn]}\n\nReply ${turn + 1}:\n${reply}`).join('\n\n');
+    const criteria = checks.map((check, index) => `${index + 1}. "${check.name}": ${check.criterion}`).join('\n');
+    return [
+        {
+            role: 'system',
+            content: `You check a played conversation from a piece of interactive fiction against written criteria. Judge only what is written in the replies, never the user’s turns. ${GRADER_ANSWER}`,
+        },
+        { role: 'user', content: `The user plays ${identity}.\n\n${chat}\n\nCriteria:\n${criteria}` },
     ];
 }
 
@@ -354,6 +373,10 @@ export function estimateEval(scenes: EvalScene[], model: PlayModel, samples: num
                 const last = expected.at(-1)!;
                 add('background', buildGraderPrompt({ ...scene, userText: scene.turns.at(-1)! }, fillerReply(last.maxTokens * EXPECTED.playWrites)), GRADER_MAX_TOKENS, times);
             }
+            if (scene.gradedChat.length > 0) {
+                const reply = fillerReply(expected.at(-1)!.maxTokens * EXPECTED.playWrites);
+                add('background', buildChatGraderPrompt(scene, scene.turns, scene.turns.map(() => reply), scene.gradedChat), GRADER_MAX_TOKENS, times);
+            }
             continue;
         }
         const prepared = prepare(scene);
@@ -497,6 +520,9 @@ export async function runEval(options: {
         const asked = scene.graded.filter((check) => !skipped.has(check.name));
         const ask = asked.length > 0 ? { checks: asked, messages: buildGraderPrompt({ ...scene, userText: scene.turns.at(-1)! }, last.text, asked, last.parsed) } : null;
         await grade(scene.name, scene.graded, { results: [], ask, skipped }, sample);
+        // And the checks about the whole Chat, in one more grader call.
+        const whole = { checks: scene.gradedChat, messages: buildChatGraderPrompt(scene, scene.turns, sample.replies!, scene.gradedChat) };
+        await grade(scene.name, scene.gradedChat, { results: [], ask: whole, skipped: new Map() }, sample);
     };
 
     const played = options.scenes.map((scene) => ({ scene, prepared: prepare(scene), samples: new Array<EvalSample | undefined>(samplesOf(scene, report.samples)).fill(undefined) }));

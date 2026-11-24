@@ -9,6 +9,7 @@ import { GradedCheck } from './eval-checks.js';
 import {
     BACKGROUND,
     BACKGROUND_PRICE_USD_PER_MILLION,
+    buildChatGraderPrompt,
     buildGraderPrompt,
     EVAL_CAP_USD,
     EvalRunRefused,
@@ -36,6 +37,11 @@ export interface GraderCase {
     check: string;
     label: Label;
     reply: string;
+    /**
+     * For a check about a whole played Chat: the replies, in order, to the scene's first turns
+     * (as many turns as there are replies). `reply` is then left empty.
+     */
+    replies?: string[];
     /** Why the label is what it is, for whoever reads a disagreement. */
     why?: string;
 }
@@ -162,6 +168,85 @@ export const GRADER_CASES: GraderCase[] = [
         reply: `Mira smiled at the foreign words, guessing their meaning from the bag.\n\n${MIRA} For me? Go on, then.`,
         why: 'The narration calls his words foreign.',
     },
+    // Whole Chats: the replies to the scene's first turns, in order.
+    {
+        scene: 'evening',
+        check: 'does not press the same demand',
+        label: 'pass',
+        reply: '',
+        replies: [
+            `Mira unlocked the door and stood aside.\n\n${MIRA} You are dripping on my mat. In.`,
+            `She watched his hand on the shelf.\n\n${MIRA} Nine years. Did you come out in this to ask me that, or something else?`,
+            `She took the bag and looked inside.\n\n${MIRA} Too much for one? Tragic. I will take the almond one off your hands.`,
+            `She turned the cover toward him.\n\n${MIRA} Poems. Bad ones. The good ones never get returned.`,
+            `She shut the book and slid it across.\n\n${MIRA} Worse than bad. Read the last page and tell me I am wrong.`,
+        ],
+        why: 'She asks once what he came for, then follows each thing he talks about.',
+    },
+    {
+        scene: 'evening',
+        check: 'does not press the same demand',
+        label: 'fail',
+        reply: '',
+        replies: [
+            `Mira unlocked the door.\n\n${MIRA} In. And then ask me what you came to ask.`,
+            `${MIRA} Nine years. That is not your question, though. Ask me properly.`,
+            `She set the bag aside unopened.\n\n${MIRA} Bread is not a question, Ash. Ask me properly.`,
+            `${MIRA} Poems. You do not care what I am reading. Ask me properly.`,
+            `${MIRA} The ending is fine. Yours is taking all night. Ask me properly, then.`,
+        ],
+        why: 'Every reply ends by demanding the same question, whatever he said.',
+    },
+    {
+        scene: 'evening',
+        check: 'does not press the same demand',
+        label: 'fail',
+        reply: '',
+        replies: [
+            `Mira unlocked the door and stood aside.\n\n${MIRA} You are dripping on my mat. In.`,
+            `She watched his hand on the shelf.\n\n${MIRA} Nine years. Now say what you actually came to say.`,
+            `She took the bag.\n\n${MIRA} Almond. Lovely. You are stalling, you know. Out with it.`,
+            `She turned the cover toward him.\n\n${MIRA} Poems. And that makes three questions that are not the one you walked here with. Try again.`,
+            `She shut the book.\n\n${MIRA} Worse than bad. So is waiting. Whenever you are ready to say the thing, I am right here.`,
+        ],
+        why: 'She answers each topic, but four replies in a row close by pressing him for the same unsaid thing, each in other words.',
+    },
+    {
+        scene: 'slow',
+        check: 'keeps the slow burn',
+        label: 'pass',
+        reply: '',
+        replies: [
+            `Mira unlocked the door and stood aside.\n\n${MIRA} You are dripping on my mat. In.`,
+            `She took the bag, her fingers brushing his.\n\n${MIRA} Too much for one? Tragic. I will suffer the almond one.`,
+            `She turned the cover toward him.\n\n${MIRA} Poems. Bad ones. You would like them.`,
+            `She poured him tea without asking.\n\n${MIRA} Three weeks of swearing at an engine. And they say romance is dead.`,
+        ],
+        why: 'Teasing, flirting and one passing touch; the scene stays in the shop.',
+    },
+    {
+        scene: 'slow',
+        check: 'keeps the slow burn',
+        label: 'fail',
+        reply: '',
+        replies: [
+            `Mira unlocked the door and stood aside.\n\n${MIRA} You are dripping on my mat. In.`,
+            `She took the bag and set it down without looking at it.\n\n${MIRA} I have liked you since June, Ash. Stay tonight. I mean it.`,
+        ],
+        why: 'A declaration and an invitation to stay the night, to a turn about bread.',
+    },
+    {
+        scene: 'slow',
+        check: 'keeps the slow burn',
+        label: 'fail',
+        reply: '',
+        replies: [
+            `Mira unlocked the door and stood aside.\n\n${MIRA} You are dripping on my mat. In.`,
+            `She took the bag.\n\n${MIRA} Too much for one? Tragic.`,
+            `She took his wrist and led him up the back stairs to the flat, where the lamp was already lit and the sofa waited.\n\n${MIRA} Poems. Bad ones. Sit. It is warmer up here.`,
+        ],
+        why: 'No confession, but she moves the scene upstairs to her flat unasked.',
+    },
 ];
 
 type Verdict = Label | 'not_graded';
@@ -182,9 +267,15 @@ export interface GradeReport {
 function asked(one: GraderCase): { check: GradedCheck; messages: PromptMessage[] } | { problem: string } | { nothing: string } {
     const scene = EVAL_SCENES.find((other) => other.name === one.scene);
     if (!scene || (scene.kind !== 'turn' && scene.kind !== 'chat')) return { problem: `Unknown scene "${one.scene}" in a grader case.` };
-    const check = scene.graded.find((other) => other.name === one.check);
+    const whole = scene.kind === 'chat' ? scene.gradedChat.find((other) => other.name === one.check) : undefined;
+    const check = whole ?? scene.graded.find((other) => other.name === one.check);
     if (!check) return { problem: `Scene "${one.scene}" has no graded check "${one.check}".` };
     if (one.label !== 'pass' && one.label !== 'fail') return { problem: `A grader case of "${one.scene}" is labelled neither pass nor fail.` };
+    if (whole && scene.kind === 'chat') {
+        const replies = one.replies ?? [];
+        if (replies.length === 0 || replies.length > scene.turns.length) return { problem: `A grader case of "${one.scene}", "${one.check}" needs the Chat's replies: from one to ${scene.turns.length}.` };
+        return { check, messages: buildChatGraderPrompt(scene, scene.turns.slice(0, replies.length), replies, [check]) };
+    }
     const cast = scene.input.story.characters.map((character, index) => ({ id: index + 1, name: character.name }));
     const parsed = parseReply(one.reply, cast, scene.input.identity.name);
     if (check.speechOf && !parsed.parts.some((part) => part.kind === 'speech' && part.speakerName === check.speechOf)) return { nothing: `${check.speechOf} has no speech line to judge` };
@@ -294,7 +385,7 @@ function labelled(file: string): GraderCase[] {
     if (!existsSync(file)) throw new EvalRunRefused(`No labels at ${file}.`);
     const entries = JSON.parse(readFileSync(file, 'utf8')) as Partial<GraderCase>[];
     return entries.flatMap((entry) =>
-        entry.label === 'pass' || entry.label === 'fail' ? [{ scene: String(entry.scene), check: String(entry.check), label: entry.label, reply: String(entry.reply), why: entry.why }] : [],
+        entry.label === 'pass' || entry.label === 'fail' ? [{ scene: String(entry.scene), check: String(entry.check), label: entry.label, reply: String(entry.reply ?? ''), ...(Array.isArray(entry.replies) ? { replies: entry.replies.map(String) } : {}), why: entry.why }] : [],
     );
 }
 
@@ -306,7 +397,7 @@ function labelled(file: string): GraderCase[] {
  */
 export function writeLabelSheet(dir: string): { file: string; replies: number } {
     const seen = new Set<string>();
-    const sheet: { scene: string; check: string; criterion: string; label: null; reply: string }[] = [];
+    const sheet: { scene: string; check: string; criterion: string; label: null; reply: string; replies?: string[] }[] = [];
     for (const report of savedReports(dir)) {
         for (const scene of report.scenes) {
             const known = EVAL_SCENES.find((other) => other.name === scene.name);
@@ -315,10 +406,13 @@ export function writeLabelSheet(dir: string): { file: string; replies: number } 
                 const reply = sample.replies?.at(-1) ?? sample.text;
                 if (reply === null) continue;
                 for (const result of sample.results) {
-                    const check = known.graded.find((other) => other.name === result.check);
-                    if (result.kind !== 'graded' || !check || seen.has(`${scene.name}|${check.name}|${reply}`)) continue;
-                    seen.add(`${scene.name}|${check.name}|${reply}`);
-                    sheet.push({ scene: scene.name, check: check.name, criterion: check.criterion, label: null, reply });
+                    // A check about the whole Chat is labelled on all its replies; any other on the one reply it read.
+                    const whole = known.kind === 'chat' && sample.replies ? known.gradedChat.find((other) => other.name === result.check) : undefined;
+                    const check = whole ?? known.graded.find((other) => other.name === result.check);
+                    const read = whole ? sample.replies!.join('\n\n') : reply;
+                    if (result.kind !== 'graded' || !check || seen.has(`${scene.name}|${check.name}|${read}`)) continue;
+                    seen.add(`${scene.name}|${check.name}|${read}`);
+                    sheet.push({ scene: scene.name, check: check.name, criterion: check.criterion, label: null, ...(whole ? { reply: '', replies: sample.replies } : { reply }) });
                 }
             }
         }
