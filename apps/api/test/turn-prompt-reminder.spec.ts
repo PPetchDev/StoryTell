@@ -33,6 +33,15 @@ describe('Turn prompt: the gender rule and the reminder near the end', () => {
         expect(system).toContain('write it out explicitly and in sensory detail, at the pace of the scene; never summarise it, skip ahead or cut away');
     });
 
+    // Spec (prompt-evals, "Checks on a whole played Chat"): in every Chat played, a Character closed reply after reply pressing the user for one thing.
+    it('has a Character ask for a thing once, take another subject as the answer for now, and not press for it reply after reply', () => {
+        const system = buildTurnPrompt(input()).messages[0].content;
+        expect(system).toContain('A Character asks Petch for a thing once.');
+        expect(system).toContain('When Petch answers with something else, that is the answer for now');
+        expect(system).toContain('Never press Petch for the same thing');
+        expect(system).toContain("don't end reply after reply on a demand or a question to Petch");
+    });
+
     it('tells the Narrator not to hurry a Scene toward its move-on condition', () => {
         const system = layersOf(
             buildTurnPrompt(input({ scene: { name: 'The milk stall', situation: 'Morning at the stall.', moveOnCondition: 'Nara sells ten jugs.' } })),

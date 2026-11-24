@@ -343,3 +343,33 @@ The reading had called it "Mira takes the scene over". The turn prompt asks for 
 
 - It now finds things: the missing `@Name:` lines, the pressing loop, and a voice check that can fail. Three plays ago every line was a pass.
 - The pressing loop is in every real Chat played so far (six of six by eye). It is the first thing worth changing in the turn prompt, and the harness can now say whether a change helps, by eye today and by a rebuilt check after.
+
+## A rule against pressing, in the turn prompt (2026-11-24)
+
+The first change to the running app that the harness led to. **Committed, not deployed: live still runs the prompt without it.**
+
+- **The rule,** in the Rules layer after "Characters act on their desires": "A Character asks Ash for a thing once. When Ash answers with something else, that is the answer for now: the Character goes with what Ash said, and what they still want shows in what they do, not in asking again. Never press Ash for the same thing (to ask, to say it, to decide) in reply after reply, and don't end reply after reply on a demand or a question to Ash: most replies end where the moment does." A test pins it; `evening` names it among the words its prompt must hold.
+- **It is in the standing system message,** so the first turn of each Chat after a deploy is uncached once.
+
+### One real play after it (GLM-5.3, `evening` and `slow`, two samples each, $0.056)
+
+Counted by eye: replies whose last line presses Ash to ask, say or decide the unsaid thing. "Before" is the plays of 2026-11-23 for `evening` and the first play of `slow`.
+
+| Chat | Before the rule | After |
+|---|---|---|
+| `evening`, first play | 7 of 10 | 3 of 10 |
+| `evening`, second play | 7 of 10 | 3 of 10 (turns 5, 6 and 7 in a row, then she says "I'm going to stop chasing you around the shop") |
+| `slow`, first play | 3 of 6 | 2 of 6 |
+| `slow`, second play | 4 of 6 | 1 of 6 |
+
+- **Less, not gone.** Several replies now end on narration or on an ordinary line ("Honestly, it's nice not being interrupted by the bell for once."), which none did before.
+- **The grader failed both `evening` plays on "does not press the same demand"** (it had failed one of two before). That check is the unsteady one, and three pressing replies in a row is a fair fail by its wording; the table above is the reading to trust.
+- **Part of the pressing is the scene's own doing.** "Ask me properly, then." is one of Mira's example lines on her card, so the model reaches for it as her catchphrase. The habit rule ("never the same habit in two replies running") already forbids what the second play did at turns 5 to 7. A scene whose Character has no such line would say how much of the loop is the prompt's.
+- **"Keeps the slow burn" slipped, 1 of 2:** in one play Mira asks Ash upstairs at turn 4. Two plays cannot say whether the new rule did that or chance did; before it was 2 of 2.
+- **Four Chats each side is thin.** It shows the direction, not the size.
+- Everything else held: every reply parsed, Mira had `@Name:` lines in all four Chats, "nine years" at turns 2 and 9.
+
+### Not known
+
+- Whether replies that end "where the moment does" read better or flatter in real play. That is the user's to judge on live; the rule is one bullet to take out again.
+- Whether DeepSeek V4 Pro behaves the same: every play so far is GLM-5.3.

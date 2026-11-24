@@ -425,7 +425,7 @@ const CHAT_SCENES: ChatScene[] = [
         kind: 'chat',
         name: 'evening',
         about: 'Ten turns played in a row: the format, a fact, the phrases and Mira’s voice hold to the end.',
-        expects: ['# Established facts', 'nine years', 'Voice: Short, teasing sentences'],
+        expects: ['# Established facts', 'nine years', 'Voice: Short, teasing sentences', 'Never press Ash for the same thing'],
         input: { ...base, facts: NINE_YEARS },
         turns: [
             'Ash knocks on the bookshop door after closing and waves through the rain-streaked glass.',
