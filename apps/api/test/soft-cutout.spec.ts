@@ -1,8 +1,10 @@
+import path from 'node:path';
 import sharp from 'sharp';
 
 import { FAKE_PNG } from '../src/service/model-gateway/fake-model-gateway.js';
-import { Enlarger, EnlargeModel } from '../src/service/model-gateway/real/enlarge.js';
+import { Enlarger } from '../src/service/model-gateway/real/enlarge.js';
 import { SOFT_CUTOUT_HOST, SOFT_CUTOUT_MODEL, SoftCutout, softCutout } from '../src/service/model-gateway/real/soft-cutout.js';
+import doubled from './harness/enlarge-models/doubled.js';
 import { gatewayUnderTest } from './harness/gateway-under-test.js';
 import { recordedFetch } from './harness/recorded-fetch.js';
 
@@ -103,18 +105,9 @@ describe('The soft cut-out', () => {
     });
 
     describe('enlarged first', () => {
-        /** A stand-in for the model: every pixel of a tile becomes four of the same colour. */
-        const doubled: EnlargeModel = async (input, width, height) => {
-            const plane = width * height;
-            const out = new Float32Array(3 * plane * 4);
-            for (let channel = 0; channel < 3; channel++) {
-                for (let y = 0; y < height * 2; y++) {
-                    for (let x = 0; x < width * 2; x++) out[channel * plane * 4 + y * width * 2 + x] = input[channel * plane + (y >> 1) * width + (x >> 1)];
-                }
-            }
-            return out;
-        };
         const here = import.meta.filename;
+        /** Stand-ins the cut-out's own process loads as files: the doubling one, and one that must never be reached. */
+        const standIn = (name: string) => path.join(import.meta.dirname, 'harness', 'enlarge-models', name);
         const encoded = async (width: number, height: number, background: Colour) => {
             const rgb = Buffer.alloc(width * height * 3);
             for (let pixel = 0; pixel < width * height; pixel++) rgb.set(background, pixel * 3);
@@ -146,7 +139,7 @@ describe('The soft cut-out', () => {
         });
 
         it('a small picture is cut out at two times its size, later; a wide one at its own size, now', async () => {
-            const soft = new SoftCutout(new Enlarger(here, doubled));
+            const soft = new SoftCutout(standIn('doubled.ts'));
             const small = await encoded(120, 120, PURPLE);
             const wide = await encoded(1200, 40, PURPLE);
 
@@ -161,7 +154,7 @@ describe('The soft cut-out', () => {
         });
 
         it('without the model file nothing is enlarged', async () => {
-            const soft = new SoftCutout(new Enlarger(here + '.missing', doubled));
+            const soft = new SoftCutout(standIn('missing.ts'));
             const small = await encoded(120, 120, PURPLE);
 
             expect(await soft.plan(small)).toBe('now');
@@ -170,17 +163,12 @@ describe('The soft cut-out', () => {
         });
 
         it('a picture that is not fit is refused before anything is enlarged', async () => {
-            let enlarged = 0;
-            const counting: EnlargeModel = async (...tile) => {
-                enlarged++;
-                return doubled(...tile);
-            };
-            const soft = new SoftCutout(new Enlarger(here, counting));
+            // A tile given to this stand-in is an error of its own, not the refusal.
+            const soft = new SoftCutout(standIn('never.ts'));
             const onWhite = await encoded(120, 120, [254, 254, 254]);
 
             await expect(soft.plan(onWhite)).rejects.toMatchObject({ code: '409.002.016' });
             await expect(soft.removeBackground(onWhite)).rejects.toMatchObject({ code: '409.002.016' });
-            expect(enlarged).toBe(0);
         });
     });
 

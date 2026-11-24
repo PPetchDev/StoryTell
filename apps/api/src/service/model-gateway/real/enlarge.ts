@@ -1,12 +1,15 @@
 import { existsSync } from 'node:fs';
 import { availableParallelism } from 'node:os';
+import { pathToFileURL } from 'node:url';
 
-import { Picture } from './soft-cutout.js';
+import type { Picture } from './soft-key.ts';
 
 /**
  * Enlarges a drawn picture two times (.scratch/soft-cutout/spec.md, "Enlarged first"), with a model
  * trained on drawn pictures, run on this computer in overlapping tiles. Slow without a graphics card:
- * about a minute a picture on the PC and six on the live VM, so a caller never makes a request wait for it.
+ * about a minute a picture on the PC and ten on the live VM, and each tile is worked out in one piece on
+ * the thread that asked. So it is never run inside the API: soft-cutout-job.ts runs it, in a process of
+ * its own, and this file holds only syntax Node runs as it is.
  */
 
 /** How many times wider and taller the answer is. */
@@ -36,11 +39,23 @@ export function onnxEnlargeModel(modelPath: string): EnlargeModel {
     };
 }
 
+/**
+ * The model in the file at `modelPath`: an `.onnx` file, run with onnxruntime. Any other file is a
+ * module whose default export is the model itself, which is how a test stands in for it.
+ */
+export function enlargeModelAt(modelPath: string): EnlargeModel {
+    if (modelPath.endsWith('.onnx')) return onnxEnlargeModel(modelPath);
+    return async (input, width, height) => ((await import(pathToFileURL(modelPath).href)) as { default: EnlargeModel }).default(input, width, height);
+}
+
 export class Enlarger {
-    constructor(
-        private readonly modelPath: string,
-        private readonly model: EnlargeModel = onnxEnlargeModel(modelPath),
-    ) {}
+    private readonly modelPath: string;
+    private readonly model: EnlargeModel;
+
+    constructor(modelPath: string, model: EnlargeModel = enlargeModelAt(modelPath)) {
+        this.modelPath = modelPath;
+        this.model = model;
+    }
 
     /** Whether the model file is there. Without it nothing is enlarged. */
     available(): boolean {

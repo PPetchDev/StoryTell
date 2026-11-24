@@ -32,7 +32,7 @@ An Expression has a third button, "Soft cut-out · free", beside "Cut out · fre
 
 - **A third maker by name only.** `?with=soft` on the three cut-out routes, and `cutoutBy: 'soft'` to the gateway. A cut-out nobody chose (after a drawing, in "Draw all", a dressed stage's sprite) is still the app's own where set up. The soft cut-out was tuned on one Character and takes no ground shadow out, so it is not a default.
 - **Fit means a flat, tinted background.** Nine tenths of the picture's outer ring within a small distance of its median colour, and that colour's strongest and weakest channel at least 24 apart. White, grey and black have no tint to tell them from white fur, grey shading or a black outline. Anything else is refused (409.002.016), with no record and no call. Whether the figure itself uses the background's colour is not checked: that is the author's choice of colour.
-- **No model.** A pure function from the picture's colours to a see-through picture, about a second for a 1664 by 2496 picture on the PC.
+- **No model.** A pure function from the picture's colours to a see-through picture, about a second for a 1664 by 2496 picture on the PC. It holds its thread for that second, so it too is run outside the API ("In a process of its own", below).
 - **Pixel distances scale with the picture's width**, measured on 832: a picture twice as wide gets a band twice as wide.
 - **The usage record** is written as for any image call: model `soft-key`, host `local`, cost 0, image pool. It needs no image credit.
 - **The answer is a lossless WebP**, about a third of a PNG's size. The stored cut-out keeps that type in its name (`-cutout.webp`), as an uploaded WebP cut-out does.
@@ -55,12 +55,28 @@ An Expression has a third button, "Soft cut-out · free", beside "Cut out · fre
 A picture drawn at 832 by 1248 shows its pixels on a tall stage. Rin's were enlarged two times by hand with the MoSR Soft model (`AnimeSharpV2_MoSR_Soft_x2.onnx`, 18 MB) before they were cut out: it keeps the soft look and the face as drawn. The soft cut-out now does the same.
 
 - **Where the model file is there**, a picture narrower than 1200 pixels is enlarged two times, and the cut-out is made from that. The Expression's own picture is not changed; only its cut-out is two times the size. The model's path defaults to `models/AnimeSharpV2_MoSR_Soft_x2.onnx` beside the image folder; `ENLARGE_MODEL` can name another. No file, nothing is enlarged, and no error.
-- **It takes minutes**, so the request does not wait: about 48 seconds a picture on the PC and 6 minutes 13 seconds on the live VM (2 cores), measured. The route answers at once with the Story as it is, the cut-out is made in the background, and it replaces the one there when it is done. A failure is logged and leaves the old cut-out.
+- **It takes minutes**, so the request does not wait: about a minute a picture on the PC (48 to 67 seconds, measured) and about ten and a half minutes on the live VM (2 cores; measured 2026-11-24 in a separate low-priority process, with the API running beside it). The route answers at once with the Story as it is, the cut-out is made in the background, and it replaces the one there when it is done. A failure is logged and leaves the old cut-out. The "6 minutes 13 seconds" first written here was one run of a standalone script on the VM, never the API doing it: see the next section.
 - **A picture that is not fit is still refused at once** (409.002.016), before anything is enlarged.
-- **One picture at a time**, in the order asked, with one core left for the app. Twenty-one pictures on the VM are over two hours. A restart of the API drops what is waiting: press again.
+- **One picture at a time**, in the order asked, with one core left for the app (the model is given every core but one). Twenty-one pictures on the VM are over two hours. A restart of the API drops what is waiting: press again.
 - **Settings' answer says whether pictures are enlarged here** (`softCutoutEnlarges`), and the editor then says, after the button is pressed, that the cut-out comes in several minutes and shows after a reload.
 - **Tests:** the enlarger with a stand-in model (the size, tiles stitched with no seam, there only with its file); the maker's plan (`later` for a small picture, `now` for a wide one or with no model) and its answer at two times the size; a picture not fit refused with nothing enlarged; the route answering at once and the cut-out arriving later.
 - **Not done:** showing in the editor which pictures are still waiting; carrying the waiting ones over a restart; enlarging the Expression's own picture, or the Reference image.
+
+## In a process of its own (2026-11-24)
+
+**What went wrong.** As first built, the enlargement ran inside the API. "The request does not wait" was true and said nothing about every other request: onnxruntime works a tile out in one piece on the thread that asked, and Node has one. The first real use on live (one 832 by 1248 picture) answered at once, then the API answered no request at all for about eleven minutes: `/api/settings` timed out, a Postgres connection dropped, the Reach-out tick failed. It had been tested with a stand-in model that answers at once, and timed with the real model only as a script of its own.
+
+**Measured on the PC, real model, 832 by 1248, inside one Node process** (35 tiles): 67.2 of 67.4 seconds are inside the model, and each tile holds the thread from start to end (1.9 seconds a tile on average, 3.5 at worst; on the VM that is about 18 seconds a tile). Preparing and stitching the tiles is 0.2 seconds in all. The cut-out itself at 1664 by 2496 is 0.6 seconds in one piece.
+
+- **Every soft cut-out is made in a process of its own**, enlarged or not: the API starts `soft-cutout-job` for one picture, hands it the picture, and gets the WebP back. The process ends with its picture, and takes the model's memory with it.
+- **At low priority**, so on two cores the app comes first and the cut-out takes what is left.
+- **Still one picture at a time**, in the order asked, so never more than one such process.
+- **The API stopped or restarted** ends the process too: nobody waits for that cut-out. What was waiting is dropped, as before.
+- **The model file may be a module**: a file that is not `.onnx` is loaded as a module whose default export is the model. That is how a test hands the other process a stand-in.
+- **The job is started from its file**: from the source in tests, from the build on a server. So `soft-cutout-job.ts`, `enlarge.ts` and `soft-key.ts` hold only syntax Node runs as it is, and import each other as `.ts`, which the build rewrites to `.js` (`rewriteRelativeImportExtensions`).
+- **Tests:** the API with the real soft cut-out and a stand-in model that holds its thread for two seconds a tile: one request after another is sent while it runs, and none waits a second. Before this change that test fails (a request waits the whole two seconds).
+- **Checked by hand on the PC**, with the built code and the real model, in a process that also serves HTTP: one 832 by 1248 picture took 58 seconds, 1,241 requests were answered meanwhile, the slowest in 45 ms.
+- **Not measured yet:** the same on the live VM. Before a batch of pictures is sent there, send one and ask the API for something else while it runs.
 
 ## Out of Scope
 - Drawing a picture on a colour picked from outside its palette: the drawing prompts still ask for the Story's own background.

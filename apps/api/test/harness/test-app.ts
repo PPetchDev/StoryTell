@@ -45,6 +45,8 @@ export interface TestAppOptions {
     /** What a web page fetch for a Document goes through. Default: a fetcher that fails every address, so no test opens a socket. */
     pageFetch?: FetchLike;
     providerKeys?: Partial<ProviderKeys>;
+    /** The model that enlarges a picture before a soft cut-out. Default: a path with no file, so nothing is enlarged. */
+    enlargeModelPath?: string;
     /** How long a send waits for a pending background call. Default 1.5 s. */
     backgroundWaitMs?: number;
     /** How long a failed background call waits before its one automatic retry. Default 0. */
@@ -105,7 +107,7 @@ export async function startTestApp(options: TestAppOptions = {}): Promise<TestAp
                 imageDir,
                 // No model file there: the app's own background remover is off, as on a computer without it.
                 cutoutModelPath: path.join(path.dirname(imageDir), 'models', 'isnet-anime.onnx'),
-                enlargeModelPath: path.join(path.dirname(imageDir), 'models', 'AnimeSharpV2_MoSR_Soft_x2.onnx'),
+                enlargeModelPath: options.enlargeModelPath ?? path.join(path.dirname(imageDir), 'models', 'AnimeSharpV2_MoSR_Soft_x2.onnx'),
                 speechDir,
                 modelGateway: options.modelGateway ?? 'fake',
                 textHosts: ['openrouter'],
