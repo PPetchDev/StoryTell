@@ -322,6 +322,21 @@ belongs to the `storytell` user under `/srv/storytell` (`app` is the running rel
 the one before, `images`, `speech`, `backup`, `logs`), settings are in `/etc/storytell/api.env`,
 and systemd runs `storytell-api` and `storytell-web`. The files for it are in `scripts/vm/`.
 
+### What the Regenerates say
+
+The play-signals report reads the live database and prints counts: by play model and by week, the
+AI Messages written, those with a reply a Regenerate replaced, and how often the kept and the
+replaced replies have each fault code can see (no speech line, an unknown speaker, a stage direction
+in a speech line, a phrase shared with the three replies before, overused words a thousand). It
+prints no reply's words, no title and no name, and it runs in a read-only transaction. On the VM:
+
+```bash
+sudo -u storytell -H bash -lc 'cd /srv/storytell/app/apps/api && ENV_FILE=/etc/storytell/api.env node dist/play-signals.js'
+```
+
+`--user <id>` reads one account; `--min <n>` gives a rate from `n` replies up (20 unless told). It
+undercounts Regenerates: a replaced reply is kept only while its Message is the newest of its Chat.
+
 ### Deploying a commit
 
 ```bash

@@ -136,7 +136,7 @@ Six pieces, each deployable alone, in this order:
 
 ### 5. The play-signals report
 
-- **A command that reads a database and prints a table.** It changes nothing.
+- **A command that reads a database and prints a table.** It changes nothing. (As built, it can see little: the app keeps a replaced reply only while its Message is the newest of its Chat. See ticket 05's comments.)
 - **What it counts,** by play model and by week: AI Messages written; those with at least one replaced Reply version; and, for replaced versions beside kept ones, the share that fail each code check a single reply can be given (no speech line, a line written as the user, a line by an unknown speaker, a stage direction inside a speech line, overused words a thousand, a phrase shared with the three replies before it).
 - **The reply checks it needs live in the app's source,** beside the reply parser, since they read a parsed reply and the report must run from a built release on the VM. The eval run imports them from there; the checks that only an eval scene uses stay with the eval.
 - **Only counts and rates are printed.** No reply's words, no Story or Chat title.

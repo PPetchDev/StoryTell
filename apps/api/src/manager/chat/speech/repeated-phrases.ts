@@ -138,6 +138,18 @@ export function repeatedPhrases(replies: readonly string[], names: readonly stri
         .map((entry) => entry.phrase);
 }
 
+const wordsOnly = (text: string): string =>
+    ` ${text
+        .toLowerCase()
+        .replace(/’/g, "'")
+        .replace(/[^a-z0-9']+/g, ' ')
+        .trim()} `;
+
+/** Whether `text` holds `phrase`, as a detector names it: by its words alone, whatever the punctuation and case between them. */
+export function holdsPhrase(text: string, phrase: string): boolean {
+    return wordsOnly(text).includes(wordsOnly(phrase));
+}
+
 /** The line before the turn's final instruction naming the repeated phrases; null with none. */
 export function repeatedPhrasesLine(phrases: readonly string[]): string | null {
     if (phrases.length === 0) return null;

@@ -1,7 +1,7 @@
 # A play-signals report: what the user's Regenerates say
 
 Type: task
-Status: ready-for-agent
+Status: done
 Blocked by: none
 Needs: no model
 Spec: [Reply repair](../spec.md), "5. The play-signals report"
@@ -31,3 +31,18 @@ The reply checks it needs move into the app's source, beside the reply parser, s
 - Replaced Reply versions are kept, up to five a Message, with their model and time.
 - The slop lists are data files beside the eval today; the report needs them in the release too. Keep their notice with them.
 - Run on live, it reads the user's own Chats in place. Nothing leaves the VM.
+
+## Comments
+
+Built 2026-11-24: `node dist/play-signals.js` (`npm run signals` in `apps/api`). Nine tests against a test database seeded through the API, written red first; reviewed on two axes and the findings fixed. Not yet run on live: it needs a deploy.
+
+- **The spec's premise was wrong, and it hollows this ticket out.** "Replaced Reply versions are kept, up to five a Message" is true only of a Chat's newest AI Message. The app drops every replaced reply of a Chat when the next Message is sent. So on live the report can see, at most, one Message a Chat with its replaced replies: far too few for a rate, and never the ones the user rejected and then played on from. The report says so in its own output. It was the user's best evidence of a bad reply, and the app throws it away.
+- **What would give the signal back:** one small record written when a reply is replaced: its Message, its model, the time, and the fault counts this report already works out, with none of its words. That is a table and a migration, and a decision about what is kept of the user's play, so it is the user's to make; it is not built.
+- **An edit of an AI Message leaves no trace** (it rewrites the parts in place), so edits are not counted; the report says so.
+- **Not counted, and said in the output:** a line written as the user (the reply parser cuts it before a reply is stored).
+- **Counted though it should not be, and said in the output:** a Branch's copied Messages, again; a line by a Character deleted since, as an unknown speaker's; a reply the user edited, as the model's.
+- **Left out:** Epilogues (their shape is not a turn's) and Reach-outs.
+- **A replaced reply is counted under the model that wrote it, in its Message's week:** a version carries its Message's time, not its own.
+- **Shared with the eval, defined once:** the overused-word count and its lists (now a source module, `slop-lists.ts`, with the notice beside it), the stage-direction pattern, and "holds this phrase". The eval's other checks stay with the eval.
+- **Not as the ticket said:** `--min` was added (a rate from `n` replies up); the SQL sits in the report's own module and is handed its database as a function, where the app's other SQL sits in model services.
+- **Not tested:** the entry point itself (its read-only transaction and its flags), more than one account, more than one week or model, and that Epilogues are left out.

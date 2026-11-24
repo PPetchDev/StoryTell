@@ -1,5 +1,6 @@
 import { ReplyLength } from '../../src/model/story/entities/story.entity.js';
-import { repeatedPhrases } from '../../src/manager/chat/speech/repeated-phrases.js';
+import { holdsPhrase, repeatedPhrases } from '../../src/manager/chat/speech/repeated-phrases.js';
+import { STAGE_DIRECTION } from '../../src/manager/chat/turn/reply-faults.js';
 import { ParsedReply } from '../../src/manager/chat/turn/reply-parser.js';
 
 /**
@@ -91,8 +92,6 @@ export function staysSilent(name: string): CodeCheck {
 
 /** What follows the name on a speech line, as the model wrote it. */
 const SPEECH_LINE_WORDS = /^\s*\**@[^:\n@]{1,60}:\s*(.*)$/;
-/** An *asterisk action* of two words or more (one starred word is emphasis), or anything in parentheses. */
-const STAGE_DIRECTION = /\*[^*\s][^*]*\s[^*]*\*|\([^)]+\)/;
 
 /** A speech line holds only what is said aloud: no *asterisk action* and no (parenthesis) inside it. */
 export const speechIsOnlySpoken: CodeCheck = {
@@ -217,13 +216,6 @@ export function replyTo(turn: number, check: CodeCheck): ChatCheck {
     };
 }
 
-const wordsOnly = (text: string): string =>
-    ` ${text
-        .toLowerCase()
-        .replace(/’/g, "'")
-        .replace(/[^a-z0-9']+/g, ' ')
-        .trim()} `;
-
 /**
  * A phrase the earlier replies of a played Chat already shared is not written again. Before each
  * turn the app's own detector reads the replies so far, as the turn prompt does to name the
@@ -240,8 +232,8 @@ export function dropsRepeatedPhrases(names: readonly string[]): ChatCheck {
                     replies.slice(0, turn).map((reply) => reply.text),
                     names,
                 );
-                const reply = wordsOnly(replies[turn].text);
-                for (const phrase of named) if (reply.includes(wordsOnly(phrase))) again.push(`turn ${turn + 1}: "${phrase}"`);
+                const reply = replies[turn].text;
+                for (const phrase of named) if (holdsPhrase(reply, phrase)) again.push(`turn ${turn + 1}: "${phrase}"`);
             }
             return { pass: again.length === 0, reason: again.join('; ') || 'none came back' };
         },

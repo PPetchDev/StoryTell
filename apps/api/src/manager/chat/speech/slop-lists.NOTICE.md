@@ -1,6 +1,6 @@
 # Slop lists
 
-`slop_list.json` and `slop_list_trigrams.json` are copied unchanged from
+The words and phrases in `slop-lists.ts` are those of `slop_list.json` and `slop_list_trigrams.json` from
 [sam-paech/slop-score](https://github.com/sam-paech/slop-score), `data/`, at commit
 `289264ab2a0df1358ef81ced3c259610ea709514` (fetched 2026-11-23). Its `LICENSE` puts the slop lists
 in `data/` under the MIT License:
@@ -25,5 +25,6 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-Used by `../eval-prose.ts`. The repository's bigram list and its wordfreq files (Apache-2.0,
-CC-BY-SA 4.0) are not copied.
+They are lower-cased, sorted and with repeats taken out; otherwise as published. Read by
+`overused.ts`. The repository's bigram list and its wordfreq files (Apache-2.0, CC-BY-SA 4.0) are not
+copied.

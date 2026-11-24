@@ -8,6 +8,7 @@
         "start": "node dist/main.js",
         "start:dev": "nest start --watch",
         "migrate": "node dist/migrate.js",
+        "signals": "node dist/play-signals.js",
         "migration:generate": "nest build && typeorm migration:generate -d dist/store/db/cli-data-source.js",
         "typecheck": "tsc --noEmit -p tsconfig.json",
         "test": "vitest run",
