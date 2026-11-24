@@ -157,6 +157,13 @@ export class NoReferenceImageToDrawError extends AppError {
     }
 }
 
+/** A cut-out was uploaded for a Reference image that is not there. */
+export class NoReferenceImageToCutOutError extends AppError {
+    constructor() {
+        super('409.003.164', 'Add a Reference image first: the cut-out is of it.');
+    }
+}
+
 /** No Expression for that emotion on that Character (.scratch/expressions/spec.md, "Authoring API"). */
 export class ExpressionNotFoundError extends AppError {
     constructor() {

@@ -118,6 +118,27 @@ export class ReferenceImageApiController {
         return this.storyManager.replaceReferenceImage(storyId, characterId, { bytes: file.buffer, mimeType });
     }
 
+    /** The Reference image's cut-out for the Visual novel stage, made elsewhere and uploaded, as an Expression's can be. */
+    @Put('cutout')
+    @UseFilters(UploadTooLargeFilter)
+    @UseInterceptors(FileInterceptor('image', { limits: { fileSize: MAX_UPLOAD_MB * 1024 * 1024, files: 1 } }))
+    @ApiConsumes('multipart/form-data')
+    @ApiBody({ schema: { type: 'object', required: ['image'], properties: { image: { type: 'string', format: 'binary', description: 'A see-through PNG or WebP of at most 15 MB.' } } } })
+    @ApiOkResponse({
+        type: StoryResponseBodyDTO,
+        description:
+            "Keeps an uploaded see-through PNG or WebP as the Reference image's cut-out, replacing any there; free. " +
+            'Refused without a Reference image (409.003.164), or for a picture with no see-through pixel (415.002.014).',
+    })
+    uploadCutout(
+        @Id('storyId') storyId: number,
+        @Id('characterId') characterId: number,
+        @UploadedFile() file: { buffer: Buffer } | undefined,
+    ): Promise<StoryResponseBodyDTO> {
+        if (!file) throw new NoImageFileError();
+        return this.storyManager.uploadReferenceCutout(storyId, characterId, file.buffer);
+    }
+
     @Delete()
     @ApiOkResponse({ type: StoryResponseBodyDTO, description: 'The Character has no Reference image again.' })
     remove(@Id('storyId') storyId: number, @Id('characterId') characterId: number): Promise<StoryResponseBodyDTO> {

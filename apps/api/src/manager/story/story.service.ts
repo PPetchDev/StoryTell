@@ -29,12 +29,12 @@ import {
     SuddenEventLimitError,
     SuddenEventNotFoundError,
 } from '../../errors/story.errors.js';
-import { InvalidRoleSectionsError, InvalidStatsError } from '../../errors/story.errors.js';
+import { InvalidRoleSectionsError, InvalidStatsError, NoReferenceImageToCutOutError } from '../../errors/story.errors.js';
 import { statsProblem } from '../chat/roll-offer/roll-offer.js';
 import { RoleSection, RoleStat } from '../../model/story/entities/role.entity.js';
 import { roleSectionsProblem, tidyRoleSections } from './role-sections.js';
 import { cleanPatterns, compileLorePattern } from '../chat/lore/lore-pattern.js';
-import { ImageNotFoundError, SnapshotNotFoundError, UnsupportedImageError } from '../../errors/image.errors.js';
+import { ImageNotFoundError, NotSeeThroughError, SnapshotNotFoundError, UnsupportedImageError } from '../../errors/image.errors.js';
 import { ChatModelService } from '../../model/chat/chat.service.js';
 import { DocumentModelService } from '../../model/document/document.service.js';
 import { BOND_AXES, BOND_AXIS_NAMES, BondAxis, BondLevels, isBondLevel } from '../../model/ledger/bond-axes.js';
@@ -439,7 +439,7 @@ export class StoryManagerService {
                 const reference = images.get(id);
                 if (!reference || !character.referenceCutout || character.referenceCutout.cutFrom !== character.referenceImagePath) continue;
                 const token = randomBytes(6).toString('hex');
-                const cutout = await copyFile(character.referenceCutout.imagePath, () => `reference-images/story-${copyId}/character-${id}-cutout-${token}.png`);
+                const cutout = await copyFile(character.referenceCutout.imagePath, (extension) => `reference-images/story-${copyId}/character-${id}-cutout-${token}.${extension}`);
                 if (cutout) await this.storyModel.putReferenceCutout(id, cutout, reference.path);
             }
 
@@ -763,6 +763,32 @@ export class StoryManagerService {
         }
         if (previous) await this.removeFile(previous);
         await this.removeReferenceCutout(characterId);
+        return this.saved(storyId);
+    }
+
+    /**
+     * Keeps an uploaded see-through picture as the Reference image's cut-out, the stage's neutral picture
+     * (.scratch/stage-pictures/spec.md, "Upload a cut-out"), replacing any there. No model call.
+     */
+    async uploadReferenceCutout(storyId: number, characterId: number, bytes: Buffer): Promise<StoryDetail> {
+        const story = await this.load(storyId);
+        const character = this.findCharacter(story, characterId);
+        const cutFrom = character.referenceImagePath;
+        if (!cutFrom) throw new NoReferenceImageToCutOutError();
+        if (!ImageStoreService.sniffMimeType(bytes)) throw new UnsupportedImageError();
+        const extension = await ImageStoreService.seeThroughExtension(bytes);
+        if (!extension) throw new NotSeeThroughError();
+        // A fresh name per upload, so a browser never shows the replaced cut-out from its cache.
+        const cutoutPath = `reference-images/story-${storyId}/character-${characterId}-cutout-${randomBytes(6).toString('hex')}.${extension}`;
+        await this.imageStore.write(cutoutPath, bytes);
+        let previous: string | null;
+        try {
+            previous = await this.storyModel.putReferenceCutout(characterId, cutoutPath, cutFrom);
+        } catch (error) {
+            await this.removeFile(cutoutPath);
+            throw error;
+        }
+        if (previous && previous !== cutoutPath) await this.removeFile(previous);
         return this.saved(storyId);
     }
 

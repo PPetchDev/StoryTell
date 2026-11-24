@@ -242,6 +242,48 @@ describe('Expressions on a Character', () => {
             expect(joy.cutoutPath).toBeNull();
             expect(await filesUnder(t.imageDir)).toEqual([joy.imagePath]);
         });
+
+        // The Reference image's own cut-out, the stage's neutral picture, takes an upload the same way.
+        const referenceCutout = (story: Story, bytes: Buffer, characterIndex = 0) =>
+            t.http.put(`/api/stories/${story.id}/characters/${story.characters[characterIndex].id}/reference-image/cutout`).attach('image', bytes, 'cut.webp');
+
+        it("keeps a see-through WebP as the Reference image's cut-out, with no model call; another replaces it; a new Reference image drops it", async () => {
+            const created = await createStory();
+            const story = await pickReferenceImage(created.id, created.characters[0].id, 'mira-reference');
+            const referencePath = story.characters[0].referenceImagePath!;
+            const first = await picture('webp', true);
+
+            const mira = ((await referenceCutout(story, first).expect(200)).body as Story).characters[0];
+
+            expect(mira.referenceImagePath).toBe(referencePath);
+            expect(mira.referenceCutoutPath).toMatch(/^reference-images\/story-\d+\/character-\d+-cutout-[0-9a-f]+\.webp$/);
+            expect(await readFile(path.join(t.imageDir, mira.referenceCutoutPath!))).toEqual(first);
+            expect((await t.http.get(`/api/images/${mira.referenceCutoutPath}`).expect(200)).headers['content-type']).toBe('image/webp');
+            expect(t.gateway.imageCalls()).toEqual([]);
+
+            // A PNG replaces it under a new name, and the WebP it replaced is deleted.
+            const second = ((await referenceCutout(story, await picture('png', true)).expect(200)).body as Story).characters[0];
+            expect(second.referenceCutoutPath).toMatch(/-cutout-[0-9a-f]+\.png$/);
+            expect(await filesUnder(t.imageDir)).toEqual([referencePath, second.referenceCutoutPath!].sort());
+
+            // A new Reference image: the cut-out was of the old one, so it goes.
+            const again = await pickReferenceImage(story.id, story.characters[0].id, 'mira-second');
+            expect(again.characters[0].referenceCutoutPath).toBeNull();
+            expect(await filesUnder(t.imageDir)).toEqual([again.characters[0].referenceImagePath!]);
+        });
+
+        it('refuses a Reference cut-out that is opaque, no picture or no file, and one for a Character with no Reference image', async () => {
+            const story = await createStory();
+            expect((await referenceCutout(story, await picture('webp', true)).expect(409)).body.error.code).toBe('409.003.164');
+            const picked = await pickReferenceImage(story.id, story.characters[0].id, 'mira-reference');
+            for (const bytes of [await picture('jpeg', false), await picture('png', false)]) {
+                expect((await referenceCutout(picked, bytes).expect(415)).body.error.code).toBe('415.002.014');
+            }
+            expect((await referenceCutout(picked, Buffer.from('GIF89a not allowed')).expect(415)).body.error.code).toBe('415.002.009');
+            expect((await t.http.put(`/api/stories/${picked.id}/characters/${picked.characters[0].id}/reference-image/cutout`).field('note', 'no file').expect(400)).body.error.code).toBe('400.002.008');
+            expect((await getStory(picked.id)).characters[0].referenceCutoutPath).toBeNull();
+            expect(await filesUnder(t.imageDir)).toEqual([picked.characters[0].referenceImagePath!]);
+        });
     });
 
     it('answers 400 for an emotion outside the seven, neutral included, on every route', async () => {
