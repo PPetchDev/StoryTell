@@ -409,3 +409,36 @@ Ticket 03 of [Reply repair](../reply-repair/spec.md). Spent: $0.084 ($0.074 on o
 - So the rule added to the turn prompt holds where the cards do not pull against it, and a card that gives a Character an asking catchphrase will still get it said too often. That is the habit rule's ground ("never the same habit in two replies running"), and the pressing notes of ticket 04 name the thing for the next turn.
 - Two plays a scene is thin: this is the direction, not the size.
 - "Sounds like Mira" failed one `evening` play on a long last speech, as before.
+
+## Pressing notes, measured (2026-11-24, evening)
+
+Ticket 04 of [Reply repair](../reply-repair/spec.md): the Judge says who pressed the user for what, and the next turn is told once. This is the eval's side of it. Spent: $0.013.
+
+### How it is measured, and why this way
+
+A played Chat does not run the Judge between its turns, so it cannot show a note at work. Two ways were open: let a played Chat run the Judge between turns, or measure with a turn scene whose history ends on a pressing reply and whose input carries the note. **The turn scene was taken.** It tests the one thing the note changes (the reply after a note) at a twentieth of the cost, with nothing else moving; a Judge inside the played Chat would add ten background calls a play and a second source of chance to every other check of that Chat. It stays the better test of the whole loop, and is left for when the loop itself is in doubt.
+
+### Built
+
+- **`judge-pressing`:** Ash's turn is about the ferry engine; the reply ends "Now stop stalling and ask me what you came here to ask." The Judge must give a note naming Mira.
+- **`judge-quiet` also checks that small talk gets no note.** Every Judge scene now reads the pressing rule and the reply shape with `pressing`, as the app's Judge does.
+- **`noted` and `unnoted`:** the same two exchanges, ending on Mira pressing ("Ask me properly, then. You did not walk here in the rain to talk about my reading."), and the same next turn about the engine. One carries the note, the other does not. Both are graded on "does not ask again". Three grader cases for it: a pass, a fail in the same words, a fail in other words.
+
+### One real run (five samples a scene, $0.011; the grader check, $0.002)
+
+| Scene | Check | Passed |
+|---|---|---|
+| `judge-pressing` | notes the pressing | 5 of 5 |
+| `judge-quiet` | notes no pressing | 5 of 5 |
+| `noted` | does not ask again | 5 of 5 |
+| `unnoted` | does not ask again | 3 of 5 |
+
+- **The Judge names the pressing, and stays quiet on small talk,** on the background model at its own temperature.
+- **With the note, the reply left it alone every time.** Without it, two of five were failed. One of those is the grader's own: "Tell me the swearing part. Word for word, ideally." is Mira asking about the engine. The other is real: "You never ask me properly, so you keep inventing reasons to knock."
+- So, read by eye: 5 of 5 against 4 of 5. The direction the note was built for; five samples cannot give its size.
+- **The grader agreed with all three written-in cases of the new check, three asks each,** and with every other graded check; "does not keep pressing" is at 18 of 20 replies, none unsteady.
+
+### Not known
+
+- How often the Judge notes pressing where a reader would not, in real play. The scenes hold one clear case each way. The API logs one line for each note kept, so live can be read later.
+- Whether a note changes anything else about the reply. Both scenes parsed and Mira spoke in all ten.

@@ -128,7 +128,7 @@ Six pieces, each deployable alone, in this order:
 ### 4. Pressing notes
 
 - **The Judge gives them, in the call it already makes:** one more field in its answer, sent in every judgement so its system message still never changes from call to call. An entry names a Character and, in a few words, what they pressed the user for. The Judge gives one only when the reply pressed for something the user's Message, just before it, had not been about.
-- **A pressing note is a detail record of a new kind,** recorded against the reply that pressed, like a slip. So Regenerate, Edit and choosing another Reply version take it back with its reply, Reset clears it and a Branch copies it, with no code of their own. One migration adds the kind.
+- **A pressing note is a detail record of a new kind,** recorded against the reply that pressed, like a slip. (As built: the record's Character is who pressed and its value is what for; see the ticket's comments for this and the other decisions made in review.) So Regenerate, Edit and choosing another Reply version take it back with its reply, Reset clears it and a Branch copies it, with no code of their own. One migration adds the kind.
 - **The next turn reads the notes of the newest AI Message only,** so a note is read once. They go in the closing user message's trailing blocks, with the slips: who asked for what, that the user spoke of something else, and that the Character does not ask again in this reply and lets it show in what they do.
 - **At most two notes a reply,** each short (a Character's name and up to 80 characters). A note for a Character who is not in the Story, or for the user's character, is dropped.
 - **The Story so far trigger reserves the line's room,** as it does for the repeats lines.

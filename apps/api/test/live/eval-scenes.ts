@@ -169,6 +169,23 @@ const SOUNDS_LIKE_MIRA: GradedCheck = {
     speechOf: MIRA,
 };
 
+/** What Mira pressed Ash for in the history of the `noted` and `unnoted` scenes, as the Judge would put it. */
+const PRESSED_FOR = 'to ask her properly what he came to ask';
+
+/** Two exchanges that end on Mira pressing Ash, when his turn had been about her book. */
+const PRESSED_HISTORY: PromptHistoryMessage[] = [
+    { role: 'user', text: 'Ash holds up a paper bag from the bakery and says he brought too much for one person.' },
+    { role: 'assistant', text: `Mira took the bag and looked inside.\n\n@${MIRA}: Too much for one? Tragic. I will suffer the almond one.` },
+    { role: 'user', text: 'Ash asks what she was reading when he knocked.' },
+    { role: 'assistant', text: `She turned the cover toward him and set it down again.\n\n@${MIRA}: Poems. Bad ones.\n\n@${MIRA}: Ask me properly, then. You did not walk here in the rain to talk about my reading.` },
+];
+
+const ASKS_AGAIN: GradedCheck = {
+    name: 'does not ask again',
+    criterion:
+        'It fails if Mira presses Ash again to ask, say or admit what he came for (for example "ask me properly", "say it", "that is not why you are here"). It passes if she leaves that alone in this reply, whatever else she says or does: answering him about the engine, teasing him about it, flirting.',
+};
+
 const TURN_SCENES: TurnScene[] = [
     {
         kind: 'turn',
@@ -384,6 +401,26 @@ const TURN_SCENES: TurnScene[] = [
             parsesAsAReply,
         ],
         graded: [],
+    },
+    {
+        kind: 'turn',
+        name: 'noted',
+        about: 'After a reply that pressed, the pressing note has the Character leave it alone.',
+        expects: [`In the last reply ${MIRA} pressed Ash for this: ${PRESSED_FOR}.`],
+        input: { ...base, history: PRESSED_HISTORY, pressing: [{ character: MIRA, forWhat: PRESSED_FOR }] },
+        userText: 'Ash tells her the ferry engine finally turned over today, after three weeks of him swearing at it.',
+        checks: [speaks(MIRA), parsesAsAReply],
+        graded: [ASKS_AGAIN],
+    },
+    {
+        kind: 'turn',
+        name: 'unnoted',
+        about: 'The same turn with no pressing note: what the rule alone does, to read beside the noted scene.',
+        expects: ['Never press Ash for the same thing', 'Ask me properly, then. You did not walk here'],
+        input: { ...base, history: PRESSED_HISTORY },
+        userText: 'Ash tells her the ferry engine finally turned over today, after three weeks of him swearing at it.',
+        checks: [speaks(MIRA), parsesAsAReply],
+        graded: [ASKS_AGAIN],
     },
     {
         kind: 'turn',

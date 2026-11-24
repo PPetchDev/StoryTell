@@ -1272,7 +1272,7 @@ describe('Chats through the real gateway', () => {
             provider: { only: ['deepinfra'], allow_fallbacks: false },
             reasoning: { enabled: false },
             response_format: { type: 'json_object' },
-            max_tokens: 1340, // 700, the 220 the Place, weather, outfits and goals answer takes (.scratch/info-box/spec.md, .scratch/character-minds/spec.md, with "where" from .scratch/cache-and-voices/spec.md), 160 for the Established facts (.scratch/story-quality/spec.md), 120 for the Now notes (.scratch/growing-cards/spec.md) and 140 for the Items (.scratch/story-items/spec.md)
+            max_tokens: 1430, // 90 for the pressing notes (.scratch/reply-repair/spec.md), 700, the 220 the Place, weather, outfits and goals answer takes (.scratch/info-box/spec.md, .scratch/character-minds/spec.md, with "where" from .scratch/cache-and-voices/spec.md), 160 for the Established facts (.scratch/story-quality/spec.md), 120 for the Now notes (.scratch/growing-cards/spec.md) and 140 for the Items (.scratch/story-items/spec.md)
         });
         expect(judgeRequest.body).not.toHaveProperty('stop');
         expect(memoryRequest.body).toMatchObject({

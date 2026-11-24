@@ -19,6 +19,7 @@ import { beliefCost, memoryCost } from '../memory/memory-choice.js';
 import { factsBlock } from '../details/facts.js';
 import { itemsBlock } from '../details/items.js';
 import { secretsBlock } from '../secrets/secrets.js';
+import { PRESSING_RESERVE_TOKENS } from '../details/pressing.js';
 import { REPEATS_RESERVE_TOKENS } from '../speech/repeated-phrases.js';
 
 /**
@@ -82,6 +83,8 @@ export function storySoFarCoverage(layers: PromptLayersInput, history: PromptHis
         // And the Secrets block as it stands (.scratch/secret-reveals/spec.md).
         estimateTokens(secretsBlock(layers.secrets, layers.identity.name) ?? '') +
         REPEATS_RESERVE_TOKENS +
+        // And a pressing note's line, which only the turn before can give (.scratch/reply-repair/spec.md).
+        PRESSING_RESERVE_TOKENS +
         estimateTokens(`${reminder}
 ${turnFinalInstruction(layers.identity.name)}`);
     const room = budget - fixed;

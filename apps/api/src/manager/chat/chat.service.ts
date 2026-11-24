@@ -137,6 +137,7 @@ import { chatEventState, EventProposalView, eventProposalView, shownProposal } f
 import { currentDetails, placeAge, promptDetails } from './details/details.js';
 import { DetailKind } from '../../model/ledger/entities/detail-change.entity.js';
 import { FACTS_MAX, factsState, promptFacts, userFactChange } from './details/facts.js';
+import { pressingOf } from './details/pressing.js';
 import { currentItems, ItemEnd, ITEMS_MAX, itemsState, userItemChange } from './details/items.js';
 import { secretsState, StorySecret, storySecrets } from './secrets/secrets.js';
 import { castNowNotes, currentNowNotes, tidyNow } from './details/now-notes.js';
@@ -1949,6 +1950,8 @@ export class ChatManagerService {
             details: detailsFor(story, chat, state),
             // The facts, and the slips of the newest reply before this one (.scratch/story-quality/spec.md).
             facts: promptFacts(state.detailChanges, newestAiMessage(chat)?.id ?? null),
+            // And what a Character pressed the user for in that reply, told once (.scratch/reply-repair/spec.md).
+            pressing: pressingOf(state.detailChanges, newestAiMessage(chat)?.id ?? null, story.characters),
             // Who holds what (.scratch/story-items/spec.md), after the facts.
             items: currentItems(state.detailChanges),
             // What each Character may now tell, and what they have told (.scratch/secret-reveals/spec.md).

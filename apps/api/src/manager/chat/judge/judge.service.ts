@@ -19,6 +19,7 @@ import { aiEventOffered, chatEventState, readNewEventFrom, takeNewEvent, withAiE
 import { SuddenEventStepKind } from '../../../model/ledger/entities/sudden-event-step.entity.js';
 import { applyDetails, currentDetails, judgeDetailsSection, placeAge } from '../details/details.js';
 import { applyFacts, factsState, judgeFactsSection } from '../details/facts.js';
+import { applyPressing, judgePressingSection } from '../details/pressing.js';
 import { applyNow, currentNowNotes, judgeNowSection } from '../details/now-notes.js';
 import { applyItems, itemsState, judgeItemsSection, readJudgedItemsFrom, withItemsJudge } from '../details/items.js';
 import { applyEnding, ENDING_SUGGEST_AFTER_REPLIES, endingState, judgeEndingSection } from '../ending/ending.js';
@@ -267,6 +268,7 @@ export class JudgeManagerService {
                 detailsSection: judgeDetailsSection(details, detailsCast, ageOfPlace, placeNames),
                 endingSection: judgeEndingSection(endings),
                 factsSection: judgeFactsSection(facts),
+                pressingSection: judgePressingSection(),
                 nowSection: judgeNowSection(nowNotes, detailsCast),
                 rollOfferSection: offering.section,
                 ...(secretsShape ? { secretsShape, secretsSection: judgeSecretsSection(secrets.offered) } : {}),
@@ -310,6 +312,10 @@ export class JudgeManagerService {
             const ended = applyEnding(endings, judgement.ending ?? null);
             // Only the user's own words change a listed fact (.scratch/story-quality/spec.md).
             const facted = applyFacts(facts, judgement.facts ?? null, userText ?? '', factsBefore.clearedByUser);
+            // Who pressed the user for what, for the next turn to read once (.scratch/reply-repair/spec.md).
+            const pressed = applyPressing(judgement.pressing ?? [], { cast: detailsCast, sittingOut, identityName, userSpoke: (userText ?? '').trim() !== '' });
+            // One line a note kept, so a note on live can be judged later, as a repair's is.
+            for (const change of pressed.changes) this.logger.log(`Chat ${chat.id}, Message ${message.id}: Pressing note kept ${JSON.stringify({ characterId: change.characterId, for: change.value })}`);
             const offered = applyRollOffer(offering, judgement.rollOffer ?? null);
             const revealed = applySecretReveals(secrets.offered, judgement.secretsRevealed ?? []);
             for (const reason of revealed.rejected) this.logger.log(`Chat ${chat.id}, Message ${message.id}: judge item dropped: ${reason}`);
@@ -325,7 +331,7 @@ export class JudgeManagerService {
                 { current: items, identityName, cast: detailsCast.map((member) => member.name), userText: userText ?? '', clearedByUser: itemsBefore.clearedByUser },
                 readJudgedItemsFrom(result.text),
             );
-            for (const reason of [...applied.rejected, ...stepped.rejected, ...detailed.rejected, ...noted.rejected, ...ended.rejected, ...facted.rejected, ...itemed.rejected]) {
+            for (const reason of [...applied.rejected, ...stepped.rejected, ...detailed.rejected, ...noted.rejected, ...ended.rejected, ...facted.rejected, ...pressed.rejected, ...itemed.rejected]) {
                 this.logger.log(`Chat ${chat.id}, Message ${message.id}: judge item dropped: ${reason}`);
             }
             if (applied.passedBy !== null && applied.scene) {
@@ -336,7 +342,7 @@ export class JudgeManagerService {
             // Written with the rest of the judgement, in its one transaction, never after it. Without
             // Expressions the parts are not touched, so the record is exactly as before.
             const emotions = tagLines ? emotionsOfParts(message.parts, judgement.expressions) : undefined;
-            await this.ledger.record(chat.id, message.id, { ...applied, suddenEvent: stepped.step, details: [...detailed.changes, ...facted.changes, ...noted.changes, ...itemed.changes], ending: ended.reached, ...(emotions ? { emotions } : {}), ...(proposed.event ? { newEvent: proposed.event } : {}), rollOffer: offered.offer, ...(revealed.reveals.length > 0 ? { secretReveals: revealed.reveals } : {}) });
+            await this.ledger.record(chat.id, message.id, { ...applied, suddenEvent: stepped.step, details: [...detailed.changes, ...facted.changes, ...pressed.changes, ...noted.changes, ...itemed.changes], ending: ended.reached, ...(emotions ? { emotions } : {}), ...(proposed.event ? { newEvent: proposed.event } : {}), rollOffer: offered.offer, ...(revealed.reveals.length > 0 ? { secretReveals: revealed.reveals } : {}) });
             if (askFace && userMessage && judgement.userFace) await this.chatModel.setJudgedFace(userMessage.id, judgement.userFace);
             // The place, light, outfits and line emotions are settled: dress the stage (.scratch/dressed-stage/spec.md).
             this.stage.dress(story.id, chat.id);

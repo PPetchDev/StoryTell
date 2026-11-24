@@ -16,6 +16,7 @@ import { detailsReminder, PromptDetails } from '../details/details.js';
 import { nowLayer, PromptNowNote } from '../details/now-notes.js';
 import { EPILOGUE_MIN_TOKENS, epilogueFinalInstruction, epilogueInstruction, PromptEpilogue } from '../ending/ending.js';
 import { factsBlock, PromptFacts } from '../details/facts.js';
+import { pressingBlock, PressingNote } from '../details/pressing.js';
 import { ChatItem, itemsBlock } from '../details/items.js';
 import { CardSecret, cardSecretLines, secretsBlock, StorySecret } from '../secrets/secrets.js';
 import { repeatedGestures, repeatedGesturesLine, repeatedPhrases, repeatedPhrasesLine } from '../speech/repeated-phrases.js';
@@ -266,6 +267,11 @@ export interface TurnPromptInput {
      * in the trailing blocks after the Author's note. None, null or left out sends no block.
      */
     facts?: PromptFacts | null;
+    /**
+     * What a Character pressed the user for in the newest reply (.scratch/reply-repair/spec.md), read
+     * once, in the trailing blocks after the Established facts. None, null or left out sends no block.
+     */
+    pressing?: PressingNote[] | null;
     /**
      * The Chat's Items (.scratch/story-items/spec.md), held and gone, read in the trailing blocks
      * right after the Established facts. None, null or left out sends no block.
@@ -920,6 +926,8 @@ export function buildTurnPrompt(input: TurnPromptInput): TurnPrompt {
         documentsBlock(input.documentPassages ?? []),
         authorsNoteBlock(input.authorsNote, identity),
         factsBlock(input.facts),
+        // Only on a turn the user sent a Message with: on a Continue, Watch or Epilogue the user said nothing to be an answer.
+        input.userText === null ? null : pressingBlock(input.pressing, identity),
         itemsBlock(input.items, identity),
         secretsBlock(input.secrets, identity),
         // With none of the turn's own lines, exactly the reminder and the final instruction as before.

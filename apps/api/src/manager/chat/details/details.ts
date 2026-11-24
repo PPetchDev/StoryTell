@@ -19,6 +19,8 @@ export const DETAIL_MAX: Record<DetailKind, number> = {
     [DetailKind.Now]: 300,
     // Items keep their own limits (items.ts); this only bounds a record, which is JSON.
     [DetailKind.Item]: 400,
+    // A pressing note keeps its own limit (pressing.ts); this entry only completes the record.
+    [DetailKind.Pressing]: 190,
 };
 
 /** A recorded change, oldest first in a list. */

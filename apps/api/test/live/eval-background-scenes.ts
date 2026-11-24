@@ -1,4 +1,5 @@
 import { judgeFactsSection } from '../../src/manager/chat/details/facts.js';
+import { judgePressingSection } from '../../src/manager/chat/details/pressing.js';
 import { ExtractedOperation, ExtractionPromptInput } from '../../src/manager/chat/memory/memory-prompt.js';
 import { judgeSecretsSection } from '../../src/manager/chat/secrets/secrets.js';
 import type { EvalScene, JudgeInput } from './eval-scenes.js';
@@ -33,6 +34,7 @@ const judgeBase: JudgeInput = {
     aiText: '',
     // Sent with every judgement on live, so the scenes read the reply shape the app's Judge reads.
     factsSection: judgeFactsSection([]),
+    pressingSection: judgePressingSection(),
 };
 
 /** The Scene both Scene-rule scenes are in: its condition names who must act, and what they must do. */
@@ -55,6 +57,26 @@ const memoryBase: ExtractionPromptInput = {
 };
 
 export const BACKGROUND_SCENES: EvalScene[] = [
+    {
+        kind: 'judge',
+        name: 'judge-pressing',
+        about: 'A Character who presses the user for something their message was not about is noted, by name.',
+        expects: ['Pressing rule:'],
+        input: {
+            ...judgeBase,
+            userText: 'Ash says the ferry engine finally turned over today, after three weeks of him swearing at it.',
+            aiText: `Mira set her mug down and looked at him over it.\n\n@${MIRA}: Three weeks. Well done, you. Now stop stalling and ask me what you came here to ask.`,
+        },
+        checks: [
+            {
+                name: 'notes the pressing',
+                run: (judgement) => {
+                    const notes = judgement.pressing ?? [];
+                    return { pass: notes.some((note) => note.character.toLowerCase() === MIRA.toLowerCase()), reason: notes.map((note) => `${note.character}: ${note.forWhat}`).join('; ') || 'no note' };
+                },
+            },
+        ],
+    },
     {
         kind: 'judge',
         name: 'judge-waits',
@@ -102,6 +124,7 @@ export const BACKGROUND_SCENES: EvalScene[] = [
             aiText: `Mira filled the kettle and found two cups that nearly matched.\n\n@${MIRA}: It always is, this time of year. Milk?`,
         },
         checks: [
+            { name: 'notes no pressing', run: (judgement) => ({ pass: (judgement.pressing ?? []).length === 0, reason: (judgement.pressing ?? []).map((note) => `${note.character}: ${note.forWhat}`).join('; ') || 'none' }) },
             { name: 'no Arc step', run: (judgement) => ({ pass: judgement.arcSteps.length === 0, reason: judgement.arcSteps.map((step) => step.step).join('; ') || 'none' }) },
             {
                 name: 'keeps the Bond’s label',

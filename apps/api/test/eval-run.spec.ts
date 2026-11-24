@@ -403,6 +403,8 @@ describe('The prompt eval run', () => {
                 bad: '{"bond_changes":[{"from":"Mira Vance","to":"user","label":"deep love","description":"She adores him.","cause":"the tea"}]}',
             },
             { scene: 'judge-facts', check: 'gives the nine years', good: '{"facts":[{"topic":"Mira’s years with the shop","fact":"nine years"}]}', bad: QUIET },
+            { scene: 'judge-pressing', check: 'notes the pressing', good: '{"pressing":[{"character":"Mira Vance","for":"to ask what he came to ask"}]}', bad: QUIET },
+            { scene: 'judge-quiet', check: 'notes no pressing', good: QUIET, bad: '{"pressing":[{"character":"Mira Vance","for":"to drink the tea"}]}' },
             { scene: 'judge-secret', check: 'reveals nothing', good: '{"secrets_revealed":[]}', bad: '{"secrets_revealed":[1]}' },
             { scene: 'memory-quiet', check: 'adds nothing', good: QUIET, bad: add('It rained harder than the day before.') },
             { scene: 'memory-promise', check: 'adds the promise', good: promise, bad: QUIET },

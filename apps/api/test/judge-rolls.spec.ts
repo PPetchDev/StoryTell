@@ -247,7 +247,10 @@ describe('Roll offers and Stats: through the HTTP API', () => {
         const judge = lastJudge();
         expect(judge.messages[0].content).toBe(before.messages[0].content);
         // The details shape, then the Items shape, follow it on every call (.scratch/cache-and-voices/spec.md, .scratch/story-items/spec.md).
-        expect(judge.messages[0].content).toContain('"roll_offer":null,\n "details":{"where":"...","place":"same","weather":null,"outfits":[],"goals":[]},\n "items":');
+        // The pressing notes' shape goes on after the Roll offer's (.scratch/reply-repair/spec.md): the offer is looked up by the system message as it stood.
+        expect(judge.messages[0].content).toContain(
+            '"roll_offer":null,\n "pressing":[{"character":"...","for":"..."}],\n "details":{"where":"...","place":"same","weather":null,"outfits":[],"goals":[]},\n "items":',
+        );
         expect(judge.messages[1].content).toContain('# Roll offer\n');
         expect(judge.messages[1].content).toContain('Their Stats: Strength +2, Charm +1.');
         // Other sections may join as the Chat grows (an Ending suggestion); the offer's own tokens are there.

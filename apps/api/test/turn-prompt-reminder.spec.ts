@@ -42,6 +42,18 @@ describe('Turn prompt: the gender rule and the reminder near the end', () => {
         expect(system).toContain("don't end reply after reply on a demand or a question to Petch");
     });
 
+    it('with no pressing note, is byte for byte the prompt it was', () => {
+        const before = buildTurnPrompt(input());
+        expect(buildTurnPrompt(input({ pressing: [] }))).toEqual(before);
+        expect(buildTurnPrompt(input({ pressing: null }))).toEqual(before);
+        expect(buildTurnPrompt(input({ pressing: [{ character: 'Nara', forWhat: 'to say it' }] }))).not.toEqual(before);
+    });
+
+    it('tells a Continue and an Epilogue nothing of a pressing note: the user said nothing to be an answer', () => {
+        const pressing = [{ character: 'Nara', forWhat: 'to say it' }];
+        expect(buildTurnPrompt(input({ pressing, userText: null }))).toEqual(buildTurnPrompt(input({ userText: null })));
+    });
+
     it('tells the Narrator not to hurry a Scene toward its move-on condition', () => {
         const system = layersOf(
             buildTurnPrompt(input({ scene: { name: 'The milk stall', situation: 'Morning at the stall.', moveOnCondition: 'Nara sells ten jugs.' } })),

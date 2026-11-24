@@ -10,6 +10,7 @@ import { JudgedSuddenEvent, readJudgedSuddenEvent } from '../sudden-event/sudden
 import { DETAILS_EXTRA_TOKENS, DETAILS_SHAPE, JudgedDetails, readJudgedDetails } from '../details/details.js';
 import { ENDING_EXTRA_TOKENS, JudgedEnding, readJudgedEnding } from '../ending/ending.js';
 import { FACTS_EXTRA_TOKENS, JudgedFacts, readJudgedFacts } from '../details/facts.js';
+import { PRESSING_EXTRA_TOKENS, PressingNote, readJudgedPressing } from '../details/pressing.js';
 import { JudgedNow, NOW_EXTRA_TOKENS, readJudgedNow } from '../details/now-notes.js';
 import { ReplyPart } from '../turn/reply-parser.js';
 import { JudgedRollOffer, readJudgedRollOffer, ROLL_OFFER_EXTRA_TOKENS } from '../roll-offer/roll-offer.js';
@@ -112,6 +113,11 @@ export interface JudgePromptInput {
      * is as it was before.
      */
     factsSection?: string | null;
+    /**
+     * The pressing rule (.scratch/reply-repair/spec.md), already worded. It goes after the facts
+     * section, and the reply shape then names `pressing`. Null or left out, the prompt is as before.
+     */
+    pressingSection?: string | null;
     /**
      * The Now notes section (.scratch/growing-cards/spec.md), already worded, with its rule. It goes
      * last, after the Established facts section. Left out, the prompt is as it was before.
@@ -222,6 +228,16 @@ const SYSTEM_WITH_EXPRESSIONS = SYSTEM.replace('Reply with JSON only:', `${EXPRE
 function withFactsShape(system: string): string {
     return system.replace(/\}\nEmpty arrays when nothing changed\.$/, ',\n "facts":[{"topic":"...","fact":"..."}],\n "slips":[{"topic":"...","said":"..."}]}\nEmpty arrays when nothing changed.');
 }
+/**
+ * The reply shape with `pressing`, when the pressing rule is sent (every judgement on live, so the
+ * system message still never changes from one call to the next): named in the shape for the same
+ * reason `facts` is.
+ */
+function withPressingShape(system: string): string {
+    const shaped = system.replace(/\}\nEmpty arrays when nothing changed\.$/, ',\n "pressing":[{"character":"...","for":"..."}]}\nEmpty arrays when nothing changed.');
+    if (shaped === system) throw new Error('judge prompt: the reply shape no longer ends as expected');
+    return shaped;
+}
 const SYSTEM_WITH_FACTS = withFactsShape(SYSTEM);
 const SYSTEM_WITH_EXPRESSIONS_AND_FACTS = withFactsShape(SYSTEM_WITH_EXPRESSIONS);
 if (SYSTEM_WITH_FACTS === SYSTEM || SYSTEM_WITH_EXPRESSIONS_AND_FACTS === SYSTEM_WITH_EXPRESSIONS) throw new Error('judge prompt: the reply shape no longer ends as expected');
@@ -321,7 +337,7 @@ ${input.recent.join('\n\n') || '(start)'}
 # LATEST EXCHANGE (judge this)
 ${exchangeUserLine(input.identityName, input.userText)}
 
-${input.expressionParts ? numberedReplyText(input.expressionParts) : input.aiText}${input.endingSection ? `\n\n${input.endingSection}` : ''}${input.detailsSection ? `\n\n${input.detailsSection}` : ''}${input.factsSection ? `\n\n${input.factsSection}` : ''}${input.nowSection ? `\n\n${input.nowSection}` : ''}`;
+${input.expressionParts ? numberedReplyText(input.expressionParts) : input.aiText}${input.endingSection ? `\n\n${input.endingSection}` : ''}${input.detailsSection ? `\n\n${input.detailsSection}` : ''}${input.factsSection ? `\n\n${input.factsSection}` : ''}${input.pressingSection ? `\n\n${input.pressingSection}` : ''}${input.nowSection ? `\n\n${input.nowSection}` : ''}`;
     return {
         messages: [
             {
@@ -343,6 +359,7 @@ ${input.expressionParts ? numberedReplyText(input.expressionParts) : input.aiTex
             (input.endingSection ? ENDING_EXTRA_TOKENS : 0) +
             (input.detailsSection ? DETAILS_EXTRA_TOKENS : 0) +
             (input.factsSection ? FACTS_EXTRA_TOKENS : 0) +
+            (input.pressingSection ? PRESSING_EXTRA_TOKENS : 0) +
             (input.nowSection ? NOW_EXTRA_TOKENS : 0),
     };
 }
@@ -390,6 +407,8 @@ export interface Judgement {
     ending?: JudgedEnding | null;
     /** The facts and slips it gave (.scratch/story-quality/spec.md); null or left out when none. */
     facts?: JudgedFacts | null;
+    /** The pressing notes it gave (.scratch/reply-repair/spec.md); empty or left out when none. */
+    pressing?: PressingNote[];
     /** The Now notes it gave (.scratch/growing-cards/spec.md); empty or left out when none. */
     now?: JudgedNow[];
 }
@@ -446,7 +465,12 @@ function parseJudgementCore(text: string): Judgement {
         const emotion = str(item.emotion).toLowerCase();
         return isEmotion(emotion) ? [{ line: item.line, emotion }] : [];
     });
-    return { bondChanges, arcSteps, scenes, timeOfDay: readTimeOfDay(json.time_of_day), expressions, suddenEvent: readJudgedSuddenEvent(json.sudden_event), details: readJudgedDetails(detailsWithGoals(json.details, json.goals)), ending: readJudgedEnding(json.ending), facts: readJudgedFacts(json.facts, json.slips), ...withNow(readJudgedNow(json.details, json.now)) };
+    return { bondChanges, arcSteps, scenes, timeOfDay: readTimeOfDay(json.time_of_day), expressions, suddenEvent: readJudgedSuddenEvent(json.sudden_event), details: readJudgedDetails(detailsWithGoals(json.details, json.goals)), ending: readJudgedEnding(json.ending), facts: readJudgedFacts(json.facts, json.slips), ...withPressing(readJudgedPressing(json.pressing)), ...withNow(readJudgedNow(json.details, json.now)) };
+}
+
+/** The pressing notes as a field of the judgement only when there are some, so a judgement without them reads as before. */
+function withPressing(pressing: PressingNote[]): { pressing?: PressingNote[] } {
+    return pressing.length > 0 ? { pressing } : {};
 }
 
 /** The Now notes as a field of the judgement only when there are some, so a judgement without them reads as before. */
@@ -516,7 +540,9 @@ export function buildJudgePrompt(input: JudgePromptInput & RollOfferJudgeInput &
     return {
         messages: prompt.messages.map((message) => {
             if (message.role === 'system') {
-                const offered = ROLL_OFFER_SYSTEMS.get(message.content) ?? message.content;
+                // The Roll offer's shape is looked up by the system message as the core built it, so every later field goes on after it.
+                const rolled = ROLL_OFFER_SYSTEMS.get(message.content) ?? message.content;
+                const offered = input.pressingSection ? withPressingShape(rolled) : rolled;
                 const content = input.secretsShape ? withSecretsShape(offered) : offered;
                 const detailed = input.detailsSection ? withDetailsShape(content) : content;
                 return { ...message, content: input.userFace ? withUserFaceShape(detailed) : detailed };

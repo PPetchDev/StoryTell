@@ -6,6 +6,7 @@ import { FAKE_TEXT_MODEL } from '../src/service/model-gateway/fake-model-gateway
 import { TextCompletionRequest } from '../src/service/model-gateway/model-gateway.js';
 import { judgeDetailsSection } from '../src/manager/chat/details/details.js';
 import { judgeFactsSection } from '../src/manager/chat/details/facts.js';
+import { judgePressingSection } from '../src/manager/chat/details/pressing.js';
 import { NOW_RULE } from '../src/manager/chat/details/now-notes.js';
 import { judgeItemsSection } from '../src/manager/chat/details/items.js';
 import { startTestApp, TestApp } from './harness/test-app.js';
@@ -331,7 +332,7 @@ describe('The Bond, Arc and Scene judge, the ledger and the dashboard', () => {
             expect(lastAi(played).judge).toEqual({ status: 'done', error: null });
             const calls = t.gateway.textCalls('judge');
             expect(calls).toHaveLength(1);
-            expect(calls[0]).toMatchObject({ kind: 'judge', json: true, maxTokens: 1340, servedFor: { storyId: story.id, chatId: chat.id } });
+            expect(calls[0]).toMatchObject({ kind: 'judge', json: true, maxTokens: 1430, servedFor: { storyId: story.id, chatId: chat.id } });
             expect(calls[0].messages.map((message) => message.role)).toEqual(['system', 'user']);
             expect(calls[0].messages[0].content).toContain('At most one change per Bond per turn.');
             expect(calls[0].messages[1].content).toBe(`# Cast
@@ -377,6 +378,8 @@ ${DETAILS_RULE}
 ${GOALS_RULE}
 
 ${judgeFactsSection([])}
+
+${judgePressingSection()}
 
 # Changed in this Chat
 Mira: nothing yet

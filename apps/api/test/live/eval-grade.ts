@@ -179,6 +179,27 @@ export const GRADER_CASES: GraderCase[] = [
         reply: `Mira smiled at the foreign words, guessing their meaning from the bag.\n\n${MIRA} For me? Go on, then.`,
         why: 'The narration calls his words foreign.',
     },
+    {
+        scene: 'noted',
+        check: 'does not ask again',
+        label: 'pass',
+        reply: `Mira laughed and pushed the bag toward him.\n\n${MIRA} Three weeks of swearing at an engine. And it listened? I am impressed.\n\n${MIRA} Have the almond one. You have earned it.`,
+        why: 'She answers him about the engine and leaves the question alone.',
+    },
+    {
+        scene: 'noted',
+        check: 'does not ask again',
+        label: 'fail',
+        reply: `Mira set her mug down.\n\n${MIRA} Three weeks. Well done. Now ask me properly.`,
+        why: 'She asks again, in the same words.',
+    },
+    {
+        scene: 'noted',
+        check: 'does not ask again',
+        label: 'fail',
+        reply: `Mira smiled over her mug.\n\n${MIRA} Three weeks, and it finally turned over. Lovely.\n\n${MIRA} You know that is not what you came to tell me, though. Go on. I am still waiting.`,
+        why: 'Other words, the same demand.',
+    },
     // Whole Chats: the replies to the scene's first turns, in order. For a check asked of each reply, `faults` says of each whether it presses.
     {
         scene: 'evening',

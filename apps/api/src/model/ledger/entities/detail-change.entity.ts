@@ -31,6 +31,11 @@ export enum DetailKind {
      * `{name, removed: true}` is the user deleting it. The newest record of a name wins.
      */
     Item = 'item',
+    /**
+     * A Character pressed the user for something the user's Message was not about
+     * (.scratch/reply-repair/spec.md), as `Character: what for`; read by the next turn only.
+     */
+    Pressing = 'pressing',
 }
 
 /**
@@ -54,7 +59,7 @@ export class DetailChangeEntity {
     @Column({ type: 'text' })
     kind: DetailKind;
 
-    /** The Character an Outfit is of; NULL for the Place and the Weather. */
+    /** The Character an Outfit is of, or who a pressing note is about; NULL for the Place and the Weather. */
     @Column({ name: 'character_id', type: 'integer', nullable: true })
     characterId: number | null;
 
