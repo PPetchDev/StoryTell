@@ -134,3 +134,20 @@ They are not exclusive. C can go with any. A is a stopgap that buys time for B, 
 4. **Count it.** The log already says each cut-off and each failure. A line on the Usage page, or a number in the play-signals report, would show whether the rate rises as Chats grow, which is the one thing that would change this advice.
 
 What would change it: a Chat whose updates fail twice running, or a first-try cut-off rate that climbs well past today's one in four on long Chats.
+
+## Built: a second try that asks for less (2026-11-25, on the user's word)
+
+Status of this part: built and committed; **not deployed, and not yet measured against a real model.**
+
+- **What changed in the app, and nothing else:** when the writer's answer is cut off at its cap, the second try ends "Your last account ran too long and was cut off before it reached the end. Write the account again, shorter: at most 350 words, and carry it through to the last of the Messages." in place of "Write the account now."
+- The first try is byte for byte what it was. So are the rules, the Messages, the cap and the number of tries. A second try after any other refusal (the writer going on with the story) still asks in the same words as the first.
+- The log line now ends "Asking once more, for a shorter account." so the two kinds of second try can be counted apart.
+- Ways A, B, D, E and F are untouched.
+- **Tests:** two in the Story so far's own tests through the manager with the fake gateway (the shorter ask after a cut-off; the same ask after another refusal), written first and seen to fail. The whole API suite passes (2,335).
+- **The eval's Layer 4 now tries again as the app does,** so the change can be measured: its scorecard says how many first answers were cut off, how many shorter second tries were stored or cut off again, how long those accounts are, and which of the four major events each kept.
+
+### Not yet known
+
+- **Whether the second try now succeeds more often.** The baseline on live is 10 stored of 15. Only a real run or live play can say.
+- **Whether a shorter account drops what matters.** Layer 4 counts the four major events in each account from a second try. Its story is denser than play, so it is the harder case.
+- Both can be measured by Layer 4 for about a cent, on the user's go-ahead. Live will then show it in the log once deployed.

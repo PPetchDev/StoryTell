@@ -109,7 +109,18 @@ export interface StorySoFarPromptInput {
     messages: Array<{ speaker: string; text: string }>;
     /** The user's own last text, if they ever wrote one: their corrections win. Null otherwise. */
     corrections: string | null;
+    /**
+     * The answer before this one ran to the length cap and was cut off: ask for a shorter account
+     * (.scratch/story-so-far-length/spec.md). Asked again in the same words, the second answer was
+     * cut off too one time in three on live.
+     */
+    ranLong?: boolean;
 }
+
+/** What a second try asks for after a cut-off: well under the words first asked for, so it ends. */
+export const STORY_SO_FAR_SHORTER_WORDS = 350;
+/** Why an answer that used the whole length cap can't be stored. */
+export const STORY_SO_FAR_CUT_OFF = 'The Story so far writer was cut off at its length cap.';
 
 /**
  * Spec: "How it is written (from scratch)". Every covered Message goes in each time, so no
@@ -136,7 +147,11 @@ Reply with the account only.`;
             `The user corrected the previous account to read as below. Where it and the Messages differ, the user's version wins; keep everything it says:\n\n${input.corrections.trim()}`,
         );
     }
-    sections.push('Write the account now.');
+    sections.push(
+        input.ranLong
+            ? `Your last account ran too long and was cut off before it reached the end. Write the account again, shorter: at most ${STORY_SO_FAR_SHORTER_WORDS} words, and carry it through to the last of the Messages.`
+            : 'Write the account now.',
+    );
     return [
         { role: 'system', content: system },
         { role: 'user', content: sections.join('\n\n') },
@@ -161,7 +176,7 @@ export function parseStorySoFar(text: string): string | null {
  */
 export function storySoFarRejection(text: string, completionTokens: number, speakers: string[], maxTokens = STORY_SO_FAR_MAX_TOKENS): string | null {
     // Using the whole cap means the model was stopped there: the account's last events are missing.
-    if (completionTokens >= maxTokens) return 'The Story so far writer was cut off at its length cap.';
+    if (completionTokens >= maxTokens) return STORY_SO_FAR_CUT_OFF;
     const tag = /^\[([^\]\n]+)\]/.exec(text.trim())?.[1]?.trim().toLowerCase();
     if (tag !== undefined && speakers.some((speaker) => speaker.trim().toLowerCase() === tag)) {
         return 'The Story so far writer went on with the story instead of telling it.';

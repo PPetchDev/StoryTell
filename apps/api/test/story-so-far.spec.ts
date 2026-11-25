@@ -289,7 +289,8 @@ describe('Story so far', () => {
 
     const cutOff = { text: 'Ash came through the storm and Mira', usage: { promptTokens: 9_000, completionTokens: STORY_SO_FAR_MAX_TOKENS } };
 
-    it('asks once more when the answer was cut off, and keeps the good one', async () => {
+    // Spec (story-so-far-length): the second try used to be the same request, and on live it was cut off again one time in three.
+    it('asks once more when the answer was cut off, this time for a shorter account, and keeps the good one', async () => {
         const storyId = await createStory();
         const chat = await createChat(storyId);
         t.gateway.scriptText('story_summary', cutOff);
@@ -298,11 +299,32 @@ describe('Story so far', () => {
 
         const calls = t.gateway.textCalls('story_summary');
         expect(calls).toHaveLength(2);
-        expect(calls[1].messages).toEqual(calls[0].messages);
+        // The same Messages and the same rules: only the closing ask changes.
+        expect(calls[1].messages[0]).toEqual(calls[0].messages[0]);
+        expect(calls[0].messages[1].content.endsWith('Write the account now.')).toBe(true);
+        expect(calls[1].messages[1].content).toBe(
+            calls[0].messages[1].content.replace(
+                /Write the account now\.$/,
+                'Your last account ran too long and was cut off before it reached the end. Write the account again, shorter: at most 350 words, and carry it through to the last of the Messages.',
+            ),
+        );
+        expect(calls[1].maxTokens).toBe(calls[0].maxTokens);
         expect(await storySoFar(storyId, chat.id)).toMatchObject({
             text: 'Ash came through the storm and Mira took the first watch.',
             failedReason: null,
         });
+    });
+
+    it('asks again in the same words when the answer was refused for another reason: only a cut-off asks for less', async () => {
+        const storyId = await createStory();
+        const chat = await createChat(storyId);
+        t.gateway.scriptText('story_summary', '[Story] The lamp gutters and Mira turns.');
+
+        await playUntilSummarised(storyId, chat.id, 'Ash came through the storm and Mira took the first watch.');
+
+        const calls = t.gateway.textCalls('story_summary');
+        expect(calls).toHaveLength(2);
+        expect(calls[1].messages).toEqual(calls[0].messages);
     });
 
     it('stores neither of two rejected answers, records why, and tries again after the next turn', async () => {

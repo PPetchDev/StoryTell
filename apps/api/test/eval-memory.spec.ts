@@ -536,11 +536,28 @@ describe('Layer 4, Story so far: does an early event stay in the account as the 
         expect(router.sent.filter((one) => one.role === 'grader')).toEqual([]);
     });
 
-    it('counts an account the app would refuse (cut off at its cap) as a failed sample, apart from the rest', async () => {
-        const router = scripted({ answer: { writer: (_body, index) => (index === 0 ? { text: 'Corin came to', completionTokens: 2000 } : 'Corin came to Harrowmere.') } });
+    // Spec (story-so-far-length): as the app does since 2026-11-25, a cut-off answer is asked for once more, shorter.
+    it('asks for a cut-off account once more as the app does, shorter, and says which accounts came from a second try', async () => {
+        const router = scripted({ answer: { writer: (_body, index) => (index === 0 ? { text: 'Corin came to', completionTokens: 2000 } : 'Corin pulled Tobin from the Marigold.') } });
         const report = await runMemoryEval({ layers: ['account'], model: 'glm-5.3', client: router.client, git: GIT, samples: 1 });
-        expect(report.account!.samples[0]).toMatchObject({ length: 6, text: null, error: 'The Story so far writer was cut off at its length cap.' });
+        const writers = router.sent.filter((one) => one.role === 'writer');
+        expect(writers).toHaveLength(6);
+        expect(promptOf(writers[0].body)).not.toContain('at most 350 words');
+        expect(promptOf(writers[1].body)).toContain('Your last account ran too long and was cut off');
+        expect(promptOf(writers[1].body)).toContain('chapter 6 in Harrowmere');
+        expect(report.account!.samples[0]).toMatchObject({ length: 6, error: null, text: 'Corin pulled Tobin from the Marigold.', secondTry: true });
+        expect(report.account!.samples[1]).toMatchObject({ length: 12, error: null, secondTry: false });
+        const card = formatMemoryScorecard(report);
+        expect(card).toContain('First answers cut off at the cap: 1 of 5. Of those, a shorter second try was stored 1 time and was cut off again 0 times.');
+        expect(card).toContain('Accounts from a shorter second try: 1, of 6 words on average; the four events kept: rescue 1 of 1, report 0 of 1, fire 0 of 1, promise 0 of 1.');
+    });
+
+    it('counts an account cut off twice as a failed update, apart from the rest', async () => {
+        const router = scripted({ answer: { writer: (_body, index) => (index < 2 ? { text: 'Corin came to', completionTokens: 2000 } : 'Corin came to Harrowmere.') } });
+        const report = await runMemoryEval({ layers: ['account'], model: 'glm-5.3', client: router.client, git: GIT, samples: 1 });
+        expect(report.account!.samples[0]).toMatchObject({ length: 6, text: null, secondTry: true, error: 'The Story so far writer was cut off at its length cap.' });
         expect(report.account!.samples[1]).toMatchObject({ length: 12, error: null });
+        expect(formatMemoryScorecard(report)).toContain('First answers cut off at the cap: 1 of 5. Of those, a shorter second try was stored 0 times and was cut off again 1 time.');
     });
 });
 

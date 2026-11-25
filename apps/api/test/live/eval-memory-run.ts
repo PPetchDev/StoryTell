@@ -5,7 +5,7 @@ import path from 'node:path';
 import { ChoiceMemory, chooseMemories, MEMORY_BUDGET_TOKENS, MEMORY_MIN_SIMILARITY, memoryCost, MemoryChoiceReason } from '../../src/manager/chat/memory/memory-choice.js';
 import { estimateTokens } from '../../src/manager/chat/turn/prompt-tokens.js';
 import { documentQuery, unitLength } from '../../src/manager/document/document-search.js';
-import { parseStorySoFar, STORY_SO_FAR_MAX_TOKENS, storySoFarPromptMessages, storySoFarRejection } from '../../src/manager/chat/story-so-far/story-so-far-prompt.js';
+import { parseStorySoFar, STORY_SO_FAR_CUT_OFF, STORY_SO_FAR_MAX_TOKENS, storySoFarPromptMessages, storySoFarRejection } from '../../src/manager/chat/story-so-far/story-so-far-prompt.js';
 import { EMBEDDING_MODEL, PLAY_MODEL_CATALOGUE, PLAY_MODELS, PlayModel, PromptMessage } from '../../src/service/model-gateway/model-gateway.js';
 import { FetchLike } from '../../src/service/model-gateway/real/http.js';
 import { backgroundSamplers, EMBEDDING_MODELS } from '../../src/service/model-gateway/real/model-table.js';
@@ -315,6 +315,8 @@ export interface AccountSample {
     text: string | null;
     error: string | null;
     words: number;
+    /** The first answer was cut off at the cap, and this is what the shorter second try came to. */
+    secondTry: boolean;
     /** Each major event: whether its telltale is in the account. */
     mustStay: Record<string, boolean>;
     /** Each minor detail: whether it is in the account. Never a pass or a fail. */
@@ -333,10 +335,10 @@ export interface AccountReport {
 const ACCOUNT_SAMPLES = 3;
 const accountSamples = (samples: number): number => Math.min(samples, ACCOUNT_SAMPLES);
 
-function writerPrompt(length: number): { messages: PromptMessage[]; speakers: string[] } {
+function writerPrompt(length: number, ranLong = false): { messages: PromptMessage[]; speakers: string[] } {
     const messages = storyMessages(length);
     return {
-        messages: storySoFarPromptMessages({ identityName: CORIN, castNames: MEMORY_CAST.map((character) => character.name), messages, corrections: null }),
+        messages: storySoFarPromptMessages({ identityName: CORIN, castNames: MEMORY_CAST.map((character) => character.name), messages, corrections: null, ranLong }),
         speakers: [...new Set(messages.map((message) => message.speaker))],
     };
 }
@@ -372,11 +374,22 @@ async function runAccount(client: OpenRouterClient, ledger: Ledger, samples: num
         const { messages, speakers } = writerPrompt(length);
         for (let time = 0; time < accountSamples(samples); time++) {
             // Sent as the app sends it: the Story so far writer's own cap and sampler values.
-            const answer = await chat(messages, STORY_SO_FAR_MAX_TOKENS, { samplers: backgroundSamplers('story_summary') });
-            if (!answer) return report;
-            const parsed = answer.error ? null : parseStorySoFar(answer.text);
-            const refused = answer.error ?? (parsed === null ? 'The Story so far writer wrote nothing.' : storySoFarRejection(parsed, answer.completionTokens, speakers));
-            const sample: AccountSample = { length, text: refused ? null : parsed, error: refused, words: 0, mustStay: {}, minor: {}, changed: {}, quotes: {} };
+            const write = async (ranLong: boolean) => {
+                const answer = await chat(ranLong ? writerPrompt(length, true).messages : messages, STORY_SO_FAR_MAX_TOKENS, { samplers: backgroundSamplers('story_summary') });
+                if (!answer) return null;
+                const parsed = answer.error ? null : parseStorySoFar(answer.text);
+                return { parsed, refused: answer.error ?? (parsed === null ? 'The Story so far writer wrote nothing.' : storySoFarRejection(parsed, answer.completionTokens, speakers)) };
+            };
+            let written = await write(false);
+            if (!written) return report;
+            // As the app does: an answer cut off at the cap is asked for once more, shorter. Any other refusal is the sample's.
+            const secondTry = written.refused === STORY_SO_FAR_CUT_OFF;
+            if (secondTry) {
+                written = await write(true);
+                if (!written) return report;
+            }
+            const { parsed, refused } = written;
+            const sample: AccountSample = { length, text: refused ? null : parsed, error: refused, words: 0, secondTry, mustStay: {}, minor: {}, changed: {}, quotes: {} };
             report.samples.push(sample);
             if (sample.text === null) continue;
             const account = sample.text;
@@ -583,6 +596,20 @@ function accountLines(now: AccountReport): string[] {
         return (['pass', 'fail', 'left out', 'not graded'] as ChangedOutcome[]).flatMap((outcome) => (outcomes.includes(outcome) ? [`${outcome} ${outcomes.filter((one) => one === outcome).length}`] : [])).join(', ');
     };
     const refused = now.samples.filter((sample) => sample.text === null);
+    const times = (count: number): string => `${count} ${count === 1 ? 'time' : 'times'}`;
+    const second = now.samples.filter((sample) => sample.secondTry);
+    const shorter = second.filter((sample) => sample.text !== null);
+    const retryLines =
+        second.length === 0
+            ? [`First answers cut off at the cap: 0 of ${now.samples.length}.`]
+            : [
+                  `First answers cut off at the cap: ${of(second.length, now.samples.length)}. Of those, a shorter second try was stored ${times(shorter.length)} and was cut off again ${times(second.length - shorter.length)}.`,
+                  ...(shorter.length > 0
+                      ? [
+                            `Accounts from a shorter second try: ${shorter.length}, of ${Math.round(shorter.reduce((sum, sample) => sum + sample.words, 0) / shorter.length)} words on average; the four events kept: ${MUST_STAY.map((name) => `${name} ${of(shorter.filter((sample) => sample.mustStay[name]).length, shorter.length)}`).join(', ')}.`,
+                        ]
+                      : []),
+              ];
     return [
         '',
         '## Layer 4: Story so far',
@@ -600,6 +627,8 @@ function accountLines(now: AccountReport): string[] {
                 `| ${length} | ${Math.round(mean((sample) => sample.words))} | ${MUST_STAY.map((name) => of(samples.filter((sample) => sample.mustStay[name]).length, samples.length)).join(' | ')} | ${wholeOrTenth(kept)} of ${MINOR_DETAILS.length} | ${CHANGED_ITEMS.map((item) => changed(samples, item.name)).join(' | ')} |`,
             ];
         }),
+        '',
+        ...retryLines,
         ...(refused.length > 0 ? ['', 'Accounts the app would not have stored:', '', ...refused.map((sample) => `- through Chapter ${sample.length}: ${sample.error}`)] : []),
     ];
 }

@@ -18,6 +18,7 @@ import {
     storySoFarCoverage,
     storySoFarPromptMessages,
     storySoFarRejection,
+    STORY_SO_FAR_CUT_OFF,
 } from './story-so-far-prompt.js';
 
 /** Spec: "Writer output guard": a rejected answer is asked for once more before the update fails. */
@@ -142,23 +143,26 @@ export class StorySoFarManagerService {
                 speaker: message.kind === MessageKind.User ? (message.identityName ?? identity.name) : 'Story',
                 text: messageText(message),
             }));
-            const request = {
+            const requestFor = (ranLong: boolean) => ({
                 kind: 'story_summary' as const,
                 messages: storySoFarPromptMessages({
                     identityName: identity.name,
                     castNames: story.characters.map((character) => character.name),
                     messages,
                     corrections: chat.storySoFarCorrections,
+                    ranLong,
                 }),
                 maxTokens: STORY_SO_FAR_MAX_TOKENS,
                 // Set off by the newest reply's background calls: its cost (.scratch/cost-view/spec.md).
                 servedFor: { storyId: story.id, chatId, ...newestReplyOf(chat) },
-            };
+            });
             const speakers = [...new Set(messages.map((message) => message.speaker))];
             // Spec: "Writer output guard". A cut-off or off-form answer is asked for once more, then fails.
+            // After a cut-off the second try asks for a shorter account (.scratch/story-so-far-length/spec.md); after any other refusal, for the same again.
             let text: string;
+            let ranLong = false;
             for (let attempt = 1; ; attempt++) {
-                const result = await this.gateway.completeText(request);
+                const result = await this.gateway.completeText(requestFor(ranLong));
                 const parsed = parseStorySoFar(result.text);
                 const rejection = parsed === null ? 'The Story so far writer wrote nothing.' : storySoFarRejection(parsed, result.usage.completionTokens, speakers);
                 if (parsed !== null && rejection === null) {
@@ -166,7 +170,8 @@ export class StorySoFarManagerService {
                     break;
                 }
                 if (attempt >= WRITER_ATTEMPTS) throw new UnparseableOutputError(rejection ?? 'The Story so far writer wrote nothing.');
-                this.logger.warn(`Chat ${chatId}: ${rejection} Asking once more.`);
+                ranLong = rejection === STORY_SO_FAR_CUT_OFF;
+                this.logger.warn(`Chat ${chatId}: ${rejection} Asking once more${ranLong ? ', for a shorter account' : ''}.`);
             }
             if (this.generationOf(chatId) !== generation) {
                 this.logger.log(`Chat ${chatId}: a Story so far update finished after a rewind or the user's save; dropped`);
