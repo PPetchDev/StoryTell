@@ -381,7 +381,7 @@ npm run eval:live -- --grade --spend                (the grader check, now with 
 
 - **Ten of fifteen accounts were cut off at the writer's cap** and the app would not have stored them. The five that finished ran 309 to 916 words against the 500 asked for.
 - **Partly the fixture's doing:** its Messages are events told one sentence each, so there is little to squeeze, and the writer is told to "keep every detail that could matter later". Played prose has more to drop.
-- **But the fault is on live too.** The live API log holds "The Story so far writer was cut off at its length cap" 20 times in the last 30 days. Each is an answer thrown away and asked for again, and a second one in a row leaves the Story so far a turn stale.
+- **But the fault is on live too.** The live API log holds "The Story so far writer was cut off at its length cap" 20 times. Each is an answer thrown away and asked for again, and a second one in a row leaves the Story so far a turn stale. (Corrected 2026-11-25: the log covers twelve days, and that is 20 answers cut off in 15 of 67 updates, of which 5 failed. See [the Story so far length spec](../story-so-far-length/spec.md).)
 - What little was measured: through Chapter 6 all four events were in all three accounts. Through Chapter 24, in the two accounts that finished, the rescue and the report were each in one of two, and both changed items gave the later state. Too few to read.
 - The layer needs Messages written as played prose before it can say what the account loses.
 
@@ -469,7 +469,7 @@ npm run eval:live -- --grade --spend                (the grader check, now with 
 ### For the user to decide about the app (none of it done)
 
 1. The similarity floor and the Memory budget: fewer, nearer Memories a turn.
-2. The Story so far writer's cap, overrun on live 20 times in 30 days.
+2. The Story so far writer's cap, overrun on live: 5 updates of 67 failed in twelve days (first written here as "20 times in 30 days", which counted answers, not failures, over the wrong span).
 3. A Character using a Memory it is not tagged on.
 4. The extraction taking narration as heard by those present.
 
@@ -555,6 +555,30 @@ For the fire it is plainer, as a Belief is held now: the prompt says Ilse believ
 - So the padding was not the cause. The writer copies the events out in order, a sentence each, under "keep every detail that could matter later", and does not squeeze. Asked for 500 words, it writes until it is stopped.
 - In the six that finished, all four major events were there every time, and the one account long enough to be asked gave the key's later state. Minor details fell from 2 of 4 to none by Chapter 18.
 - **What the layer was built to ask, which events an account loses as the story grows, is still unanswered,** because past Chapter 18 there is no account to read. That is itself the answer for now: on a long story the app may have no fresh Story so far at all.
-- The fixture's story is dense, eight events a Chapter that each could matter. A played Chat has fewer. Live has the same fault 20 times in 30 days, so it is not only the fixture.
+- The fixture's story is dense, eight events a Chapter that each could matter. A played Chat has fewer. Live has the same fault (5 failed updates of 67 in twelve days; first written here as "20 times in 30 days"), so it is not only the fixture.
 
 Spent on this eval in all: **$0.323.**
+
+## Buried, or spoken against: a crowd that is not hers (2026-11-25, with the user's go-ahead)
+
+A fifth arm, "among strangers": the anchor's Memory beside as many Memories (about 3,400 tokens) that neither name the Character nor are known by her. Same card, same turn. Three scenes, five samples: **$0.032**, 30 calls, none failed. Three more assertions in the tests; the whole API suite passes (2,333).
+
+| All three anchors | Among the others (the later past of the same two people) | Among strangers | Alone | Without |
+|---|---|---|---|---|
+| recall | 2 of 15 | 10 of 15 | 14 of 15 | 0 of 15 |
+| impact | 2 of 15 | 10 of 15 | 14 of 15 | 1 of 15 |
+
+By anchor, among strangers: the report 5 of 5 on both; the fire 2 of 5 recall by its telltale and 4 of 5 impact; the rescue 3 of 5 recall and 1 of 5 impact.
+
+- **This changes the reading of the third run.** Most of the loss is not burial. A crowd of the same size that says nothing of the two of them costs about four replies in fifteen (14 down to 10). The later Memories of the same two people cost eight more (10 down to 2).
+- So the Character is not failing to find the old Memory in a long list. The model reads a year of working side by side and plays the two as on good terms, and the old grievance, debt or Belief goes unsaid.
+- **Whether that is a fault depends on the Memory.** An old grievance worn down by a year of friendship is a fair way to tell it, though nothing in the Chat ever said it was mended. A Belief is another matter: the prompt says Ilse believes, now, that he burned her shed, and among the later Memories she offers him the cordial.
+- **Burial is real and smaller:** 4 in 15, and uneven. Bram's grievance survives a crowd whole; Sera's debt does not (impact 1 of 5), though she names it 3 times in 5.
+- Read by eye, two of the fire's four passes are thin (she lets him draw, unsmiling). Call impact among strangers 9 or 10 of 15.
+- Ilse spoke of the lantern once in these five. Over all runs: 3 replies in 20 where its Memory was in the prompt.
+- Five replies a cell, one Story, one model, as before.
+
+### What it means for the app (nothing done)
+
+- Cutting the Memory layer to fewer, nearer Memories would win back some recall, not most of it.
+- The larger question is one the app has no place for today: **whether a thing between two people is still open.** A Memory is a line in a list; nothing marks a grievance as unmended or a debt as unpaid, and a year of ordinary Memories reads as an answer. Bonds carry feeling as numbers, and were left empty in these scenes; a run with the Bond set would say whether they already do this work.

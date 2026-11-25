@@ -247,7 +247,27 @@ export const FILLER_MEMORIES: PromptMemory[] = (() => {
     return kept.map((memory) => ({ text: memory.text, knownBy: memory.knownBy, locked: false }));
 })();
 
-export type Arm = 'with' | 'without' | 'offtopic' | 'alone';
+/**
+ * A crowd that is not hers: the newest Memories that neither name the Character nor are known by
+ * her, as many as the filler holds. Beside the anchor they are as much to read and say nothing of
+ * her and the user, where the filler is the next 25 Chapters of the two of them. If the Memory is
+ * lost among these too, it is buried; if only among the filler, the later past speaks against it.
+ */
+export function strangerMemories(character: string): PromptMemory[] {
+    const first = character.split(' ')[0];
+    const kept: typeof FIXTURE_MEMORIES = [];
+    let used = 0;
+    for (const memory of [...FIXTURE_MEMORIES].reverse()) {
+        if (memory.anchor || memory.text.includes(first) || memory.knownBy.includes(character)) continue;
+        const cost = memoryCost(memory);
+        if (used + cost > FILLER_BUDGET_TOKENS) break;
+        used += cost;
+        kept.unshift(memory);
+    }
+    return kept.map((memory) => ({ text: memory.text, knownBy: memory.knownBy, locked: false }));
+}
+
+export type Arm = 'with' | 'without' | 'offtopic' | 'alone' | 'strangers';
 
 /** One anchor as Layer 3 plays it: the Character, the ask their card opposes, and the choice the past points to. */
 interface UseAnchor {
@@ -331,6 +351,7 @@ function useScene(use: UseAnchor, arm: Arm): TurnScene {
         without: `The same turn without the Memory: what ${use.character}’s card alone gives, and no past invented.`,
         offtopic: `With the Memory, on a turn it has no bearing on: ${use.character} leaves it alone.`,
         alone: `The same turn with the Memory and no other: a Memory lost in the crowd acts here, one the card overrules does not.`,
+        strangers: `The same turn with the Memory among as many that are not about ${use.character}: buried here too, or only where the later past speaks against it.`,
     };
     return {
         kind: 'turn',
@@ -341,12 +362,12 @@ function useScene(use: UseAnchor, arm: Arm): TurnScene {
             ...MEMORY_STORY,
             history: use.history,
             present: [use.character],
-            memories: [...(withMemory ? [{ text: own.memory.text, knownBy: own.memory.knownBy, locked: false }] : []), ...(arm === 'alone' ? [] : FILLER_MEMORIES)],
+            memories: [...(withMemory ? [{ text: own.memory.text, knownBy: own.memory.knownBy, locked: false }] : []), ...(arm === 'alone' ? [] : arm === 'strangers' ? strangerMemories(use.character) : FILLER_MEMORIES)],
             ...(fire && withMemory ? { beliefs: [ILSE_BELIEF] } : {}),
         },
         userText: arm === 'offtopic' ? use.offTopic! : use.ask,
         checks: [
-            ...(arm === 'with' || arm === 'alone' ? [mentions('recall evidence', own.telltale)] : []),
+            ...(arm === 'with' || arm === 'alone' || arm === 'strangers' ? [mentions('recall evidence', own.telltale)] : []),
             ...(arm === 'without' ? [avoids('invents no past', own.eventWords)] : []),
             ...(arm === 'offtopic' ? [avoids('leaves it alone', own.eventWords)] : []),
             // The truth of the fire is in the prompt, known by Bram alone: Ilse was never told.
@@ -359,7 +380,7 @@ function useScene(use: UseAnchor, arm: Arm): TurnScene {
     };
 }
 
-export const USE_SCENES: TurnScene[] = USE_ANCHORS.flatMap((use) => (['with', 'without', ...(use.offTopic ? ['offtopic'] : []), 'alone'] as Arm[]).map((arm) => useScene(use, arm)));
+export const USE_SCENES: TurnScene[] = USE_ANCHORS.flatMap((use) => (['with', 'without', ...(use.offTopic ? ['offtopic'] : []), 'alone', 'strangers'] as Arm[]).map((arm) => useScene(use, arm)));
 
 /** The anchors Layer 3 plays, in order. */
 export const USE_ANCHOR_NAMES: AnchorName[] = USE_ANCHORS.map((use) => use.anchor);

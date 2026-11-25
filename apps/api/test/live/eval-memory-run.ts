@@ -260,6 +260,10 @@ export interface UseSummary {
     aloneSamples: number;
     recallAlone: number;
     impactAlone: number;
+    /** The same turn with the Memory among as many that are not about the Character: burial, apart from a later past that speaks against the old one. */
+    strangersSamples: number;
+    recallStrangers: number;
+    impactStrangers: number;
 }
 
 function useSummaries(report: EvalReport): UseSummary[] {
@@ -274,6 +278,7 @@ function useSummaries(report: EvalReport): UseSummary[] {
         const without = samplesOf(`use-${name}-without`);
         const offTopic = samplesOf(`use-${name}-offtopic`);
         const alone = samplesOf(`use-${name}-alone`).filter(judged);
+        const strangers = samplesOf(`use-${name}-strangers`).filter(judged);
         return {
             anchor: name,
             samples: pairs.length,
@@ -291,6 +296,9 @@ function useSummaries(report: EvalReport): UseSummary[] {
             aloneSamples: alone.length,
             recallAlone: alone.filter((sample) => outcome(sample, 'recall evidence') === 'pass').length,
             impactAlone: alone.filter((sample) => outcome(sample, IMPACT) === 'pass').length,
+            strangersSamples: strangers.length,
+            recallStrangers: strangers.filter((sample) => outcome(sample, 'recall evidence') === 'pass').length,
+            impactStrangers: strangers.filter((sample) => outcome(sample, IMPACT) === 'pass').length,
         };
     });
 }
@@ -555,11 +563,14 @@ function useLines(now: NonNullable<MemoryReport['use']>, before?: MemoryReport['
                 `| ${one.anchor} | ${of(one.impact, one.samples)} | ${of(one.impactWithout, one.withoutSamples)} | ${of(one.inventedPast, one.withoutSamples)} | ${one.offTopicSamples === 0 ? 'no such turn' : of(one.broughtUpOffTopic, one.offTopicSamples)} | ${points(one)} |`,
         ),
         '',
-        'Lost in the crowd, or overruled by the card: the same turn with the Memory and no other beside it. Where "alone" acts and "among the others" does not, the crowd is the cause; where neither acts, the card is.',
+        'Why a Memory is lost. "Among the others": beside the newest Memories of the Chat, which are the later past of the same people. "Among strangers": beside as many that are not about this Character. "Alone": no other Memory. Lost among strangers too, it is buried; lost only among the others, the later past speaks against it.',
         '',
-        '| Anchor | Recall, among the others | Recall, alone | Impact, among the others | Impact, alone | Impact, without |',
+        '| Anchor | Measure | Among the others | Among strangers | Alone | Without |',
         '|---|---|---|---|---|---|',
-        ...now.anchors.map((one) => `| ${one.anchor} | ${of(one.recall, one.samples)} | ${of(one.recallAlone, one.aloneSamples)} | ${of(one.impact, one.samples)} | ${of(one.impactAlone, one.aloneSamples)} | ${of(one.impactWithout, one.withoutSamples)} |`),
+        ...now.anchors.flatMap((one) => [
+            `| ${one.anchor} | recall | ${of(one.recall, one.samples)} | ${of(one.recallStrangers ?? 0, one.strangersSamples ?? 0)} | ${of(one.recallAlone, one.aloneSamples)} | - |`,
+            `| ${one.anchor} | impact | ${of(one.impact, one.samples)} | ${of(one.impactStrangers ?? 0, one.strangersSamples ?? 0)} | ${of(one.impactAlone, one.aloneSamples)} | ${of(one.impactWithout, one.withoutSamples)} |`,
+        ]),
         '',
         ...playedLines(now.report, before?.report),
     ];

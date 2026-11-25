@@ -331,19 +331,22 @@ describe('Layer 3, Use: with the Memory in the prompt, does the Character act on
     const scene = (name: string) => USE_SCENES.find((one) => one.name === name)!;
     const built = (name: string) => buildTurnPrompt({ ...scene(name).input, userText: scene(name).userText }).messages.map((message) => message.content).join('\n');
 
-    it('is eleven scenes: for each anchor the Memory among the others, without it, and alone; and an off-topic turn where the past has one', () => {
+    it('is fourteen scenes: for each anchor the Memory among the others, without it, alone, and among as many that are not hers; and an off-topic turn where the past has one', () => {
         expect(USE_SCENES.map((one) => one.name)).toEqual([
             'use-rescue-with',
             'use-rescue-without',
             'use-rescue-offtopic',
             'use-rescue-alone',
+            'use-rescue-strangers',
             'use-report-with',
             'use-report-without',
             'use-report-offtopic',
             'use-report-alone',
+            'use-report-strangers',
             'use-fire-with',
             'use-fire-without',
             'use-fire-alone',
+            'use-fire-strangers',
         ]);
         expect(scenePromptProblems([...USE_SCENES, ...EXTRACTION_SCENES])).toEqual([]);
     });
@@ -379,6 +382,22 @@ describe('Layer 3, Use: with the Memory in the prompt, does the Character act on
             expect(alone.input.memories[0]).toEqual(withIt.input.memories[0]);
             expect({ ...alone.input, memories: [] }).toEqual({ ...withIt.input, memories: [] });
         }
+        // "Strangers" is "with", its other Memories changed for as many that are not about her and that she does not know:
+        // a crowd of the same size that says nothing of her and the user. It tells burial from a later past that speaks against the old one.
+        for (const [name, first, full] of [['rescue', 'Sera', SERA], ['report', 'Bram', BRAM], ['fire', 'Ilse', ILSE]] as const) {
+            const withIt = scene(`use-${name}-with`);
+            const strangers = scene(`use-${name}-strangers`);
+            expect(strangers.userText).toBe(withIt.userText);
+            expect(strangers.input.memories[0]).toEqual(withIt.input.memories[0]);
+            const crowd = strangers.input.memories.slice(1);
+            expect(crowd.filter((memory) => memory.text.includes(first) || memory.knownBy.includes(full))).toEqual([]);
+            expect(ANCHORS.filter((anchor) => crowd.some((memory) => anchor.telltale.test(memory.text)))).toEqual([]);
+            const tokens = crowd.reduce((sum, memory) => sum + memoryCost(memory), 0);
+            expect(tokens).toBeGreaterThan(3300);
+            expect(tokens).toBeLessThanOrEqual(3500);
+            expect({ ...strangers.input, memories: [] }).toEqual({ ...withIt.input, memories: [] });
+            expect(built(`use-${name}-strangers`)).toContain(crowd.at(-1)!.text.replaceAll('{user}', CORIN));
+        }
         for (const name of ['rescue', 'report']) {
             const withIt = scene(`use-${name}-with`);
             const offTopic = scene(`use-${name}-offtopic`);
@@ -406,9 +425,11 @@ describe('Layer 3, Use: with the Memory in the prompt, does the Character act on
             answer: {
                 play: (body) => {
                     const prompt = promptOf(body);
-                    const tells = /Marigold|Vessin|Candle Night/.test(prompt);
-                    const crowd = prompt.includes(FILLER_MEMORIES[0].text.replaceAll('{user}', CORIN));
-                    const name = USE_SCENES.find((one) => prompt.includes(one.userText) && (one.name.endsWith('without') ? !tells : one.name.endsWith('alone') ? tells && !crowd : tells && crowd))!.name;
+                    // The scene whose turn and whose Memories, all of them and no others, are in the prompt.
+                    const lines = prompt.split('\n').filter((line) => line.startsWith('- [known by')).length;
+                    const name = USE_SCENES.find(
+                        (one) => prompt.includes(one.userText) && one.input.memories.length === lines && one.input.memories.every((memory) => prompt.includes(memory.text.replaceAll('{user}', CORIN))),
+                    )!.name;
                     const index = asked[name] ?? 0;
                     asked[name] = index + 1;
                     return replies[name]?.[index] ?? `The room was quiet.\n\n@${USE_SCENES.find((one) => one.name === name)!.input.present![0]}: Not today.`;
@@ -424,10 +445,11 @@ describe('Layer 3, Use: with the Memory in the prompt, does the Character act on
             'use-rescue-without': [`@${SERA}: No.`, `@${SERA}: Just this once. GRANTS.`],
             'use-rescue-offtopic': [`@${SERA}: Four feet two.`, `@${SERA}: Four feet two, and I have not forgotten the Marigold.`],
             'use-rescue-alone': [`@${SERA}: For the Marigold. GRANTS.`, `@${SERA}: For Tobin. GRANTS.`],
+            'use-rescue-strangers': [`@${SERA}: For the Marigold. GRANTS.`, `@${SERA}: No.`],
         });
         const report = await runMemoryEval({ layers: ['use'], model: 'glm-5.3', client: router.client, git: GIT, samples: 2 });
 
-        expect(router.sent.filter((one) => one.role === 'play')).toHaveLength(22);
+        expect(router.sent.filter((one) => one.role === 'play')).toHaveLength(28);
         expect(router.sent.filter((one) => one.role === 'play')[0].body.model).toBe('z-ai/glm-5.3');
         const rescue = report.use!.anchors.find((one) => one.anchor === 'rescue')!;
         expect(rescue).toEqual({
@@ -447,6 +469,9 @@ describe('Layer 3, Use: with the Memory in the prompt, does the Character act on
             aloneSamples: 2,
             recallAlone: 2,
             impactAlone: 2,
+            strangersSamples: 2,
+            recallStrangers: 1,
+            impactStrangers: 1,
         });
         // The fire has no off-topic arm.
         expect(report.use!.anchors.find((one) => one.anchor === 'fire')).toMatchObject({ offTopicSamples: 0, broughtUpOffTopic: 0, recall: 0, impact: 0, neither: 2 });
@@ -455,8 +480,9 @@ describe('Layer 3, Use: with the Memory in the prompt, does the Character act on
         expect(card).toContain('| Anchor | Recall evidence | Behavioural impact | Both | Recall only | Impact only | Neither |');
         expect(card).toContain('| rescue | 2 of 2 | 1 of 2 | 1 | 1 | 0 | 0 |');
         expect(card).toContain('| rescue | 1 of 2 | 1 of 2 | 0 of 2 |');
-        expect(card).toContain('| Anchor | Recall, among the others | Recall, alone | Impact, among the others | Impact, alone | Impact, without |');
-        expect(card).toContain('| rescue | 2 of 2 | 2 of 2 | 1 of 2 | 2 of 2 | 1 of 2 |');
+        expect(card).toContain('| Anchor | Measure | Among the others | Among strangers | Alone | Without |');
+        expect(card).toContain('| rescue | recall | 2 of 2 | 1 of 2 | 2 of 2 | - |');
+        expect(card).toContain('| rescue | impact | 1 of 2 | 1 of 2 | 2 of 2 | 1 of 2 |');
     });
 
     it('fails Ilse for knowing of the lantern, which only Bram was ever told', async () => {
@@ -601,7 +627,7 @@ describe('The memory eval’s gate, its grader cases and its report', () => {
     });
 
     it('has, for every graded check of its own, a text the grader must pass and one it must fail, and the grader check reads them', () => {
-        const graded = [...USE_SCENES.flatMap((scene) => scene.graded.map((check) => ({ scene: scene.name.replace(/-(?:without|alone)$/, '-with'), check: check.name }))), ...Object.values(CURRENT_STATE).map((check) => ({ scene: ACCOUNT_SCENE, check: check.name }))];
+        const graded = [...USE_SCENES.flatMap((scene) => scene.graded.map((check) => ({ scene: scene.name.replace(/-(?:without|alone|strangers)$/, '-with'), check: check.name }))), ...Object.values(CURRENT_STATE).map((check) => ({ scene: ACCOUNT_SCENE, check: check.name }))];
         for (const { scene, check } of graded) {
             for (const label of ['pass', 'fail'] as const) {
                 expect(MEMORY_GRADER_CASES.some((one) => one.scene === scene && one.check === check && one.label === label), `${scene}, ${check}: a ${label} case`).toBe(true);
