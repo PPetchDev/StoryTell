@@ -149,7 +149,7 @@ Reply with the account only.`;
     }
     sections.push(
         input.ranLong
-            ? `Your last account ran too long and was cut off before it reached the end. Write the account again, shorter: at most ${STORY_SO_FAR_SHORTER_WORDS} words, and carry it through to the last of the Messages.`
+            ? `Your last account ran too long and was cut off before it reached the end. Write the account again, shorter: at most ${STORY_SO_FAR_SHORTER_WORDS} words, still from the beginning of the story through to the last of the Messages.`
             : 'Write the account now.',
     );
     return [

@@ -151,3 +151,61 @@ Status of this part: built and committed; **not deployed, and not yet measured a
 - **Whether the second try now succeeds more often.** The baseline on live is 10 stored of 15. Only a real run or live play can say.
 - **Whether a shorter account drops what matters.** Layer 4 counts the four major events in each account from a second try. Its story is denser than play, so it is the harder case.
 - Both can be measured by Layer 4 for about a cent, on the user's go-ahead. Live will then show it in the log once deployed.
+
+## The second try, measured (2026-11-25, with the user's go-ahead)
+
+Layer 4 of the memory eval, fifteen accounts at five story lengths: **$0.010.** Every account from a second try was read against what the scorecard counted.
+
+### Does the second try succeed more often?
+
+| | First answer cut off | Second try stored | Cut off again |
+|---|---|---|---|
+| Live, twelve days, the same request sent twice | 15 of 67 | 10 of 15 | 5 of 15 |
+| The eval, the shorter ask | 8 of 15 | **8 of 8** | **0 of 8** |
+
+- Every length now has three accounts. In the run before, with no second try, every account from Chapter 24 on was lost.
+- The second tries ran 214 to 859 words, 380 on average. Seven of eight came in under the first ask's 500; one wrote 859 and still ended in time.
+- Eight tries is few, and the eval's story is not a played Chat. It says the shorter ask works on the hard case; live will say how often.
+- The first-try rate is unchanged, as it should be: the first try was not touched.
+
+### Does a shorter account drop what matters?
+
+The scorecard counted the four major events as kept 24 times of 32 in the second-try accounts. Read by eye, it is better and worse than that:
+
+- **Four of the eight "lost" were not lost.** The account told the event without its telltale word: "Bram was fined and has not forgiven it" (no "forty crowns"), "Bram's lantern burned Ilse's drying shed" (no "Candle Night"). A telltale is right for a reply, where it shows a Memory was read; for an account it is too strict. The count by eye: **28 of 32.**
+- **Seven of the eight accounts hold all four events.**
+- **One holds none of them.** Asked for less, it told only Chapters 18 to 24 and left the first seventeen out. The ask ends "carry it through to the last of the Messages", and that reply read it as "tell the end". One in eight here; on live that would be a Story so far that has lost the beginning until the next rewrite.
+- Minor details are gone from every account past Chapter 12, first try or second. They may be.
+- Both changed items gave the later state every time they were asked: the key 9 of 9, the boat 6 of 6.
+- One account got a fact backwards (who carved the spoon for whom). First tries do that too; it was not counted.
+
+### What it comes to
+
+The second try now ends where it used to be cut off, and most of the time it keeps the story's spine. It has one new way to go wrong, which the old second try did not: dropping the beginning.
+
+**A mend within the same ask, not done:** have it say the account must still run from the story's beginning, for instance "...shorter: at most 350 words, still from the beginning of the story through to the last of the Messages." It is one clause in the second try's sentence and no part of ways A, B, D, E or F. It would want the same measure again, about a cent.
+
+**For the eval, not done:** an account's events should be counted by the event's own words, not its telltale.
+
+## The second try, with "from the beginning" (2026-11-25, on the user's word)
+
+- **Changed:** the second try's sentence now ends "...shorter: at most 350 words, still from the beginning of the story through to the last of the Messages." One clause; nothing else in the app. The test was changed first and seen to fail. The whole API suite passes (2,335).
+- **In the eval:** an account's four events are now counted by the event's own words, not its telltale, as the reading above asked.
+
+Measured again with Layer 4, fifteen accounts: **$0.009.** Every account was checked for where it opens and for the four events, by the scorecard and by a second, looser pattern.
+
+| | First answer cut off | Second try stored | Cut off again | Second tries holding all four events | Opening at the story's start |
+|---|---|---|---|---|---|
+| Before the clause | 8 of 15 | 8 of 8 | 0 | 7 of 8 | 7 of 8 |
+| With the clause | 6 of 15 | 6 of 6 | 0 | **6 of 6** | **6 of 6** |
+
+- **No second try dropped the beginning this time,** and all six hold all four major events.
+- Over both runs: 14 second tries, 14 stored, none cut off again. The same request sent twice, on live, was cut off again 5 times in 15.
+- **What a shorter account does lose:** the later state of a changed item was left out once for the key and once for the boat, each in a second try under 300 words. Nothing was given wrongly; it was not there. First tries left none out.
+- The second tries ran 286 to 1,040 words, 472 on average. "At most 350" is not obeyed any better than "at most 500" was; what matters is that they end.
+- Six tries is few. One clean run after one bad account in eight is the direction, not proof the fault is gone.
+- Minor details are still gone from the long accounts, first try or second.
+
+### Where this leaves it
+
+Committed, not pushed, not deployed. Live keeps the old second try until a deploy. After one, the log's "Asking once more, for a shorter account" and "update failed" lines say whether updates still fail on long Chats; the baseline is 5 failed of 67.

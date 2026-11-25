@@ -305,7 +305,7 @@ describe('Story so far', () => {
         expect(calls[1].messages[1].content).toBe(
             calls[0].messages[1].content.replace(
                 /Write the account now\.$/,
-                'Your last account ran too long and was cut off before it reached the end. Write the account again, shorter: at most 350 words, and carry it through to the last of the Messages.',
+                'Your last account ran too long and was cut off before it reached the end. Write the account again, shorter: at most 350 words, still from the beginning of the story through to the last of the Messages.',
             ),
         );
         expect(calls[1].maxTokens).toBe(calls[0].maxTokens);

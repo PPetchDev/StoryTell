@@ -394,7 +394,8 @@ async function runAccount(client: OpenRouterClient, ledger: Ledger, samples: num
             if (sample.text === null) continue;
             const account = sample.text;
             sample.words = wordCount(account);
-            for (const name of MUST_STAY) sample.mustStay[name] = anchor(name).telltale.test(account);
+            // By the event's own words, not its telltale: an account may tell the fine without "forty crowns" (the second try, measured).
+            for (const name of MUST_STAY) sample.mustStay[name] = anchor(name).eventWords.test(account);
             for (const detail of MINOR_DETAILS) sample.minor[detail.name] = detail.tells.test(account);
             for (const item of CHANGED_ITEMS) sample.changed[item.name] = length < item.changedIn ? 'too early' : item.mentions.test(account) ? 'not graded' : 'left out';
             // One grader call for the items this account speaks of: silence is counted, not judged.
