@@ -62,7 +62,7 @@ The writer's instruction holds two rules that cannot both be kept on a long stor
 ## One measured problem, and one finding still to check
 
 1. **Measured: the answer is too long.** One update in thirteen fails on live, and the rest average a fifth over the length asked.
-2. **A finding, not yet a conclusion: the input grows with the Chat.** Every covered Message is sent again each time, 150,000 tokens today in the longest Chat. What is not known:
+2. **A finding, checked further down ("The two unknowns, checked"): the input grows with the Chat.** Every covered Message is sent again each time, 150,000 tokens today in the longest Chat. What is not known:
    - the background model's limit on input, which was not looked up. Past it the update would fail every time, but how near that is cannot be said;
    - whether anything in the app or the host already guards against it;
    - what the five failed updates did to the turns after them: whether the next turn's update succeeded, and how stale the Story so far got meanwhile.
@@ -117,3 +117,20 @@ They are not exclusive. C can go with any. A is a stopgap that buys time for B, 
 
 - The cost is not the reason to act: all 134 calls cost $0.82. The reasons are the failed updates and the input that has no limit.
 - The first spec's choice to write from scratch was sound at the size it was written for. The longest Chat is now 864 Messages.
+
+## The two unknowns, checked (2026-11-25, read-only, nothing spent)
+
+- **The background model's input limit:** OpenRouter lists DeepSeek V4 Flash on DeepInfra at 1,048,576 tokens. The longest Chat's update sends about 150,000, a seventh of it. At that Chat's rate of about 170 tokens a Message the limit is near 6,000 Messages. **So the growing input is not a wall in sight.** It is a cost and a wait that grow with the Chat, and it makes a cut-off likelier (three times as likely past 60,000 tokens).
+- **What followed each failed update:** all five were followed by an update that succeeded, and none failed twice running. Four recovered within two to five minutes, on the next turn. The fifth recovered six hours and forty minutes later, which was simply the next turn the user played.
+- So each failure cost **one turn played on a Story so far one update old.** On that turn the recent Messages that no longer fit are left out of the prompt with no account of them yet: the gap the Story so far exists to close, open for one turn.
+
+## A proposal, for the user to accept, change or refuse
+
+**Read with the figures above, this is a small fault, not an urgent one:** five one-turn delays in twelve days of play, each mended by the app itself on the next turn. It does not ask for a new design.
+
+1. **Do C: a second try that asks for less.** Today the second try sends the same request and was cut off again one time in three (5 of 15). Telling it the first answer ran long and asking for a shorter account is a few lines in one place, changes nothing about the prompt cache or the cost, and bears directly on the one thing measured: the failed update.
+2. **Then measure, and only then think of B.** Rewording the writer's rules (what to keep first, and that the length wins) could cut the first-try cut-offs too, but it trades away detail, and nothing yet says how much. Layer 4 can say, once it has Messages written as played prose.
+3. **Leave A, D, E and F.** A raises the cost of every turn to mend a thing that mends itself in one. D and E would bring back the fading the first spec was written against, to solve an input limit that is forty times the Chat's present size away. F hides the newest events.
+4. **Count it.** The log already says each cut-off and each failure. A line on the Usage page, or a number in the play-signals report, would show whether the rate rises as Chats grow, which is the one thing that would change this advice.
+
+What would change it: a Chat whose updates fail twice running, or a first-try cut-off rate that climbs well past today's one in four on long Chats.
