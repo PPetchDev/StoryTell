@@ -3,6 +3,7 @@ import path from 'node:path';
 import { parseEnv } from 'node:util';
 
 import { startGraderCheck } from './eval-grade.js';
+import { startMemoryEval } from './eval-memory-run.js';
 import { DEFAULT_EVAL_DIR, startEvalRun } from './eval-run.js';
 import { REPO_ROOT } from './smoke-run.js';
 
@@ -21,7 +22,8 @@ it(
             env.OPENROUTER_API_KEY = parseEnv(readFileSync(envFile, 'utf8')).OPENROUTER_API_KEY;
         }
         // --grade checks the grader alone (eval-grade.ts); --label-sheet writes the replies to label by hand.
-        await (env.EVAL_GRADE ? startGraderCheck : startEvalRun)(env, {
+        // --memory runs the long-term memory eval (eval-memory-run.ts) in place of the scenes.
+        await (env.EVAL_MEMORY ? startMemoryEval : env.EVAL_GRADE ? startGraderCheck : startEvalRun)(env, {
             fetch: globalThis.fetch.bind(globalThis),
             reportDir: DEFAULT_EVAL_DIR,
             log: (line) => console.log(line),

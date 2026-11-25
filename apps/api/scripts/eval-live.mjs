@@ -17,6 +17,10 @@
 //   npm run eval:live -- --label-sheet             (free: the saved runs' replies, to label by hand)
 //   npm run eval:live -- --grade --labels <file> --spend
 //
+//   npm run eval:live -- --memory                  (the long-term memory eval: says what its four layers would cost)
+//   npm run eval:live -- --memory --spend
+//   npm run eval:live -- --memory choice account --spend --against last
+//
 // The full report, with the played text, lands under .data/eval-runs/ (gitignored).
 import { spawn } from 'node:child_process';
 import path from 'node:path';
@@ -45,6 +49,7 @@ const child = spawn('npx', ['vitest', 'run', '--config', 'vitest.live.config.ts'
         EVAL_SAMPLES: options['--samples'] ?? '',
         EVAL_AGAINST: options['--against'] ?? '',
         EVAL_PARALLEL: options['--parallel'] ?? '',
+        EVAL_MEMORY: args.includes('--memory') ? 'yes' : '',
         EVAL_GRADE: args.includes('--label-sheet') ? 'sheet' : args.includes('--grade') ? 'yes' : '',
         EVAL_LABELS: options['--labels'] ? path.resolve(options['--labels']) : '',
     },

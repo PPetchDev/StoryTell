@@ -149,7 +149,7 @@ function speechLines(parsed: ParsedReply, name: string): string[] {
  * for the verdict first, it now and then quoted the very sentence that broke a criterion and
  * answered true (the grader check, 2026-11-23).
  */
-const GRADER_ANSWER =
+export const GRADER_ANSWER =
     'Answer with JSON only: {"checks":[{"name":"<the criterion\'s name>","quote":"<the words you judged on, at most 25 words>","pass":true or false}]}, one entry per criterion, in order. ' +
     'For each, first find the words that decide it, then give the verdict: "pass" is true only when the criterion is met, and false when the words you quoted break it.';
 

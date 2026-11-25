@@ -24,6 +24,8 @@ import {
     savedReports,
     worstCaseUsd,
 } from './eval-run.js';
+import { buildAccountGraderPrompt } from './eval-memory-run.js';
+import { ACCOUNT_SCENE, CURRENT_STATE, MEMORY_GRADER_CASES, USE_SCENES } from './eval-memory-scenes.js';
 import { EVAL_SCENES } from './eval-scenes.js';
 
 /**
@@ -297,6 +299,7 @@ export const GRADER_CASES: GraderCase[] = [
         ],
         why: 'No confession, but she moves the scene upstairs to her flat unasked.',
     },
+    ...MEMORY_GRADER_CASES,
 ];
 
 type Verdict = Label | 'not_graded';
@@ -315,7 +318,12 @@ export interface GradeReport {
 
 /** What the grader is asked about a case: its one check alone, as the run asks it (`each` for a check asked of every reply of a Chat); or why there is nothing to ask. */
 function asked(one: GraderCase): { check: GradedCheck; messages: PromptMessage[] } | { each: PerReplyCheck; messages: PromptMessage[] } | { problem: string } | { nothing: string } {
-    const scene = EVAL_SCENES.find((other) => other.name === one.scene);
+    // The long-term memory eval's own (.scratch/long-term-memory-eval/spec.md): an account of the story so far, and its turn scenes.
+    if (one.scene === ACCOUNT_SCENE) {
+        const current = Object.values(CURRENT_STATE).find((other) => other.name === one.check);
+        return current ? { check: current, messages: buildAccountGraderPrompt(one.reply, [current]) } : { problem: `The account has no graded check "${one.check}".` };
+    }
+    const scene = [...EVAL_SCENES, ...USE_SCENES].find((other) => other.name === one.scene);
     if (!scene || (scene.kind !== 'turn' && scene.kind !== 'chat')) return { problem: `Unknown scene "${one.scene}" in a grader case.` };
     const each = scene.kind === 'chat' ? scene.gradedReplies.find((other) => other.name === one.check) : undefined;
     if (each && scene.kind === 'chat') {
