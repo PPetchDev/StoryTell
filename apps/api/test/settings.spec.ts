@@ -26,14 +26,14 @@ describe('Settings', () => {
         });
         expect(body.playModels.map((m: { id: string }) => m.id)).toEqual(['glm-5.3', 'deepseek-v4-pro']);
         // List prices per million tokens from OpenRouter's endpoints API on DeepInfra, and a long
-        // turn: the 22k prompt budget uncached plus the Long reply's 1,400 output tokens, to the cent.
-        // GLM-5.3: 22,000 × $0.5625/M + 1,400 × $2.50/M = $0.0159 → $0.02.
-        // DeepSeek V4 Pro: 22,000 × $1.30/M + 1,400 × $2.60/M = $0.0322 → $0.03.
+        // turn: the 28k prompt budget uncached plus the Long reply's 1,400 output tokens, to the cent.
+        // GLM-5.3: 28,000 × $0.5625/M + 1,400 × $2.50/M = $0.0193 → $0.02.
+        // DeepSeek V4 Pro: 28,000 × $1.30/M + 1,400 × $2.60/M = $0.0400 → $0.04.
         expect(
             body.playModels.map((m: Record<string, unknown>) => [m.id, m.label, m.priceUsdPerMillion, m.longTurnUsd]),
         ).toEqual([
             ['glm-5.3', 'GLM-5.3', { input: 0.5625, output: 2.5, cachedInput: 0.125 }, 0.02],
-            ['deepseek-v4-pro', 'DeepSeek V4 Pro', { input: 1.3, output: 2.6, cachedInput: 0.1 }, 0.03],
+            ['deepseek-v4-pro', 'DeepSeek V4 Pro', { input: 1.3, output: 2.6, cachedInput: 0.1 }, 0.04],
         ]);
         expect(body.imageModels.map((m: { id: string }) => m.id)).toEqual([
             'seedream-v4-edit',

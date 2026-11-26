@@ -554,16 +554,17 @@ A Character knows only the Memories it is tagged on and acts as if the rest neve
         it('trims the recent-Message window from the oldest to fit the token budget', async () => {
             const story = await createStory();
             const chat = await createChat(story.id);
-            // Each long message is about 4.75k tokens: four fit a 22k prompt beside the system
-            // prompt, five cannot. (At 16k it was three and four; a message can't pass 20,000 characters.)
+            // Each long message is about 4.75k tokens: five fit a 28k prompt beside the system
+            // prompt, six cannot. (At 16k it was three and four, at 22k four and five; a message can't pass 20,000 characters.)
             const long = (n: number) => `Turn ${n}. ${'The storm goes on and on. '.repeat(770)}`.slice(0, 19_000);
-            expect(TURN_PROMPT_TOKEN_BUDGET).toBe(22_000);
+            expect(TURN_PROMPT_TOKEN_BUDGET).toBe(28_000);
 
             await send(story.id, chat.id, long(1), 'Reply one.');
             await send(story.id, chat.id, long(2), 'Reply two.');
             await send(story.id, chat.id, long(3), 'Reply three.');
             await send(story.id, chat.id, long(4), 'Reply four.');
             await send(story.id, chat.id, long(5), 'Reply five.');
+            await send(story.id, chat.id, long(6), 'Reply six.');
 
             const call = lastTurnCall();
             const contents = call.messages.map((message) => message.content);
@@ -578,12 +579,14 @@ A Character knows only the Memories it is tagged on and acts as if the rest neve
                 'Turn 4. The ',
                 'Reply four.',
                 'Turn 5. The ',
+                'Reply five.',
+                'Turn 6. The ',
             ]);
             // The closing message still carries the state and the final instruction, whatever was trimmed.
             expect(trailingOf(call).startsWith('Where things stand:')).toBe(true);
             expect(trailingOf(call)).toContain('Write the next turn now.');
             // Every stored Message is still there; only the prompt window is trimmed.
-            expect((await getChat(story.id, chat.id)).messages).toHaveLength(11);
+            expect((await getChat(story.id, chat.id)).messages).toHaveLength(13);
         });
     });
 

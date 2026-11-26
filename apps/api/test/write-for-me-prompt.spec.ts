@@ -122,7 +122,7 @@ describe('Write for me: the prompt (pure)', () => {
     });
 
     it('reserves the closing message in the history budget: a long draft or a Documents block keeps fewer Messages, never going over', () => {
-        const history = Array.from({ length: 200 }, (_, i) => ({
+        const history = Array.from({ length: 400 }, (_, i) => ({
             role: (i % 2 === 0 ? 'assistant' : 'user') as 'user' | 'assistant',
             text: `M${i} ${'word '.repeat(80)}`,
         }));

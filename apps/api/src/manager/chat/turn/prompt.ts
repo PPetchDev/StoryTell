@@ -297,9 +297,11 @@ export interface TurnPrompt {
 /**
  * Spec: "about 16k tokens, tunable"; 22k since .scratch/cache-and-voices/spec.md. The reserves and
  * trailing blocks added since had left the history about 2-3k tokens, so the Story so far covered
- * all but the newest exchange every 3-5 turns, and every rewrite broke the cache.
+ * all but the newest exchange every 3-5 turns, and every rewrite broke the cache. 28k since
+ * .scratch/story-so-far-start/spec.md ("Turn budget 28,000"): a sixth Character's card, Bonds and Arc
+ * left live Chat 4 the same 2-3k again.
  */
-export const TURN_PROMPT_TOKEN_BUDGET = 22_000;
+export const TURN_PROMPT_TOKEN_BUDGET = 28_000;
 
 /** Spec: "medium ≈ 150–350 words, tunable". */
 export const REPLY_LENGTH_WORDS: Record<ReplyLength, { min: number; max: number; maxTokens: number }> = {

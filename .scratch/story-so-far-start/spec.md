@@ -303,6 +303,41 @@ Report `.data/eval-runs/long-account-2026-11-26T13-54-45-089Z.md`.
 - Deploying needs `--unmeasured` again (the gate cannot read `long-account-` reports), said openly.
 - To watch on live after a deploy: the next Chat 4 accounts keep the bell, Odile's token and the Order; length near 450 to 500 words; no cut-off.
 
+### Seen on live with F (2026-11-26, read-only; deployed 363bfad at 14:15 UTC)
+
+- Chat 4, 14:28 to 15:59 UTC: 14 updates (463 to 506 Messages), 2 failed on DeepInfra outages (520, 502) and the next turn's update succeeded. No cut-off, no second try; 500 to 1,083 completion tokens. Cost fell to about $0.0025 an update from 14:36 on (cached input).
+- The newest account (506 Messages) is 368 words, opens at the start, third person (its one "first person" is a quoted letter). It names what Rin holds and who gave it (Ines's bell, Odile's token, Mireille's biscuit), the promises standing (the supper, the decree, Rin's search of the records, Odile's oath) and the secret of the Rite of Union. Of chat-4-445's keepers it keeps 6 of 12 by reading (the fox-shape pattern misses "Rin as a fox"); the misses are older threads (the Order, the bounty, the watcher, the voice, the blossoms, Severine's order).
+- New: updates now come every 1 to 6 Messages, against 7 to 16 before.
+
+### Why updates come so often (2026-11-26, read-only)
+
+- Every update on Chat 4 today, before F and after, covered all but the newest two Messages: `storySoFarCoverage` hits its floor (`ALWAYS_UNCOVERED`), meaning the room left for word-for-word Messages is below the headroom plus the account's growth allowance. Chat length at each update (usage time) against the coverage logged: 365/363, 381/379 ... 447/445 before F; 465/463 ... 507/506 after.
+- F is not the cause: the trigger counts the account's own tokens plus its growth allowance (`STORY_SO_FAR_MAX_TOKENS` minus the account), and that sum stays 2,000 whatever the account's length.
+- Message size is steady (about 220 to 250 estimated tokens per Message from 300 to 500). So the gap shrinking from about 13 Messages to about 3 means the room left shrank by about 2,300 estimated tokens during the day: the rest of the turn prompt's fixed part grew. Room left now is about 2,400 estimated tokens, so the Narrator reads only the last 5 or so Messages word for word, the rest through the account.
+- Broken down (2026-11-26, the user: "Break it down") with the app's own `promptLayersFor` and the same sums as `storySoFarCoverage`, run on two local copies of the live database in `.data/diag/` (git-ignored): the 06:05 restore point and a read-only dump at 23:30. Fixed part, estimated tokens:
+
+| Part | 06:05 (418 Messages) | 23:30 (512 Messages) | Change |
+|---|---|---|---|
+| Cast cards | 3,570 (5 Characters) | 4,908 (6: Empress Ysolde added) | +1,338 |
+| Reminder + final instruction (names the whole cast) | 1,375 | 1,689 | +314 |
+| Feelings (Bonds 9 to 14) | 446 | 719 | +273 |
+| Facts, Secrets, Items | 828 | 1,073 | +245 |
+| Arcs (5 to 6) | 483 | 602 | +119 |
+| Lasting memory + Memory | 3,965 | 3,961 | 0 (capped at 4,000) |
+| Story so far | 744 | 537 | -207 |
+| Rules, Setting, Identity, Style, Lore reserve, small reserves | 4,504 | 4,575 | +71 |
+| **Total** | **17,435** (room 4,565) | **19,617** (room 2,383) | **+2,182** |
+
+- So the cause is the Empress joining Chat 4's cast during the day: her card, her name in the reminder, her Bonds and Arc take about 2,000 of the 2,200 tokens lost. With six full Characters' cards (about 800 tokens each) the 22,000-token turn budget leaves room for only about five Messages word for word.
+### Turn budget 28,000 (2026-11-27, the user: "Raise the budget"; not committed)
+
+- `TURN_PROMPT_TOKEN_BUDGET` goes from 22,000 to 28,000. On Chat 4 as it stands the room for the history goes from about 2,400 to about 8,400 estimated tokens: an update then leaves about 2,900 tokens (about eleven Messages) word for word, and the next comes about 4,500 tokens (about 18 Messages) later.
+- Why 28,000: the same reasoning as the 16k-to-22k raise (`.scratch/cache-and-voices/spec.md`): the history sits in the cached opening, so on a warm turn the extra 5,000 or so real tokens cost about $0.0006 at GLM-5.3's cached price; a cold turn about $0.0028 more; and far fewer Story so far rewrites mean fewer cold turns and fewer $0.0025 updates. Live turns on GLM-5.3 average $0.0085 now. Real turn prompts would run about 23,000 tokens, well inside the model's window.
+- Suggested replies and Write for me read the same budget, as before. The settings page's "long turn" price for DeepSeek V4 Pro becomes $0.04 (GLM-5.3 stays $0.02).
+- Tests: a cadence test with a fixed part as large as Chat 4's (seen red at 22k: every update leaves two Messages; at 28k at least eight and about every dozen turns); the budget-bound tests updated (five long Messages fit, not four; 400 Messages to force trimming). Those specs pass; the full suite's only failures are the Meanwhile session's work in progress in the same checkout, not this change.
+
+- Ways open then: raise `TURN_PROMPT_TOKEN_BUDGET` (real turn prompts run about 18,000 tokens against the 22,000 estimate; the narrator model's window is far larger; cost per turn grows, mostly cached); send full cards only for the Characters present and a short line for the rest; or leave it (each Story so far update costs about $0.0025).
+
 ### Approvals, each on its own
 
 1. Build: keepers in the harness and its tests, the export's new rows (no spend). Done.

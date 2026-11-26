@@ -58,10 +58,10 @@ describe('Memory extraction prompt order', () => {
  * Live Chat 2 on 2026-11-19: the standing part, reserves and trailing blocks left the history about
  * 2-3k tokens of a 16k budget. A setting sized to that stands in for all of them here.
  */
-function liveLikeLayers(storySoFar: PromptLayersInput['storySoFar']): PromptLayersInput {
+function liveLikeLayers(storySoFar: PromptLayersInput['storySoFar'], settingRepeats = 1_935): PromptLayersInput {
     return {
         story: {
-            setting: 'The camp on the road. '.repeat(1_935),
+            setting: 'The camp on the road. '.repeat(settingRepeats),
             pov: Pov.First,
             tense: Tense.Present,
             replyLength: ReplyLength.Medium,
@@ -83,14 +83,14 @@ const exchange = (n: number): PromptHistoryMessage[] => [
 ];
 
 /** Plays `turns` exchanges, running the update check after each; the coverage steps it took and the Messages left uncovered after each. */
-function play(budget: number, turns: number): Array<{ turn: number; covered: number; uncovered: number }> {
+function play(budget: number, turns: number, settingRepeats?: number): Array<{ turn: number; covered: number; uncovered: number }> {
     const history: PromptHistoryMessage[] = [];
     let covered = 0;
     const steps: Array<{ turn: number; covered: number; uncovered: number }> = [];
     for (let turn = 1; turn <= turns; turn++) {
         history.push(...exchange(turn));
         const storySoFar = covered > 0 ? { text: 'Petch came to the camp and stayed. '.repeat(60), coveredMessages: covered } : null;
-        const next = storySoFarCoverage(liveLikeLayers(storySoFar), history, budget);
+        const next = storySoFarCoverage(liveLikeLayers(storySoFar, settingRepeats), history, budget);
         if (next !== null) {
             covered = next;
             steps.push({ turn, covered, uncovered: history.length - covered });
@@ -107,8 +107,32 @@ describe('Story so far cadence at live-like sizes', () => {
     });
 
     it('at the turn budget, leaves several exchanges word for word and comes about every dozen turns', () => {
-        expect(TURN_PROMPT_TOKEN_BUDGET).toBe(22_000);
+        expect(TURN_PROMPT_TOKEN_BUDGET).toBe(28_000);
         const steps = play(TURN_PROMPT_TOKEN_BUDGET, 90).slice(1);
+        expect(steps.length).toBeGreaterThan(2);
+        for (const step of steps) expect(step.uncovered).toBeGreaterThanOrEqual(8);
+        const gaps = steps.slice(1).map((step, at) => step.turn - steps[at].turn);
+        for (const gap of gaps) expect(gap).toBeGreaterThanOrEqual(10);
+    });
+});
+
+/**
+ * Live Chat 4 on 2026-11-26 (.scratch/story-so-far-start/spec.md, "Why updates come so often"): a
+ * sixth Character joined, and her card, Bonds and Arc took about 2,200 more tokens of the fixed part,
+ * leaving about 2,400 tokens for the history at 22k. Here the setting grows until the room left is
+ * about the same.
+ */
+const SIX_CARDS = 1_935 + 1_100;
+
+describe('Story so far cadence with a larger cast', () => {
+    it('at the 22k budget, covers all but the newest exchange every few turns (what live Chat 4 did)', () => {
+        const steps = play(22_000, 60, SIX_CARDS).slice(1);
+        expect(steps.length).toBeGreaterThan(8);
+        for (const step of steps) expect(step.uncovered).toBe(2);
+    });
+
+    it('at the turn budget, still leaves several exchanges word for word and comes about every dozen turns', () => {
+        const steps = play(TURN_PROMPT_TOKEN_BUDGET, 90, SIX_CARDS).slice(1);
         expect(steps.length).toBeGreaterThan(2);
         for (const step of steps) expect(step.uncovered).toBeGreaterThanOrEqual(8);
         const gaps = steps.slice(1).map((step, at) => step.turn - steps[at].turn);

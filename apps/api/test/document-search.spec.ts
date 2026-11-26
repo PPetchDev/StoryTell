@@ -239,7 +239,7 @@ describe('Document search (pure)', () => {
         });
 
         it('takes the block from the history budget: a long history keeps fewer Messages with it, never going over', () => {
-            const history = Array.from({ length: 200 }, (_, i) => ({
+            const history = Array.from({ length: 400 }, (_, i) => ({
                 role: (i % 2 === 0 ? 'assistant' : 'user') as 'user' | 'assistant',
                 text: `M${i} ${'word '.repeat(80)}`,
             }));
