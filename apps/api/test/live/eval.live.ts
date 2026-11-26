@@ -3,6 +3,7 @@ import path from 'node:path';
 import { parseEnv } from 'node:util';
 
 import { startGraderCheck } from './eval-grade.js';
+import { startLongAccountEval } from './eval-long-account.js';
 import { startMemoryEval } from './eval-memory-run.js';
 import { DEFAULT_EVAL_DIR, startEvalRun } from './eval-run.js';
 import { REPO_ROOT } from './smoke-run.js';
@@ -23,7 +24,9 @@ it(
         }
         // --grade checks the grader alone (eval-grade.ts); --label-sheet writes the replies to label by hand.
         // --memory runs the long-term memory eval (eval-memory-run.ts) in place of the scenes.
-        await (env.EVAL_MEMORY ? startMemoryEval : env.EVAL_GRADE ? startGraderCheck : startEvalRun)(env, {
+        // --memory account-long runs the long-input account eval (eval-long-account.ts) on copies of live Chats.
+        const longAccount = env.EVAL_MEMORY && (env.EVAL_SCENES ?? '').split(',').includes('account-long');
+        await (longAccount ? startLongAccountEval : env.EVAL_MEMORY ? startMemoryEval : env.EVAL_GRADE ? startGraderCheck : startEvalRun)(env, {
             fetch: globalThis.fetch.bind(globalThis),
             reportDir: DEFAULT_EVAL_DIR,
             log: (line) => console.log(line),

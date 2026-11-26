@@ -20,14 +20,18 @@
 //   npm run eval:live -- --memory                  (the long-term memory eval: says what its four layers would cost)
 //   npm run eval:live -- --memory --spend
 //   npm run eval:live -- --memory choice account --spend --against last
+//   npm run eval:live -- --memory account-long            (the long-input account eval on copies of live Chats; says its cost)
+//   npm run eval:live -- --memory account-long c d --spend (arms c and d; "now" alone when none is named)
+//   npm run eval:live -- --memory account-long --rescore last   (free: the newest report scored again by the plan as it is now)
 //
+// The copies come from scripts/export-chat.mjs (repo root) into .data/eval-inputs/, with the plan of checks beside them.
 // The full report, with the played text, lands under .data/eval-runs/ (gitignored).
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const args = process.argv.slice(2);
-const VALUED = ['--model', '--samples', '--against', '--parallel', '--labels'];
+const VALUED = ['--model', '--samples', '--against', '--parallel', '--labels', '--rescore'];
 const options = {};
 const scenes = [];
 for (let index = 0; index < args.length; index++) {
@@ -52,6 +56,7 @@ const child = spawn('npx', ['vitest', 'run', '--config', 'vitest.live.config.ts'
         EVAL_MEMORY: args.includes('--memory') ? 'yes' : '',
         EVAL_GRADE: args.includes('--label-sheet') ? 'sheet' : args.includes('--grade') ? 'yes' : '',
         EVAL_LABELS: options['--labels'] ? path.resolve(options['--labels']) : '',
+        EVAL_RESCORE: !options['--rescore'] ? '' : options['--rescore'] === 'last' ? 'last' : path.resolve(options['--rescore']),
     },
 });
 child.on('exit', (code) => process.exit(code ?? 1));
