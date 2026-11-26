@@ -21,7 +21,7 @@
 //   npm run eval:live -- --memory --spend
 //   npm run eval:live -- --memory choice account --spend --against last
 //   npm run eval:live -- --memory account-long            (the long-input account eval on copies of live Chats; says its cost)
-//   npm run eval:live -- --memory account-long c d --spend (arms c and d; "now" alone when none is named)
+//   npm run eval:live -- --memory account-long c d --spend (arms of now, before, c, d, e, f; "now" alone when none is named)
 //   npm run eval:live -- --memory account-long --rescore last   (free: the newest report scored again by the plan as it is now)
 //
 // The copies come from scripts/export-chat.mjs (repo root) into .data/eval-inputs/, with the plan of checks beside them.

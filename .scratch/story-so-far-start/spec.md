@@ -212,7 +212,105 @@ Report: `.data/eval-runs/long-account-2026-11-26T05-13-04-820Z.json/.md` (accoun
 - To watch after a deploy: the opening sentence of each new Story so far on live (Chats 1, 3, 4), and that none is in the first person.
 - Left open: the two "accounts" that were not accounts (the writer's system prompt repeated; the Chat's first paragraph copied), which the guard would store. A separate fix.
 
-### Approvals this plan needs, each on its own
+### Deployed (2026-11-26)
+
+- Committed 5447a20 (D) and f9ff26b (the eval), pushed to main, deployed with `npm run vm:deploy -- --unmeasured` (the gate named `story-so-far-prompt.ts`; the measure is the long-input eval, which it cannot read). BUILD_OK, RESTORE_POINT_OK, MIGRATE_OK; live COMMIT f9ff26b; both units active; health 200; the Stories page loads signed in.
+- Not yet seen on live: the first Story so far written with D. Check its opening sentence, and that it is not in the first person, on the next update of Chats 3 or 4.
+
+### Seen on live with D (2026-11-26, read-only)
+
+- Four updates of Chat 4 after the deploy (418, 431, 438, 445 Messages): all four open at the story's start, in the third person, 211 to 396 completion tokens (cap 2,000), no second try, no failure, about $0.010 each.
+- The newest account (445 Messages) is 222 words. Set against the Chat's own records (its Facts, Items, Goals and the four Scene chapter summaries), it keeps the start, the tree-house, the voice of command, the Empress's healing and its cost, and the last scene, but drops:
+  - both Items Rin still holds (the bell from Ines, the silver token from Odile), though the rules ask to keep gifts;
+  - Odile as Voice of the Moon, and the Moon Tree's three blossoms opened for Rin's truths;
+  - the harekin gran's fifty-year candle, kept for a nine-tailed fox before the Foxmother vanished;
+  - the Order of the Eclipse, the bounty and its nine grey-cloaked riders, and the grey robes' trail;
+  - the sleeproot tea and the amends for it, and Mireille's proposal on the road;
+  - the night of the game, and what it changed between the women and Rin.
+- Round 2's D accounts ran 158 to 1,196 words (median about 340), so the eval already shows the short answers; its checks counted the start and the four quarters, not what was dropped.
+
+## Plan: does a longer, item-keeping ask lose less? (written 2026-11-26, not built, nothing spent)
+
+### Step 0: a free baseline from round 2
+
+Round 2 kept all 45 accounts whole. Score them for keepers (below) with `--rescore`, spending nothing: how much D and "before" each drop, before any new arm is asked.
+
+### Keepers: what an account must not lose
+
+- Per input, 8 to 12 keeper telltales, each a regex like the quarter telltales, hand-picked from the Chat's own records as they stood at that input's last Message: Items still held (with their giver), Facts that name a promise, a secret, a curse or a cost, and Scene chapter events.
+- The export (`scripts/export-chat.mjs`) gains the Chat's `detail_change` rows of kind item and fact, with the Message each came at, so the picks rest on records and not on memory. Read-only on live; private text stays in `.data/`.
+- A new `keepers` list in the plan file, guarded like the start telltale: each keeper must match a hand-judged account that keeps it and must not match one that drops it (the live 222-word account is a ready drop example for six of Chat 4's). The plan is refused otherwise.
+- A sixth input, `chat-4-445`, the very input the live account above came from.
+
+### Arms
+
+- `d`: the app now (baseline, asked again so the day's noise is shared).
+- `e`: D's ask plus "Use about 450 to 500 words." (the rules' "At most 500 words" left as is).
+- `f`: E plus "Keep every item someone still holds and who gave it, every promise, and every secret, even if each gets only a few words."
+
+### Checks per account (by code)
+
+- Keepers kept, as a share of the input's keepers (the main measure).
+- The existing ones: opens at the start, the four quarters, first-person words, word count, cut off, second try.
+- A longer ask risks the 2,000-token cap: a cut-off or second try counts against an arm.
+
+### Size and cost
+
+6 inputs, 3 arms, 3 samples: 54 calls. Round 2 was 45 calls for $0.095, so about $0.12, with the ledger capped at $0.20.
+
+### Choosing
+
+An arm replaces D only if, against D asked the same day: it keeps clearly more keepers (at least 15 points more on average, and more on Chat 4's 445), opens at the start 18 of 18, puts no account in the first person, and has no more cut-offs or second tries than D. If neither does, the next way is to hand the writer the Chat's Items and Facts as a list (an app change, its own plan).
+
+### Built: keepers (2026-11-26, the user: "Build it"; no spend, no live access)
+
+- `eval-long-account.ts`: an input may carry `keepers` (name, pattern, `kept` and `dropped` examples judged by hand). The plan is refused when a keeper's pattern is empty, holds a control character, has no example on either side, misses a `kept` example or matches a `dropped` one. Each account is checked for each keeper anywhere in its text; a not-stored account keeps none. `--rescore` fills keepers into an older report.
+- Arms `e` and `f`, worded as above.
+- The scorecard gains a "Keepers kept (avg)" column (share of the input's keepers, stored accounts only) and a "By arm" table: stored, opens at the start, keepers kept, first person, second tries, not stored.
+- `scripts/export-chat.mjs`: each copy also carries the Chat's item and fact rows from `detail_change`, with the Character's name and the Message position each came at; the log line counts them.
+- Tests seen failing first (9), then passing; full API suite 2,361 passed, 1 skipped; typecheck clean.
+- Still to do by hand before step 0: write the keepers for each input into `.data/eval-inputs/long-account.json`, from the new export.
+
+### Keepers written, and step 0 (2026-11-26, no spend)
+
+- Chats 1, 3 and 4 exported again (Chat 4 now 463 Messages; Items and Facts: Chat 4 38, Chat 3 2, Chat 1 none, the feature being newer). Scene chapter summaries and Memories saved read-only to `.data/eval-inputs/records-<id>.json` as the other source for Chats 1 and 3.
+- Keepers picked per input from those records (10 to 12 each), and calibrated by reading every round-2 account against every pattern, kept and missed alike; reading and code agree except two story-style non-accounts in chat-4-150/363. Kept examples written by hand (no account keeps the thing): Odile's token (Chat 4), "daughter by fire" (Chat 3).
+- New input `chat-4-445`: start and examples as chat-4-363, the live 222-word account as a good opening; its quarters are approximate. The live account keeps 6 of its 12 keepers.
+- The plan's guard caught a `\b` written through a shell heredoc as a backspace again; mended from a script file.
+- Step 0, round 2 scored again (`long-account-2026-11-26T05-13-04-820Z-rescored.md`), keepers kept on average: "now" of that day (the old ask) 43%, C 67%, D 60%. D keeps more than the old ask but still loses about two in five; on Chat 4 it ranged 39% to 67%.
+
+### Round 3 (2026-11-26, arms D, E, F, 3 samples each, $0.130 spent; the user: "Run it")
+
+Report `.data/eval-runs/long-account-2026-11-26T13-54-45-089Z.md`.
+
+| Arm | Stored | Opens at the start | Keepers kept (avg) | chat-4-445 keepers | First person | Second tries |
+|---|---|---|---|---|---|---|
+| D (live now) | 18 of 18 | 18 of 18 | 49% | 39% | 0 | 1 |
+| E (about 450-500 words) | 18 of 18 | 18 of 18 | 53% | 36% | 0 | 0 |
+| F (E + keep items, promises, secrets) | 18 of 18 | 18 of 18 | 67% | 58% | 1, a false hit | 0 |
+
+- F's one "first person" is a song title in the account ("Where We Belong"), not narration: read by hand. No real first person in any arm.
+- Asking only for more words (E) barely helped (+4 points); naming what to keep (F) did (+18 overall, +19 on chat-4-445), at about 430 words, with no cut-off.
+- Checked by reading: the three F accounts of chat-4-445 against their missed keepers. Each miss was a real omission (the voice of command, the grey-gloved watcher, Severine's standing order); the bounty was told only as "grey-cloak riders", which the keeper counts as dropped, a fair call.
+- D on the same inputs scored 49% today against 60% in round 2's rescore: day-to-day noise is about ten points, which is why D was asked again alongside.
+- **F meets every condition of "Choosing"**: more than 15 points over D, more on chat-4-445, 18 of 18 at the start, no first person, fewer second tries.
+
+### Built: way F (2026-11-26, after round 3; not committed)
+
+- `STORY_SO_FAR_ASK` is now F's line; the shorter second try after a cut-off is unchanged.
+- `story-so-far.spec.ts` expects F's line on the first try; the eval's "now" equals F. Both seen failing before the change.
+- Full API suite 2,361 passed, 1 skipped; typecheck clean.
+- Deploying needs `--unmeasured` again (the gate cannot read `long-account-` reports), said openly.
+- To watch on live after a deploy: the next Chat 4 accounts keep the bell, Odile's token and the Order; length near 450 to 500 words; no cut-off.
+
+### Approvals, each on its own
+
+1. Build: keepers in the harness and its tests, the export's new rows (no spend). Done.
+2. Export Chat 4 through 445 and the detail rows for all five inputs (read-only on live).
+3. Step 0, the free rescore of round 2.
+4. The round, about $0.12.
+
+### Approvals the first long-input plan needed (all given)
 
 1. Build the harness and tests (no spend, no live access).
 2. Export Chats 1, 3 and 4 to `.data/eval-inputs/` (read-only on live, private text on the PC).

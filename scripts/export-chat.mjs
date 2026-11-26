@@ -4,7 +4,8 @@
 //
 // For each Chat id it runs one read-only SELECT on the VM's database (over ssh, as the app's own
 // database user) and writes what it answers to .data/eval-inputs/chat-<id>.json: the Chat's
-// Messages with their parts, the Story's Character names, and the Persona's and Role's names.
+// Messages with their parts, the Story's Character names, the Persona's and Role's names, and the
+// Chat's own records of Items and Facts with the Message each came at (for picking keepers).
 // .data/ is git-ignored. Nothing is written on the VM, and nothing is printed but the counts.
 //
 // The Chats are the user's private text: run it only with the user's OK.
@@ -41,6 +42,15 @@ SELECT json_build_object(
             )
         ) ORDER BY m.position), '[]'::json)
         FROM message m WHERE m.chat_id = c.id
+    ),
+    'details', (
+        SELECT coalesce(json_agg(json_build_object(
+            'kind', d.kind,
+            'value', d.value,
+            'characterName', (SELECT ch.name FROM character ch WHERE ch.id = d.character_id),
+            'position', (SELECT m.position FROM message m WHERE m.id = d.message_id)
+        ) ORDER BY d.id), '[]'::json)
+        FROM detail_change d WHERE d.chat_id = c.id AND d.kind IN ('item', 'fact')
     )
 ) FROM chat c WHERE c.id = ${chatId};
 ROLLBACK;`;
@@ -69,7 +79,7 @@ export function exportChats(ids, world) {
         const chat = parseExport(world.read(exportSql(id)), id);
         world.write(`chat-${id}.json`, `${JSON.stringify(chat, null, 2)}\n`);
         const parts = chat.messages.reduce((sum, message) => sum + message.parts.length, 0);
-        world.log(`Chat ${id}: ${chat.messages.length} Messages, ${parts} reply parts, ${chat.castNames.length} Characters, saved as chat-${id}.json.`);
+        world.log(`Chat ${id}: ${chat.messages.length} Messages, ${parts} reply parts, ${chat.castNames.length} Characters, ${(chat.details ?? []).length} Items and Facts, saved as chat-${id}.json.`);
         done.push({ id, messages: chat.messages.length });
     }
     return done;

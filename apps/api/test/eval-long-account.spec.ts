@@ -52,6 +52,10 @@ const PLAN: LongAccountPlan = {
             start: 'pillar|torch',
             quarters: ['pillar', 'beat 8', 'beat 12', 'beat 18'],
             startExamples: { good: ['Rin hid behind the broken pillar. The torches passed.'], bad: ['Rin slept in the herb garden. Odile sang.'] },
+            keepers: [
+                { name: 'the bell', pattern: '\\bbell\\b', kept: ['Ines gave Rin a small bell.'], dropped: ['Ines gave Rin her trust.'] },
+                { name: 'the candle', pattern: 'candle', kept: ['The gran kept a candle lit.'], dropped: ['The gran made soup.'] },
+            ],
         },
     ],
 };
@@ -103,6 +107,9 @@ describe('The export script', () => {
         expect(sql.startsWith('BEGIN READ ONLY;')).toBe(true);
         expect(sql.trim().endsWith('ROLLBACK;')).toBe(true);
         expect(sql).toContain('WHERE c.id = 4;');
+        // The Chat's own records of Items and Facts, for picking what an account must keep.
+        expect(sql).toContain('FROM detail_change d');
+        expect(sql).toContain("d.kind IN ('item', 'fact')");
         expect(sql).not.toMatch(/\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|COPY)\b/i);
         expect(() => exportSql(Number('4; DROP TABLE chat'))).toThrow();
         expect(() => exportSql(0)).toThrow();
@@ -125,7 +132,7 @@ describe('The export script', () => {
         });
         expect(Object.keys(written)).toEqual(['chat-4.json']);
         expect(JSON.parse(written['chat-4.json']).messages).toHaveLength(6);
-        expect(logged).toEqual(['Chat 4: 6 Messages, 6 reply parts, 2 Characters, saved as chat-4.json.']);
+        expect(logged).toEqual(['Chat 4: 6 Messages, 6 reply parts, 2 Characters, 0 Items and Facts, saved as chat-4.json.']);
         expect(logged.join(' ')).not.toContain('Rin acts');
     });
 });
@@ -171,6 +178,35 @@ describe('The plan', () => {
     });
 });
 
+describe('The keepers', () => {
+    const chats = () => new Map([[4, madeUpChat(40)]]);
+    const withKeepers = (keepers: any): LongAccountPlan => ({ inputs: [{ ...PLAN.inputs[0], keepers }] });
+
+    it('are optional, and each must be shown to find an account that keeps it and stay quiet on one that drops it', () => {
+        expect(planProblems(withKeepers(undefined), chats())).toEqual([]);
+        expect(planProblems(PLAN, chats())).toEqual([]);
+        expect(planProblems(withKeepers([{ name: 'the bell', pattern: 'bell', kept: ['A bell.'], dropped: [] }]), chats())).toEqual([
+            'chat-4-20: keeper "the bell" needs at least one account that keeps it and one that drops it, judged by hand.',
+        ]);
+        // Written as the bell; the account called it a chime.
+        expect(planProblems(withKeepers([{ name: 'the bell', pattern: 'bell', kept: ['Ines gave Rin a silver chime.'], dropped: ['Ines gave Rin her trust.'] }]), chats())).toEqual([
+            'chat-4-20: keeper "the bell" misses an account that keeps it: "Ines gave Rin a silver chime."',
+        ]);
+        // Too wide: "Ines gave" is in the account that drops it too.
+        expect(planProblems(withKeepers([{ name: 'the bell', pattern: 'Ines gave', kept: ['Ines gave Rin a bell.'], dropped: ['Ines gave Rin her trust.'] }]), chats())).toEqual([
+            'chat-4-20: keeper "the bell" passes an account that drops it: "Ines gave Rin her trust."',
+        ]);
+        expect(planProblems(withKeepers([{ name: 'x', pattern: String.fromCharCode(8) + 'bell', kept: ['A bell.'], dropped: ['None.'] }]), chats())).toEqual([
+            `chat-4-20: keeper "x": "${String.fromCharCode(8)}bell" is not a pattern.`,
+        ]);
+    });
+
+    it('are looked for in the whole account', () => {
+        expect(checkAccount(PLAN.inputs[0], 'By the pillar, Ines gave Rin a bell.').keepers).toEqual([true, false]);
+        expect(checkAccount({ ...PLAN.inputs[0], keepers: undefined }, 'A bell.').keepers).toEqual([]);
+    });
+});
+
 describe('The arms', () => {
     const input = writerInputFrom(madeUpChat(8));
 
@@ -180,21 +216,26 @@ describe('The arms', () => {
 
     it('the other arms change only the last line of the first try; the second try is the app\'s in every arm', () => {
         const now = armPrompt(input, 'now');
-        for (const arm of ['before', 'c', 'd'] as const) {
+        for (const arm of ['before', 'c', 'd', 'e', 'f'] as const) {
             const prompt = armPrompt(input, arm);
             expect(prompt[0]).toEqual(now[0]);
             expect(prompt[1].content).toBe(`${now[1].content.slice(0, -ARM_ASK.now.length)}${ARM_ASK[arm]}`);
             expect(armPrompt(input, arm, true)).toEqual(armPrompt(input, 'now', true));
         }
         // D was chosen (2026-11-26): the app's own ask is now D's, and "before" keeps the old one to measure against.
-        expect(ARM_ASK.now).toBe(ARM_ASK.d);
+        // F was chosen after round 3 (2026-11-26): the app's own ask is F's; D stays to measure against.
+        expect(ARM_ASK.now).toBe(ARM_ASK.f);
         expect(ARM_ASK.before).toBe('Write the account now.');
+        // E and F (.scratch/story-so-far-start/spec.md, "Plan: does a longer, item-keeping ask lose less?").
+        expect(ARM_ASK.e).toBe(`${ARM_ASK.d} Use about 450 to 500 words.`);
+        expect(ARM_ASK.f).toBe(`${ARM_ASK.e} Keep every item someone still holds and who gave it, every promise, and every secret, even if each gets only a few words.`);
     });
 
     it('are named after account-long; "now" alone when none is', () => {
         expect(armsAsked(['account-long'])).toEqual(['now']);
         expect(armsAsked(['account-long', 'd', 'c', 'before'])).toEqual(['before', 'c', 'd']);
-        expect(() => armsAsked(['account-long', 'e'])).toThrow(EvalRunRefused);
+        expect(armsAsked(['account-long', 'f', 'd', 'e'])).toEqual(['d', 'e', 'f']);
+        expect(() => armsAsked(['account-long', 'g'])).toThrow(EvalRunRefused);
     });
 });
 
@@ -240,6 +281,18 @@ describe('The run', () => {
         expect(card).toContain('| chat-4-20 | 20 |');
         expect(card).toContain('| before | 2 of 2 | 0 of 2 | 1.0 | 0 of 2 |');
         expect(card).toContain('| c | 2 of 2 | 2 of 2 | 4.0 | 0 of 2 |');
+        // No account kept the bell or the candle.
+        expect(card).toContain('| 0 | 0% |');
+        expect(card).toContain('## By arm');
+        expect(card).toContain('| before | 2 of 2 | 0 of 2 | 0% | 0 of 2 | 0 | 0 |');
+    });
+
+    it('scores the keepers kept per account and per arm, a not-stored account counted apart', async () => {
+        const router = scripted((_body, index) => (index === 0 ? 'Rin hid by the pillar. Ines gave Rin a bell.' : index === 1 ? 'Rin hid by the pillar. A bell and a candle.' : { text: 'cut', completionTokens: 2000 }));
+        const report = await runLongAccount({ plan: PLAN, chats: chats(), arms: ['e'], samples: 3, client: router.client, git: GIT });
+        expect(report.results.map((one) => one.keepers)).toEqual([[true, false], [true, true], [false, false]]);
+        // Stored accounts only: half and all, 75% on average; the third was cut off twice and counts under "Not stored".
+        expect(formatLongAccountScorecard(report)).toContain('| e | 2 of 3 | 2 of 2 | 75% | 0 of 2 | 1 | 1 |');
     });
 
     it('keeps the whole account, so it can be scored again for free', async () => {
@@ -304,7 +357,7 @@ describe('The gate', () => {
         const wider: LongAccountPlan = { inputs: [{ ...PLAN.inputs[0], start: 'pillar|torch|wolves', startExamples: { good: [...EXAMPLES.good, 'Shadow-wolves attacked Ines.'], bad: EXAMPLES.bad } }] };
         const dir = inputDir(wider);
         const { report, json } = await startLongAccountEval({ EVAL_SCENES: 'account-long', EVAL_RESCORE: 'last' }, { fetch: router.fetchImpl, reportDir, inputDir: dir, log: () => {} });
-        expect(report.results[0]).toMatchObject({ opensAtStart: true, quarters: [false, true, false, false] });
+        expect(report.results[0]).toMatchObject({ opensAtStart: true, quarters: [false, true, false, false], keepers: [false, false] });
         expect(path.basename(json)).toBe('long-account-2026-11-26T00-00-00-000Z-rescored.json');
         expect(router.sent).toHaveLength(0);
     });

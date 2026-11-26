@@ -43,6 +43,14 @@ export interface ExportedMessage {
     parts: ExportedPart[];
 }
 
+/** One of the Chat's own records of an Item or a Fact, at the Message it came with (scripts/export-chat.mjs). */
+export interface ExportedDetail {
+    kind: string;
+    value: string;
+    characterName: string | null;
+    position: number | null;
+}
+
 export interface ExportedChat {
     chatId: number;
     personaName: string | null;
@@ -50,6 +58,8 @@ export interface ExportedChat {
     castNames: string[];
     storySoFarThrough: number | null;
     messages: ExportedMessage[];
+    /** Missing from copies made before keepers (2026-11-26). */
+    details?: ExportedDetail[];
 }
 
 export interface WriterInput {
@@ -108,25 +118,48 @@ export interface LongInput {
      * check shown only to fire on failures has not been shown to stay quiet on successes.
      */
     startExamples: { good: string[]; bad: string[] };
+    /**
+     * What an account must not lose (spec: "Keepers"), picked by hand from the Chat's own records: an
+     * Item still held, a promise, a secret, a cost. Each is shown, before anything is sent, to find an
+     * account that keeps it and to stay quiet on one that drops it.
+     */
+    keepers?: Keeper[];
+}
+
+export interface Keeper {
+    name: string;
+    /** Looked for, case ignored, anywhere in the account. */
+    pattern: string;
+    /** Accounts, or parts of them, judged by hand to keep it... */
+    kept: string[];
+    /** ...and to drop it. */
+    dropped: string[];
 }
 
 export interface LongAccountPlan {
     inputs: LongInput[];
 }
 
-export type Arm = 'now' | 'before' | 'c' | 'd';
-export const ARMS: Arm[] = ['now', 'before', 'c', 'd'];
+export type Arm = 'now' | 'before' | 'c' | 'd' | 'e' | 'f';
+export const ARMS: Arm[] = ['now', 'before', 'c', 'd', 'e', 'f'];
+
+const D_ASK = 'Write the account now, from the beginning of the story through to the last of the Messages. Open with one sentence on how the story began.';
+const E_ASK = `${D_ASK} Use about 450 to 500 words.`;
 
 /**
  * The last line of the first try's ask, by arm. "now" is the app's own, whatever it is; "before" is
  * the ask the app had until D was chosen (2026-11-26); C and D are the two measured in round 2. The
- * second try after a cut-off is the app's in every arm.
+ * second try after a cut-off is the app's in every arm. E and F ask D for a fuller account, F also to
+ * keep held items, promises and secrets: on live, D's accounts of a long Chat ran to about 220 words
+ * and lost them (spec: "Seen on live with D").
  */
 export const ARM_ASK: Record<Arm, string> = {
     now: STORY_SO_FAR_ASK,
     before: 'Write the account now.',
     c: 'Write the account now, from the beginning of the story through to the last of the Messages.',
-    d: 'Write the account now, from the beginning of the story through to the last of the Messages. Open with one sentence on how the story began.',
+    d: D_ASK,
+    e: E_ASK,
+    f: `${E_ASK} Keep every item someone still holds and who gave it, every promise, and every secret, even if each gets only a few words.`,
 };
 
 export function armPrompt(input: WriterInput, arm: Arm, ranLong = false): PromptMessage[] {
@@ -172,8 +205,32 @@ export function planProblems(plan: LongAccountPlan, chats: Map<number, ExportedC
             for (const good of examples.good) if (!pattern(input.start).test(openingOf(good))) problems.push(`${input.name}: the start pattern misses a good opening: "${good.slice(0, 80)}"`);
             for (const bad of examples.bad) if (pattern(input.start).test(openingOf(bad))) problems.push(`${input.name}: the start pattern passes a bad opening: "${bad.slice(0, 80)}"`);
         }
+        for (const keeper of input.keepers ?? []) problems.push(...keeperProblems(input.name, keeper));
     }
     return problems;
+}
+
+function readable(source: unknown): boolean {
+    try {
+        if (typeof source !== 'string' || source.trim() === '' || /[\u0000-\u001f]/.test(source)) return false;
+        pattern(source);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+function keeperProblems(inputName: string, keeper: Keeper): string[] {
+    const named = `${inputName}: keeper "${keeper.name}"`;
+    if (!readable(keeper.pattern)) return [`${named}: "${keeper.pattern}" is not a pattern.`];
+    if (!Array.isArray(keeper.kept) || !Array.isArray(keeper.dropped) || keeper.kept.length === 0 || keeper.dropped.length === 0) {
+        return [`${named} needs at least one account that keeps it and one that drops it, judged by hand.`];
+    }
+    const test = pattern(keeper.pattern);
+    return [
+        ...keeper.kept.filter((account) => !test.test(account)).map((account) => `${named} misses an account that keeps it: "${account.slice(0, 80)}"`),
+        ...keeper.dropped.filter((account) => test.test(account)).map((account) => `${named} passes an account that drops it: "${account.slice(0, 80)}"`),
+    ];
 }
 
 function cut(chat: ExportedChat, input: LongInput): WriterInput {
@@ -210,6 +267,8 @@ export interface LongAccountSample {
     opensAtStart: boolean;
     /** Whether each quarter's telltale is in the account. */
     quarters: boolean[];
+    /** Whether each of the input's keepers is in the account; missing in reports made before keepers. */
+    keepers?: boolean[];
     firstPerson: number;
 }
 
@@ -227,11 +286,12 @@ export interface LongAccountReport {
     results: LongAccountSample[];
 }
 
-export function checkAccount(input: LongInput, account: string): Pick<LongAccountSample, 'words' | 'opensAtStart' | 'quarters' | 'firstPerson'> {
+export function checkAccount(input: LongInput, account: string): Pick<LongAccountSample, 'words' | 'opensAtStart' | 'quarters' | 'keepers' | 'firstPerson'> {
     return {
         words: wordCount(account),
         opensAtStart: pattern(input.start).test(openingOf(account)),
         quarters: input.quarters.map((source) => pattern(source).test(account)),
+        keepers: (input.keepers ?? []).map((keeper) => pattern(keeper.pattern).test(account)),
         firstPerson: firstPersonWords(account),
     };
 }
@@ -302,7 +362,9 @@ export async function runLongAccount(options: {
                     text: account,
                     error: written.refused,
                     secondTry,
-                    ...(account === null ? { words: 0, opensAtStart: false, quarters: [false, false, false, false], firstPerson: 0 } : checkAccount(input, account)),
+                    ...(account === null
+                        ? { words: 0, opensAtStart: false, quarters: [false, false, false, false], keepers: (input.keepers ?? []).map(() => false), firstPerson: 0 }
+                        : checkAccount(input, account)),
                 });
             }
         }
@@ -315,6 +377,14 @@ export async function runLongAccount(options: {
 
 const of = (part: number, whole: number): string => `${part} of ${whole}`;
 
+/** The average share of keepers kept by the stored accounts, or "-" when none had keepers to keep. */
+function keptShare(stored: LongAccountSample[]): string {
+    const scored = stored.filter((sample) => (sample.keepers ?? []).length > 0);
+    if (scored.length === 0) return '-';
+    const share = scored.reduce((sum, sample) => sum + sample.keepers!.filter(Boolean).length / sample.keepers!.length, 0) / scored.length;
+    return `${Math.round(share * 100)}%`;
+}
+
 export function formatLongAccountScorecard(report: LongAccountReport): string {
     const lines = [
         `# Long-input account eval, ${report.startedAt}`,
@@ -322,8 +392,8 @@ export function formatLongAccountScorecard(report: LongAccountReport): string {
         `Commit ${report.commit}${report.dirty ? ' (with uncommitted changes)' : ''}. Arms: ${report.arms.join(', ')}. ${report.samples} samples each.`,
         `Total $${report.totalUsd.toFixed(5)} of a $${report.capUsd.toFixed(2)} cap${report.stoppedAtCap ? ' (stopped at the cap: the scorecard is not complete)' : ''}.`,
         '',
-        '| Input | Messages | Tokens | Arm | Stored | Opens at the start | Quarters told (avg of 4) | First person | Words (avg) | Second tries |',
-        '|---|---|---|---|---|---|---|---|---|---|',
+        '| Input | Messages | Tokens | Arm | Stored | Opens at the start | Quarters told (avg of 4) | First person | Words (avg) | Second tries | Keepers kept (avg) |',
+        '|---|---|---|---|---|---|---|---|---|---|---|',
     ];
     for (const input of report.inputs) {
         for (const arm of report.arms) {
@@ -332,9 +402,18 @@ export function formatLongAccountScorecard(report: LongAccountReport): string {
             const stored = samples.filter((sample) => sample.text !== null);
             const avg = (value: (sample: LongAccountSample) => number) => (stored.length === 0 ? '-' : (stored.reduce((sum, sample) => sum + value(sample), 0) / stored.length).toFixed(1));
             lines.push(
-                `| ${input.name} | ${input.messages} | ${input.tokens} | ${arm} | ${of(stored.length, samples.length)} | ${of(stored.filter((sample) => sample.opensAtStart).length, stored.length)} | ${avg((sample) => sample.quarters.filter(Boolean).length)} | ${of(stored.filter((sample) => sample.firstPerson > 0).length, stored.length)} | ${avg((sample) => sample.words)} | ${samples.filter((sample) => sample.secondTry).length} |`,
+                `| ${input.name} | ${input.messages} | ${input.tokens} | ${arm} | ${of(stored.length, samples.length)} | ${of(stored.filter((sample) => sample.opensAtStart).length, stored.length)} | ${avg((sample) => sample.quarters.filter(Boolean).length)} | ${of(stored.filter((sample) => sample.firstPerson > 0).length, stored.length)} | ${avg((sample) => sample.words)} | ${samples.filter((sample) => sample.secondTry).length} | ${keptShare(stored)} |`,
             );
         }
+    }
+    lines.push('', '## By arm', '', '| Arm | Stored | Opens at the start | Keepers kept (avg) | First person | Second tries | Not stored |', '|---|---|---|---|---|---|---|');
+    for (const arm of report.arms) {
+        const samples = report.results.filter((sample) => sample.arm === arm);
+        if (samples.length === 0) continue;
+        const stored = samples.filter((sample) => sample.text !== null);
+        lines.push(
+            `| ${arm} | ${of(stored.length, samples.length)} | ${of(stored.filter((sample) => sample.opensAtStart).length, stored.length)} | ${keptShare(stored)} | ${of(stored.filter((sample) => sample.firstPerson > 0).length, stored.length)} | ${samples.filter((sample) => sample.secondTry).length} | ${samples.length - stored.length} |`,
+        );
     }
     const refused = report.results.filter((sample) => sample.text === null);
     if (refused.length > 0) lines.push('', 'Not stored:', ...refused.map((sample) => `- ${sample.input}, ${sample.arm}: ${sample.error}`));
