@@ -126,10 +126,12 @@ export const STORY_SO_FAR_CUT_OFF = 'The Story so far writer was cut off at its 
  * The first try's closing ask (.scratch/story-so-far-start/spec.md). Asked only "Write the account
  * now." on a long Chat, the writer told just the latest scene about four times in ten; asked to
  * open with how the story began, 15 of 15 started at the start, without slipping into the first
- * person or running into the cap (the long-input eval, round 2, 2026-11-26).
+ * person or running into the cap (the long-input eval, round 2, 2026-11-26). That ask alone still
+ * dropped about half of what the story needs later (held items, promises, secrets): naming them, and
+ * asking for 450 to 500 words, kept 67% against 49%, with no cut-off (round 3, way F).
  */
 export const STORY_SO_FAR_ASK =
-    'Write the account now, from the beginning of the story through to the last of the Messages. Open with one sentence on how the story began.';
+    'Write the account now, from the beginning of the story through to the last of the Messages. Open with one sentence on how the story began. Use about 450 to 500 words. Keep every item someone still holds and who gave it, every promise, and every secret, even if each gets only a few words.';
 
 /**
  * Spec: "How it is written (from scratch)". Every covered Message goes in each time, so no

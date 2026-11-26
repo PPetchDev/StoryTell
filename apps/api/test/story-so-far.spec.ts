@@ -301,8 +301,10 @@ describe('Story so far', () => {
         expect(calls).toHaveLength(2);
         // The same Messages and the same rules: only the closing ask changes.
         expect(calls[1].messages[0]).toEqual(calls[0].messages[0]);
-        // Spec (story-so-far-start): the first try asks for the story from its start, opening with how it began.
-        const firstAsk = 'Write the account now, from the beginning of the story through to the last of the Messages. Open with one sentence on how the story began.';
+        // Spec (story-so-far-start): the first try asks for the story from its start, opening with how it began,
+        // in about 450 to 500 words, keeping held items, promises and secrets (way F, round 3).
+        const firstAsk =
+            'Write the account now, from the beginning of the story through to the last of the Messages. Open with one sentence on how the story began. Use about 450 to 500 words. Keep every item someone still holds and who gave it, every promise, and every secret, even if each gets only a few words.';
         expect(calls[0].messages[1].content.endsWith(firstAsk)).toBe(true);
         expect(calls[1].messages[1].content).toBe(
             calls[0].messages[1].content.replace(
