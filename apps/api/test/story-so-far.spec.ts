@@ -301,10 +301,12 @@ describe('Story so far', () => {
         expect(calls).toHaveLength(2);
         // The same Messages and the same rules: only the closing ask changes.
         expect(calls[1].messages[0]).toEqual(calls[0].messages[0]);
-        expect(calls[0].messages[1].content.endsWith('Write the account now.')).toBe(true);
+        // Spec (story-so-far-start): the first try asks for the story from its start, opening with how it began.
+        const firstAsk = 'Write the account now, from the beginning of the story through to the last of the Messages. Open with one sentence on how the story began.';
+        expect(calls[0].messages[1].content.endsWith(firstAsk)).toBe(true);
         expect(calls[1].messages[1].content).toBe(
             calls[0].messages[1].content.replace(
-                /Write the account now\.$/,
+                firstAsk,
                 'Your last account ran too long and was cut off before it reached the end. Write the account again, shorter: at most 350 words, still from the beginning of the story through to the last of the Messages.',
             ),
         );

@@ -123,6 +123,15 @@ export const STORY_SO_FAR_SHORTER_WORDS = 350;
 export const STORY_SO_FAR_CUT_OFF = 'The Story so far writer was cut off at its length cap.';
 
 /**
+ * The first try's closing ask (.scratch/story-so-far-start/spec.md). Asked only "Write the account
+ * now." on a long Chat, the writer told just the latest scene about four times in ten; asked to
+ * open with how the story began, 15 of 15 started at the start, without slipping into the first
+ * person or running into the cap (the long-input eval, round 2, 2026-11-26).
+ */
+export const STORY_SO_FAR_ASK =
+    'Write the account now, from the beginning of the story through to the last of the Messages. Open with one sentence on how the story began.';
+
+/**
  * Spec: "How it is written (from scratch)". Every covered Message goes in each time, so no
  * detail fades over many rewrites; the user's own text rides along as corrections that win.
  */
@@ -150,7 +159,7 @@ Reply with the account only.`;
     sections.push(
         input.ranLong
             ? `Your last account ran too long and was cut off before it reached the end. Write the account again, shorter: at most ${STORY_SO_FAR_SHORTER_WORDS} words, still from the beginning of the story through to the last of the Messages.`
-            : 'Write the account now.',
+            : STORY_SO_FAR_ASK,
     );
     return [
         { role: 'system', content: system },
