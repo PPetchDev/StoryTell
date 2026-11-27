@@ -97,6 +97,7 @@ async function copyChat(manager: EntityManager, sourceChatId: number, through: n
         autoDiary: source.autoDiary,
         dressStage: source.dressStage,
         characterThoughts: source.characterThoughts,
+        charactersLive: source.charactersLive,
         // What the user answered when the Chat began (.scratch/opening-questions/spec.md).
         openingAnswers: source.openingAnswers,
         ...(keepStorySoFar
@@ -311,6 +312,23 @@ const copyChatEvents: CopyStep = async ({ manager, sourceChatId, chatId, message
  * Who is sitting out (.scratch/speaker-controls/spec.md): the user's choice, not story state, so
  * the Branch starts with the same people in play, as the source has them now.
  */
+/**
+ * Meanwhiles (.scratch/meanwhile/spec.md): copied to the Branch's Messages and to the copies of
+ * their Memories; the rollback then drops those after N, as for the Diary.
+ */
+const copyMeanwhiles: CopyStep = async ({ manager, sourceChatId, chatId, messageIds, memoryIds }) => {
+    const [messageOlds, messageNews] = oldAndNewIds(messageIds);
+    const [memoryOlds, memoryNews] = oldAndNewIds(memoryIds);
+    await manager.query(
+        `INSERT INTO "meanwhile" ("chat_id", "character_id", "message_id", "text", "memory_id", "created_at")
+         SELECT $1, s."character_id", msg."new_id", s."text", mm."new_id", s."created_at"
+         FROM "meanwhile" s JOIN unnest($3::int[], $4::int[]) AS msg("old_id", "new_id") ON msg."old_id" = s."message_id"
+         LEFT JOIN unnest($5::int[], $6::int[]) AS mm("old_id", "new_id") ON mm."old_id" = s."memory_id"
+         WHERE s."chat_id" = $2 ORDER BY s."id"`,
+        [chatId, sourceChatId, messageOlds, messageNews, memoryOlds, memoryNews],
+    );
+};
+
 const copySittingOut: CopyStep = async ({ manager, sourceChatId, chatId }) => {
     await manager.query(
         `INSERT INTO "chat_sitting_out" ("chat_id", "character_id")
@@ -446,7 +464,7 @@ const remapMemoriesUsed: CopyStep = async ({ manager, chatId, memoryIds, beliefI
 };
 
 /** In order: Messages before anything that points at them, Memories before their changes and the Beliefs that contradict them. */
-const COPY_STEPS: CopyStep[] = [copyMessages, copyMessageParts, copyThaiReadings, copyBookmarks, copyThoughts, copyMemories, copyBeliefs, remapMemoriesUsed, copyChatEvents, copyLedger, copySittingOut];
+const COPY_STEPS: CopyStep[] = [copyMessages, copyMessageParts, copyThaiReadings, copyBookmarks, copyThoughts, copyMemories, copyBeliefs, remapMemoriesUsed, copyChatEvents, copyLedger, copyMeanwhiles, copySittingOut];
 
 /** `count` fresh ids from `table`'s id sequence, ascending. */
 async function reserveIds(manager: EntityManager, table: string, count: number): Promise<number[]> {

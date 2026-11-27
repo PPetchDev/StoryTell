@@ -20,6 +20,7 @@ import { SceneAdvanceEntity } from './entities/scene-advance.entity.js';
 import { SuddenEventStepEntity, SuddenEventStepKind } from './entities/sudden-event-step.entity.js';
 import { DetailChangeEntity, DetailKind } from './entities/detail-change.entity.js';
 import { DiaryEntryEntity } from './entities/diary-entry.entity.js';
+import { MeanwhileEntity } from './entities/meanwhile.entity.js';
 import { EndingReachedEntity } from './entities/ending-reached.entity.js';
 import { SecretRevealEntity } from './entities/secret-reveal.entity.js';
 import { TimeChangeEntity } from './entities/time-change.entity.js';
@@ -213,6 +214,7 @@ export class LedgerModelService {
         @InjectRepository(SuddenEventStepEntity) private readonly suddenEventSteps: Repository<SuddenEventStepEntity>,
         @InjectRepository(DetailChangeEntity) private readonly detailChanges: Repository<DetailChangeEntity>,
         @InjectRepository(DiaryEntryEntity) private readonly diaryEntries: Repository<DiaryEntryEntity>,
+        @InjectRepository(MeanwhileEntity) private readonly meanwhiles: Repository<MeanwhileEntity>,
         @InjectRepository(EndingReachedEntity) private readonly endingsReached: Repository<EndingReachedEntity>,
     ) {}
 
@@ -336,6 +338,43 @@ export class LedgerModelService {
     async deleteDiaryEntry(chatId: number, entryId: number): Promise<boolean> {
         const result = await this.diaryEntries.delete({ id: entryId, chatId });
         return (result.affected ?? 0) > 0;
+    }
+
+    /** The Chat's Meanwhiles (.scratch/meanwhile/spec.md), every Character's, oldest first. */
+    meanwhilesOf(chatId: number): Promise<MeanwhileEntity[]> {
+        return this.meanwhiles.find({ where: { chatId }, order: { id: 'ASC' } });
+    }
+
+    /**
+     * Keeps what Characters away from the moment did, all against the AI Message they came after,
+     * in one transaction: for each, a Memory only they know (recorded as an addition, so a rewind
+     * takes it), their Goal changed when it moved (a Goal detail record), and the Meanwhile itself.
+     * Returns the ids of the Memories added, which are then embedded.
+     */
+    recordMeanwhile(chatId: number, messageId: number, entries: Array<{ characterId: number; text: string; goal: string | null }>): Promise<number[]> {
+        return this.dataSource.transaction(async (manager) => {
+            const added: number[] = [];
+            for (const entry of entries) {
+                const memory = await createMemory(manager, {
+                    chatId,
+                    text: entry.text,
+                    knownBy: [entry.characterId],
+                    writtenBy: MemoryAuthor.Ai,
+                    locked: false,
+                    archived: false,
+                    messageId,
+                });
+                await manager.save(
+                    manager.create(MemoryChangeEntity, { chatId, memoryId: memory.id, kind: MemoryChangeKind.Add, before: null, after: memory.snapshot(), event: 'Meanwhile', messageId }),
+                );
+                if (entry.goal !== null) {
+                    await manager.save(manager.create(DetailChangeEntity, { chatId, messageId, kind: DetailKind.Goal, characterId: entry.characterId, value: entry.goal }));
+                }
+                await manager.save(manager.create(MeanwhileEntity, { chatId, messageId, characterId: entry.characterId, text: entry.text, memoryId: memory.id }));
+                added.push(memory.id);
+            }
+            return added;
+        });
     }
 
     /** The Chat's Place, Weather and Outfit records alone, oldest first: the newest of each is current. */
@@ -682,6 +721,8 @@ export class LedgerModelService {
             await manager.delete(SecretRevealEntity, { messageId: In(ids) });
             // A Diary entry tells the story up to its Message: it goes with it (.scratch/diary/spec.md). Not counted.
             await manager.delete(DiaryEntryEntity, { messageId: In(ids) });
+            // A Meanwhile goes with the reply it came after (.scratch/meanwhile/spec.md); its Memory and Goal go as ledger records above. Not counted.
+            await manager.delete(MeanwhileEntity, { messageId: In(ids) });
             // A Roll offer goes with the judgement that made it (.scratch/judge-rolls/spec.md), so it never shows on a new reply. Not counted.
             await manager.update(MessageEntity, { id: In(ids) }, { rollOffer: null });
             const arcs = newestFirst(await manager.find(ArcStepEntity, { where: { messageId: In(ids) } }));
@@ -712,6 +753,7 @@ export class LedgerModelService {
             await manager.delete(SuddenEventEntity, { chatId });
             await manager.delete(DetailChangeEntity, { chatId });
             await manager.delete(DiaryEntryEntity, { chatId });
+            await manager.delete(MeanwhileEntity, { chatId });
             await manager.delete(EndingReachedEntity, { chatId });
             await manager.delete(SecretRevealEntity, { chatId });
             await manager.delete(BeliefChangeEntity, { chatId });

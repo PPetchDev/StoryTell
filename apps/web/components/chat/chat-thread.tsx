@@ -427,6 +427,7 @@ function sameMessage(a: Message, b: Message): boolean {
     if (a === b) return true;
     if (a.id !== b.id || a.thaiReading !== b.thaiReading) return false;
     if (a.kind === 'ai' && b.kind === 'ai' && (a.thoughts?.length ?? 0) !== (b.thoughts?.length ?? 0)) return false;
+    if (a.kind === 'ai' && b.kind === 'ai' && (a.meanwhile?.length ?? 0) !== (b.meanwhile?.length ?? 0)) return false;
     if (a.kind === 'user' || b.kind === 'user') {
         return a.kind === 'user' && b.kind === 'user' && a.text === b.text && a.identityName === b.identityName;
     }
@@ -643,7 +644,7 @@ const MessageView = memo(function MessageView({
                         <MessageBody message={message} cast={cast} portraits={portraits} readingNow={readingNow} />
                         {/* What each Character thought before it, behind a tap (.scratch/character-minds/spec.md). */}
                         {/* And, with "Show cost per reply" on, what it cost, in the same row (.scratch/cost-view/spec.md). */}
-                        {message.kind === 'ai' && <MessageThoughts thoughts={message.thoughts} after={cost ? <ReplyCostLine cost={cost} /> : undefined} />}
+                        {message.kind === 'ai' && <MessageThoughts thoughts={message.thoughts} meanwhile={message.meanwhile} after={cost ? <ReplyCostLine cost={cost} /> : undefined} />}
                         {/* A Secret this reply told the user (.scratch/secret-reveals/spec.md). */}
                         {message.kind === 'ai' && <RevealedSecretCards messageId={message.id} />}
                     </>

@@ -104,7 +104,9 @@ export type TextCallKind =
     | 'speech_repair'
     | 'speech_repair_fallback'
     // A Character messaging the user first (.scratch/reach-outs/spec.md): a background-model call.
-    | 'reach_out';
+    | 'reach_out'
+    // What Characters away from the moment do on their own (.scratch/meanwhile/spec.md): a background-model call.
+    | 'meanwhile';
 
 /**
  * `expression_image`: a Character's Expression, drawn from their Reference image (.scratch/expressions/spec.md).

@@ -195,6 +195,8 @@ export interface AiMessage {
     thaiReading: string | null;
     /** What each Character thought before it (.scratch/character-minds/spec.md), shown only on a tap; empty or absent for none. */
     thoughts?: MessageThought[];
+    /** What Characters away from the moment did after it (.scratch/meanwhile/spec.md), shown only on a tap; empty or absent for none. */
+    meanwhile?: MessageThought[];
 }
 
 /** One Character's Thought before a reply. */
@@ -229,6 +231,8 @@ export interface Chat extends ChatSummary {
     stage?: ChatStage | null;
     /** Whether each Character thinks on their own before a reply (.scratch/character-minds/spec.md). */
     characterThoughts: boolean;
+    /** Whether Characters away from the moment do things on their own (.scratch/meanwhile/spec.md); absent reads as on. */
+    charactersLive?: boolean;
     /** What each Character is after now, for those who are after something (.scratch/character-minds/spec.md). */
     goals?: Array<{ characterId: number; goal: string }>;
     /** What has lastingly changed about each Character in this Chat (.scratch/growing-cards/spec.md), for those with a Now note; `note` with `{user}`. */
@@ -575,6 +579,9 @@ export const chatApi = {
     /** Whether each Character thinks before a reply in this Chat. */
     setCharacterThoughts: (storyId: number, chatId: number, characterThoughts: boolean) =>
         apiSend<Chat>('PATCH', `/stories/${storyId}/chats/${chatId}`, { characterThoughts }),
+    /** Whether Characters away from the moment do things on their own in this Chat (.scratch/meanwhile/spec.md). */
+    setCharactersLive: (storyId: number, chatId: number, charactersLive: boolean) =>
+        apiSend<Chat>('PATCH', `/stories/${storyId}/chats/${chatId}`, { charactersLive }),
     /** Whether the Characters write Diary entries by themselves in this Chat. */
     setAutoDiary: (storyId: number, chatId: number, autoDiary: boolean) => apiSend<Chat>('PATCH', `/stories/${storyId}/chats/${chatId}`, { autoDiary }),
     /** Dresses the stage as the story goes, or stops (.scratch/dressed-stage/spec.md). */

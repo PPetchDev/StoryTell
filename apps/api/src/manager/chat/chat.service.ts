@@ -94,6 +94,8 @@ import { ChaptersManagerService } from './chapters/chapters.service.js';
 import { sceneMove } from './chapters/chapters.js';
 import { SuggestedRepliesManagerService } from './suggestions/suggested-replies.service.js';
 import { DiaryManagerService } from './diary/diary.service.js';
+import { MeanwhileManagerService } from './meanwhile/meanwhile.service.js';
+import { meanwhileActors, meanwhilesInPlay } from './meanwhile/meanwhile.js';
 import { ThoughtsManagerService } from './thoughts/thoughts.service.js';
 import { SpeechRepairManagerService } from './speech/speech-repair.service.js';
 import { repeatedOpenings } from './speech/repeated-openings.js';
@@ -176,6 +178,8 @@ export type ChatMessageResponse = MessageResponse & {
     thaiReading: string | null;
     /** What each Character thought before this reply (.scratch/character-minds/spec.md), in order; empty for none. */
     thoughts: Array<{ characterId: number; characterName: string; text: string }>;
+    /** What Characters away from the moment did after this reply (.scratch/meanwhile/spec.md); empty for none. */
+    meanwhile: Array<{ characterId: number; characterName: string; text: string }>;
 };
 
 /** A Chat as the Chat screen reads it: its Messages plus everything the notice line needs. */
@@ -276,6 +280,8 @@ export interface ChatDetail extends ChatSummary {
     stage: ChatStage | null;
     /** Whether each Character thinks before a reply in this Chat (.scratch/character-minds/spec.md). */
     characterThoughts: boolean;
+    /** Whether Characters away from the moment do things on their own (.scratch/meanwhile/spec.md). */
+    charactersLive: boolean;
     /** Entries are being written by themselves right now: the Chat screen re-reads until they are done. */
     diaryWriting: boolean;
     /** Each Character's newest Diary entry, in cast order: a new one is shown to the user. */
@@ -424,6 +430,8 @@ export interface ChatFields {
     autoDiary?: boolean;
     /** Whether each Character thinks before a reply (.scratch/character-minds/spec.md). */
     characterThoughts?: boolean;
+    /** Whether Characters away from the moment do things on their own (.scratch/meanwhile/spec.md). */
+    charactersLive?: boolean;
     /** Whether the stage is dressed as the story goes (.scratch/dressed-stage/spec.md). */
     dressStage?: boolean;
 }
@@ -441,6 +449,8 @@ export class ChatManagerService {
     private readonly startAfterTurn = new Map<number, () => void>();
     /** Each Chat's Diary entries being written by themselves after a reply (.scratch/diary/spec.md); play never waits on them. */
     private readonly diaryRuns = new Map<number, Promise<void>>();
+    /** The Meanwhile run under way for each Chat (.scratch/meanwhile/spec.md). */
+    private readonly meanwhileRuns = new Map<number, Promise<void>>();
     /** Each Chat's newest reply's Judge and Memory extraction, settled together: what Watch waits on between replies. */
     private readonly replyCalls = new Map<number, Promise<unknown>>();
 
@@ -464,6 +474,7 @@ export class ChatManagerService {
         private readonly writeForMeWriter: WriteForMeManagerService,
         private readonly thaiReadings: ThaiReadingManagerService,
         private readonly diaryWriter: DiaryManagerService,
+        private readonly meanwhileWriter: MeanwhileManagerService,
         private readonly thinker: ThoughtsManagerService,
         private readonly speechRepair: SpeechRepairManagerService,
         private readonly storySoFar: StorySoFarManagerService,
@@ -927,11 +938,12 @@ export class ChatManagerService {
         // Registered now, not once both are done: the Chat says entries may be on the way from the moment the
         // reply's calls start, so a screen reading it between the two never stops looking too soon.
         const diaries = this.writeDiariesAfter(story, chatId, messageId, settled);
+        const meanwhiles = this.liveMeanwhileAfter(story, chatId, messageId, settled);
         const chain = settled.then(() => {
             this.storySoFar.start(story, chatId, (chat) => this.promptLayersFor(story, chat));
             // A Scene the Judge moved on ends a Chapter (.scratch/scene-chapters/spec.md); never awaited.
             this.chapters.start(story, chatId);
-            return diaries;
+            return Promise.all([diaries, meanwhiles]).then(() => undefined);
         });
         this.background.set(chatId, chain);
         void chain.finally(() => {
@@ -948,6 +960,7 @@ export class ChatManagerService {
         while (this.background.has(chatId)) await this.background.get(chatId);
         await this.storySoFar.idle(chatId);
         while (this.diaryRuns.has(chatId)) await this.diaryRuns.get(chatId);
+        while (this.meanwhileRuns.has(chatId)) await this.meanwhileRuns.get(chatId);
         await this.chapters.idle(chatId);
     }
 
@@ -1091,6 +1104,118 @@ export class ChatManagerService {
     }
 
     /**
+     * What the Characters away from the moment do on their own at a reply (.scratch/meanwhile/spec.md),
+     * after any run before it for the Chat and the reply's Judge and Memory extraction. Never
+     * rejects: a failure is logged, and the next due reply tries again.
+     */
+    private liveMeanwhileAfter(story: StoryEntity, chatId: number, messageId: number, ready: Promise<unknown>): Promise<void> {
+        const before = this.meanwhileRuns.get(chatId) ?? Promise.resolve();
+        const run = Promise.all([before, ready])
+            .then(() => this.meanwhile(story, chatId, messageId))
+            .catch((error: unknown) => {
+                this.logger.warn(`Chat ${chatId}, Message ${messageId}: no Meanwhile: ${error instanceof Error ? error.message : String(error)}`);
+            });
+        this.meanwhileRuns.set(chatId, run);
+        void run.finally(() => {
+            if (this.meanwhileRuns.get(chatId) === run) this.meanwhileRuns.delete(chatId);
+        });
+        return run;
+    }
+
+    private async meanwhile(story: StoryEntity, chatId: number, messageId: number): Promise<void> {
+        const chat = await this.reload(chatId);
+        if (!chat.charactersLive) return;
+        // Only at the newest reply a model wrote: one overtaken by the next turn, or taken back, is past.
+        const at = newestAiMessage(chat);
+        if (!at || at.id !== messageId || at.model === AUTHOR_MODEL) return;
+        if (await this.textCreditOut()) return;
+        const [state, meanwhiles] = await Promise.all([this.ledger.state(chat.id), this.ledger.meanwhilesOf(chat.id)]);
+        const positionOf = new Map(chat.messages.map((message) => [message.id, message.position]));
+        const lastMeanwhileAt = new Map<number, number>();
+        for (const entry of meanwhiles) {
+            const position = positionOf.get(entry.messageId);
+            if (position !== undefined) lastMeanwhileAt.set(entry.characterId, position);
+        }
+        const details = currentDetails(state.detailChanges);
+        const goalOf = (id: number) => details.goals.find((goal) => goal.characterId === id)?.goal ?? null;
+        const actorIds = meanwhileActors({
+            messages: chat.messages.map((message) => ({
+                position: message.position,
+                written: message.kind === MessageKind.Ai && message.model !== AUTHOR_MODEL,
+                speakers: (message.parts ?? []).flatMap((part) => (part.characterId === null ? [] : [part.characterId])),
+            })),
+            at: {
+                position: at.position,
+                epilogue: at.epilogue,
+                sceneMoved: state.sceneAdvances.some((advance) => advance.messageId === at.id),
+                endingReached: state.endingsReached.some((record) => record.messageId === at.id),
+            },
+            cast: story.characters.map((character) => ({ id: character.id, goal: goalOf(character.id) })),
+            sittingOut: chat.sittingOutIds(),
+            lastMeanwhileAt,
+        });
+        if (actorIds.length === 0) return;
+
+        const [held, memories, entries, thoughts] = await Promise.all([
+            this.beliefModel.findByChat(chat.id),
+            this.memoryModel.findByChatWithoutVectors(chat.id),
+            this.ledger.diaryEntriesOf(chat.id),
+            this.chatModel.findThoughts(chat.messages.filter((message) => message.kind === MessageKind.Ai).map((message) => message.id)),
+        ]);
+        const identity = wornIdentity(story, chat);
+        const nameOf = (id: number | null): string | null => (id === null ? identity.name : (story.characters.find((candidate) => candidate.id === id)?.name ?? null));
+        const bonds = currentBonds(state.bondChanges);
+        const nowNotes = castNowNotes(currentNowNotes(state.detailChanges), story.characters);
+        const innerLives = promptDiaries(story, chat, entries);
+        const scene = story.scenes.find((candidate) => candidate.id === chat.currentSceneId) ?? null;
+        const actors = actorIds.map((id) => story.characters.find((character) => character.id === id)!);
+        const result = await this.meanwhileWriter.write(
+            {
+                setting: story.setting,
+                identityName: identity.name,
+                castNames: story.characters.map((character) => character.name),
+                scene: scene ? { name: scene.name, situation: scene.situation } : null,
+                timeOfDay: chat.timeOfDay,
+                place: details.place,
+                storySoFar: chat.storySoFar,
+                story: chat.messages
+                    .filter((message) => message.position <= at.position)
+                    .slice(-12)
+                    .map((message) =>
+                        message.kind === MessageKind.User ? `${message.identityName ?? identity.name}: ${(message.text ?? '').trim()}` : thaiReadingSource(message.toResponse()),
+                    ),
+                actors: actors.map((character) => ({
+                    character: { name: character.name, personality: character.personality, voice: character.voice, background: character.background },
+                    nowNote: nowNotes.find((note) => note.characterId === character.id)?.note ?? null,
+                    goal: goalOf(character.id),
+                    bonds: bonds.flatMap((bond) => {
+                        const towardName = nameOf(bond.toCharacterId);
+                        if (bond.fromCharacterId !== character.id || towardName === null) return [];
+                        return [{ towardName, label: bond.label, description: bond.description, levels: bond.levels() }];
+                    }),
+                    beliefs: held.filter((belief) => belief.active && belief.characterId === character.id).map((belief) => renderUser(belief.text, identity.name)),
+                    // Only what they know: a Memory is the Characters' in its Known by.
+                    memories: memories
+                        .filter((memory) => !memory.archived && memory.knownByIds().includes(character.id))
+                        .map((memory) => renderUser(memory.text, identity.name)),
+                    innerLife: innerLives.find((line) => line.characterName === character.name)?.text ?? null,
+                    thought: thoughts.filter((thought) => thought.characterId === character.id).at(-1)?.text ?? null,
+                })),
+            },
+            // Its cost is the reply's (.scratch/cost-view/spec.md).
+            { storyId: story.id, chatId: chat.id, messageId: at.id },
+        );
+        if (result.read === null) throw new Error(`the answer (${result.model}) could not be read`);
+        // Read again: a later turn may have moved on or taken the reply back meanwhile.
+        if (newestAiMessage(await this.reload(chatId))?.id !== at.id) return;
+        const kept = result.read.flatMap((entry) => {
+            const character = actors.find((candidate) => candidate.name === entry.character);
+            return character ? [{ characterId: character.id, text: entry.did, goal: entry.goal }] : [];
+        });
+        if (kept.length > 0) await this.ledger.recordMeanwhile(chat.id, at.id, kept);
+    }
+
+    /**
      * The Opening becomes Message 1 with model "author", split by the same parser as replies, its
      * placeholders filled with the Chat's answers (.scratch/opening-questions/spec.md).
      */
@@ -1143,6 +1268,10 @@ export class ChatManagerService {
         if (fields.characterThoughts !== undefined) {
             chat.characterThoughts = fields.characterThoughts;
             await this.chatModel.setCharacterThoughts(chat.id, chat.characterThoughts);
+        }
+        if (fields.charactersLive !== undefined) {
+            chat.charactersLive = fields.charactersLive;
+            await this.chatModel.setCharactersLive(chat.id, chat.charactersLive);
         }
         if (fields.autoDiary !== undefined) {
             chat.autoDiary = fields.autoDiary;
@@ -1912,11 +2041,12 @@ export class ChatManagerService {
             }));
         const identity: WornIdentity = wornIdentity(story, chat);
         const sittingOut = sittingOutOf(story, chat);
-        const [state, memories, held, entries] = await Promise.all([
+        const [state, memories, held, entries, meanwhileRows] = await Promise.all([
             this.ledger.state(chat.id),
             this.memoryModel.findByChat(chat.id),
             this.beliefModel.findByChat(chat.id),
             this.ledger.diaryEntriesOf(chat.id),
+            this.ledger.meanwhilesOf(chat.id),
         ]);
         const beliefs = choiceBeliefs(story, held);
         // Before the prompt is built (.scratch/documents/spec.md): out of text credit fails the turn here, with nothing stored.
@@ -1982,6 +2112,8 @@ export class ChatManagerService {
             face: userText !== null ? pickedFaceOf(chat.messages[chat.messages.length - 1]) : null,
             epilogue: asEpilogue ? promptEpilogue(endingState(story.endings ?? [], state.endingsReached)) : null,
             thoughts: thoughts.map((thought) => ({ characterName: thought.name, text: thought.text })),
+            // What Characters away from the moment did lately (.scratch/meanwhile/spec.md): not on an Epilogue.
+            meanwhiles: asEpilogue ? [] : promptMeanwhiles(story, chat, meanwhileRows, userText),
             watch,
         });
         if (prompt.trimmed > 0) {
@@ -2250,7 +2382,7 @@ export class ChatManagerService {
     }
 
     private async detail(story: StoryEntity, chat: ChatEntity): Promise<ChatDetail> {
-        const [settings, creditOut, source, readings, appSavedReplies, appReplaceRules, bondChanges, beliefs, eventSteps, detailChanges, endingsReached, personas, diaryEntries, thoughtRows, chatEvents, secretReveals] = await Promise.all([
+        const [settings, creditOut, source, readings, appSavedReplies, appReplaceRules, bondChanges, beliefs, eventSteps, detailChanges, endingsReached, personas, diaryEntries, thoughtRows, chatEvents, secretReveals, meanwhileRows] = await Promise.all([
             this.settingsModel.get(),
             this.creditOut(),
             // Read live, so a rename of the source shows.
@@ -2270,6 +2402,7 @@ export class ChatManagerService {
             this.chatModel.findThoughts(chat.messages.map((message) => message.id)),
             this.ledger.chatSuddenEventsOf(chat.id),
             this.ledger.secretRevealsOf(chat.id),
+            this.ledger.meanwhilesOf(chat.id),
         ]);
         const events = chatEventState(story.suddenEvents ?? [], chatEvents, eventSteps);
         // Oldest first, so each Character's newest entry is the one left.
@@ -2321,6 +2454,7 @@ export class ChatManagerService {
                 chat.messages.map((message) => message.toResponse()),
                 readings,
                 thoughtRows,
+                meanwhileRows,
                 story.characters,
             ),
             awaitingReply: awaitingReply(chat),
@@ -2343,6 +2477,7 @@ export class ChatManagerService {
             endingSuggestions: (story.endings ?? []).some(endingReady) ? null : chat.endingSuggestions,
             autoDiary: chat.autoDiary,
             characterThoughts: chat.characterThoughts,
+            charactersLive: chat.charactersLive,
             dressStage: chat.dressStage,
             stage: await chatStage(this.stageModel, story, chat, details, detailChanges),
             diaryWriting: this.diaryRuns.has(chat.id),
@@ -2491,6 +2626,30 @@ function sittingOutOf(story: StoryEntity, chat: ChatEntity): CastName[] {
 }
 
 /**
+ * The Meanwhiles the Narrator reads this turn (.scratch/meanwhile/spec.md): for the Characters not
+ * in the latest exchange and not sitting out, at the Chat's Messages as they are now.
+ */
+function promptMeanwhiles(
+    story: StoryEntity,
+    chat: ChatEntity,
+    entries: ReadonlyArray<{ characterId: number; messageId: number; text: string }>,
+    userText: string | null,
+): Array<{ characterName: string; text: string }> {
+    const out = new Set(chat.sittingOutIds());
+    return meanwhilesInPlay({
+        entries,
+        messages: chat.messages.map((message) => ({
+            id: message.id,
+            position: message.position,
+            written: message.kind === MessageKind.Ai && message.model !== AUTHOR_MODEL,
+            speakers: (message.parts ?? []).flatMap((part) => (part.characterId === null ? [] : [part.characterId])),
+        })),
+        cast: story.characters.filter((character) => !out.has(character.id)).map((character) => ({ id: character.id, name: character.name })),
+        present: inLatestExchange(story, chat, userText),
+    });
+}
+
+/**
  * The Diary entries the Narrator reads this turn (.scratch/diary/spec.md, "The Narrator reads
  * them, as feelings only"): the Characters not sitting out, at the Chat's Messages as they are now.
  */
@@ -2576,6 +2735,7 @@ function withThaiReadings(
     messages: MessageResponse[],
     readings: ThaiReadingEntity[],
     thoughts: MessageThoughtEntity[] = [],
+    meanwhiles: ReadonlyArray<{ messageId: number; characterId: number; text: string }> = [],
     characters: ReadonlyArray<{ id: number; name: string }> = [],
 ): ChatMessageResponse[] {
     const byMessage = new Map<string, string>(readings.map((reading) => [`${reading.messageId}:${reading.sourceFingerprint}`, reading.text]));
@@ -2585,6 +2745,10 @@ function withThaiReadings(
         thoughts: thoughts.flatMap((thought) => {
             const characterName = characters.find((character) => character.id === thought.characterId)?.name;
             return thought.messageId === message.id && characterName ? [{ characterId: thought.characterId, characterName, text: thought.text }] : [];
+        }),
+        meanwhile: meanwhiles.flatMap((entry) => {
+            const characterName = characters.find((character) => character.id === entry.characterId)?.name;
+            return entry.messageId === message.id && characterName ? [{ characterId: entry.characterId, characterName, text: entry.text }] : [];
         }),
     }));
 }

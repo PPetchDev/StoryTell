@@ -418,6 +418,7 @@ interface ChatTopBarProps {
     onSetDressStage(on: boolean): void;
     /** Turns the Characters' Thoughts before each reply on or off in this Chat. */
     onSetCharacterThoughts(on: boolean): void;
+    onSetCharactersLive(on: boolean): void;
     onReset(): void;
     /** Asks for the story's Epilogue (.scratch/endings/spec.md); the menu asks first. */
     onEndStory(): void;
@@ -467,6 +468,7 @@ export function ChatTopBar({
     onSetAutoDiary,
     onSetDressStage,
     onSetCharacterThoughts,
+    onSetCharactersLive,
     onReset,
     onEndStory,
     canEndStory,
@@ -770,6 +772,22 @@ export function ChatTopBar({
                                 >
                                     <span className="flex min-w-0 flex-1 flex-col items-start">
                                         <MenuText label="Characters think for themselves" sub="Each thinks before they reply" />
+                                    </span>
+                                    <span aria-hidden="true" className={SWITCH_TRACK}>
+                                        <span className={SWITCH_KNOB} />
+                                    </span>
+                                </button>
+                                {/* Characters away from the moment do things on their own (.scratch/meanwhile/spec.md): on by default. */}
+                                <button
+                                    type="button"
+                                    role="switch"
+                                    aria-checked={chat.charactersLive ?? true}
+                                    className={`${ITEM} flex-row items-center gap-3 text-text`}
+                                    disabled={busy}
+                                    onClick={() => onSetCharactersLive(!(chat.charactersLive ?? true))}
+                                >
+                                    <span className="flex min-w-0 flex-1 flex-col items-start">
+                                        <MenuText label="Characters live their own lives" sub="Those away from the scene act on their own" />
                                     </span>
                                     <span aria-hidden="true" className={SWITCH_TRACK}>
                                         <span className={SWITCH_KNOB} />

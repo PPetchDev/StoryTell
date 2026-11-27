@@ -166,6 +166,13 @@ export class ChatEntity {
     characterThoughts: boolean;
 
     /**
+     * Whether Characters away from the moment do things on their own (.scratch/meanwhile/spec.md).
+     * On by default; the user turns it off or on, a Branch copies it, Reset keeps it.
+     */
+    @Column({ name: 'characters_live', type: 'boolean', default: true })
+    charactersLive: boolean;
+
+    /**
      * The answers to its Story's Opening questions (.scratch/opening-questions/spec.md), one per
      * question when the Chat was made; null when the Story asked none. Reset keeps them, a Branch
      * copies them.

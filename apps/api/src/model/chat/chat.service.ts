@@ -237,6 +237,11 @@ export class ChatModelService {
         if (thoughts.length > 0) await this.thoughts.insert(thoughts.map((thought, position) => ({ messageId, characterId: thought.characterId, position, text: thought.text })));
     }
 
+    /** Whether Characters away from the moment do things on their own in this Chat (.scratch/meanwhile/spec.md). */
+    async setCharactersLive(chatId: number, charactersLive: boolean): Promise<void> {
+        await this.chats.update({ id: chatId }, { charactersLive });
+    }
+
     async setAutoDiary(chatId: number, autoDiary: boolean): Promise<void> {
         await this.chats.update({ id: chatId }, { autoDiary });
     }

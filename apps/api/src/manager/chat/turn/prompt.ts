@@ -165,6 +165,8 @@ export interface TurnPromptInput {
     diaries?: PromptDiary[];
     /** Each Character's Thought before this reply (.scratch/character-minds/spec.md); none, or left out, and the prompt is as before. */
     thoughts?: PromptThought[];
+    /** What Characters away from the moment did lately (.scratch/meanwhile/spec.md); none, or left out, and the prompt is as before. */
+    meanwhiles?: PromptMeanwhile[];
     /**
      * The most the Memory layer may take on the next turn, which the Story so far trigger reserves
      * (spec: "The budget is reserved"); left out, only the layer as it stands is counted.
@@ -342,6 +344,23 @@ export function thoughtsBlock(thoughts: readonly PromptThought[] | undefined): s
     return `What the Characters are thinking right now, each knowing only what they know:
 ${thoughts.map((thought) => `- ${thought.characterName}: ${thought.text}`).join('\n')}
 Let each speak and act from their own thought, in their own way, as far as the moment allows; you decide what actually happens. A thought is private: nobody else hears it, and nothing in it has happened.`;
+}
+
+/** What a Character away from the moment did lately (.scratch/meanwhile/spec.md): it has happened. */
+export interface PromptMeanwhile {
+    characterName: string;
+    text: string;
+}
+
+/**
+ * The Meanwhiles in the turn's trailing message, after "Where things stand": what Characters away
+ * from the moment did on their own. It has happened, and only they know it. Null with none.
+ */
+export function meanwhileBlock(meanwhiles: readonly PromptMeanwhile[] | undefined): string | null {
+    if (!meanwhiles || meanwhiles.length === 0) return null;
+    return `Meanwhile, away from the moment (this has happened; only that Character knows it unless the story has shown it):
+${meanwhiles.map((entry) => `- ${entry.characterName}: ${entry.text}`).join('\n')}
+When one of them comes back, let it shape where they come from, how they act and what they say, without retelling it.`;
 }
 
 /** A Character's inner-life line from their newest Diary entry (.scratch/diary/spec.md): feelings, never facts. */
@@ -938,6 +957,7 @@ export function buildTurnPrompt(input: TurnPromptInput): TurnPrompt {
             ...(epilogue
                 ? [repeats, epilogueFinalInstruction(identity)]
                 : [
+                      meanwhileBlock(input.meanwhiles),
                       thoughtsBlock(input.thoughts),
                       suddenEventBlock(input.suddenEvent, identity),
                       rollBlock(input.roll, identity),

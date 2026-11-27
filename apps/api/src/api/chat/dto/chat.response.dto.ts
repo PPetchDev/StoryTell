@@ -488,6 +488,13 @@ export class MessageDTO {
 
     @ApiProperty({ type: () => MessageThoughtDTO, isArray: true, description: 'What each Character thought before this reply, in order; empty for none. Shown only when asked for.' })
     thoughts: MessageThoughtDTO[];
+
+    @ApiProperty({
+        type: () => MessageThoughtDTO,
+        isArray: true,
+        description: 'What Characters away from the moment did on their own after this reply (.scratch/meanwhile/spec.md); empty for none. Shown only when asked for.',
+    })
+    meanwhile: MessageThoughtDTO[];
 }
 
 export class MessageThoughtDTO {
@@ -611,6 +618,9 @@ export class ChatResponseBodyDTO extends ChatSummaryDTO implements Omit<ChatDeta
 
     @ApiProperty({ description: 'Whether each Character thinks on their own before a reply. On by default.' })
     characterThoughts: boolean;
+
+    @ApiProperty({ description: 'Whether Characters away from the moment do things on their own (.scratch/meanwhile/spec.md). On by default.' })
+    charactersLive: boolean;
 
     @ApiProperty({ description: 'Diary entries are being written by themselves right now; re-read the Chat until this is false.' })
     diaryWriting: boolean;

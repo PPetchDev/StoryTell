@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChatBackdrop } from '@/components/chat/backdrop';
 import { BookmarksProvider, useChatBookmarks } from '@/components/chat/bookmarks';
 import { SecretRevealsProvider } from '@/components/chat/secret-reveals';
-import { useOpenProfile, useProfileChat, useProfileGoals, useProfileNow, useProfileOutfits, useProfileSecrets } from '@/components/chat/character-profile';
+import { useOpenProfile, useProfileChat, useProfileGoals, useProfileLately, useProfileNow, useProfileOutfits, useProfileSecrets } from '@/components/chat/character-profile';
 import { diaryEntrySeen, markDiaryEntrySeen } from '@/lib/diary-seen';
 import { CharacterRow } from '@/components/chat/character-row';
 import { ChatComposer } from '@/components/chat/chat-composer';
@@ -260,6 +260,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
     useProfileOutfits(chat.outfits);
     // And what they are after now (.scratch/character-minds/spec.md).
     useProfileGoals(chat.goals);
+    useProfileLately(chat.messages);
     // The Secrets the Chat has revealed, which the profiles show (.scratch/secret-reveals/spec.md).
     useProfileSecrets(chat.secretReveals);
     // And what has lastingly changed about them, which the user can edit there (.scratch/growing-cards/spec.md).
@@ -722,6 +723,7 @@ export function ChatScreen({ initial, cast, characters, portraits, scenes, looks
                 onSetAutoDiary={(on) => void runWrite(() => chatApi.setAutoDiary(chat.storyId, chat.id, on))}
                 onSetDressStage={(on) => void runWrite(() => chatApi.setDressStage(chat.storyId, chat.id, on))}
                 onSetCharacterThoughts={(on) => void runWrite(() => chatApi.setCharacterThoughts(chat.storyId, chat.id, on))}
+                onSetCharactersLive={(on) => void runWrite(() => chatApi.setCharactersLive(chat.storyId, chat.id, on))}
                 onSetSittingOut={(characterIds) =>
                     void runWrite(() => chatApi.setSittingOut(chat.storyId, chat.id, characterIds))
                 }

@@ -17,6 +17,7 @@ import { UsageRecordModelModule } from '../../model/usage-record/usage-record.mo
 import { ReadAloudManagerModule } from '../read-aloud/read-aloud.module.js';
 import { ChatManagerService } from './chat.service.js';
 import { DiaryManagerService } from './diary/diary.service.js';
+import { MeanwhileManagerService } from './meanwhile/meanwhile.service.js';
 import { ThoughtsManagerService } from './thoughts/thoughts.service.js';
 import { SpeechRepairManagerService } from './speech/speech-repair.service.js';
 import { DocumentSearchManagerService } from './document-search.service.js';
@@ -37,7 +38,7 @@ import { ImageStoreModule } from '../../store/image/image-store.module.js';
 
 @Module({
     imports: [ChatModelModule, BranchModelModule, StoryModelModule, SettingsModelModule, LedgerModelModule, MemoryModelModule, PersonaModelModule, SnapshotModelModule, DocumentModelModule, SavedReplyModelModule, ReplaceRuleModelModule, ReadAloudManagerModule, UsageRecordModelModule, ReplyRecordModelModule, StageModelModule, ImageStoreModule, YourFaceModelModule],
-    providers: [ChatManagerService, DocumentSearchManagerService, JudgeManagerService, BeliefManagerService, MemoryEmbeddingManagerService, MemoryExtractionManagerService, MemoryManagerService, SuggestedRepliesManagerService, WriteForMeManagerService, ThaiReadingManagerService, DiaryManagerService, ThoughtsManagerService, SpeechRepairManagerService, StorySoFarManagerService, ChaptersManagerService, ChatTranscriptManagerService, StageManagerService],
+    providers: [ChatManagerService, DocumentSearchManagerService, JudgeManagerService, BeliefManagerService, MemoryEmbeddingManagerService, MemoryExtractionManagerService, MemoryManagerService, SuggestedRepliesManagerService, WriteForMeManagerService, ThaiReadingManagerService, DiaryManagerService, MeanwhileManagerService, ThoughtsManagerService, SpeechRepairManagerService, StorySoFarManagerService, ChaptersManagerService, ChatTranscriptManagerService, StageManagerService],
     exports: [ChatManagerService, MemoryManagerService, BeliefManagerService, StorySoFarManagerService, ChaptersManagerService, ChatTranscriptManagerService],
 })
 export class ChatManagerModule {}

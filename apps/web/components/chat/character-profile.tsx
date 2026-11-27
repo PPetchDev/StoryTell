@@ -7,6 +7,7 @@ import { DiaryChat, DiarySection } from '@/components/chat/diary-section';
 import { PortraitImage } from '@/components/portrait/portrait-image';
 import { Sheet } from '@/components/sheet/sheet';
 import { characterColour } from '@/lib/character-colour';
+import type { Message } from '@/lib/chat';
 import { EMOTION_LABEL } from '@/lib/expressions';
 import { renderUser } from '@/lib/memory';
 import { Character, referenceImageUrl } from '@/lib/story';
@@ -41,6 +42,7 @@ const ProfileContext = createContext<{
     setNow(now: NowNotes | null): void;
     setChat(chat: DiaryChat | null): void;
     setSecrets(secrets: Secrets): void;
+    setLately(lately: Secrets): void;
 } | null>(null);
 
 /** The Secrets the Chat on screen has revealed, in the order they came out, by Character id (.scratch/secret-reveals/spec.md). */
@@ -84,6 +86,28 @@ export function useProfileOutfits(outfits: ReadonlyArray<{ characterId: number; 
     useEffect(() => {
         setOutfits?.(Object.fromEntries((JSON.parse(key) as Array<{ characterId: number; outfit: string }>).map((entry) => [entry.characterId, entry.outfit])));
     }, [setOutfits, key]);
+}
+
+/** The most Meanwhiles a profile shows under "Lately" (.scratch/meanwhile/spec.md). */
+const LATELY_SHOWN = 5;
+
+/**
+ * Tells the profiles what each Character did lately while away from the moment, from the Chat on
+ * screen's Messages (.scratch/meanwhile/spec.md), newest first, so a profile shows "Lately".
+ * Outside a Chat it does nothing, and no profile shows any.
+ */
+export function useProfileLately(messages: readonly Message[]): void {
+    const setLately = useContext(ProfileContext)?.setLately;
+    const key = JSON.stringify(messages.flatMap((message) => (message.kind === 'ai' ? (message.meanwhile ?? []) : []).map(({ characterId, text }) => ({ characterId, text }))));
+    useEffect(() => {
+        const lately: Record<number, string[]> = {};
+        for (const { characterId, text } of (JSON.parse(key) as Array<{ characterId: number; text: string }>).reverse()) {
+            const list = (lately[characterId] ??= []);
+            if (list.length < LATELY_SHOWN) list.push(text);
+        }
+        setLately?.(lately);
+    }, [setLately, key]);
+    useEffect(() => () => setLately?.({}), [setLately]);
 }
 
 /**
@@ -172,7 +196,8 @@ export function CharacterProfiles({ characters, children }: { characters: readon
     const [now, setNow] = useState<NowNotes | null>(null);
     const [chat, setChat] = useState<DiaryChat | null>(null);
     const [secrets, setSecrets] = useState<Secrets>({});
-    const value = useMemo(() => ({ open: setOpenId, has, character: find, setOutfits, setGoals, setNow, setChat, setSecrets }), [has, find]);
+    const [lately, setLately] = useState<Secrets>({});
+    const value = useMemo(() => ({ open: setOpenId, has, character: find, setOutfits, setGoals, setNow, setChat, setSecrets, setLately }), [has, find]);
     const character = characters.find((candidate) => candidate.id === openId);
     const close = useCallback(() => setOpenId(null), []);
 
@@ -188,6 +213,7 @@ export function CharacterProfiles({ characters, children }: { characters: readon
                     now={now}
                     chat={chat}
                     secrets={secrets[character.id] ?? []}
+                    lately={lately[character.id] ?? []}
                     onClose={close}
                 />
             )}
@@ -210,6 +236,7 @@ function CharacterProfileSheet({
     now,
     chat,
     secrets,
+    lately,
     onClose,
 }: {
     character: Character;
@@ -222,6 +249,8 @@ function CharacterProfileSheet({
     chat: DiaryChat | null;
     /** The Secrets they have told in this Chat, in the order they came out (.scratch/secret-reveals/spec.md). */
     secrets: readonly string[];
+    /** What they did lately while away from the moment, newest first (.scratch/meanwhile/spec.md). */
+    lately: readonly string[];
     onClose(): void;
 }) {
     const name = character.name.trim() || 'Unnamed';
@@ -255,6 +284,19 @@ function CharacterProfileSheet({
                     <section className="rounded-lg bg-surface-raised px-3.5 py-3" data-goal>
                         <h3 className="mt-0 mb-1 text-sm font-semibold text-muted">Wants now</h3>
                         <p className="m-0 leading-normal [overflow-wrap:anywhere]">{goal}</p>
+                    </section>
+                )}
+                {/* What they did lately while away from the moment (.scratch/meanwhile/spec.md), newest first. */}
+                {lately.length > 0 && (
+                    <section className="rounded-lg bg-surface-raised px-3.5 py-3" data-lately>
+                        <h3 className="mt-0 mb-1 text-sm font-semibold text-muted">Lately</h3>
+                        <ul className="m-0 grid list-none gap-1.5 p-0 leading-normal">
+                            {lately.map((text, index) => (
+                                <li key={index} className="[overflow-wrap:anywhere]">
+                                    {text}
+                                </li>
+                            ))}
+                        </ul>
                     </section>
                 )}
                 {/* What has lastingly changed about them in this Chat (.scratch/growing-cards/spec.md), which the user can edit. */}

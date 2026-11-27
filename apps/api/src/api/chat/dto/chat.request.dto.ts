@@ -67,6 +67,11 @@ export class UpdateChatRequestBodyDTO implements ChatFields {
     @IsOptional()
     @IsBoolean()
     characterThoughts?: boolean;
+
+    @ApiPropertyOptional({ description: 'Whether Characters away from the moment do things on their own (.scratch/meanwhile/spec.md). Off, no new Meanwhile is written.' })
+    @IsOptional()
+    @IsBoolean()
+    charactersLive?: boolean;
 }
 
 /** .scratch/speaker-controls/spec.md, "Nudge": who the user would like to hear from in this turn. */

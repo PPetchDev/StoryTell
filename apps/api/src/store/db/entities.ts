@@ -21,6 +21,7 @@ import { TimeChangeEntity } from '../../model/ledger/entities/time-change.entity
 import { SuddenEventStepEntity } from '../../model/ledger/entities/sudden-event-step.entity.js';
 import { DetailChangeEntity } from '../../model/ledger/entities/detail-change.entity.js';
 import { DiaryEntryEntity } from '../../model/ledger/entities/diary-entry.entity.js';
+import { MeanwhileEntity } from '../../model/ledger/entities/meanwhile.entity.js';
 import { EndingReachedEntity } from '../../model/ledger/entities/ending-reached.entity.js';
 import { ChatRecapEntity } from '../../model/recap/entities/chat-recap.entity.js';
 import { EndingEntity } from '../../model/story/entities/ending.entity.js';
@@ -94,6 +95,7 @@ export const entities = [
     SuddenEventStepEntity,
     DetailChangeEntity,
     DiaryEntryEntity,
+    MeanwhileEntity,
     EndingEntity,
     EndingReachedEntity,
     LoreSetEntity,

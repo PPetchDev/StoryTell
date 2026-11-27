@@ -205,6 +205,10 @@ _Avoid_: Skip, auto-play, next
 A short message one Character sends the user on their own, in a Chat whose "Characters message first" is on, once the user has been away from it for the time chosen: the Character who feels most warmly toward the user writes it, from where the story stands. It is an AI Message like any other, so the story carries on from it, and comes as an alert on the user's devices; at most one is sent per absence, never at night, and never after the Chat reached an Ending.
 _Avoid_: Ping, notification, nudge (a Nudge is the user asking a Character to speak)
 
+**Meanwhile**:
+Something a Character who is not in the moment did on their own, between replies, toward what they are after, setting themselves an aim if they had none: a short line of plain fact that is now part of the story, known only to that Character until the story shows it to others. It comes every few replies and when a Scene moves on, never from a Character sitting out; the Narrator knows it and can bring it in when the Character is back, and the user sees it only by asking to. Taking back the reply it came after takes it back.
+_Avoid_: Off-scene action (a Scene is a stage of the plot, not the moment), offscreen, background action
+
 **Regenerate**:
 Writing the Chat's newest AI Message again, undoing everything the shown one changed; the replaced one is kept as a Reply version.
 _Avoid_: Reroll, swipe, retry, redo
