@@ -140,12 +140,13 @@ describe('Applying a judgement: Bond gates', () => {
         expect(applyJudgement(input, stillUnmeasured).scene).toBeNull();
     });
 
-    it('a Scene with neither gates nor a condition moves on as before, on the Judge\'s word', () => {
+    // Changed on 2026-11-27 (live Chat 4): the Judge read "(none)" as "always met". Such a Scene is
+    // open now, and lasts until an Ending or the user moves on (scene-flow.spec.ts).
+    it('a Scene with neither gates nor a condition does not move on on the Judge\'s word', () => {
         const scenes = [{ id: 10, name: 'Arrival', moveOnCondition: '', gates: [] }];
-        expect(applyJudgement(applyInput({ scenes }), { ...NO_JUDGED_CHANGE, scenes: [{ moveOn: true, reason: 'Done.' }] }).scene).toMatchObject({
-            toSceneId: null,
-            event: 'Done.',
-        });
+        const applied = applyJudgement(applyInput({ scenes }), { ...NO_JUDGED_CHANGE, scenes: [{ moveOn: true, reason: 'Done.' }] });
+        expect(applied.scene).toBeNull();
+        expect(applied.rejected).toContain('Scene: moved on from a Scene with no condition and no gates');
     });
 });
 

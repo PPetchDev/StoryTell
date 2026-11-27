@@ -142,6 +142,10 @@ export function applyJudgement(input: ApplyInput, judgement: Judgement): Applied
     // A Scene with gates (.scratch/bond-axes/spec.md, "Moving on"): checked on the Bonds after this
     // turn's changes, so a reply that opens a gate moves the Scene on in the same judgement.
     const gatesOnly = gates.length > 0 && here?.moveOnCondition !== undefined && here.moveOnCondition.trim() === '';
+    // A Scene with no condition and no gates is open: nothing in the story moves it on, by move_on or
+    // passed by; it lasts until an Ending or until the user moves on. Seen on live Chat 4 (2026-11-27):
+    // the Judge read "(none)" as "always met" and sent the last Scene to free play after 7 replies.
+    const open = gates.length === 0 && here?.moveOnCondition !== undefined && here.moveOnCondition.trim() === '';
     const held = gates.length === 0 || gatesHold(gates, bondsAfter(input.bonds, bonds)).every(Boolean);
     // A Passed-by Scene (.scratch/scene-flow/spec.md, "Passed by"): only from the threshold, and only
     // when the Scene does not move on by its own rules, which win when both are given.
@@ -150,7 +154,9 @@ export function applyJudgement(input: ApplyInput, judgement: Judgement): Applied
     const passedBy = passed && here && replies !== null && replies >= PASSED_BY_REPLIES ? passed : undefined;
     const next: ApplyScene | undefined = input.scenes[index + 1];
     let passedByReason: string | null = null;
-    if (here && (gatesOnly ? held : moveOn && held)) {
+    if (open && (moveOn || passed)) {
+        rejected.push('Scene: moved on from a Scene with no condition and no gates');
+    } else if (here && (gatesOnly ? held : moveOn && held)) {
         const nameOf = (characterId: number | null): string =>
             characterId === null ? input.identityName : (input.cast.find((member) => member.id === characterId)?.name ?? 'someone');
         scene = {
@@ -187,7 +193,7 @@ export function applyJudgement(input: ApplyInput, judgement: Judgement): Applied
     }
     if (passed && !here) {
         rejected.push('Scene: passed by while in free play');
-    } else if (passed && !passedBy) {
+    } else if (passed && !passedBy && !open) {
         rejected.push(`Scene: passed by with only ${replies ?? 0} replies in the Scene, under ${PASSED_BY_REPLIES}`);
     }
 

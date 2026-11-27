@@ -299,7 +299,7 @@ describe('Applying a passed-by judgement', () => {
     const scenes = [
         { id: 10, name: 'Mare\'s milk', moveOnCondition: 'Ash asks about the cows.', gates: [{ fromCharacterId: NARA, toCharacterId: null, axis: 'trust' as const, atLeast: 3 }] },
         { id: 11, name: 'The guest tent', moveOnCondition: 'Nara tells a secret.', gates: [] },
-        { id: 12, name: 'The fire', moveOnCondition: '', gates: [] },
+        { id: 12, name: 'The fire', moveOnCondition: 'Nara asks Ash to stay.', gates: [] },
     ];
     const input = (overrides: Partial<ApplyInput> = {}): ApplyInput => ({
         cast: [{ id: NARA, name: 'Nara' }],
@@ -374,5 +374,50 @@ describe('Applying a passed-by judgement', () => {
     it('from the last Scene, goes to free play', () => {
         const applied = applyJudgement(input({ currentSceneId: 12 }), PASSED);
         expect(applied.scene).toMatchObject({ fromSceneId: 12, toSceneId: null, toSceneName: null, event: `The story moved past The fire: ${WENT_TO}` });
+    });
+});
+
+// Seen on live Chat 4 (2026-11-27): the Judge read the last Scene's "(none)" as "always met" and
+// moved it to free play after 7 replies, though the author meant it to last until an Ending.
+describe('A Scene with no condition and no gates', () => {
+    const scenes = [
+        { id: 20, name: 'The festival', moveOnCondition: 'The festival ends.', gates: [] },
+        { id: 21, name: 'The eclipse', moveOnCondition: '   ', gates: [] },
+    ];
+    const input = (overrides: Partial<ApplyInput> = {}): ApplyInput => ({
+        cast: [],
+        identityName: 'Rin',
+        bonds: [],
+        scenes,
+        currentSceneId: 21,
+        repliesInScene: PASSED_BY_REPLIES + 5,
+        ...overrides,
+    });
+    const judgement = (moveOn: boolean, passedBy: boolean): Judgement => ({
+        bondChanges: [],
+        arcSteps: [],
+        scenes: [{ moveOn, passedBy, reason: 'The scene\'s move-on condition is (none), so it is always met.', wentTo: passedBy ? 'The story went to the palace.' : '' }],
+        timeOfDay: null,
+        expressions: [],
+    });
+
+    it('never moves on by move_on, passed by, or both, and says why', () => {
+        for (const [moveOn, passedBy] of [[true, false], [false, true], [true, true]]) {
+            const applied = applyJudgement(input(), judgement(moveOn, passedBy));
+            expect(applied.scene).toBeNull();
+            expect(applied.passedBy).toBeNull();
+            expect(applied.rejected).toEqual(['Scene: moved on from a Scene with no condition and no gates']);
+        }
+    });
+
+    it('is not rejected when the Judge does not ask to move on', () => {
+        const applied = applyJudgement(input(), judgement(false, false));
+        expect(applied.scene).toBeNull();
+        expect(applied.rejected).toEqual([]);
+    });
+
+    it('leaves a Scene with a condition as it was: move_on still moves it', () => {
+        const applied = applyJudgement(input({ currentSceneId: 20 }), judgement(true, false));
+        expect(applied.scene).toMatchObject({ fromSceneId: 20, toSceneId: 21 });
     });
 });

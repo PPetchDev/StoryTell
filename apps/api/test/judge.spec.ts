@@ -161,7 +161,7 @@ describe('The Bond, Arc and Scene judge, the ledger and the dashboard', () => {
                 .post(`/api/stories/${storyId}/scenes`)
                 .send({ name: 'Arrival', situation: 'Reach the lamp room.', moveOnCondition: 'Mira lets Ash up the stairs.' })
                 .expect(201);
-            await t.http.post(`/api/stories/${storyId}/scenes`).send({ name: 'The lamp', situation: 'Light it.' }).expect(201);
+            await t.http.post(`/api/stories/${storyId}/scenes`).send({ name: 'The lamp', situation: 'Light it.', moveOnCondition: 'The lamp is lit.' }).expect(201);
         }
         const { body } = await t.http.get(`/api/stories/${storyId}`).expect(200);
         return body as Story;
@@ -448,7 +448,7 @@ ${judgeItemsSection([])}`);
             expect(system).toContain('# Current Scene: The lamp\nLight it.');
             expect(system).toContain('- Mira → the user (Ash): "Curious" — The letter changes things.');
             expect(system).toContain('- Mira: Arc so far: Lets herself hope for company.');
-            expect(lastCall('judge').messages[1].content).toContain('# Current Scene\nThe lamp. Move-on condition: (none)');
+            expect(lastCall('judge').messages[1].content).toContain('# Current Scene\nThe lamp. Move-on condition: The lamp is lit.');
             expect(lastCall('judge').messages[1].content).toContain('- Mira: Lets herself hope for company.');
         });
 

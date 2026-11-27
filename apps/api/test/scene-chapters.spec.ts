@@ -77,7 +77,7 @@ describe('Move on, and Chapters', () => {
             .send({ name: "Mare's milk", situation: 'Ash is a guest at the fire.', moveOnCondition: 'Ash openly asks where the tribe keeps its cows.' })
             .expect(201);
         await t.http.post(`/api/stories/${storyId}/scenes`).send({ name: 'The guest tent', situation: 'Night in the guest tent.', moveOnCondition: 'Nara tells a secret.' }).expect(201);
-        return (await t.http.post(`/api/stories/${storyId}/scenes`).send({ name: 'The fire', situation: 'A lord comes to the fire.' }).expect(201)).body as Story;
+        return (await t.http.post(`/api/stories/${storyId}/scenes`).send({ name: 'The fire', situation: 'A lord comes to the fire.', moveOnCondition: 'The lord sits down.' }).expect(201)).body as Story;
     }
 
     async function createChat(storyId: number): Promise<number> {
