@@ -6,7 +6,7 @@ import { BackupBanner } from '@/components/backup-banner';
 import { useAccount } from '@/lib/account';
 import { useApiQuery } from '@/components/connection';
 import { ErrorState, Loading } from '@/components/query-state';
-import { CALL_KIND_LABEL, CreditPool, NamedSpend, POOL_LABEL, PoolUsage, REPAIR_KIND_LABEL, RepairCount, TEXT_HOST_LABEL, UsageResponse, usd } from '@/lib/types';
+import { allowanceReset, CALL_KIND_LABEL, CreditPool, millionTokens, NamedSpend, POOL_LABEL, PoolUsage, REPAIR_KIND_LABEL, RepairCount, TEXT_HOST_LABEL, UsageResponse, usd } from '@/lib/types';
 
 /**
  * Label and value, the label muted: the label over its value on a phone, so the value has the
@@ -201,6 +201,7 @@ function PoolCard({ pool, usage, member }: { pool: CreditPool; usage: PoolUsage;
                                         <>. Venice&apos;s balance could not be read just now.</>
                                     )}
                                     {pool === 'text' && usage.host === 'free' && <>. Text is on a free model while the paid hosts are out of credit.</>}
+                                    {pool === 'text' && usage.host === 'nanogpt' && <>. Text is on NanoGPT&apos;s subscription, which charges nothing per call.</>}
                                 </span>
                             ) : (
                                 <>
@@ -209,6 +210,24 @@ function PoolCard({ pool, usage, member }: { pool: CreditPool; usage: PoolUsage;
                                 </>
                             )}
                         </dd>
+                        {/* .scratch/nanogpt-provider/spec.md: the subscription's tokens for the week. */}
+                        {pool === 'text' && usage.weeklyAllowance && (
+                            <>
+                                <dt>Weekly allowance</dt>
+                                <dd>
+                                    {usage.weeklyAllowance.usedUp ? (
+                                        <strong className="text-caution-text">
+                                            Used up: text runs on {TEXT_HOST_LABEL[usage.host ?? 'openrouter'] ?? usage.host} until {allowanceReset(usage.weeklyAllowance.resetAt)}
+                                        </strong>
+                                    ) : (
+                                        <>
+                                            {millionTokens(usage.weeklyAllowance.limitTokens - usage.weeklyAllowance.usedTokens)} of {millionTokens(usage.weeklyAllowance.limitTokens)} input tokens left this
+                                            week <span className="muted">· resets {allowanceReset(usage.weeklyAllowance.resetAt)}</span>
+                                        </>
+                                    )}
+                                </dd>
+                            </>
+                        )}
                         <dt>Low-credit warning</dt>
                         <dd>
                             {usage.remainingUsd !== null && usage.remainingUsd <= 0 ? (

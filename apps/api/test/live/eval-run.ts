@@ -11,6 +11,7 @@ import { BACKGROUND_MODEL, PLAY_MODEL_CATALOGUE, PLAY_MODELS, PlayModel, PromptM
 import { FetchLike } from '../../src/service/model-gateway/real/http.js';
 import { backgroundSamplers, TEXT_MODELS } from '../../src/service/model-gateway/real/model-table.js';
 import { OpenRouterClient } from '../../src/service/model-gateway/real/openrouter-client.js';
+import { evalTextClient, spendsWhat } from './eval-host.js';
 import { Check, CheckContext, GradedCheck, PerReplyCheck, ReplyVerdict } from './eval-checks.js';
 import { proseOf, SceneProse } from './eval-prose.js';
 import { ChatScene, EVAL_SCENES, EvalScene, TurnScene } from './eval-scenes.js';
@@ -909,7 +910,7 @@ export async function startEvalRun(
         } catch {
             cost = '';
         }
-        throw new EvalRunRefused(`The prompt eval run spends OpenRouter credit. Start it with --spend.${cost}`);
+        throw new EvalRunRefused(`The prompt eval run ${spendsWhat(env)}. Start it with --spend.${cost}`);
     }
     const request = asked(env);
     if (!env.OPENROUTER_API_KEY) {
@@ -921,7 +922,7 @@ export async function startEvalRun(
     const names = request.models.map((model) => PLAY_MODEL_CATALOGUE[model].name).join(' and ');
 
     deps.log(`Prompt eval run on ${names}, ${request.scenes.length} scenes: at most $${EVAL_CAP_USD.toFixed(2)} of OpenRouter credit.`);
-    const client = new OpenRouterClient(env.OPENROUTER_API_KEY, deps.fetch);
+    const client = evalTextClient(env, deps.fetch);
     const git = (deps.git ?? gitState)();
     const runs: { report: EvalReport; json: string; scorecard: string }[] = [];
     // One cap for the whole command, however many models it plays.

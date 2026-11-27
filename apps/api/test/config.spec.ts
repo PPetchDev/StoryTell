@@ -46,6 +46,14 @@ describe('Config: the text hosts', () => {
         expect(loadConfig({ ...base, TEXT_HOST: 'venice' }).textHosts).toEqual(['venice']);
     });
 
+    // .scratch/nanogpt-provider/spec.md: NanoGPT first, with its own key.
+    it('takes nanogpt in TEXT_HOSTS, and refuses it without NANOGPT_API_KEY', () => {
+        const config = loadConfig({ ...base, TEXT_HOSTS: 'nanogpt,openrouter,free', NANOGPT_API_KEY: 'sk-nano-test' });
+        expect(config.textHosts).toEqual(['nanogpt', 'openrouter', 'free']);
+        expect(config.providerKeys.nanoGpt).toBe('sk-nano-test');
+        expect(() => loadConfig({ ...base, TEXT_HOSTS: 'nanogpt,openrouter' })).toThrow(/NANOGPT_API_KEY/);
+    });
+
     it('reads TEXT_HOSTS in order, ahead of TEXT_HOST', () => {
         expect(loadConfig({ ...base, TEXT_HOSTS: 'openrouter, venice,free', TEXT_HOST: 'venice' }).textHosts).toEqual(['openrouter', 'venice', 'free']);
     });

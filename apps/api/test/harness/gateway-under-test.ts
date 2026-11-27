@@ -12,6 +12,7 @@ export const TEST_KEYS = {
     openRouter: 'sk-or-test-not-a-real-key',
     venice: 'venice-test-not-a-real-key',
     veniceAdmin: 'venice-admin-test-not-a-real-key',
+    nanoGpt: 'sk-nano-test-not-a-real-key',
 };
 
 export interface GatewayUnderTest {

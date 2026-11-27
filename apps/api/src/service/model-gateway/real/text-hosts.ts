@@ -3,6 +3,7 @@ import { CreditBalance, SamplerParam } from '../model-gateway.js';
 import { defaultSleep, FetchLike, SleepFn } from './http.js';
 import { VENICE_HOST } from './model-table.js';
 import { OpenRouterChatRequest, OpenRouterClient, OpenRouterEmbeddingRequest } from './openrouter-client.js';
+import { NANOGPT_HOST, NanoGptTextClient } from './nanogpt-text-client.js';
 import { VeniceClient } from './venice-client.js';
 import { VeniceTextClient } from './venice-text-client.js';
 
@@ -79,6 +80,12 @@ export interface TextHost {
     embeds: boolean;
     /** Whether a stopped stream's bill can be looked up afterwards (OpenRouter's generation endpoint). */
     looksUpStoppedBills: boolean;
+    /**
+     * Whether a call this host stays busy for (a 429 or 503 through every retry) moves on to the next
+     * host, as one out of credit does. NanoGPT's only (.scratch/nanogpt-provider/spec.md): a used-up
+     * Weekly allowance answers 429 too, and the next host is a different backend.
+     */
+    movesOnWhenBusy?: boolean;
     /** The balance this host spends. */
     credit(): Promise<CreditBalance>;
 }
@@ -89,7 +96,7 @@ export const FREE_HOST = 'openrouter-free';
 /** The chain `TEXT_HOSTS` names, in its order. */
 export function buildTextHosts(
     names: readonly TextHostName[],
-    keys: Pick<ProviderKeys, 'openRouter' | 'venice'>,
+    keys: Pick<ProviderKeys, 'openRouter' | 'venice' | 'nanoGpt'>,
     fetchImpl: FetchLike,
     venice: VeniceClient,
     sleep: SleepFn = defaultSleep,
@@ -111,6 +118,19 @@ export function buildTextHosts(
                     looksUpStoppedBills: false,
                     credit: () => venice.credit(),
                 };
+            case 'nanogpt': {
+                const client = new NanoGptTextClient(keys.nanoGpt, fetchImpl, sleep);
+                return {
+                    name,
+                    client,
+                    recordedHost: NANOGPT_HOST,
+                    ownModel: undefined,
+                    embeds: false,
+                    looksUpStoppedBills: false,
+                    movesOnWhenBusy: true,
+                    credit: () => client.credit(),
+                };
+            }
             case 'free': {
                 const client = new FreeTextClient(keys.openRouter, fetchImpl, sleep);
                 return { name, client, recordedHost: FREE_HOST, ownModel: FREE_TEXT_MODEL.name, embeds: false, looksUpStoppedBills: false, credit: () => client.credit() };

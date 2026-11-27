@@ -354,3 +354,7 @@ _Avoid_: Guest, friend, user
 **Monthly cap**:
 The most a Member may spend in one calendar month (UTC), in US dollars, set by the Owner. Once reached, a new send or picture is refused until the month turns or the Owner raises it; what a turn already started still finishes.
 _Avoid_: Quota, limit, budget
+
+**Weekly allowance**:
+The input tokens a week that a text subscription includes at no charge per call, counted in tokens rather than dollars and reset on a fixed weekday. While it lasts, text costs nothing more; once it is used up, text moves to a host that spends credit until it resets.
+_Avoid_: Credit (credit is dollars on a host), quota, Monthly cap

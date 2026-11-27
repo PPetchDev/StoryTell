@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react';
 import { hidesBottomNav, isChatScreen } from '@/components/bottom-nav/bottom-nav';
 import { CloseIcon } from '@/components/icons';
 import { apiFetch } from '@/lib/api';
-import { CreditPool, POOL_LABEL, UsageResponse, usd } from '@/lib/types';
+import { allowanceUsedUpText, CreditPool, POOL_LABEL, UsageResponse, usd } from '@/lib/types';
 
 /** How old the usage read may get before a navigation reads it again. */
 const FRESH_MS = 5 * 60_000;
@@ -62,7 +62,10 @@ function useLowCredit(): LowCredit {
     }, [pathname]);
 
     const low = usage ? (Object.keys(usage.pools) as CreditPool[]).filter((pool) => usage.pools[pool].lowCredit) : [];
-    const lowKey = low.join(',');
+    // .scratch/nanogpt-provider/spec.md: text has left a used-up Weekly allowance for a host that costs credit.
+    const allowance = usage?.pools.text.weeklyAllowance;
+    const allowanceOut = allowance?.usedUp ? allowance : null;
+    const lowKey = [...low, ...(allowanceOut ? [`allowance:${allowanceOut.resetAt}`] : [])].join(',');
 
     const hide = () => {
         setHidden(lowKey);
@@ -80,7 +83,10 @@ function useLowCredit(): LowCredit {
         return { pool, text, usedUp };
     });
 
-    return { lines, showing: low.length > 0 && hidden !== lowKey, hide };
+    // Not "used up" in the composer's sense: text still plays, on credit, so the Chat shows it too.
+    if (allowanceOut) lines.unshift({ pool: 'text', text: allowanceUsedUpText(allowanceOut, usage!.pools.text.host), usedUp: false });
+
+    return { lines, showing: lines.length > 0 && hidden !== lowKey, hide };
 }
 
 /** Above the bottom nav on a phone; at the foot of the window beside the rail. */

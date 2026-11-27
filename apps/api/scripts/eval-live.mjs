@@ -23,6 +23,7 @@
 //   npm run eval:live -- --memory account-long            (the long-input account eval on copies of live Chats; says its cost)
 //   npm run eval:live -- --memory account-long c d --spend (arms of now, before, c, d, e, f; "now" alone when none is named)
 //   npm run eval:live -- --memory account-long --rescore last   (free: the newest report scored again by the plan as it is now)
+//   npm run eval:live -- all --spend --host nanogpt      (text on NanoGPT's Weekly allowance, $0 a call; OpenRouter by default)
 //
 // The copies come from scripts/export-chat.mjs (repo root) into .data/eval-inputs/, with the plan of checks beside them.
 // The full report, with the played text, lands under .data/eval-runs/ (gitignored).
@@ -31,7 +32,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const args = process.argv.slice(2);
-const VALUED = ['--model', '--samples', '--against', '--parallel', '--labels', '--rescore'];
+const VALUED = ['--model', '--samples', '--against', '--parallel', '--labels', '--rescore', '--host'];
 const options = {};
 const scenes = [];
 for (let index = 0; index < args.length; index++) {
@@ -50,6 +51,7 @@ const child = spawn('npx', ['vitest', 'run', '--config', 'vitest.live.config.ts'
         EVAL_SPEND: args.includes('--spend') ? 'yes' : '',
         EVAL_SCENES: scenes.join(','),
         EVAL_MODEL: options['--model'] ?? '',
+        EVAL_HOST: options['--host'] ?? '',
         EVAL_SAMPLES: options['--samples'] ?? '',
         EVAL_AGAINST: options['--against'] ?? '',
         EVAL_PARALLEL: options['--parallel'] ?? '',

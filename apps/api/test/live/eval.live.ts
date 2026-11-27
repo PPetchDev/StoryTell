@@ -22,6 +22,10 @@ it(
         if (env.EVAL_SPEND === 'yes' && !env.OPENROUTER_API_KEY && existsSync(envFile)) {
             env.OPENROUTER_API_KEY = parseEnv(readFileSync(envFile, 'utf8')).OPENROUTER_API_KEY;
         }
+        // --host nanogpt (.scratch/nanogpt-provider/spec.md): its key, the same way.
+        if (env.EVAL_SPEND === 'yes' && env.EVAL_HOST === 'nanogpt' && !env.NANOGPT_API_KEY && existsSync(envFile)) {
+            env.NANOGPT_API_KEY = parseEnv(readFileSync(envFile, 'utf8')).NANOGPT_API_KEY;
+        }
         // --grade checks the grader alone (eval-grade.ts); --label-sheet writes the replies to label by hand.
         // --memory runs the long-term memory eval (eval-memory-run.ts) in place of the scenes.
         // --memory account-long runs the long-input account eval (eval-long-account.ts) on copies of live Chats.

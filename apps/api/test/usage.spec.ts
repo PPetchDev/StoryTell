@@ -66,6 +66,8 @@ describe('Usage', () => {
                 lowCreditPercent: 20,
                 lowCredit: false,
                 host: null,
+                // .scratch/nanogpt-provider/spec.md: a subscription's Weekly allowance is the text pool's only.
+                weeklyAllowance: null,
                 cache: null,
                 // .scratch/cost-view/spec.md: the month by model and by host, for the Owner.
                 byModel: [{ name: 'seedream-v5-pro', spentUsd: 0.11, calls: 1, cache: null }],

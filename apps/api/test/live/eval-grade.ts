@@ -5,6 +5,7 @@ import { parseReply } from '../../src/manager/chat/turn/reply-parser.js';
 import { PromptMessage } from '../../src/service/model-gateway/model-gateway.js';
 import { FetchLike } from '../../src/service/model-gateway/real/http.js';
 import { OpenRouterClient } from '../../src/service/model-gateway/real/openrouter-client.js';
+import { evalTextClient, spendsWhat } from './eval-host.js';
 import { GradedCheck, PerReplyCheck } from './eval-checks.js';
 import {
     BACKGROUND,
@@ -558,12 +559,12 @@ export async function startGraderCheck(
     if (env.EVAL_SPEND !== 'yes') {
         const cost = estimateGrade(cases, repeats);
         throw new EvalRunRefused(
-            `The grader check spends OpenRouter credit. Start it with --spend. ${cases.length} cases would send ${cost.calls} calls on ${BACKGROUND.id}: about $${cost.expectedUsd.toFixed(3)}, at most $${cost.worstUsd.toFixed(3)}.`,
+            `The grader check ${spendsWhat(env)}. Start it with --spend. ${cases.length} cases would send ${cost.calls} calls on ${BACKGROUND.id}: about $${cost.expectedUsd.toFixed(3)}, at most $${cost.worstUsd.toFixed(3)}.`,
         );
     }
     if (!env.OPENROUTER_API_KEY) throw new EvalRunRefused('OPENROUTER_API_KEY is not set: the run reads it from the root .env.');
     deps.log(`Grader check, ${cases.length} cases: at most $${EVAL_CAP_USD.toFixed(2)} of OpenRouter credit.`);
-    const report = await runGraderCheck({ cases, repeats, client: new OpenRouterClient(env.OPENROUTER_API_KEY, deps.fetch), git: (deps.git ?? gitState)() });
+    const report = await runGraderCheck({ cases, repeats, client: evalTextClient(env, deps.fetch), git: (deps.git ?? gitState)() });
     mkdirSync(deps.reportDir, { recursive: true });
     // Named apart from the runs' reports ("eval-"), which the run reads back.
     const stem = path.join(deps.reportDir, `grade-${report.startedAt.replace(/[:.]/g, '-')}`);

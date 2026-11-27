@@ -195,8 +195,9 @@ export class RealModelGateway extends ModelGateway {
         try {
             return { modelName, result: await host.client.chat(chat) };
         } catch (error) {
-            // A host with its own model (the free one) has no other endpoint to send it to.
-            if (!(error instanceof ProviderBusyError) || modelName !== BACKGROUND_MODEL || host.ownModel) throw forUser(error, modelName);
+            // A host with its own model (the free one) has no other endpoint to send it to, and a host
+            // that moves on when busy (NanoGPT) leaves it to the next host in the chain.
+            if (!(error instanceof ProviderBusyError) || modelName !== BACKGROUND_MODEL || host.ownModel || host.movesOnWhenBusy) throw forUser(error, modelName);
             const endpoint = BACKGROUND_BUSY_MODEL.host;
             this.logger.warn(`${request.kind} on ${BACKGROUND_MODEL} stayed busy (${error.message}); sending it to ${endpoint}.`);
             return { modelName, result: await host.client.chat({ ...chat, model: BACKGROUND_BUSY_MODEL }), endpoint };
@@ -265,9 +266,14 @@ export class RealModelGateway extends ModelGateway {
                 this.outUntil.delete(host.name);
                 return { result, host };
             } catch (error) {
+                const next = tried[at + 1];
+                // .scratch/nanogpt-provider/spec.md: a busy NanoGPT moves on, once, without being remembered as out.
+                if (error instanceof ProviderBusyError && host.movesOnWhenBusy && next && mayMoveOn()) {
+                    this.logger.warn(`${what}: skipped ${host.name}, busy (${error.message}); sending it to ${next.name}.`);
+                    continue;
+                }
                 if (!(error instanceof OutOfCreditError)) throw error;
                 this.rememberOutOfCredit(host);
-                const next = tried[at + 1];
                 if (!next || !mayMoveOn()) throw error;
                 this.logger.warn(
                     `${what}: skipped ${host.name}, out of credit (${error.message}); sending it to ${next.name}, and passing ${host.name} over for ${Math.round(this.outOfCreditSkipMs / 60_000)} min.`,
@@ -657,13 +663,16 @@ export class RealModelGateway extends ModelGateway {
      */
     private async textCredit(): Promise<CreditBalance> {
         const hosts = this.deps.textHosts;
+        // A Weekly allowance read on the way stays on the pool, so the app can say it is used up.
+        let weeklyAllowance: CreditBalance['weeklyAllowance'];
         for (let at = 0; ; at++) {
             const host = hosts[at];
             const last = at === hosts.length - 1;
             if (!last && this.isOutOfCredit(host)) continue;
             const reading = await this.creditOf(host);
+            weeklyAllowance ??= reading.weeklyAllowance;
             if (!last && reading.remainingUsd !== null && reading.remainingUsd <= 0) continue;
-            return { ...reading, host: host.name };
+            return { ...reading, host: host.name, ...(weeklyAllowance ? { weeklyAllowance } : {}) };
         }
     }
 

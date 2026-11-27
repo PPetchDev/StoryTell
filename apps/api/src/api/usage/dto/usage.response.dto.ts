@@ -79,6 +79,23 @@ export class NamedSpendDTO implements NamedSpend {
     cache: PromptCacheSpendDTO | null;
 }
 
+export class WeeklyAllowanceDTO {
+    @ApiProperty({ description: 'The subscription host it belongs to (nanogpt).' })
+    host: string;
+
+    @ApiProperty({ description: 'Input tokens used this week.' })
+    usedTokens: number;
+
+    @ApiProperty({ description: 'Input tokens the week includes.' })
+    limitTokens: number;
+
+    @ApiProperty({ description: 'When it resets, ISO 8601.' })
+    resetAt: string;
+
+    @ApiProperty({ description: 'True when it is used up or cannot serve a call: text then runs on the next host, which costs credit.' })
+    usedUp: boolean;
+}
+
 export class PoolUsageDTO implements PoolUsage {
     @ApiProperty({ description: "This month's spend for the pool, the sum of its usage records, in USD." })
     spentUsd: number;
@@ -109,11 +126,18 @@ export class PoolUsageDTO implements PoolUsage {
     lowCredit: boolean;
 
     @ApiProperty({
-        description: 'The text pool: the host of the text chain serving now (openrouter, venice or free). Null for the image pool, or when unknown.',
+        description: 'The text pool: the host of the text chain serving now (nanogpt, openrouter, venice or free). Null for the image pool, or when unknown.',
         nullable: true,
         type: String,
     })
     host: string | null;
+
+    @ApiProperty({
+        type: WeeklyAllowanceDTO,
+        nullable: true,
+        description: "The text pool: a subscription host's Weekly allowance, also while it is used up. The Owner's only; null otherwise.",
+    })
+    weeklyAllowance: WeeklyAllowanceDTO | null;
 
     @ApiProperty({
         type: PromptCacheSpendDTO,

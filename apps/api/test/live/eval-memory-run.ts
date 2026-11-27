@@ -10,6 +10,7 @@ import { EMBEDDING_MODEL, PLAY_MODEL_CATALOGUE, PLAY_MODELS, PlayModel, PromptMe
 import { FetchLike } from '../../src/service/model-gateway/real/http.js';
 import { backgroundSamplers, EMBEDDING_MODELS } from '../../src/service/model-gateway/real/model-table.js';
 import { OpenRouterClient } from '../../src/service/model-gateway/real/openrouter-client.js';
+import { evalTextClient, spendsWhat } from './eval-host.js';
 import { GradedCheck, wordCount } from './eval-checks.js';
 import { anchor, AnchorName, CHANGED_ITEMS, CORIN, FIXTURE_MEMORIES, FixtureMemory, ILSE_BELIEF, MEMORY_CAST, MINOR_DETAILS, MUST_STAY, STORY_LENGTHS, storyMessages } from './eval-memory-fixture.js';
 import { ChoiceCase, CHOICE_CASES, Cue, CURRENT_STATE, EXTRACTION_SCENES, IMPACT, TIGHT_BUDGET_TOKENS, USE_ANCHOR_NAMES, USE_SCENES } from './eval-memory-scenes.js';
@@ -755,7 +756,7 @@ export async function startMemoryEval(
         } catch {
             cost = '';
         }
-        throw new EvalRunRefused(`The long-term memory eval spends OpenRouter credit. Start it with --memory --spend.${cost}`);
+        throw new EvalRunRefused(`The long-term memory eval ${spendsWhat(env)}. Start it with --memory --spend.${cost}`);
     }
     const request = asked(env);
     if (!env.OPENROUTER_API_KEY) throw new EvalRunRefused('OPENROUTER_API_KEY is not set: the run reads it from the root .env.');
@@ -767,7 +768,7 @@ export async function startMemoryEval(
         model: request.model,
         samples: request.samples,
         concurrency: request.parallel,
-        client: new OpenRouterClient(env.OPENROUTER_API_KEY, deps.fetch),
+        client: evalTextClient(env, deps.fetch),
         vectorsFile: path.join(deps.reportDir, 'memory-vectors.json'),
         git: (deps.git ?? gitState)(),
     });

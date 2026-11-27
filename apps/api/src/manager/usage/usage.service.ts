@@ -6,7 +6,7 @@ import { RepairCount, ReplyRecordModelService } from '../../model/reply-record/r
 import { SettingsModelService } from '../../model/settings/settings.service.js';
 import { startOfMonthUtc } from '../../service/model-gateway/spend-cap.js';
 import { KindSpend, NamedSpend, PromptCacheSpend, UsageRecordModelService } from '../../model/usage-record/usage-record.service.js';
-import { CreditPool, ModelGateway } from '../../service/model-gateway/model-gateway.js';
+import { CreditPool, ModelGateway, WeeklyAllowance } from '../../service/model-gateway/model-gateway.js';
 
 export interface PoolUsage {
     /** Sum of this month's UsageRecords for the pool. */
@@ -26,6 +26,11 @@ export interface PoolUsage {
      * .scratch/text-fallback/spec.md); null for the image pool, and when it isn't known.
      */
     host: string | null;
+    /**
+     * The text pool: a subscription host's Weekly allowance (.scratch/nanogpt-provider/spec.md), also
+     * while it is used up and text runs on the next host. The Owner's only; null otherwise.
+     */
+    weeklyAllowance: WeeklyAllowance | null;
     /**
      * This month's prompt cache (.scratch/prompt-cache/spec.md): the prompt tokens of the calls
      * whose host reported its cache, and how many of them it read from the cache. Null while no
@@ -111,6 +116,8 @@ export class UsageManagerService {
                 lowCredit: remainingUsd !== null && remainingUsd <= (capUsd * lowCreditPercent) / 100,
                 // Which host serves text is not a balance, so a Member sees it too.
                 host: ownerCredit[name].host ?? null,
+                // How much of a subscription is left is the Owner's, as balances are.
+                weeklyAllowance: member ? null : (ownerCredit[name].weeklyAllowance ?? null),
                 cache: spend[name].cache,
                 byModel: (named?.[name].byModel ?? []).map(rounded),
                 byHost: (named?.[name].byHost ?? []).map(rounded),

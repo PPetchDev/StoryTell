@@ -158,8 +158,13 @@ export interface PoolUsage {
     capUsd: number;
     lowCreditPercent: number;
     lowCredit: boolean;
-    /** The text pool: the host serving text now (`openrouter`, `venice` or `free`); null for the image pool. */
+    /** The text pool: the host serving text now (`nanogpt`, `openrouter`, `venice` or `free`); null for the image pool. */
     host?: string | null;
+    /**
+     * The text pool: NanoGPT's Weekly allowance (.scratch/nanogpt-provider/spec.md), also while it is
+     * used up. The Owner's only; null or left out otherwise.
+     */
+    weeklyAllowance?: WeeklyAllowance | null;
     /**
      * This month's prompt cache (.scratch/prompt-cache/spec.md): the prompt tokens of the calls whose
      * host reported it, and how many of those it read from its cache; null while none did.
@@ -182,7 +187,36 @@ export interface NamedSpend {
 }
 
 /** How the Usage page names the host serving text (.scratch/text-fallback/spec.md). */
-export const TEXT_HOST_LABEL: Record<string, string> = { openrouter: 'OpenRouter', venice: 'Venice', free: 'free model on OpenRouter' };
+export const TEXT_HOST_LABEL: Record<string, string> = { nanogpt: 'NanoGPT', openrouter: 'OpenRouter', venice: 'Venice', free: 'free model on OpenRouter' };
+
+/** A text subscription's input tokens for the week (CONTEXT.md: Weekly allowance). */
+export interface WeeklyAllowance {
+    host: string;
+    usedTokens: number;
+    limitTokens: number;
+    resetAt: string;
+    usedUp: boolean;
+}
+
+/** "Monday 07:00": when a Weekly allowance resets, in the browser's own zone. */
+export function allowanceReset(resetAt: string): string {
+    const at = new Date(resetAt);
+    const day = at.toLocaleDateString('en-GB', { weekday: 'long' });
+    const time = at.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+    return `${day} ${time}`;
+}
+
+/** "41.2M": a token count in millions, one decimal. */
+export function millionTokens(count: number): string {
+    return `${(Math.max(0, count) / 1_000_000).toFixed(1).replace(/.0$/, '')}M`;
+}
+
+/** The banner's words while text has left a used-up Weekly allowance for a host that costs credit. */
+export function allowanceUsedUpText(allowance: WeeklyAllowance, servingHost: string | null | undefined): string {
+    const host = TEXT_HOST_LABEL[allowance.host] ?? allowance.host;
+    const next = TEXT_HOST_LABEL[servingHost ?? 'openrouter'] ?? servingHost;
+    return `${host}'s Weekly allowance is used up. Text runs on ${next}, which costs credit, until it resets on ${allowanceReset(allowance.resetAt)}.`;
+}
 
 export interface UsageResponse {
     month: string;

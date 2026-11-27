@@ -105,10 +105,15 @@ export interface ProviderKeys {
     readonly venice: string | undefined;
     /** Venice Admin key, optional: the balance is read with it when set, else with the inference key. */
     readonly veniceAdmin: string | undefined;
+    /** NanoGPT API key: text on its subscription, when `TEXT_HOSTS` names `nanogpt` (.scratch/nanogpt-provider/spec.md). */
+    readonly nanoGpt: string | undefined;
 }
 
-/** A host text can go to: OpenRouter, Venice, or a free model on OpenRouter (text only, no embeddings). */
-export const TEXT_HOSTS = ['openrouter', 'venice', 'free'] as const;
+/**
+ * A host text can go to: OpenRouter, Venice, a free model on OpenRouter (text only, no embeddings), or
+ * NanoGPT's subscription (text only, .scratch/nanogpt-provider/spec.md).
+ */
+export const TEXT_HOSTS = ['openrouter', 'venice', 'free', 'nanogpt'] as const;
 export type TextHost = (typeof TEXT_HOSTS)[number];
 
 /**
@@ -179,6 +184,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     }
 
     const textHosts = readTextHosts(env);
+    // Named without its key, every call would fail on the first host; say so at start-up instead.
+    if (textHosts.includes('nanogpt') && !env.NANOGPT_API_KEY) {
+        throw new ConfigError('TEXT_HOSTS names nanogpt, but NANOGPT_API_KEY is not set');
+    }
 
     const backgroundWaitMs = env.BACKGROUND_WAIT_MS ? Number(env.BACKGROUND_WAIT_MS) : DEFAULT_BACKGROUND_WAIT_MS;
     if (!Number.isInteger(backgroundWaitMs) || backgroundWaitMs < 0) {
@@ -256,6 +265,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
             // The Venice dashboard calls it an inference key; either name works.
             venice: env.VENICE_API_KEY || env.VENICE_INFERENCE_KEY || undefined,
             veniceAdmin: env.VENICE_ADMIN_KEY || undefined,
+            nanoGpt: env.NANOGPT_API_KEY || undefined,
         },
     };
 }

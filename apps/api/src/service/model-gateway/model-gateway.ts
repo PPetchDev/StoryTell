@@ -485,6 +485,23 @@ export interface CreditBalance {
      * `free`), the first that can still serve a call (.scratch/text-fallback/spec.md).
      */
     host?: string;
+    /**
+     * The text pool only: a subscription host's Weekly allowance (.scratch/nanogpt-provider/spec.md),
+     * read even while that host is passed over for having used it up, so the app can say so.
+     */
+    weeklyAllowance?: WeeklyAllowance;
+}
+
+/** A text subscription's input tokens for the week, counted in tokens rather than dollars. */
+export interface WeeklyAllowance {
+    /** The host it belongs to (`nanogpt`). */
+    host: string;
+    usedTokens: number;
+    limitTokens: number;
+    /** When it resets, ISO 8601. */
+    resetAt: string;
+    /** True when nothing is left, or the subscription can't serve a call: text then goes to the next host. */
+    usedUp: boolean;
 }
 
 export type RemainingCredit = Record<CreditPool, CreditBalance>;

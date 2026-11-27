@@ -127,6 +127,7 @@ export async function startTestApp(options: TestAppOptions = {}): Promise<TestAp
                     openRouter: undefined,
                     venice: undefined,
                     veniceAdmin: undefined,
+                    nanoGpt: undefined,
                     ...options.providerKeys,
                 },
             }),

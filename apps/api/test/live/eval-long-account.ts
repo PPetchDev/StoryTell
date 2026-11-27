@@ -7,6 +7,7 @@ import { PromptMessage } from '../../src/service/model-gateway/model-gateway.js'
 import { FetchLike } from '../../src/service/model-gateway/real/http.js';
 import { backgroundSamplers } from '../../src/service/model-gateway/real/model-table.js';
 import { OpenRouterClient } from '../../src/service/model-gateway/real/openrouter-client.js';
+import { evalTextClient, spendsWhat } from './eval-host.js';
 import { wordCount } from './eval-checks.js';
 import { BACKGROUND, BACKGROUND_PRICE_USD_PER_MILLION, EVAL_CAP_USD, EvalRunRefused, EXPECTED, gitState, worstCaseUsd } from './eval-run.js';
 import { REPO_ROOT } from './smoke-run.js';
@@ -518,10 +519,10 @@ export async function startLongAccountEval(
         return { report, json, scorecard };
     }
     const cost = longAccountCost(plan, chats, arms, samples);
-    if (env.EVAL_SPEND !== 'yes') throw new EvalRunRefused(`The long-input account eval spends OpenRouter credit. Start it with --memory account-long --spend. ${cost}`);
+    if (env.EVAL_SPEND !== 'yes') throw new EvalRunRefused(`The long-input account eval ${spendsWhat(env)}. Start it with --memory account-long --spend. ${cost}`);
     if (!env.OPENROUTER_API_KEY) throw new EvalRunRefused('OPENROUTER_API_KEY is not set: the run reads it from the root .env.');
     deps.log(`Long-input account eval: ${cost}`);
-    const report = await runLongAccount({ plan, chats, arms, samples, client: new OpenRouterClient(env.OPENROUTER_API_KEY, deps.fetch), git: (deps.git ?? gitState)() });
+    const report = await runLongAccount({ plan, chats, arms, samples, client: evalTextClient(env, deps.fetch), git: (deps.git ?? gitState)() });
     mkdirSync(deps.reportDir, { recursive: true });
     const stem = `long-account-${report.startedAt.replace(/[:.]/g, '-')}`;
     const json = path.join(deps.reportDir, `${stem}.json`);
