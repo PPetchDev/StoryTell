@@ -85,7 +85,7 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | `409.003.023` | `NoReferenceImageToDrawError` | Drawing an Expression (`POST .../expressions/:emotion/draw`) for a Character with no Reference image. No call is made. Add a Reference image first. |
 | `409.003.040` | `NoPictureToCropError` | A face square set on the Role's picture (`PUT /api/stories/:storyId/role/image/crop`) or a Persona's (`PUT /api/personas/:personaId/image/crop`) with no picture (`.scratch/your-faces/spec.md`). Nothing changes. |
 | `404.003.026` | `SuddenEventNotFoundError` | No Sudden event with that id in this Story (`PATCH`/`DELETE /api/stories/:storyId/sudden-events/:eventId`). Nothing changes. |
-| `422.003.027` | `SuddenEventLimitError` | A ninth Sudden event on one Story. Nothing is added. |
+| `422.003.027` | `SuddenEventLimitError` | A thirteenth Sudden event on one Story. Nothing is added. |
 | `404.003.028` | `EndingNotFoundError` | No Ending with that id in this Story (`PATCH`/`DELETE /api/stories/:storyId/endings/:endingId`, `.scratch/endings/spec.md`). Nothing changes. |
 | `422.003.029` | `EndingLimitError` | A ninth Ending on one Story. Nothing is added. |
 | `404.003.030` | `LoreSetNotFoundError` | No Lore set with that id for this Account when linking (`PUT /api/stories/:storyId/lore-sets`), or one this Story does not link when renaming it, deleting it or changing its entries (`…/lore-sets/:setId…`, `.scratch/shared-lore/spec.md`). Another Account's set answers the same. Nothing changes. |

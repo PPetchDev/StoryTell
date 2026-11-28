@@ -27,7 +27,7 @@ export enum EventProposal {
 export const SUDDEN_EVENT_TURNS = { min: 2, max: 8, default: 4 } as const;
 
 /** The most Sudden events one Story holds: each waiting one is a line in every judge call. */
-export const MAX_SUDDEN_EVENTS = 8;
+export const MAX_SUDDEN_EVENTS = 12;
 
 export interface SuddenEventResponse {
     id: number;

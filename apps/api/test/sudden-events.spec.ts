@@ -411,11 +411,11 @@ describe('Sudden events: authoring and play (HTTP)', () => {
         expect(removed.suddenEvents).toEqual([]);
     });
 
-    it('holds at most eight, and a Duplicate carries them all', async () => {
+    it('holds at most twelve, and a Duplicate carries them all', async () => {
         const storyId = await createStory();
-        for (let i = 1; i <= 8; i++) await addEvent(storyId, { name: `Event ${i}`, direction: i % 2 ? 'lower' : 'raise' });
+        for (let i = 1; i <= 12; i++) await addEvent(storyId, { name: `Event ${i}`, direction: i % 2 ? 'lower' : 'raise' });
         const { body: refused } = await t.http.post(`/api/stories/${storyId}/sudden-events`).send({}).expect(422);
-        expect(refused.error.message).toContain('at most 8 Sudden events');
+        expect(refused.error.message).toContain('at most 12 Sudden events');
 
         const { body: copy } = await t.http.post(`/api/stories/${storyId}/duplicate`).expect(201);
         const original = (await t.http.get(`/api/stories/${storyId}`).expect(200)).body.suddenEvents as StoryEvent[];

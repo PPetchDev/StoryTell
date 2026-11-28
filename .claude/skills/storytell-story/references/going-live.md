@@ -24,7 +24,7 @@ All routes are under `/api`. `:id` is the Story id from step 1.
 1. `POST /stories`: Title, Setting, Opening, Style, Image style, Opening questions.
 2. `PATCH /stories/:id/role`: name, description, sections and stats. Send the full sections list, because it replaces the old one.
 3. `POST /stories/:id/characters`, once per Character. Then add her Secrets in two calls, a POST and then a PATCH, under `/stories/:id/characters/:cid/secrets`. The story response calls them `secretList`.
-4. `POST /stories/:id/starting-bonds`, `/scenes`, `/sudden-events`, `/endings` (at most 8), `/lore`.
+4. `POST /stories/:id/starting-bonds`, `/scenes`, `/sudden-events` (at most 12), `/endings` (at most 8), `/lore`.
 5. `POST /stories/:id/places`, once per Place: `{name, looks}`.
 6. Pictures, each a multipart field `image`, a PNG, JPEG or WebP of at most 15 MB:
    - Character Reference: `PUT /stories/:id/characters/:cid/reference-image/upload`.

@@ -427,7 +427,7 @@ export function gaugeGoalInWords(direction: GaugeDirection): string {
 }
 /** The replies a Sudden event can give, as the editor's choices (mirrors SUDDEN_EVENT_TURNS: 2 to 8). */
 export const SUDDEN_EVENT_TURN_LABELS: Record<string, string> = { 2: '2', 3: '3', 4: '4', 5: '5', 6: '6', 7: '7', 8: '8' };
-export const MAX_SUDDEN_EVENTS = 8;
+export const MAX_SUDDEN_EVENTS = 12;
 /** The most Endings a Story holds (mirrors MAX_ENDINGS). */
 export const MAX_ENDINGS = 8;
 
