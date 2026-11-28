@@ -15,6 +15,9 @@ describe('Config: the speech folder', () => {
         // .scratch/soft-cutout/spec.md: so does the model that enlarges a picture before a soft cut-out.
         expect(loadConfig(base).enlargeModelPath).toBe(path.resolve('/data/storytell/models/AnimeSharpV2_MoSR_Soft_x2.onnx'));
         expect(loadConfig({ ...base, ENLARGE_MODEL: '/opt/models/e.onnx' }).enlargeModelPath).toBe(path.resolve('/opt/models/e.onnx'));
+        // .scratch/own-embeddings/spec.md: and the folder of bge-m3, the embeddings backup.
+        expect(loadConfig(base).embedModelDir).toBe(path.resolve('/data/storytell/models/bge-m3'));
+        expect(loadConfig({ ...base, EMBED_MODEL_DIR: '/opt/models/bge' }).embedModelDir).toBe(path.resolve('/opt/models/bge'));
     });
 
     it('takes SPEECH_DIR when it is set, as an absolute path', () => {

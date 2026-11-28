@@ -67,6 +67,7 @@ import { OpenRouterChatRequest, OpenRouterChatResult, SamplerRefusedError, TextB
 import { TextHost } from './text-hosts.js';
 import { OwnCutoutUnavailableError, SoftCutoutUnsuitableError } from '../../../errors/image.errors.js';
 import { OWN_CUTOUT_HOST, OWN_CUTOUT_MODEL } from './own-cutout.js';
+import { OWN_EMBEDDING_HOST } from './own-embedding.js';
 import { SOFT_CUTOUT_MODEL } from './soft-cutout.js';
 import { VeniceClient } from './venice-client.js';
 
@@ -115,6 +116,11 @@ export interface RealModelGatewayDeps {
     ownCutout?: { available(): boolean; removeBackground(image: ImageData): Promise<ImageData> };
     /** The soft cut-out (.scratch/soft-cutout/spec.md): made on this computer for nothing, only when asked for by name. */
     softCutout?: { removeBackground(image: ImageData): Promise<ImageData>; plan?(image: ImageData): Promise<'now' | 'later'>; enlarges?(): boolean };
+    /**
+     * The embeddings backup (.scratch/own-embeddings/spec.md): bge-m3 on this computer, for nothing.
+     * Asked only when no host that embeds can answer, and only where its model files are there.
+     */
+    ownEmbedder?: { available(): boolean; embed(inputs: string[]): Promise<{ vectors: number[][]; promptTokens: number }> };
     settings: { current(): Promise<GatewayModelSettings> };
     usage: { record(record: NewUsageRecord): Promise<void> };
     /** How long a credit reading is reused, so the banner doesn't hit the providers per page. */
@@ -448,12 +454,20 @@ export class RealModelGateway extends ModelGateway {
         const modelName = EMBEDDING_MODEL;
         const model = EMBEDDING_MODELS[modelName];
         const hosts = this.deps.textHosts.filter((host) => host.embeds);
-        // Only the free model in the chain: nothing can embed, which a turn's search survives.
-        if (hosts.length === 0) throw new NoEmbeddingCreditError('No host in TEXT_HOSTS has an embedding model.');
+        const backup = this.deps.ownEmbedder?.available() ? this.deps.ownEmbedder : undefined;
+        if (hosts.length === 0) {
+            if (backup) return this.embedOnBackup(request, backup, 'no host in TEXT_HOSTS embeds');
+            // Only the free model in the chain: nothing can embed, which a turn's search survives.
+            throw new NoEmbeddingCreditError('No host in TEXT_HOSTS has an embedding model.');
+        }
         let answered: { result: Awaited<ReturnType<TextHost['client']['embed']>>; host: TextHost };
         try {
             answered = await this.onHosts(request.kind, hosts, (host) => host.client.embed({ model, inputs: request.inputs }));
         } catch (error) {
+            // Out of credit, busy or down (busy and no-credit-for-embeddings are outages too).
+            if (backup && (error instanceof OutOfCreditError || error instanceof ProviderOutageError)) {
+                return this.embedOnBackup(request, backup, error.message);
+            }
             if (error instanceof OutOfCreditError && this.deps.textHosts.some((host) => !host.embeds)) {
                 throw new NoEmbeddingCreditError(`No host with an embedding model has credit; text goes on on the free model. ${error.message}`);
             }
@@ -476,6 +490,30 @@ export class RealModelGateway extends ModelGateway {
             messageId: request.servedFor?.messageId ?? null,
         });
         return { vectors: result.vectors, model: modelName, usage: { promptTokens: result.promptTokens }, costUsd };
+    }
+
+    /** The call answered by the app's own bge-m3: the same vectors, slower, for nothing. */
+    private async embedOnBackup(
+        request: EmbeddingRequest,
+        backup: NonNullable<RealModelGatewayDeps['ownEmbedder']>,
+        reason: string,
+    ): Promise<EmbeddingResult> {
+        this.logger.warn(`${request.kind}: answered by the app's own bge-m3, as no embedding host could (${reason}).`);
+        const { vectors, promptTokens } = await backup.embed(request.inputs);
+        await this.deps.usage.record({
+            kind: request.kind,
+            pool: 'text',
+            model: EMBEDDING_MODEL,
+            host: OWN_EMBEDDING_HOST,
+            promptTokens,
+            completionTokens: 0,
+            images: null,
+            costUsd: 0,
+            storyId: request.servedFor?.storyId ?? null,
+            chatId: request.servedFor?.chatId ?? null,
+            messageId: request.servedFor?.messageId ?? null,
+        });
+        return { vectors, model: EMBEDDING_MODEL, usage: { promptTokens }, costUsd: 0 };
     }
 
     async generateImage(request: ImageGenerationRequest): Promise<ImageGenerationResult> {

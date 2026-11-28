@@ -108,6 +108,7 @@ export async function startTestApp(options: TestAppOptions = {}): Promise<TestAp
                 // No model file there: the app's own background remover is off, as on a computer without it.
                 cutoutModelPath: path.join(path.dirname(imageDir), 'models', 'isnet-anime.onnx'),
                 enlargeModelPath: options.enlargeModelPath ?? path.join(path.dirname(imageDir), 'models', 'AnimeSharpV2_MoSR_Soft_x2.onnx'),
+                embedModelDir: path.join(path.dirname(imageDir), 'models', 'bge-m3'),
                 speechDir,
                 modelGateway: options.modelGateway ?? 'fake',
                 textHosts: ['openrouter'],

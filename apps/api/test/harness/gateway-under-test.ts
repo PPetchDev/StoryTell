@@ -40,6 +40,8 @@ export function gatewayUnderTest(
         ownCutout?: { available(): boolean; removeBackground(image: { bytes: Buffer; mimeType: string }): Promise<{ bytes: Buffer; mimeType: string }> };
         /** The soft cut-out; none by default. */
         softCutout?: { removeBackground(image: { bytes: Buffer; mimeType: string }): Promise<{ bytes: Buffer; mimeType: string }>; plan?(image: { bytes: Buffer; mimeType: string }): Promise<'now' | 'later'>; enlarges?(): boolean };
+        /** The embeddings backup (.scratch/own-embeddings/spec.md); none by default, as without its model files. */
+        ownEmbedder?: { available(): boolean; embed(inputs: string[]): Promise<{ vectors: number[][]; promptTokens: number }> };
         /** How long a balance reading is reused; 0 (read every time) by default. */
         creditCacheMs?: number;
     } = {},
@@ -64,6 +66,7 @@ export function gatewayUnderTest(
         venice,
         ownCutout: options.ownCutout,
         softCutout: options.softCutout,
+        ownEmbedder: options.ownEmbedder,
         settings: { current: async () => ({ ...settings }) },
         usage: {
             record: async (record) => {

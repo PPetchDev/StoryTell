@@ -22,6 +22,11 @@ export abstract class AppConfig {
      */
     abstract readonly enlargeModelPath: string;
     /**
+     * Absolute path of the folder holding bge-m3 for the embeddings backup (.scratch/own-embeddings/spec.md).
+     * Where its files are missing, there is no backup and an embedding call fails as before.
+     */
+    abstract readonly embedModelDir: string;
+    /**
      * Absolute path of the speech folder (Read aloud's audio and voice samples). Never inside the
      * image folder: the backup job copies that folder, and audio is not backed up.
      */
@@ -211,6 +216,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     const cutoutModelPath = env.CUTOUT_MODEL ? path.resolve(env.CUTOUT_MODEL) : path.join(path.dirname(imageDir), 'models', 'isnet-anime.onnx');
     // Default: `models/AnimeSharpV2_MoSR_Soft_x2.onnx` beside the image folder. Missing is fine.
     const enlargeModelPath = env.ENLARGE_MODEL ? path.resolve(env.ENLARGE_MODEL) : path.join(path.dirname(imageDir), 'models', 'AnimeSharpV2_MoSR_Soft_x2.onnx');
+    // Default: `models/bge-m3` beside the image folder. Files, never secrets; missing is fine.
+    const embedModelDir = env.EMBED_MODEL_DIR ? path.resolve(env.EMBED_MODEL_DIR) : path.join(path.dirname(imageDir), 'models', 'bge-m3');
     const fromImages = path.relative(imageDir, speechDir);
     if (fromImages === '' || (!fromImages.startsWith('..') && !path.isAbsolute(fromImages))) {
         throw new ConfigError(
@@ -253,6 +260,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
         imageDir,
         cutoutModelPath,
         enlargeModelPath,
+        embedModelDir,
         speechDir,
         modelGateway,
         textHosts,
