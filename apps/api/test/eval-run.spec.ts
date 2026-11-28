@@ -120,6 +120,9 @@ describe('The prompt eval run', () => {
             await expect(start({ ...env }).started).rejects.toThrow(`Name a scene: one of ${allNames}, or all.`);
             await expect(start({ ...env, EVAL_SCENES: 'weather' }).started).rejects.toThrow('Unknown scene "weather"');
             await expect(start({ ...env, EVAL_SCENES: 'all', EVAL_MODEL: 'gpt-9' }).started).rejects.toThrow('Unknown model "gpt-9". Name one of glm-5.3, deepseek-v4-pro, or all.');
+            await expect(start({ ...env, EVAL_SCENES: 'all', EVAL_MODEL: 'gpt-9', EVAL_HOST: 'nanogpt' }).started).rejects.toThrow(
+                'Name one of glm-5.3, deepseek-v4-pro, glm-5.3-flash-uncensored, or all.',
+            );
             await expect(start({ ...env, EVAL_SCENES: 'all', EVAL_SAMPLES: '0' }).started).rejects.toThrow('Samples is a whole number from 1 to 10.');
             await expect(start({ ...env, EVAL_SCENES: 'all', EVAL_PARALLEL: '9' }).started).rejects.toThrow('Parallel calls is a whole number from 1 to 8.');
             await expect(start({ EVAL_SPEND: 'yes', EVAL_SCENES: 'all' }).started).rejects.toThrow('OPENROUTER_API_KEY is not set');

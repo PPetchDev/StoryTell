@@ -863,15 +863,18 @@ function asked(env: Record<string, string | undefined>): { scenes: EvalScene[]; 
     if (named.length === 0) throw new EvalRunRefused(`Name a scene: one of ${all.join(', ')}, or all.`);
     const unknown = named.find((name) => name !== 'all' && !all.includes(name));
     if (unknown) throw new EvalRunRefused(`Unknown scene "${unknown}". Name one of ${all.join(', ')}, or all.`);
-    const model = env.EVAL_MODEL || PLAY_MODELS[0];
-    if (model !== 'all' && !PLAY_MODELS.includes(model as PlayModel)) throw new EvalRunRefused(`Unknown model "${model}". Name one of ${PLAY_MODELS.join(', ')}, or all.`);
+    // A model only one host serves is played only on that host (.scratch/glm-flash-uncensored/spec.md).
+    const host = env.EVAL_HOST || 'openrouter';
+    const playable = PLAY_MODELS.filter((one) => (PLAY_MODEL_CATALOGUE[one].onlyOn?.host ?? host) === host);
+    const model = env.EVAL_MODEL || playable[0];
+    if (model !== 'all' && !playable.includes(model as PlayModel)) throw new EvalRunRefused(`Unknown model "${model}". Name one of ${playable.join(', ')}, or all.`);
     const samples = env.EVAL_SAMPLES ? Number(env.EVAL_SAMPLES) : EVAL_SAMPLES;
     if (!Number.isInteger(samples) || samples < 1 || samples > 10) throw new EvalRunRefused('Samples is a whole number from 1 to 10.');
     const parallel = env.EVAL_PARALLEL ? Number(env.EVAL_PARALLEL) : EVAL_PARALLEL;
     if (!Number.isInteger(parallel) || parallel < 1 || parallel > 8) throw new EvalRunRefused('Parallel calls is a whole number from 1 to 8.');
     return {
         scenes: named.includes('all') ? EVAL_SCENES : EVAL_SCENES.filter((scene) => named.includes(scene.name)),
-        models: model === 'all' ? [...PLAY_MODELS] : [model as PlayModel],
+        models: model === 'all' ? playable : [model as PlayModel],
         samples,
         parallel,
     };

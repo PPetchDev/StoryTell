@@ -61,6 +61,14 @@ export const TEXT_MODELS: Record<TextModel, TextModelSpec> = {
         reasoning: { enabled: false },
         stopStrings: true,
     },
+    // .scratch/glm-flash-uncensored/spec.md: on NanoGPT only, so OpenRouter never gets this id (the
+    // gateway sends GLM-5.3 there instead). It always thinks; at `minimal` it used no reasoning tokens.
+    'glm-5.3-flash-uncensored': {
+        id: 'z-ai/glm-5.3-flash-uncensored',
+        host: 'nanogpt',
+        reasoning: { effort: 'minimal' },
+        stopStrings: true,
+    },
 };
 
 /**

@@ -144,7 +144,7 @@ export const MAX_REFERENCE_IMAGES = 3;
  * notice, and UsageRecords carry them. The provider ids and hosts behind each one live in
  * the real gateway's model table.
  */
-export const PLAY_MODELS = ['glm-5.3', 'deepseek-v4-pro'] as const;
+export const PLAY_MODELS = ['glm-5.3', 'deepseek-v4-pro', 'glm-5.3-flash-uncensored'] as const;
 export type PlayModel = (typeof PLAY_MODELS)[number];
 export const BACKGROUND_MODEL = 'deepseek-v4-flash';
 export type TextModel = PlayModel | typeof BACKGROUND_MODEL;
@@ -225,6 +225,11 @@ export interface PlayModelFacts {
     samplers: SamplerParam[];
     /** The maker's suggested values, where the maker publishes any. A hint only: never sent unless set. */
     suggested: SamplerValues;
+    /**
+     * The one text host that serves it, where only one does (.scratch/glm-flash-uncensored/spec.md). On
+     * any other host in the chain the call goes as `standIn`, with that model's own Sampling.
+     */
+    onlyOn?: { host: 'nanogpt'; standIn: PlayModel };
 }
 
 /**
@@ -249,6 +254,15 @@ export const PLAY_MODEL_CATALOGUE: Record<PlayModel, PlayModelFacts> = {
         priceUsdPerMillion: { input: 1.3, output: 2.6, cachedInput: 0.1 },
         samplers: ['temperature', 'minP', 'topP', 'repetitionPenalty'],
         suggested: { temperature: 1, topP: 1 },
+    },
+    // .scratch/glm-flash-uncensored/spec.md: NanoGPT's subscription alone serves it; its list price
+    // there, read 2026-11-28 ($0.00007 per thousand cached tokens). No maker suggestion published.
+    'glm-5.3-flash-uncensored': {
+        name: 'GLM-5.3 Flash Uncensored',
+        priceUsdPerMillion: { input: 0.2, output: 0.8, cachedInput: 0.07 },
+        samplers: ['temperature', 'minP', 'topP', 'repetitionPenalty'],
+        suggested: {},
+        onlyOn: { host: 'nanogpt', standIn: 'glm-5.3' },
     },
 };
 

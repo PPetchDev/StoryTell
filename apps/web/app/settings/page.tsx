@@ -27,6 +27,10 @@ type ModelKey = 'playModel' | 'imageModel';
 /** "$0.56 in / $2.50 out per million tokens · a long turn about $0.01" */
 function priceLine(option: PlayModelOption): string {
     const { input, output } = option.priceUsdPerMillion;
+    // .scratch/glm-flash-uncensored/spec.md: a model only NanoGPT serves runs on its subscription.
+    if (option.onlyOn === 'nanogpt') {
+        return `Only on NanoGPT's subscription ($${input.toFixed(2)} in / $${output.toFixed(2)} out per million tokens past it). When NanoGPT can't answer, GLM-5.3 does.`;
+    }
     return `On DeepInfra: $${input.toFixed(2)} in / $${output.toFixed(2)} out per million tokens · a long turn about $${option.longTurnUsd.toFixed(2)}. Usage shows the host serving now.`;
 }
 

@@ -23,6 +23,7 @@ import {
     MAX_REFERENCE_IMAGES,
     ModelGateway,
     isPlayModel,
+    PLAY_MODEL_CATALOGUE,
     PlayModel,
     playModelName,
     PlaySamplers,
@@ -175,12 +176,13 @@ export class RealModelGateway extends ModelGateway {
      * the model that answered.
      */
     async completeText(request: TextCompletionRequest): Promise<TextCompletionResult> {
-        const { modelName: asked, chat, settings } = await this.textCall(request);
-        const { result: answer, host } = await this.onHosts(request.kind, this.deps.textHosts, (host) =>
-            settings
+        const { modelName: askedFirst, chat: chatFirst, settings } = await this.textCall(request);
+        const { result: answer, host } = await this.onHosts(request.kind, this.deps.textHosts, (host) => {
+            const { asked, chat } = this.servedOn(host, request, askedFirst, chatFirst, settings);
+            return settings
                 ? this.onBusyPlay(host, request, asked, chat, settings, (sent) => host.client.chat(sent))
-                : this.chatOn(host, request, asked, chat),
-        );
+                : this.chatOn(host, request, asked, chat);
+        });
         const { modelName, result, endpoint } = answer;
         await this.recordText(request, modelName, result, host, endpoint);
         return {
@@ -342,7 +344,7 @@ export class RealModelGateway extends ModelGateway {
      * for it; nor is one stopped on Venice, which has no such lookup, or on the free model.
      */
     async streamText(request: TextCompletionRequest, stream: TextStream): Promise<TextStreamResult> {
-        const { modelName: asked, chat, settings } = await this.textCall(request);
+        const { modelName: askedFirst, chat: chatFirst, settings } = await this.textCall(request);
         let streamed = false;
         const watched: TextStream = {
             ...stream,
@@ -355,15 +357,17 @@ export class RealModelGateway extends ModelGateway {
         const { result: answer, host } = await this.onHosts(
             request.kind,
             this.deps.textHosts,
-            (host) =>
-                settings
+            (host) => {
+                const { asked, chat } = this.servedOn(host, request, askedFirst, chatFirst, settings);
+                return settings
                     ? this.onBusyPlay(host, request, asked, chat, settings, (sent) => host.client.chatStream(sent, watched), mayMoveOn)
                     : host.client.chatStream(chat, watched).then(
                           (result) => ({ modelName: asked, result }),
                           (error: unknown) => {
                               throw forUser(error, asked);
                           },
-                      ),
+                      );
+            },
             mayMoveOn,
         );
         const { modelName, result } = answer;
@@ -402,6 +406,23 @@ export class RealModelGateway extends ModelGateway {
         const settings = await this.deps.settings.current();
         const modelName = settings.playModel;
         return { modelName, chat: this.playChat(request, modelName, settings), settings };
+    }
+
+    /**
+     * The model and request one host gets: a play model that only one host serves goes to any other
+     * host as its stand-in, with the stand-in's own Sampling (.scratch/glm-flash-uncensored/spec.md).
+     * The free host answers with its own model whatever it is sent.
+     */
+    private servedOn(
+        host: TextHost,
+        request: TextCompletionRequest,
+        asked: TextModel,
+        chat: OpenRouterChatRequest,
+        settings: GatewayModelSettings | undefined,
+    ): { asked: TextModel; chat: OpenRouterChatRequest } {
+        const onlyOn = settings && isPlayModel(asked) ? PLAY_MODEL_CATALOGUE[asked].onlyOn : undefined;
+        if (!settings || !onlyOn || host.name === onlyOn.host || host.ownModel) return { asked, chat };
+        return { asked: onlyOn.standIn, chat: this.playChat(request, onlyOn.standIn, settings) };
     }
 
     /** A play call's request on one play model: only that model's Sampling values, and only on a sampled kind. */

@@ -24,7 +24,13 @@ describe('Settings', () => {
             imageCreditCapUsd: 8,
             snapshotSize: '1K',
         });
-        expect(body.playModels.map((m: { id: string }) => m.id)).toEqual(['glm-5.3', 'deepseek-v4-pro']);
+        expect(body.playModels.map((m: { id: string }) => m.id)).toEqual(['glm-5.3', 'deepseek-v4-pro', 'glm-5.3-flash-uncensored']);
+        // .scratch/glm-flash-uncensored/spec.md: served by NanoGPT alone, which the price line says.
+        expect(body.playModels.map((m: { id: string; onlyOn: string | null }) => [m.id, m.onlyOn])).toEqual([
+            ['glm-5.3', null],
+            ['deepseek-v4-pro', null],
+            ['glm-5.3-flash-uncensored', 'nanogpt'],
+        ]);
         // List prices per million tokens from OpenRouter's endpoints API on DeepInfra, and a long
         // turn: the 28k prompt budget uncached plus the Long reply's 1,400 output tokens, to the cent.
         // GLM-5.3: 28,000 × $0.5625/M + 1,400 × $2.50/M = $0.0193 → $0.02.
@@ -34,6 +40,8 @@ describe('Settings', () => {
         ).toEqual([
             ['glm-5.3', 'GLM-5.3', { input: 0.5625, output: 2.5, cachedInput: 0.125 }, 0.02],
             ['deepseek-v4-pro', 'DeepSeek V4 Pro', { input: 1.3, output: 2.6, cachedInput: 0.1 }, 0.04],
+            // NanoGPT's list price: 28,000 × $0.20/M + 1,400 × $0.80/M = $0.0067, shown as the $0.01 floor.
+            ['glm-5.3-flash-uncensored', 'GLM-5.3 Flash Uncensored', { input: 0.2, output: 0.8, cachedInput: 0.07 }, 0.01],
         ]);
         expect(body.imageModels.map((m: { id: string }) => m.id)).toEqual([
             'seedream-v4-edit',

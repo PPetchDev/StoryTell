@@ -121,6 +121,55 @@ describe('NanoGPT host (contract)', () => {
         ]);
     });
 
+    // .scratch/glm-flash-uncensored/spec.md: a play model served by NanoGPT alone.
+    describe('GLM-5.3 Flash Uncensored, on NanoGPT only', () => {
+        const FLASH_SETTINGS = {
+            playModel: 'glm-5.3-flash-uncensored' as const,
+            samplers: { 'glm-5.3-flash-uncensored': { temperature: 1.1 }, 'glm-5.3': { temperature: 0.7 } },
+        };
+
+        it('plays a turn on NanoGPT at minimal effort with ZDR, recorded under its own name', async () => {
+            const { fetchImpl, sent } = scripted([nanoReply('@Mira: Fine.')]);
+            const { gateway, records } = gatewayUnderTest(fetchImpl, { textHosts: ['nanogpt', 'openrouter', 'free'], settings: FLASH_SETTINGS });
+
+            const result = await gateway.completeText(TURN);
+
+            expect(result).toMatchObject({ model: 'glm-5.3-flash-uncensored', costUsd: 0 });
+            expect(sent[0].url).toBe(NANOGPT_CHAT);
+            expect(sent[0].body).toMatchObject({
+                model: 'z-ai/glm-5.3-flash-uncensored',
+                reasoning_effort: 'minimal',
+                provider: { zdr: true },
+                stop: ['\nAsh:'],
+                temperature: 1.1,
+            });
+            expect(records).toEqual([expect.objectContaining({ kind: 'turn', model: 'glm-5.3-flash-uncensored', host: 'nanogpt' })]);
+        });
+
+        it('goes as GLM-5.3, with its Sampling, when a busy NanoGPT gives way to OpenRouter', async () => {
+            const { fetchImpl, sent } = scripted([...busyThroughRetries(), openRouterReply('@Mira: Fine.')]);
+            const { gateway, records } = gatewayUnderTest(fetchImpl, { textHosts: ['nanogpt', 'openrouter', 'free'], settings: FLASH_SETTINGS });
+            warnings();
+
+            const result = await gateway.completeText(TURN);
+
+            expect(result.model).toBe('glm-5.3');
+            expect(sent.at(-1)!.url).toBe(OPENROUTER_CHAT);
+            expect(sent.at(-1)!.body).toMatchObject({ model: 'z-ai/glm-5.3', temperature: 0.7 });
+            expect(records).toEqual([expect.objectContaining({ model: 'glm-5.3', host: 'deepinfra' })]);
+        });
+
+        it('goes as GLM-5.3 on a chain without NanoGPT', async () => {
+            const { fetchImpl, sent } = scripted([openRouterReply('@Mira: Fine.')]);
+            const { gateway } = gatewayUnderTest(fetchImpl, { textHosts: ['openrouter'], settings: FLASH_SETTINGS });
+
+            const result = await gateway.completeText(TURN);
+
+            expect(result.model).toBe('glm-5.3');
+            expect(sent[0].body).toMatchObject({ model: 'z-ai/glm-5.3', temperature: 0.7 });
+        });
+    });
+
     it('sends a background call on DeepSeek V4 Flash with reasoning off and JSON asked for', async () => {
         const { fetchImpl, sent } = scripted([nanoReply('{"bond_changes":[]}')]);
         const { gateway, records } = gatewayUnderTest(fetchImpl, { textHosts: ['nanogpt', 'openrouter'] });

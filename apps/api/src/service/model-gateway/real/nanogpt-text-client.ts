@@ -21,6 +21,8 @@ export const NANOGPT_TEXT_MODELS: Record<string, { id: string; zdr: boolean }> =
     'z-ai/glm-5.3': { id: 'z-ai/glm-5.3', zdr: true },
     'deepseek/deepseek-v4-flash': { id: 'deepseek/deepseek-v4-flash', zdr: true },
     'deepseek/deepseek-v4-pro': { id: 'deepseek/deepseek-v4-pro', zdr: true },
+    // .scratch/glm-flash-uncensored/spec.md: five of its six providers are eligible for ZDR.
+    'z-ai/glm-5.3-flash-uncensored': { id: 'z-ai/glm-5.3-flash-uncensored', zdr: true },
 };
 
 const NANOGPT_SAMPLER_NAMES: Record<SamplerParam, string> = {

@@ -49,7 +49,7 @@ describe('Sampling in Settings', () => {
         const first = await t.http.put(samplersPath('glm-5.3')).send({ temperature: 0.8, minP: 0.05 }).expect(200);
         expect(first.body.settings.samplers).toEqual({ 'glm-5.3': { temperature: 0.8, minP: 0.05 } });
         expect(first.body.settings.playModel).toBe('glm-5.3');
-        expect(first.body.playModels).toHaveLength(2);
+        expect(first.body.playModels).toHaveLength(3);
         expect(first.body.imageModels).toHaveLength(3);
 
         await t.http.put(samplersPath('glm-5.3')).send({ topP: 0.9 }).expect(200);

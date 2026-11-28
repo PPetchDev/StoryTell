@@ -19,6 +19,8 @@ export interface PlayModelOption {
     priceUsdPerMillion: { input: number; output: number; cachedInput: number };
     /** Roughly what a long turn costs: the full turn prompt uncached plus a Long reply, to the cent. */
     longTurnUsd: number;
+    /** The one host that serves it, where only one does (.scratch/glm-flash-uncensored/spec.md); else null. */
+    onlyOn: 'nanogpt' | null;
     /** The parameters this model is offered, in SAMPLER_PARAMS order. */
     samplers: Array<{ param: SamplerParam; min: number; max: number; step: number; suggested: number | null }>;
 }
@@ -32,6 +34,7 @@ export function playModelOptions(): PlayModelOption[] {
             label: facts.name,
             priceUsdPerMillion: { ...facts.priceUsdPerMillion },
             longTurnUsd: longTurnUsd(facts.priceUsdPerMillion),
+            onlyOn: facts.onlyOn?.host ?? null,
             samplers: SAMPLER_PARAMS.filter((param) => facts.samplers.includes(param)).map((param) => ({
                 param,
                 ...SAMPLER_RANGES[param],

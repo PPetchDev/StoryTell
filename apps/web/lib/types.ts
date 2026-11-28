@@ -47,6 +47,8 @@ export interface PlayModelOption extends ModelOption {
     priceUsdPerMillion: { input: number; output: number; cachedInput: number };
     /** Roughly what a long turn costs, in USD, to the cent. */
     longTurnUsd: number;
+    /** The one text host that serves it, where only one does; GLM-5.3 answers on any other (.scratch/glm-flash-uncensored/spec.md). */
+    onlyOn?: 'nanogpt' | null;
     /** The parameters this model is offered, in order. */
     samplers: SamplerOption[];
 }
