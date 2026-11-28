@@ -91,6 +91,7 @@ export type CallKind =
     | 'speech_repair_fallback'
     | 'reach_out'
     | 'meanwhile'
+    | 'scene_decision'
     | 'snapshot_image'
     | 'reference_image'
     | 'expression_image'
@@ -129,6 +130,7 @@ export const CALL_KIND_LABEL: Record<CallKind, string> = {
     speech_repair_fallback: 'Speech repairs (fallback)',
     reach_out: 'Characters messaging first',
     meanwhile: 'Characters living their own lives',
+    scene_decision: 'Scene move-on decisions',
     snapshot_image: 'Snapshots',
     reference_image: 'Reference images',
     expression_image: 'Expression pictures',

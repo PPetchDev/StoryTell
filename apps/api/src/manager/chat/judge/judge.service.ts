@@ -275,6 +275,33 @@ export class JudgeManagerService {
                 ...(askFace ? { userFace: true } : {}),
             }), judgeItemsSection(items)), aiEvents);
 
+            // .scratch/scene-decisions/spec.md: whether the Scene's condition has happened is asked of a
+            // decision model, alongside the Judge, reading what the Judge reads; never in free play, in a
+            // gates-only Scene or on an Epilogue.
+            const condition = scene?.moveOnCondition.trim() ?? '';
+            const decided =
+                scene && condition !== '' && !message.epilogue
+                    ? this.gateway
+                          .decide({
+                              kind: 'scene_decision',
+                              state: [
+                                  `Scene: ${scene.name}.${scene.situation.trim() ? ` ${scene.situation.trim()}` : ''}`,
+                                  `Move-on condition: ${condition}`,
+                                  `The user plays ${identityName}.`,
+                                  ...(chat.storySoFar?.trim() ? ['Story so far:', chat.storySoFar.trim()] : []),
+                                  'Recent exchanges:',
+                                  ...context.map((entry) => messageLine(entry, identityName)),
+                                  'Latest exchange:',
+                                  ...(userText !== null ? [`${identityName}: ${userText}`] : []),
+                                  partsToText(replyParts),
+                              ].join('\n'),
+                              servedFor: { storyId: story.id, chatId: chat.id, messageId: message.id },
+                          })
+                          .then(
+                              (answer) => ({ answer }),
+                              (error: unknown) => ({ error: error as Error }),
+                          )
+                    : Promise.resolve(null);
             const result = await this.gateway.completeText({
                 kind: 'judge',
                 messages: prompt.messages,
@@ -283,6 +310,19 @@ export class JudgeManagerService {
                 servedFor: { storyId: story.id, chatId: chat.id, messageId: message.id },
             });
             const judgement = parseJudgement(result.text);
+            const decision = await decided;
+            if (decision && 'error' in decision) {
+                // Both decision models failed: the Scene stays this turn, whatever the Judge said.
+                this.logger.warn(`Chat ${chat.id}, Message ${message.id}: no Scene decision (${decision.error.message}); the Scene stays.`);
+                judgement.scenes = judgement.scenes.map((signal) => ({ ...signal, moveOn: false }));
+            } else if (decision?.answer) {
+                const { met, probability, model } = decision.answer;
+                this.logger.log(`Chat ${chat.id}, Message ${message.id}: Scene decision ${met ? 'met' : 'not met'} (${model}, ${probability.toFixed(2)}; the Judge said ${judgement.scenes.some((signal) => signal.moveOn) ? 'met' : 'not met'}).`);
+                // Met: the Scene moves on, its condition the event. Not met: the Judge's passed-by still stands.
+                judgement.scenes = met
+                    ? [{ moveOn: true, passedBy: false, reason: condition, wentTo: '' }]
+                    : judgement.scenes.map((signal) => ({ ...signal, moveOn: false }));
+            }
             const applied = applyJudgement(
                 {
                     cast: story.characters.map((character) => ({ id: character.id, name: character.name })),

@@ -1,0 +1,516 @@
+[
+  {
+    "name": "bookshop-dinner-gradual",
+    "setting": "A small independent bookshop on a rainy modern high street.",
+    "userName": "Ash",
+    "cast": [{ "name": "Mira Vance", "personality": "Owner of Vance & Page Books; dry wit, guarded, secretly lonely." }],
+    "scene": {
+      "name": "Closing Time",
+      "situation": "It is a rainy Thursday; Ash has stayed after closing to help Mira shelve a donation of old paperbacks.",
+      "moveOnCondition": "Ash asks Mira out to dinner."
+    },
+    "recent": [
+      "Ash: I set another box on the counter. Where do the Christies go?",
+      "Mira doesn't look up from the ledger.\n@Mira: Crime, bottom shelf, left of the radiator. And don't alphabetise by title again.",
+      "Ash: Fine, by author. You know, you skip lunch every day. I've noticed.",
+      "Mira pauses, pen hovering.\n@Mira: Is that concern or surveillance?\nShe goes back to her columns, but the corner of her mouth twitches.",
+      "Ash: Concern. Mostly. There's a lot of good food on this street you're missing.",
+      "@Mira: I've eaten at the bakery. Twice. Last year.\nShe holds out a hand for the next stack without looking.",
+      "Ash: I hand her the stack. Someone should drag you somewhere with actual plates sometime.",
+      "@Mira: Someone should, should they.\nThe kettle clicks off in the back. She goes to pour, and comes back with two mugs, holding one out to him.",
+      "Ash: I take the mug. Thanks. How long have you run this place alone?",
+      "@Mira: Six years since Dad died. People think it's romantic. It's mostly invoices.\nRain hammers on the shop window.",
+      "Ash: It looks romantic from my side of the counter.",
+      "Mira gives him a long, unreadable look over the rim of her mug.\n@Mira: Careful, Ash. That almost sounded like a line.",
+      "Ash: I shrug, grinning. Almost.",
+      "@Mira: Mm.\nShe flips the sign to CLOSED and starts counting the till, slower than she needs to."
+    ],
+    "userText": "I put my mug down and actually face her. Okay, not almost. There's a Lebanese place on Cork Street that does a lamb thing I think you'd love. Friday, eight? Just the two of us. Dinner.",
+    "aiText": "The coins stop clinking. Mira stares at the till drawer as if it has said something.\n@Mira: You're asking me to dinner.\n@Mira: ...Eight is late for a Friday. Make it seven-thirty.\nShe snaps the drawer shut, ears faintly pink.",
+    "met": true,
+    "why": "The earlier hints ('someone should drag you somewhere', 'almost a line') are not an invitation; the latest message is an explicit dinner invitation with place and time, and Mira hears and answers it."
+  },
+  {
+    "name": "bookshop-sale-told-long-ago",
+    "setting": "A small independent bookshop on a modern high street, during the year-end stock count.",
+    "userName": "Ash",
+    "cast": [
+      { "name": "Mira Vance", "personality": "Owner of the bookshop; proud, tired, hates being pitied." },
+      { "name": "Theo Park", "personality": "Cheerful part-time clerk and amiable gossip." }
+    ],
+    "scene": {
+      "name": "Inventory Night",
+      "situation": "Ash comes in to help with the year-end stock count and notices Mira has been strangely quiet for weeks.",
+      "moveOnCondition": "Mira tells Ash she is selling the shop."
+    },
+    "recent": [
+      "Ash: Why are half the shelves labelled with yellow stickers?",
+      "Mira keeps counting without turning round.\n@Mira: Because the man from Harlow Holdings wanted to know what's worth anything.\n@Mira: I've accepted his offer, Ash. The shop is sold as of January. I didn't know how to say it, so there. I said it.",
+      "Ash: I just stand there with the clipboard. January? This January?",
+      "@Mira: This January. The rent went up forty percent. I'm tired.\nShe finally looks at him, and her eyes are red at the rims.",
+      "Ash: Okay. Okay. I'm not going to argue tonight. Let's just count.",
+      "@Mira: Thank you.\nThey work in silence. Theo arrives with pizza at nine and reads the room immediately.",
+      "Ash: I take a slice. Theo, did you know?",
+      "@Theo: I guessed. She's been taking phone calls in the back for weeks.\n@Mira: Eat your pizza, Theo.",
+      "Ash: Poetry section: two hundred and twelve books, three water-damaged.",
+      "@Mira: Write the damaged ones on a separate sheet.\nShe sounds steadier now, almost businesslike.",
+      "Ash: Done. What happens to the cat?",
+      "@Mira: Biscuit comes with me. Harlow doesn't get the cat.\nTheo laughs, a little too loudly.",
+      "Ash: Fair. Children's section next?",
+      "@Theo: I'll take children's, you two do reference. It's the heavy stuff, sorry.\nHe disappears behind the picture-book carousel."
+    ],
+    "userText": "I pull down the first atlas. These weigh a ton. Who even buys atlases anymore?",
+    "aiText": "@Mira: Tourists. And one old man every spring who checks whether Prussia is still in it.\nShe takes the atlas from him and sets it on the count pile, her fingers resting on its cracked spine a moment longer than necessary.",
+    "met": true,
+    "why": "Mira told Ash plainly in the first earlier exchange that she has accepted an offer and the shop is sold; the condition already happened, even though the latest exchange is small talk."
+  },
+  {
+    "name": "kingdom-ledger-offscreen-delivery",
+    "setting": "Varnholm, a European-style fantasy city ruled by guilds and magistrates.",
+    "userName": "Kael",
+    "cast": [
+      { "name": "Magistrate Orsolya Venn", "personality": "Stern, incorruptible senior magistrate." },
+      { "name": "Guildmaster Pell", "personality": "Oily, charming head of the Merchants' Guild." }
+    ],
+    "scene": {
+      "name": "The Ledger",
+      "situation": "Kael has stolen the Merchants' Guild's secret ledger, which proves Pell bribes the tax office, and must get it somewhere safe.",
+      "moveOnCondition": "Kael hands the stolen ledger to the magistrate."
+    },
+    "recent": [
+      "Kael: I wrap the ledger in oilcloth and hide it under the floorboard of my rented room.",
+      "Below, the tavern goes quiet as two Guild enforcers come in asking about a thief with a limp. The landlady sends them off, but she glances up at the ceiling as she does.",
+      "Kael: I wait until they're gone, then slip out the back with the ledger under my coat.",
+      "The streets are thick with fog. Somewhere ahead, the bells of the Hall of Justice begin to toll the morning session. A carriage with the Guild's crest rolls past, and Pell leans out of the window.\n@Pell: Lovely morning to be honest, isn't it?\nThe carriage doesn't stop.",
+      "Kael: Did he see me? I keep my head down and take the long way through the tanners' row.",
+      "The tanners' row stinks of lye. A boy shadows Kael for two streets, then loses interest. The Hall's steps are crowded with petitioners.",
+      "Kael: I join the line and ask the guard whether Magistrate Venn is sitting today.",
+      "@Guard: She is. Sealed matters go up the east stair, if you've got one. Otherwise wait like the rest.\nHe eyes the shape under Kael's coat.",
+      "Kael: I've got one. I head for the east stair.",
+      "The east stair is narrow and cold. At the top is a door bearing the magistrate's seal. Behind it, a woman's voice is dictating a judgment.",
+      "Kael: I hesitate at the door. If Venn is in Pell's pocket too, I'm a dead man.",
+      "A clerk hurries past with an armful of scrolls and doesn't spare Kael a glance. Through the door, the dictating voice pauses, then goes on, cold and precise."
+    ],
+    "userText": "I knock twice, then go in.",
+    "aiText": "The scene shifts to the Merchants' Guild hall, where Pell is holding court over spiced wine, laughing at some story about a fishmonger.\nBy the time the bells rang noon, the ledger lay open on Magistrate Venn's desk, put into her hands by Kael himself, and her clerk was already copying out the third page of names.\n@Pell: ...and then he says, but my lord, the fish was already dead!\nNobody in the hall knows yet.",
+    "met": true,
+    "why": "The handover happens off-screen, but the narration states as fact that Kael put the ledger into the magistrate's hands; a cut to another location does not undo it."
+  },
+  {
+    "name": "kingdom-duel-wrong-challenger",
+    "setting": "Duke Aldric's winter ball in a European-style fantasy duchy.",
+    "userName": "Ash",
+    "cast": [
+      { "name": "Sir Hadrian Moll", "personality": "Arrogant, sharp-tongued knight who enjoys humiliating lesser houses." },
+      { "name": "Lord Fenwick", "personality": "Hot-tempered young noble, Ash's loyal friend." }
+    ],
+    "scene": {
+      "name": "Insult at the Ball",
+      "situation": "At Duke Aldric's winter ball, Sir Hadrian has publicly mocked Ash's family name.",
+      "moveOnCondition": "Ash challenges Sir Hadrian to a duel."
+    },
+    "recent": [
+      "Ash: I set my glass down very carefully. Say that again, Sir Hadrian.",
+      "@Hadrian: I said your father sold his spurs for bread. Shall I write it down for you?\nLaughter ripples through the nearby guests. Fenwick goes white with anger at Ash's side.",
+      "Ash: My father served this duchy for thirty years. You'll apologise.",
+      "@Hadrian: To a pawnbroker's son? I think not.\nThe musicians falter. Every eye in the ballroom turns toward them."
+    ],
+    "userText": "I take off my glove, slowly, and hold it in my fist, staring him down.",
+    "aiText": "Before Ash can move further, Fenwick steps between them, tears off his own glove and slaps it across Hadrian's cheek.\n@Fenwick: Dawn, the river meadow. Bring a second, if anyone will stand for you.\n@Hadrian: Gladly, boy. Though it's your friend I'd rather kill.\nAsh's glove is still clenched in his fist, unthrown.",
+    "met": false,
+    "why": "A duel was challenged, but by Fenwick, not Ash; Ash only removed his glove, never threw it, and spoke no challenge."
+  },
+  {
+    "name": "ship-letter-confession",
+    "setting": "The Grey Heron, a three-masted merchant ship on a long voyage.",
+    "userName": "Ash",
+    "cast": [{ "name": "Captain Isolde Marr", "personality": "Scarred, secretive captain who never explains herself." }],
+    "scene": {
+      "name": "The Captain's Secret",
+      "situation": "Ash suspects the captain scuttled her former ship, the Merrow, years ago, and has been pressing the crew for the truth.",
+      "moveOnCondition": "Captain Isolde admits she sank the Merrow on purpose."
+    },
+    "recent": [
+      "Ash: I knock on the captain's cabin door. Captain, I need to ask you about the Merrow.",
+      "@Isolde: Not tonight. Not ever, if you've any sense.\nThe door stays shut. Her lamp burns until the middle watch.",
+      "Ash: At dawn I go below to check the rigging stores instead.",
+      "The morning is grey and windless. When Ash returns to his hammock, a folded letter sealed with black wax lies on the blanket, the captain's initials pressed into it."
+    ],
+    "userText": "I break the seal and read it.",
+    "aiText": "The handwriting is cramped and slanted, as if written fast before she could change her mind.\nAsh — You'll keep asking, so here it is, once, and never to be spoken aloud. The Merrow did not strike the Hollow Reef by bad luck. I opened her seacocks myself, off Carrow Point, so the Admiralty would never find what was in her hold. Eleven men drowned for that decision. I live with it. Burn this. — I.M.\nOn deck, her voice calls the watch change as if nothing has happened.",
+    "met": true,
+    "why": "The admission comes in a letter in her own hand rather than speech, but it plainly states she sank the Merrow deliberately, and Ash has read it."
+  },
+  {
+    "name": "ship-dream-kiss",
+    "setting": "The Grey Heron, a three-masted merchant ship on a long voyage.",
+    "userName": "Ash",
+    "cast": [{ "name": "Captain Isolde Marr", "personality": "Scarred, secretive captain with a dry sense of humour." }],
+    "scene": {
+      "name": "Night Watch",
+      "situation": "After the storm, Ash and Isolde shared the night watch and grew close.",
+      "moveOnCondition": "Ash kisses Captain Isolde."
+    },
+    "recent": [
+      "Ash: I hand her the spyglass and our fingers brush. I don't pull away.",
+      "@Isolde: You're bold for a deckhand.\nShe doesn't pull away either. Then the lookout's cry of 'Sail to starboard!' rings down from the masthead, and the moment breaks.",
+      "Ash: I go back to my hammock after the watch, cursing the lookout.",
+      "Ash sleeps badly. The ship creaks around him like an old house."
+    ],
+    "userText": "I dream of the quarterdeck again.",
+    "aiText": "In the dream the lookout never shouts. Isolde turns from the rail, Ash closes the distance, and he kisses her, slow, the salt wind tugging her hair loose.\n@Isolde: Took you long enough.\nThen the bell for the morning watch clangs and Ash jolts awake, alone, the hammock swinging, the taste of salt only spray from a leaking porthole.",
+    "met": false,
+    "why": "The kiss happens only inside a dream the user explicitly asked for; Ash wakes alone, so it has not happened in the story."
+  },
+  {
+    "name": "bookshop-love-rehearsal",
+    "setting": "A small independent bookshop on a modern high street.",
+    "userName": "Ash",
+    "cast": [
+      { "name": "Mira Vance", "personality": "Owner of the bookshop; dry wit, guarded." },
+      { "name": "Theo Park", "personality": "Cheerful part-time clerk who teases everyone." }
+    ],
+    "scene": {
+      "name": "The Confession",
+      "situation": "Ash has decided to tell Mira how he feels before the shop closes for good.",
+      "moveOnCondition": "Ash tells Mira he loves her."
+    },
+    "recent": [
+      "Ash: Theo, cover the till for five minutes? I need to talk to Mira.",
+      "@Theo: She's upstairs sorting the attic boxes. You look like you're going to be sick.\nHe takes the till anyway, grinning.",
+      "Ash: I go into the back storeroom first to get my nerve up.",
+      "The storeroom smells of dust and old glue. Through the ceiling, Mira's footsteps cross back and forth overhead; she is humming along to the radio up there."
+    ],
+    "userText": "I face the stack of returns like it's her and practise out loud. Mira, I love you. I've loved you since the day you threw me out for reading without buying. ...No. Too much. Mira, I love you. Simple.",
+    "aiText": "The words sound strange in the empty storeroom. Overhead, the humming goes on, unbroken; the attic floor is thick and the radio is loud.\nThe storeroom door creaks and Theo leans in.\n@Theo: Was that to the returns pile? Bold opener.\n@Theo: She's coming down in a minute, by the way. Real Mira, not cardboard Mira.",
+    "met": false,
+    "why": "Ash says the exact words, but as a rehearsal to a pile of boxes; Mira is upstairs, her humming goes on unbroken, and Theo confirms she has not heard."
+  },
+  {
+    "name": "kingdom-dance-interrupted",
+    "setting": "Duke Aldric's winter ball in a European-style fantasy duchy.",
+    "userName": "Ash",
+    "cast": [
+      { "name": "Lady Seraphine Dorne", "personality": "Cool, clever heiress who is courted by everyone." },
+      { "name": "Duke Aldric", "personality": "Cautious, dignified host of the ball." }
+    ],
+    "scene": {
+      "name": "The First Dance",
+      "situation": "Ash has been working up the courage to ask Lady Seraphine for the first waltz of the evening.",
+      "moveOnCondition": "Ash asks Lady Seraphine to dance."
+    },
+    "recent": [
+      "Ash: I straighten my collar and look across the ballroom for her.",
+      "Seraphine stands by the wine fountain, fan half-open, three suitors orbiting her like moths.",
+      "Ash: I wait for the suitors to drift off, then start across the floor.",
+      "One by one, the suitors are dismissed with a flick of her fan. She is alone for the first time all evening."
+    ],
+    "userText": "I stop in front of her, bow, and open my mouth to ask.",
+    "aiText": "Trumpets blare from the gallery before a word leaves Ash's lips. The herald's staff strikes the floor.\n@Herald: His Grace, Duke Aldric, requests the honour of the first dance with Lady Seraphine Dorne!\nSeraphine's fan snaps shut. She gives Ash a small, apologetic look over her shoulder as the Duke leads her onto the floor, and Ash is left bowing to empty air.",
+    "met": false,
+    "why": "Ash bows and is about to ask, but the narration says the herald cut in before a word left his lips; the attempt was interrupted and she danced with the Duke."
+  },
+  {
+    "name": "ship-mutiny-what-if",
+    "setting": "The Grey Heron, a merchant ship whose crew is on short rations far from port.",
+    "userName": "Ash",
+    "cast": [{ "name": "Bosun Gage Harrow", "personality": "Blunt, hard-handed bosun and ringleader of the discontented crew." }],
+    "scene": {
+      "name": "Below Decks",
+      "situation": "The half-starved crew is talking mutiny, and Bosun Harrow wants Ash to lead it because the men trust him.",
+      "moveOnCondition": "Ash agrees to lead the mutiny."
+    },
+    "recent": [
+      "Ash: I sit down on the barrel across from Harrow. You wanted to see me.",
+      "@Harrow: The lads'll follow you, Ash. Not me. They think I'm a brute.\n@Harrow: Captain's rationing us down to biscuit and grudges. We take the ship at the turn of the tide. You lead.",
+      "Ash: And if it fails, we hang.",
+      "@Harrow: If we wait, we starve. Pick your rope."
+    ],
+    "userText": "What if I did? Hypothetically. Say I led it. Who's actually with us — names, not guesses. And what happens to the captain after?",
+    "aiText": "Harrow leans back, studying him in the swaying lamplight.\n@Harrow: Hypothetically. Right.\n@Harrow: Twelve sure, six leaning. Captain goes in a boat with water and a compass. I'm no butcher.\n@Harrow: But I don't hand names to a man who's still saying what if. You're in or you're not. Tell me by the dog watch.",
+    "met": false,
+    "why": "Ash frames it explicitly as a hypothetical and asks questions; Harrow himself says Ash has not committed and gives him until the dog watch to answer."
+  },
+  {
+    "name": "bookshop-sarcastic-saturday",
+    "setting": "A small independent bookshop on a modern high street, before the holiday rush.",
+    "userName": "Ash",
+    "cast": [{ "name": "Mira Vance", "personality": "Owner of the bookshop; dry wit, no patience for nonsense." }],
+    "scene": {
+      "name": "The Rota",
+      "situation": "Mira is short-staffed for the holiday rush and needs someone to cover Saturdays.",
+      "moveOnCondition": "Ash agrees to work the Saturday shift."
+    },
+    "recent": [
+      "Ash: You said you needed to talk about the rota?",
+      "@Mira: Theo's off to his sister's wedding. I need Saturdays covered until the new year.\nShe slides the rota across the counter, the Saturday column conspicuously empty.",
+      "Ash: Saturday is literally the one day I don't do anything.",
+      "@Mira: Exactly. You'd be free.\nShe taps the column with her pen."
+    ],
+    "userText": "Oh, absolutely. Nothing I'd love more than spending my one lie-in alphabetising the self-help section for screaming tourists. Put me down in ink. Twice. I roll my eyes so hard it hurts.",
+    "aiText": "@Mira: So that's a no.\nShe doesn't write anything. The Saturday column stays empty.\n@Mira: I'll ask the Dunmore girl. She at least pretends to like people.",
+    "met": false,
+    "why": "The words say yes, but the eye-roll marks them as sarcasm; Mira reads it as a no, writes nothing, and goes to ask someone else."
+  },
+  {
+    "name": "kingdom-debt-settled-indirect",
+    "setting": "The Lantern Guild's counting house in a European-style fantasy city.",
+    "userName": "Ash",
+    "cast": [{ "name": "Master Corvin Hale", "personality": "Moneylender of the Lantern Guild; polite, precise and pitiless." }],
+    "scene": {
+      "name": "The Debt",
+      "situation": "Ash's late brother owed the Lantern Guild three hundred crowns, and Corvin has given Ash until the full moon to clear it.",
+      "moveOnCondition": "Ash pays the guild's debt to Master Corvin."
+    },
+    "recent": [
+      "Ash: I come to the guildhouse at dusk, as summoned.",
+      "@Corvin: Punctual. Your brother never was. Sit.\nHe opens a heavy book to a page headed with Ash's family name in red ink.",
+      "Ash: I don't sit. Read me the figure.",
+      "@Corvin: Three hundred crowns, and the forty we agreed not to call interest.\nHe smiles without warmth."
+    ],
+    "userText": "I drop the purse on his book. It lands heavy. That's all of it. Three hundred and forty, counted twice. My brother's name comes off that page tonight.",
+    "aiText": "Corvin unties the purse and counts with the speed of long practice, stacking the coins in towers of ten. When the last tower stands, he dips his pen and draws a single line through the red name.\n@Corvin: Settled. The Lantern Guild thanks your family for its custom.\n@Corvin: Do give my regards to no one.",
+    "met": true,
+    "why": "Nobody says the word pay, but the full sum is handed over, counted, the debt struck from the book and declared settled."
+  },
+  {
+    "name": "kingdom-treaty-signed-not-sealed",
+    "setting": "The ducal court of Ashford in a European-style fantasy kingdom.",
+    "userName": "Kael",
+    "cast": [
+      { "name": "Duke Aldric", "personality": "Cautious ruler who never acts in haste." },
+      { "name": "Treasurer Holt", "personality": "Grey, grudging keeper of the ducal purse." },
+      { "name": "Envoy Brannoc", "personality": "Bored northern envoy invited as witness." }
+    ],
+    "scene": {
+      "name": "The Treaty of Ashford",
+      "situation": "Kael, envoy of the Free Cities, has spent three days negotiating a trade treaty with Duke Aldric's court.",
+      "moveOnCondition": "Kael signs the treaty and Duke Aldric seals it."
+    },
+    "recent": [
+      "Kael: I present the final draft. Clause nine is the river tolls, as we agreed yesterday.",
+      "@Aldric: Clause nine I accept. Clause eleven, the grain levy, still sticks in my treasurer's throat.\nHolt nods grimly.",
+      "Kael: Then cap the levy at a tenth, not an eighth. The cities can live with a tenth.",
+      "@Aldric: A tenth. Holt?\n@Holt: ...A tenth, your Grace. Barely.\nThe scribes scratch the change into the fair copy.",
+      "Kael: Then we're done arguing. Let's have the fair copy.",
+      "The fair copy is brought on a velvet board: four pages, ribbons, and a space at the foot for two names and the ducal seal. Candles are lit, though it is midday; this is how Ashford does things.",
+      "Kael: I read it through once more, every line.",
+      "Nothing has been changed that shouldn't be. Brannoc yawns behind his hand.",
+      "Kael: I take the pen.",
+      "@Aldric: Your name first, Envoy. Then mine, and the seal.",
+      "Kael: I sign it, clear and full: Kael Rennick, for the Free Cities.",
+      "The ink shines wet beneath the clauses. Aldric picks up his own pen, then pauses as a page whispers urgently in his ear."
+    ],
+    "userText": "Your Grace? Is something wrong?",
+    "aiText": "@Aldric: A rider from the border. Clan raiders burned a toll station on the river last night, on the very stretch clause nine covers.\nHe sets his pen down, unsigned, and lifts his hand away from the seal.\n@Aldric: I will not seal a river treaty while the river is burning. We resume in the morning, Envoy. Your signature stands. Mine waits.\nThe wax stays cold in its dish.",
+    "met": false,
+    "why": "Only one half of the two-part condition happened: Kael signed two exchanges ago, but the Duke explicitly refuses to sign or seal until morning."
+  },
+  {
+    "name": "ship-spy-told-narrator-deflects",
+    "setting": "The Grey Heron, a merchant ship pursued by a Valcourt frigate.",
+    "userName": "Ash",
+    "cast": [
+      { "name": "Captain Isolde Marr", "personality": "Scarred, secretive captain; acts first, explains never." },
+      { "name": "Renner Voss", "personality": "Quiet, watchful navigator." }
+    ],
+    "scene": {
+      "name": "The Lantern",
+      "situation": "Ash saw a light signalling from the stern last night and has been working out who aboard is in contact with the Valcourt frigate trailing them.",
+      "moveOnCondition": "Ash tells Captain Isolde that the navigator is a spy."
+    },
+    "recent": [
+      "Ash: I check the stern rail where I saw the light. Any marks?",
+      "There is soot on the rail and a drip of lamp oil. Below it, in the wood, someone has carved a small fresh notch. The navigator's chart room is ten paces away.",
+      "Ash: I find the captain on the quarterdeck.",
+      "Isolde is shouting at the helmsman; the wind is backing hard and black clouds stack up to the south.\n@Isolde: Make it quick, Ash. We've got weather."
+    ],
+    "userText": "Captain, Renner's the spy. He's been signalling the Valcourt frigate from the stern with a hooded lantern. There's soot and oil on the rail outside his chart room. I saw the light myself.",
+    "aiText": "Thunder cracks overhead and a wall of rain sweeps the deck. Isolde heard him; her eyes flick once to the chart room door. Then she pushes past Ash toward the mast.\n@Isolde: All hands! Reef the mainsail! Move, damn you!\nShe says nothing more about it. Renner, at the chart room door, watches them both.",
+    "met": true,
+    "why": "Ash names the navigator as the spy directly to the captain in the user message, and the narration confirms she heard; the reply turning to the storm instead of responding does not undo the telling."
+  },
+  {
+    "name": "bookshop-narrator-voices-apology",
+    "setting": "A small independent bookshop on a modern high street.",
+    "userName": "Ash",
+    "cast": [{ "name": "Mira Vance", "personality": "Owner of the bookshop; dry wit, holds grudges quietly." }],
+    "scene": {
+      "name": "After the Reading",
+      "situation": "Ash promised to come to Mira's poetry reading last night and didn't show; she has been cold to him all morning.",
+      "moveOnCondition": "Ash apologizes to Mira for missing the reading."
+    },
+    "recent": [
+      "Ash: Morning. I brought the good coffee.",
+      "@Mira: Put it on the counter. I'm busy.\nShe is not busy. She is re-shelving a book that was already on the shelf.",
+      "Ash: How did the reading go?",
+      "@Mira: Seven people came. One of them was asleep. It was fine.\nShe doesn't look at him."
+    ],
+    "userText": "I lean on the counter, not quite meeting her eyes, and turn the coffee cup round and round.",
+    "aiText": "The silence stretches until Ash can't stand it. The words come out low and rough.\n@Ash: I'm sorry I missed it, Mira. I should have been there. No excuse.\nMira's hands go still on the spine of the book.\n@Mira: ...No. There isn't.\nBut she takes the coffee.",
+    "met": true,
+    "why": "The user only fidgets, but the narrator gives Ash a spoken apology for missing the reading; the story now says he apologized, so it counts."
+  },
+  {
+    "name": "kingdom-fealty-oath-thai",
+    "setting": "The great hall of Duke Aldric's castle in a European-style fantasy duchy.",
+    "userName": "Ash",
+    "cast": [{ "name": "Duke Aldric", "personality": "Cautious, dignified ruler who never forgets a debt." }],
+    "scene": {
+      "name": "The Oath",
+      "situation": "After saving the Duke's heir at the border, Ash has been summoned to the great hall, where the Duke offers him a knight's place in his household.",
+      "moveOnCondition": "Ash swears fealty to Duke Aldric."
+    },
+    "recent": [
+      "Ash: I enter the great hall and stop at the foot of the dais.",
+      "The hall is full: knights along the walls, the heir at his father's side with a bandaged arm. Duke Aldric rises.\n@Aldric: You saved my son. I don't forget debts. A place in my household is yours, if you'll take it.",
+      "Ash: What would it mean, my lord? What would I owe?",
+      "@Aldric: Your sword when I call. Your honesty when I don't want it. In return, land, a name, and my protection.\nHe waits. The whole hall waits."
+    ],
+    "userText": "ข้าคุกเข่าลงต่อหน้าท่านดยุก ถอดดาบวางไว้แทบเท้าของท่าน แล้วกล่าวเสียงดังให้ทั้งท้องพระโรงได้ยิน 'ดาบเล่มนี้และชีวิตของข้า ขอถวายแด่ท่านดยุกอัลดริก ตราบจนลมหายใจสุดท้าย'",
+    "aiText": "A murmur runs along the walls. Aldric steps down, lifts the sword from the flagstones, and lays its flat on Ash's shoulder.\n@Aldric: Then I accept your oath, and give you mine: you will not serve a faithless lord.\n@Aldric: Rise, Sir Ash of Aldric's household.\nThe heir grins and begins the applause.",
+    "met": true,
+    "why": "In Thai, Ash kneels, lays down his sword and pledges his sword and life to Duke Aldric until his last breath, an oath of fealty, which the Duke formally accepts."
+  },
+  {
+    "name": "bookshop-reserve-not-buy-thai",
+    "setting": "A small independent bookshop on a modern high street.",
+    "userName": "Ash",
+    "cast": [{ "name": "Mira Vance", "personality": "Owner of the bookshop; generous to friends, strict about money." }],
+    "scene": {
+      "name": "The First Edition",
+      "situation": "A first edition of Elin Marsh's The Salt Orchard has come in with a donation, and Ash has wanted one his whole life.",
+      "moveOnCondition": "Ash buys the first edition from Mira."
+    },
+    "recent": [
+      "Ash: Is that... The Salt Orchard? First printing?",
+      "@Mira: First printing, first state, the typo on page forty and all. Someone's grandmother kept it in a biscuit tin.\nShe turns it so he can see the spine.",
+      "Ash: How much?",
+      "@Mira: Four hundred. It'd fetch six online. I'm giving you the friend price because you'll actually read it."
+    ],
+    "userText": "สี่ร้อยเหรอ... ตอนนี้ในบัญชีมีไม่ถึงเลย ขอจองไว้ก่อนได้ไหม สิ้นเดือนเงินเดือนออกจะรีบมาจ่ายทันทีเลย สัญญา",
+    "aiText": "Mira sighs, but she takes a slip of paper, writes HOLD — ASH — END OF MONTH in block capitals, and tucks it into the book.\n@Mira: It goes on the shelf behind the till. If you're not here by the first, it goes online.\n@Mira: And don't touch it until it's yours.",
+    "met": false,
+    "why": "In Thai, Ash says he can't afford it yet and asks to reserve it, promising to pay at month's end; Mira only puts it on hold and says it isn't his yet."
+  },
+  {
+    "name": "ship-map-to-first-mate",
+    "setting": "The Grey Heron, a merchant ship fleeing a Valcourt frigate at night.",
+    "userName": "Ash",
+    "cast": [
+      { "name": "Captain Isolde Marr", "personality": "Scarred, secretive captain." },
+      { "name": "First Mate Doran Kell", "personality": "Steady, loyal first mate." }
+    ],
+    "scene": {
+      "name": "The Chart",
+      "situation": "Ash has stolen the Valcourt chart of the Hollow Reef passage and must get it to Captain Isolde before the frigate catches them.",
+      "moveOnCondition": "Ash gives the map to Captain Isolde."
+    },
+    "recent": [
+      "Ash: I climb back over the rail, soaked, the chart case strapped to my back.",
+      "The deck is chaos; the frigate's lanterns are closer. Doran Kell, the first mate, hauls Ash up the last rung.\n@Doran: You got it? Captain's shut in her cabin with the surgeon. She took a splinter in the leg.",
+      "Ash: Is she alright?",
+      "@Doran: She'll live, if she stops swearing at the surgeon. Nobody goes in until he's done.\nHe holds out a hand."
+    ],
+    "userText": "I unstrap the chart case and hand it to Doran. Here. Get this to her the moment the surgeon's out. The passage is marked in red.",
+    "aiText": "Doran tucks the case under his coat and nods.\n@Doran: The moment he's out. You get below and dry off before you die of cold.\nThe cabin door stays shut. Inside, the captain is still swearing at the surgeon, and the chart is in Doran's coat on deck.",
+    "met": false,
+    "why": "Ash hands over the map, but to the first mate, not the captain, and the narration confirms it has not reached her yet."
+  },
+  {
+    "name": "kingdom-seal-halves-completed",
+    "setting": "A European-style fantasy city where the Masons' Guild elects its leaders by seal.",
+    "userName": "Ash",
+    "cast": [
+      { "name": "Wren Talley", "personality": "Quick, cynical thief and Ash's partner." },
+      { "name": "Brother Anselm", "personality": "Dry-humoured archivist monk who keeps the guild's relics." },
+      { "name": "Dario", "personality": "The old guildmaster's bitter, hard-drinking son." }
+    ],
+    "scene": {
+      "name": "The Broken Seal",
+      "situation": "The Masons' Guild seal was broken in two and the halves hidden; whoever holds both can call the guild's vote. Ash and Wren are hunting them.",
+      "moveOnCondition": "Ash recovers both halves of the guild seal."
+    },
+    "recent": [
+      "Ash: First stop, the archive. Brother Anselm owes me a favour.",
+      "@Anselm: A favour, and you're spending it on that? Very well. The left half was given into our keeping by the old guildmaster.\nHe unlocks a niche and hands Ash a half-moon of bronze, the mason's compass on its face cut clean down the middle.",
+      "Ash: I wrap it in cloth and put it inside my shirt. And the other half?",
+      "@Anselm: Taken by his son, Dario, when they quarrelled. Dario drinks at the Bent Nail now, and plays dice badly.",
+      "Ash: Wren, you're good at dice.",
+      "@Wren: I'm good at cheating at dice. Different skill. Fine.\nThey leave the archive as the vesper bell rings.",
+      "Ash: At the Bent Nail I buy a round and take the seat across from Dario.",
+      "Dario is a big man gone soft, a bronze half-moon hanging on a leather cord at his throat. He squints at Ash.\n@Dario: Don't know you. Sit anyway, you bought the ale.",
+      "Ash: I nod to Wren. Play him.",
+      "Wren plays. She loses the first three games on purpose, then wins five straight. Dario's purse is empty and his face is red.\n@Dario: One more. I'll stake... this.\nHe pulls the cord over his head and slaps the bronze half on the table.",
+      "Ash: Wren, don't lose.",
+      "@Wren: When have I ever?\nThe dice rattle in the cup. A crowd has gathered around the table.",
+      "Ash: I keep a hand near my knife, just in case.",
+      "Wren throws two sixes. The crowd roars. Dario stares at the dice for a long moment, then shoves the bronze half toward her and stalks off to the bar.\nWren pockets it, grinning."
+    ],
+    "userText": "Outside in the alley, I hold out my hand. Wren. The half. Please.",
+    "aiText": "@Wren: Say please again, it's charming.\nShe drops it into his palm anyway. Ash takes the left half from inside his shirt and fits them together: the compass closes, the two edges meeting with a soft click, as if the bronze had been waiting.\n@Wren: Well. Now the whole guild has to listen to you. Lucky them.",
+    "met": true,
+    "why": "The left half came to Ash many exchanges ago; the right half was won by Wren, and only in the latest reply does it reach Ash's hand, so he now holds both halves together."
+  },
+  {
+    "name": "ship-election-one-short",
+    "setting": "The Kestrel, a merchant ship governed by its signed articles after its captain's death at sea.",
+    "userName": "Ash",
+    "cast": [
+      { "name": "Bosun Gage Harrow", "personality": "Veteran bosun who wants the captaincy for himself." },
+      { "name": "Quartermaster Bell Arden", "personality": "Fair-minded quartermaster who goes strictly by the articles." },
+      { "name": "Old Tobin", "personality": "Garrulous ship's cook, fond of Ash." }
+    ],
+    "scene": {
+      "name": "The Vote",
+      "situation": "After the old captain's death, the crew is choosing a new captain by show of hands under the ship's articles; Ash is standing against Harrow.",
+      "moveOnCondition": "The crew elects Ash as captain."
+    },
+    "recent": [
+      "Ash: I stand on the hatch cover so everyone can see me. I'll be short. I'll get us home, and I'll get us paid.",
+      "A few cheers, a few jeers. Harrow climbs up beside him.\n@Harrow: Pretty words. I've been at sea twenty years. He's been at sea two.",
+      "Ash: Two years, and I never lost a man on my watch. Ask them.",
+      "@Tobin: That's true enough! He hauled me out of the scuppers in the gale!\nLaughter. The mood tilts a little toward Ash.",
+      "Ash: Bell, how do we count?",
+      "@Bell: Articles say show of hands, every man who's signed. Thirty-one signed. Sixteen wins it.\nShe takes out a stub of pencil and the ship's book.",
+      "Ash: Then count.",
+      "@Bell: Hands for Harrow.\nHands go up across the deck. Bell counts twice, lips moving.\n@Bell: Fourteen for Harrow.",
+      "Ash: I keep my face still.",
+      "@Bell: Hands for Ash.\nMore hands. Tobin raises both and is told off. Bell counts.\n@Bell: Fifteen for Ash.",
+      "Ash: Fifteen. That's not sixteen. Who didn't vote?",
+      "@Bell: Two men abstained. Carver's in the sick bay with fever and can't stand. Jory says he won't choose.\nA restless murmur. Harrow grins.",
+      "Ash: Then someone fetch Carver's vote from the sick bay.",
+      "@Bell: Articles say hands on deck, in daylight. Not whispers through a door."
+    ],
+    "userText": "So what now? I've got the most hands. That should be enough.",
+    "aiText": "@Bell: Most isn't sixteen. Articles are plain.\nShe closes the ship's book.\n@Bell: We vote again at dawn, when Carver can stand or can't. Until then nobody's captain. I'll hold the keys.\nHarrow claps Ash on the shoulder, too hard.\n@Harrow: Sleep well, almost-captain.",
+    "met": false,
+    "why": "Ash wins the most hands, but the articles set out earlier require sixteen and he has fifteen; the quartermaster declares no captain and a new vote at dawn."
+  },
+  {
+    "name": "kingdom-alliance-sigil-gesture",
+    "setting": "Duke Aldric's winter ball in a European-style fantasy duchy.",
+    "userName": "Ash",
+    "cast": [
+      { "name": "Lady Seraphine Dorne", "personality": "Cool, clever heiress who prefers gestures to speeches." },
+      { "name": "Duke Aldric", "personality": "Dignified host with a dry sense of humour." }
+    ],
+    "scene": {
+      "name": "The Answer",
+      "situation": "Ash has proposed an alliance between House Ashgrove and House Dorne; Seraphine said she would answer at the Duke's ball, and that if the answer were yes she would wear the Ashgrove silver hart.",
+      "moveOnCondition": "Lady Seraphine accepts Ash's proposal of alliance."
+    },
+    "recent": [
+      "Ash: I arrive at the ball and scan the room for Seraphine.",
+      "She has not arrived. The court whispers: House Dorne is late, House Dorne is undecided, House Dorne has been seen talking to the Vells.",
+      "Ash: I wait by the stair, trying not to look like I'm waiting.",
+      "Duke Aldric pauses as he passes.\n@Aldric: You look like a man waiting for a verdict, Ashgrove.\nHe moves on, amused.",
+      "Ash: Am I that obvious? I keep watching the doors.",
+      "The great doors open. The herald announces House Dorne."
+    ],
+    "userText": "I hold my breath and look at her gown.",
+    "aiText": "Seraphine descends the stair in midnight blue. At her breast, pinned where every eye in the hall can see it, gleams a small silver hart, the Ashgrove badge. She doesn't look at Ash; she doesn't need to. The whispering changes key all at once.\n@Aldric: Well. That's answered, then.\nAt the foot of the stair she offers Ash her gloved hand, and he takes it.",
+    "met": true,
+    "why": "Seraphine says nothing, but she wears the silver hart, the yes signal agreed in the Scene's situation, publicly; the Duke reads it as an answer and she gives Ash her hand."
+  }
+]

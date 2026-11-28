@@ -1,4 +1,6 @@
 import {
+    DecisionRequest,
+    DecisionResult,
     EmbeddingRequest,
     EmbeddingResult,
     ImageData,
@@ -46,6 +48,10 @@ export class CappedModelGateway extends ModelGateway {
 
     embedTexts(request: EmbeddingRequest): Promise<EmbeddingResult> {
         return this.cap.run(request.kind, () => this.inner.embedTexts(request));
+    }
+
+    decide(request: DecisionRequest): Promise<DecisionResult | null> {
+        return this.cap.run(request.kind, () => this.inner.decide(request));
     }
 
     embeddingModel(): string {

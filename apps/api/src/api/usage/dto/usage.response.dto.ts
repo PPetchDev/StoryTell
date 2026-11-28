@@ -31,6 +31,7 @@ export const CALL_KINDS = Object.keys({
     speech_repair_fallback: true,
     reach_out: true,
     meanwhile: true,
+    scene_decision: true,
     snapshot_image: true,
     reference_image: true,
     expression_image: true,

@@ -12,6 +12,8 @@ import {
     CallKind,
     CreditBalance,
     CreditPool,
+    DecisionRequest,
+    DecisionResult,
     EMBEDDING_MODEL,
     EmbeddingRequest,
     EmbeddingResult,
@@ -65,6 +67,8 @@ import {
 } from './model-table.js';
 import { defaultSleep, SleepFn } from './http.js';
 import { OpenRouterChatRequest, OpenRouterChatResult, SamplerRefusedError, TextBill } from './openrouter-client.js';
+import { SCENE_DECISION_MODELS } from './decision-models.js';
+import { NANOGPT_HOST, NanoGptTextClient } from './nanogpt-text-client.js';
 import { TextHost } from './text-hosts.js';
 import { OwnCutoutUnavailableError, SoftCutoutUnsuitableError } from '../../../errors/image.errors.js';
 import { OWN_CUTOUT_HOST, OWN_CUTOUT_MODEL } from './own-cutout.js';
@@ -430,6 +434,42 @@ export class RealModelGateway extends ModelGateway {
         const { messages, maxTokens, json, stop } = request;
         const samplers = isSampledKind(request.kind) ? settings.samplers[modelName] : undefined;
         return { model: TEXT_MODELS[modelName], messages, maxTokens, json, stop, ...(samplers ? { samplers } : {}) };
+    }
+
+    /**
+     * A Scene decision (.scratch/scene-decisions/spec.md): the decision models in order on NanoGPT,
+     * the first that answers deciding by its own threshold. Null when no host in the chain is NanoGPT.
+     */
+    async decide(request: DecisionRequest): Promise<DecisionResult | null> {
+        const host = this.deps.textHosts.find((candidate) => candidate.client instanceof NanoGptTextClient);
+        if (!host) return null;
+        const client = host.client as NanoGptTextClient;
+        const failures: string[] = [];
+        for (const model of SCENE_DECISION_MODELS) {
+            try {
+                const { answers, inputTokens } = await client.decisions(model.id, request.state, model.questions);
+                const probability = model.probability(answers);
+                if (!Number.isFinite(probability)) throw new ProviderOutageError(`${model.name} gave no probability`);
+                await this.deps.usage.record({
+                    kind: request.kind,
+                    pool: 'text',
+                    model: model.name,
+                    host: host.recordedHost ?? NANOGPT_HOST,
+                    promptTokens: inputTokens,
+                    completionTokens: 0,
+                    images: null,
+                    costUsd: 0,
+                    storyId: request.servedFor?.storyId ?? null,
+                    chatId: request.servedFor?.chatId ?? null,
+                    messageId: request.servedFor?.messageId ?? null,
+                });
+                return { met: probability >= model.threshold, probability, model: model.name };
+            } catch (error) {
+                failures.push(`${model.name}: ${(error as Error).message}`);
+                this.logger.warn(`${request.kind}: ${model.name} failed (${(error as Error).message}).`);
+            }
+        }
+        throw new ProviderOutageError(`No decision model answered ${request.kind}: ${failures.join('; ')}`);
     }
 
     /** One text-pool UsageRecord for what a call billed, naming the host (and its own model, if it has one) that answered. */

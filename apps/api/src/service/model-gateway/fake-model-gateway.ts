@@ -1,6 +1,9 @@
 import { ModelGatewayError, ProviderOutageError } from '../../errors/model-gateway.errors.js';
 import { fakeEmbedding } from './fake-embedding.js';
 import {
+    DecisionCallKind,
+    DecisionRequest,
+    DecisionResult,
     EmbeddingCallKind,
     EmbeddingRequest,
     EmbeddingResult,
@@ -60,6 +63,7 @@ export type FakeSpeechReply = (Partial<SpeechResult> & { delayMs?: number }) | M
 export type FakeGatewayCall =
     | { method: 'completeText'; request: TextCompletionRequest }
     | { method: 'embedTexts'; request: EmbeddingRequest }
+    | { method: 'decide'; request: DecisionRequest }
     | { method: 'transcribe'; request: TranscriptionRequest }
     | { method: 'synthesizeSpeech'; request: SpeechRequest }
     /** `stopped` turns true when the caller's signal ended the stream. */
@@ -116,6 +120,7 @@ const DEFAULT_CREDIT: RemainingCredit = {
 export class FakeModelGateway extends ModelGateway {
     readonly calls: FakeGatewayCall[] = [];
     private readonly textReplies = new Map<TextCallKind, FakeTextReply[]>();
+    private readonly decisionReplies = new Map<DecisionCallKind, Array<DecisionResult | ModelGatewayError | null>>();
     private readonly imageReplies = new Map<ImageCallKind, FakeImageReply[]>();
     private readonly embeddingReplies = new Map<EmbeddingCallKind, FakeEmbeddingReply[]>();
     private readonly transcriptionReplies: FakeTranscriptionReply[] = [];
@@ -160,6 +165,19 @@ export class FakeModelGateway extends ModelGateway {
     setRemainingCredit(credit: Partial<RemainingCredit>): this {
         this.credit = { ...this.credit, ...credit };
         return this;
+    }
+
+    /**
+     * Queues what the next decision calls of `kind` answer, in order. Unscripted, a decision answers
+     * null, as where no host serves decision models, so the Judge decides by itself.
+     */
+    scriptDecision(kind: DecisionCallKind, ...replies: Array<DecisionResult | ModelGatewayError | null>): this {
+        this.decisionReplies.set(kind, [...(this.decisionReplies.get(kind) ?? []), ...replies]);
+        return this;
+    }
+
+    decisionCalls(kind?: DecisionCallKind): DecisionRequest[] {
+        return this.calls.flatMap((call) => (call.method === 'decide' && (!kind || call.request.kind === kind) ? [call.request] : []));
     }
 
     textCalls(kind?: TextCallKind): TextCompletionRequest[] {
@@ -212,6 +230,7 @@ export class FakeModelGateway extends ModelGateway {
     reset(): void {
         this.calls.length = 0;
         this.textReplies.clear();
+        this.decisionReplies.clear();
         this.imageReplies.clear();
         this.embeddingReplies.clear();
         this.transcriptionReplies.length = 0;
@@ -220,6 +239,13 @@ export class FakeModelGateway extends ModelGateway {
         this.credit = structuredClone(DEFAULT_CREDIT);
         this.softPlan = 'now';
         this.softCutoutGate = null;
+    }
+
+    async decide(request: DecisionRequest): Promise<DecisionResult | null> {
+        this.calls.push({ method: 'decide', request });
+        const reply = this.decisionReplies.get(request.kind)?.shift() ?? null;
+        if (reply instanceof ModelGatewayError) throw reply;
+        return reply;
     }
 
     async completeText(request: TextCompletionRequest): Promise<TextCompletionResult> {

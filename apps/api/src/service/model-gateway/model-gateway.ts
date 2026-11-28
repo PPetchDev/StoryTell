@@ -27,6 +27,13 @@ export abstract class ModelGateway {
     abstract embedTexts(request: EmbeddingRequest): Promise<EmbeddingResult>;
 
     /**
+     * A bounded decision by a decision model (.scratch/scene-decisions/spec.md): whether a Scene's
+     * move-on condition has happened. Null when no host in the text chain serves decision models, so
+     * the caller decides as before; rejects when every decision model failed. Text pool, $0 on NanoGPT.
+     */
+    abstract decide(request: DecisionRequest): Promise<DecisionResult | null>;
+
+    /**
      * The model `embedTexts` answers with now, the same name its results carry. Makes no call:
      * the Memory backfill reads it to find vectors another model made.
      */
@@ -135,7 +142,10 @@ export type AudioCallKind = 'dictation' | 'read_aloud' | 'voice_preview';
 /** The audio kinds that make speech: reading a Message aloud, and a voice's sample in the Story editor. */
 export type SpeechCallKind = Extract<AudioCallKind, 'read_aloud' | 'voice_preview'>;
 
-export type CallKind = TextCallKind | ImageCallKind | EmbeddingCallKind | AudioCallKind;
+/** A decision model's call (.scratch/scene-decisions/spec.md): whether the Scene's move-on condition has happened. */
+export type DecisionCallKind = 'scene_decision';
+
+export type CallKind = TextCallKind | ImageCallKind | EmbeddingCallKind | AudioCallKind | DecisionCallKind;
 
 export const MAX_REFERENCE_IMAGES = 3;
 
@@ -383,6 +393,22 @@ export interface ImageGenerationResult {
     image: ImageData;
     model: string;
     costUsd: number;
+}
+
+export interface DecisionRequest {
+    kind: DecisionCallKind;
+    /** What the decision model reads: the Scene, its condition and the story, as text. */
+    state: string;
+    servedFor?: ServedFor;
+}
+
+export interface DecisionResult {
+    /** Whether the condition has happened, by the answering model's own threshold. */
+    met: boolean;
+    /** The answering model's probability that it has. */
+    probability: number;
+    /** The app's name for the decision model that answered. */
+    model: string;
 }
 
 export interface EmbeddingRequest {

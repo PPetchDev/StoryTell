@@ -1,6 +1,7 @@
 import { ProviderBusyError, ProviderOutageError } from '../../../errors/model-gateway.errors.js';
 import { CreditBalance, SamplerParam, TextStream, WeeklyAllowance } from '../model-gateway.js';
 import { defaultSleep, FetchLike, NetworkError, readJson, sendRequest, SleepFn } from './http.js';
+import { DecisionAnswers } from './decision-models.js';
 import { ReasoningSetting } from './model-table.js';
 import { OpenRouterChatRequest, OpenRouterChatResult, OpenRouterClient, OpenRouterEmbeddingRequest, OpenRouterStreamResult, TextBill } from './openrouter-client.js';
 
@@ -63,6 +64,24 @@ export class NanoGptTextClient extends OpenRouterClient {
         sleep: SleepFn = defaultSleep,
     ) {
         super(nanoKey, nanoFetch, sleep, NANOGPT_BASE_URL);
+    }
+
+    /**
+     * One decision model's answers (.scratch/scene-decisions/spec.md), with Zero Data Retention
+     * required. No retries: a failed call goes to the next decision model at once.
+     */
+    async decisions(model: string, state: string, questions: Record<string, unknown>): Promise<{ answers: DecisionAnswers; inputTokens: number }> {
+        if (!this.nanoKey) throw new ProviderOutageError('NanoGPT: NANOGPT_API_KEY is not set.');
+        const response = await sendRequest(this.nanoFetch, `${NANOGPT_BASE_URL}/decisions`, {
+            method: 'POST',
+            headers: { authorization: `Bearer ${this.nanoKey}`, 'content-type': 'application/json' },
+            body: JSON.stringify({ model, state, questions, provider: { zdr: true } }),
+        });
+        const json = (await response.json().catch(() => null)) as { answers?: DecisionAnswers; usage?: { input_tokens?: number }; error?: { message?: string } } | null;
+        if (!response.ok || !json?.answers) {
+            throw new ProviderOutageError(`NanoGPT decisions (${model}) answered ${response.status}: ${json?.error?.message ?? 'no answers'}`);
+        }
+        return { answers: json.answers, inputTokens: json.usage?.input_tokens ?? 0 };
     }
 
     /** The JSON body a request becomes on NanoGPT. Exposed so contract tests can check it. */
