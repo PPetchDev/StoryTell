@@ -929,7 +929,8 @@ export function StoryEditor({ initial }: { initial: Story }) {
                         )}
                         {/* The Role's faces (.scratch/your-faces/spec.md), drawn from its picture as a Character's are. */}
                         {tab === 'role' && (
-                            <div className="card m-0">
+                            /* mb-4 like every card: m-0 left it touching "Your own sections" (docs/ui-audit-2026-11-21.md, L9). */
+                            <div className="card mb-4">
                                 <ExpressionSet<Story>
                                     owner={{
                                         key: 'role',

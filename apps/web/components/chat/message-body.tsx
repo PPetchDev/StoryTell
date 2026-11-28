@@ -168,10 +168,10 @@ function Speech({
             aria-current={reading ? 'true' : undefined}
         >
             {openProfile ? (
-                // A 44px target round the 36px picture.
+                // A 44px target, seen by the layout too: a 36px button's inset hit-area read 36px to taps under it (docs/ui-audit-2026-11-21.md, L1).
                 <button
                     type="button"
-                    className="bare-button relative shrink-0 rounded-full press before:absolute before:-inset-1 before:rounded-full"
+                    className="bare-button relative grid size-11 shrink-0 place-items-center rounded-full press focus-ring"
                     aria-label={`Profile of ${part.speakerName}`}
                     tabIndex={tabStop ? undefined : -1}
                     onClick={openProfile}

@@ -27,6 +27,8 @@ const CHIP = [
 const PORTRAIT_CHIP = [
     'bare-button icon-ring inline-flex size-11 shrink-0 items-center justify-center rounded-full',
     'cursor-pointer press focus-ring-inset disabled:cursor-not-allowed',
+    // The nudge ring is drawn outside the portrait, where the 36px picture left it all but hidden (docs/ui-audit-2026-11-21.md, L12).
+    'aria-pressed:outline-2 aria-pressed:outline-accent aria-pressed:-outline-offset-2',
 ].join(' ');
 
 interface CharacterRowProps {

@@ -68,7 +68,8 @@ export function FacePicker({ face, onFace, faces, name, disabled = false, onPoin
                 className={ICON_BUTTON}
                 aria-label={face ? `Your face: ${EMOTION_LABEL[face]}. Change it` : 'Pick your face for this message'}
                 title={face ? `Your face: ${EMOTION_LABEL[face]}` : 'Your face for this message'}
-                aria-pressed={face !== null}
+                // It opens a sheet, so it is a popup, not a toggle (docs/ui-audit-2026-11-21.md, L2).
+                aria-haspopup="dialog"
                 disabled={disabled}
                 onPointerDown={onPointerDown}
                 onClick={() => setOpen(true)}
@@ -88,11 +89,12 @@ export function FacePicker({ face, onFace, faces, name, disabled = false, onPoin
                         <button type="button" className="button button-quiet justify-self-start" aria-pressed={face === null} onClick={() => choose(null)}>
                             No face
                         </button>
-                        <ul className={`m-0 grid list-none gap-2 p-0 ${EMOTION_GRID}`} aria-label="Everyday faces">
+                        <ul className={`m-0 grid list-none gap-2 p-0 ${EMOTION_GRID}`} aria-label="Everyday feelings">
                             {EVERYDAY_EMOTIONS.map(tile)}
                         </ul>
-                        <h3 className="m-0 text-base font-semibold">Intimate moments (18+)</h3>
-                        <ul className={`m-0 grid list-none gap-2 p-0 ${EMOTION_GRID}`} aria-label="Intimate faces">
+                        {/* The same heading as the editor's (.scratch/stage-pictures/spec.md; docs/ui-audit-2026-11-21.md, L6). */}
+                        <h3 className="m-0 text-base font-semibold">Intimate scenes (18+)</h3>
+                        <ul className={`m-0 grid list-none gap-2 p-0 ${EMOTION_GRID}`} aria-label="Intimate feelings">
                             {INTIMATE_EMOTIONS.map(tile)}
                         </ul>
                     </div>

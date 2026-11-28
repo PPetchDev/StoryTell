@@ -904,6 +904,8 @@ export function ChatComposer({
                                 faces={faces}
                                 name={chat.identityName}
                                 disabled={writing || busy || blocked || writingForMe || dictating || watching}
+                                /* Keeps focus on the text box: picking a face mid-draft returns it there, not the button (docs/ui-audit-2026-11-21.md, L3). */
+                                onPointerDown={keepFocus}
                             />
                         )}
                         {/* .scratch/dictation/spec.md: only where the browser can record. */}

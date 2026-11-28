@@ -109,7 +109,7 @@ function PersonaCard({ persona, autosave, justCreated, onSaved, onDelete, focusA
                         <button
                             ref={pictureButton}
                             type="button"
-                            className="button button-quiet button-small"
+                            className="button button-quiet"
                             disabled={pictureBusy !== null}
                             aria-label={`${picture ? 'Change picture' : 'Add a picture'} of ${persona.name}`}
                             onClick={() => fileInput.current?.click()}
@@ -119,13 +119,25 @@ function PersonaCard({ persona, autosave, justCreated, onSaved, onDelete, focusA
                         {picture && (
                             <button
                                 type="button"
-                                className="button button-quiet button-small"
+                                className="button button-quiet"
                                 disabled={pictureBusy !== null}
                                 aria-label={`Pick the face in the picture of ${persona.name}`}
                                 onClick={() => setCropping(true)}
                             >
                                 Pick the face
                             </button>
+                        )}
+                        {/* Reset, as a Character's Expressions have (docs/ui-audit-2026-11-21.md, L7): back to the picture's own face square. */}
+                        {picture && crop !== null && (
+                            <ConfirmButton
+                                label="Reset"
+                                ariaLabel={`Reset the face of ${persona.name}`}
+                                disabled={pictureBusy !== null}
+                                question={`Reset the face of ${persona.name} to the picture's own square?`}
+                                confirmLabel="Reset"
+                                onConfirm={() => savePicture('Resetting…', () => personaApi.setImageCrop(persona.id, null))}
+                                focusAfter={() => pictureButton.current}
+                            />
                         )}
                         {picture && (
                             <ConfirmButton
@@ -135,7 +147,6 @@ function PersonaCard({ persona, autosave, justCreated, onSaved, onDelete, focusA
                                 disabled={pictureBusy !== null}
                                 question="Remove the picture?"
                                 confirmLabel="Remove"
-                                small
                                 onConfirm={() => savePicture('Removing…', () => personaApi.clearImage(persona.id))}
                                 focusAfter={() => pictureButton.current}
                             />

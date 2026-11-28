@@ -38,6 +38,8 @@ const BAR_TOGGLE = [
     'cursor-pointer press focus-ring active:bg-surface-raised',
     // Small text on the tint: the accent made for text, as the composer's pressed tools use.
     'aria-pressed:bg-accent-soft aria-pressed:text-rewrite-text',
+    // The word gives way below 360: the title had about nine characters left (docs/ui-audit-2026-11-21.md, L4).
+    '[&>span]:max-[359px]:hidden',
 ].join(' ');
 
 /** A row of the ⋯ menu, a link or a button: 44px, its ring inside (the sheet's edge would clip one outside). */

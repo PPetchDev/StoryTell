@@ -123,7 +123,8 @@ export function SceneStrip({
                   * as the story moves. Otherwise this wrapper is not there for layout at all.
                   */}
                 <span className={!open && place ? 'flex min-w-0 flex-[1_0_100%] items-center gap-x-2.5' : 'contents'} data-strip-line>
-                <span className={`font-semibold text-text ${open ? 'shrink-0' : place ? 'min-w-0 shrink truncate' : 'shrink-0 max-w-[50%] truncate'}`}>
+                {/* The name gives way by its own length, never capped at half the strip: at 360 that left about nine characters and set the pin above the cut name (docs/ui-audit-2026-11-21.md, L5). */}
+                <span className={`font-semibold text-text ${open ? 'shrink-0' : 'min-w-0 shrink truncate'}`}>
                     <span className="sr-only">Scene: </span>
                     <PinIcon size={14} className={STRIP_ICON} />
                     {current ? current.name : 'Free play'}

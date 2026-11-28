@@ -82,7 +82,7 @@ export function RolePicture({ storyId, roleName, imagePath, imageCrop = null, on
                     <button
                         ref={pictureButton}
                         type="button"
-                        className="button button-quiet button-small"
+                        className="button button-quiet"
                         disabled={busy !== null}
                         aria-label={`${imagePath ? 'Change picture' : 'Add a picture'} of ${name}`}
                         onClick={() => fileInput.current?.click()}
@@ -92,13 +92,25 @@ export function RolePicture({ storyId, roleName, imagePath, imageCrop = null, on
                     {imagePath && (
                         <button
                             type="button"
-                            className="button button-quiet button-small"
+                            className="button button-quiet"
                             disabled={busy !== null}
                             aria-label={`Pick the face in the picture of ${name}`}
                             onClick={() => setCropping(true)}
                         >
                             Pick the face
                         </button>
+                    )}
+                    {/* Reset, as a Character's Expressions have (docs/ui-audit-2026-11-21.md, L7): back to the picture's own face square. */}
+                    {imagePath && imageCrop !== null && (
+                        <ConfirmButton
+                            label="Reset"
+                            ariaLabel={`Reset the face of ${name}`}
+                            disabled={busy !== null}
+                            question={`Reset the face of ${name} to the picture's own square?`}
+                            confirmLabel="Reset"
+                            onConfirm={() => save('Resetting…', () => storyApi.setRoleImageCrop(storyId, null))}
+                            focusAfter={() => pictureButton.current}
+                        />
                     )}
                     {imagePath && (
                         <ConfirmButton
@@ -108,7 +120,6 @@ export function RolePicture({ storyId, roleName, imagePath, imageCrop = null, on
                             disabled={busy !== null}
                             question="Remove the picture?"
                             confirmLabel="Remove"
-                            small
                             onConfirm={() => save('Removing…', () => storyApi.clearRoleImage(storyId))}
                             focusAfter={() => pictureButton.current}
                         />

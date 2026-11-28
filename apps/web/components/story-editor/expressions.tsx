@@ -195,11 +195,14 @@ export function ExpressionSet<T>({ owner, api, commit, flush, onDrawn, reload }:
     const allPrice = price === null ? null : toDraw * (price + cutoutPrice);
     const allLabel =
         redraw ? `Redraw all ${toDraw}` : toDraw === all.length ? `Draw all ${toDraw}` : `Draw the ${toDraw} missing`;
+    // The moving part alone, in the live region: the standing sentence beside it is never re-read aloud (docs/ui-audit-2026-11-21.md, L10).
     const drawingAll = run?.running
         ? run.stopped
             ? `Stopping after ${run.current ? EMOTION_LABEL[run.current] : 'this one'}…`
-            : `Drawing ${run.current ? EMOTION_LABEL[run.current] : '…'}, ${Math.min(run.drawn.length + 1, run.emotions.length)} of ${run.emotions.length}. It goes on if you leave this page.`
+            : `Drawing ${run.current ? EMOTION_LABEL[run.current] : '…'}, ${Math.min(run.drawn.length + 1, run.emotions.length)} of ${run.emotions.length}.`
         : null;
+    /** The standing sentence beside the status, plain text for the eye, never re-read aloud (docs/ui-audit-2026-11-21.md, L10). */
+    const drawingAllNote = run?.running && !run.stopped ? 'It goes on if you leave this page.' : null;
 
     /** A run that ended: take in its last pictures and say how it went. */
     const ended = (last: ExpressionDrawing) => {
@@ -317,8 +320,9 @@ export function ExpressionSet<T>({ owner, api, commit, flush, onDrawn, reload }:
         <fieldset className={`${SUBSECTION} lg:col-span-2`}>
             <legend className={SUBSECTION_LEGEND}>Expressions</legend>
             <p className={`${FIELD_HINT} mb-2`}>
-                A picture for each feeling. In a Chat, a line that shows one has this picture in place of {owner.plainName}; the
-                others keep {owner.plainName}. Tap a feeling to draw, upload or change it.
+                A picture for each feeling. In a Chat, a line that shows one has this picture in place of {owner.plainName}; a
+                line with a newer feeling, or an intimate one, shows the nearest one of these pictures where there is one
+                (docs/ui-audit-2026-11-21.md, L8). Tap a feeling to draw, upload or change it.
             </p>
             {owner.picturePath === null && <p className={`${FIELD_HINT} mb-2`}>Add a {owner.pictureName} to draw Expressions.</p>}
             {canDraw && (
@@ -338,8 +342,10 @@ export function ExpressionSet<T>({ owner, api, commit, flush, onDrawn, reload }:
                         onConfirm={() => void drawAll()}
                     />
                     {drawingAll && (
-                        <span className="hint mt-0" role="status">
-                            {drawingAll}
+                        <span className="hint mt-0">
+                            {/* Only the moving part sits in the live region; the standing sentence beside it is plain text (docs/ui-audit-2026-11-21.md, L10). */}
+                            <span role="status">{drawingAll}</span>
+                            {drawingAllNote && <span> {drawingAllNote}</span>}
                         </span>
                     )}
                     {run?.running && !run.stopped && (

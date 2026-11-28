@@ -118,7 +118,7 @@ test('the face picker sends a face with the Message, shows it beside the line, a
     const composer = page.getByRole('form', { name: 'Composer' });
     await composer.getByRole('button', { name: 'Pick your face for this message' }).tap();
     const sheet = page.getByRole('dialog', { name: 'Your face' });
-    await expect(sheet.getByRole('list', { name: 'Everyday faces' }).getByRole('button')).toHaveCount(15);
+    await expect(sheet.getByRole('list', { name: 'Everyday feelings' }).getByRole('button')).toHaveCount(15);
     await expect(sheet.getByRole('button', { name: 'Annoyed' })).toBeVisible();
     await expect(sheet.getByRole('button', { name: 'Thinking' })).toBeVisible();
     await expect(sheet.getByRole('button', { name: 'Smug' })).toBeVisible();
@@ -138,7 +138,8 @@ test('the face picker sends a face with the Message, shows it beside the line, a
     await sheet.getByRole('button', { name: 'Embarrassed' }).tap();
     await expect(sheet).toHaveCount(0);
     const picker = composer.getByRole('button', { name: 'Your face: Embarrassed. Change it' });
-    await expect(picker).toHaveAttribute('aria-pressed', 'true');
+    // It opens a sheet, so it says popup, not pressed (docs/ui-audit-2026-11-21.md, L2).
+    await expect(picker).toHaveAttribute('aria-haspopup', 'dialog');
 
     for (const width of [360, 320]) {
         await page.setViewportSize({ width, height: 740 });
@@ -156,5 +157,5 @@ test('the face picker sends a face with the Message, shows it beside the line, a
     await expect(page.getByRole('article', { name: 'AI reply' }).last()).toContainText('You are blushing.');
     await expect(page.locator('[data-your-face="embarrassment"]')).toHaveCount(1);
     // One send only.
-    await expect(composer.getByRole('button', { name: 'Pick your face for this message' })).toHaveAttribute('aria-pressed', 'false');
+    await expect(composer.getByRole('button', { name: 'Pick your face for this message' })).not.toHaveAttribute('aria-pressed');
 });

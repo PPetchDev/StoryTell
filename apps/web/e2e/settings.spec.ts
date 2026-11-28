@@ -13,7 +13,8 @@ test('changing the play model shows a Drift warning and saves it at once', async
 
     try {
         await playModel.selectOption('deepseek-v4-pro');
-        await expect(page.getByText('$1.30 in / $2.60 out per million tokens · a long turn about $0.03')).toBeVisible();
+        // The price line moved on with the subscription route (6e3daf8): a turn is about $0.04, and the line names the host.
+        await expect(page.getByText('On DeepInfra: $1.30 in / $2.60 out per million tokens · a long turn about $0.04. Usage shows the host serving now.')).toBeVisible();
         await expect(page.getByText('$0.56 in', { exact: false })).toHaveCount(0);
 
         // Next.js adds its own role="alert" route announcer, so filter on the text.

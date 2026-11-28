@@ -241,7 +241,9 @@ test('Draw all draws the missing ones on the server, and goes on through a reloa
 
     await expressions.getByRole('button', { name: 'Draw the 20 missing Expressions of Nara' }).click();
     await expressions.getByRole('button', { name: /^Draw the 20 missing(?! Expressions)/ }).click();
-    await expect(expressions.getByRole('status').filter({ hasText: 'of 20. It goes on if you leave this page.' })).toBeVisible();
+    // The count alone sits in the live region; the standing sentence is beside it, never re-read (docs/ui-audit-2026-11-21.md, L10).
+    await expect(expressions.getByRole('status').filter({ hasText: /, \d+ of 20\.$/ })).toBeVisible();
+    await expect(expressions.getByText('It goes on if you leave this page.')).toBeVisible();
     // The run opens no row of its own: 21 panels of disabled buttons hid every tile (docs/ui-audit-2026-11-21.md, H1).
     await expect(expressions.getByRole('group', { name: /Expression$/ })).toHaveCount(0);
     await expect(expressions.getByRole('button', { name: 'Thinking Expression, none yet' })).toContainText('Thinking');
