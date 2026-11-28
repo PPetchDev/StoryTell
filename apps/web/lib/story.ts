@@ -429,7 +429,7 @@ export function gaugeGoalInWords(direction: GaugeDirection): string {
 export const SUDDEN_EVENT_TURN_LABELS: Record<string, string> = { 2: '2', 3: '3', 4: '4', 5: '5', 6: '6', 7: '7', 8: '8' };
 export const MAX_SUDDEN_EVENTS = 8;
 /** The most Endings a Story holds (mirrors MAX_ENDINGS). */
-export const MAX_ENDINGS = 6;
+export const MAX_ENDINGS = 8;
 
 export const MAX_CHARACTERS = 6;
 

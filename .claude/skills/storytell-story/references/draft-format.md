@@ -112,7 +112,7 @@ Mix fights, chases, an everyday chaos event (like a busy café day), and one tie
 
 ## Endings
 
-Write at most **6** Endings (the app refuses a 7th). Each has a name, when it is reached, and what the Epilogue should tell. Include:
+Write at most **8** Endings (the app refuses a 9th). Each has a name, when it is reached, and what the Epilogue should tell. Include:
 - a bittersweet one;
 - a "together" one;
 - a "Rin keeps her own life" one;
@@ -134,7 +134,7 @@ Write 6–10 Places. Each has a name of at most a few words, and **looks** in a 
 
 ## App limits to check before showing the draft
 
-- Endings: at most 6.
+- Endings: at most 8.
 - Secret text: at most 1000 characters each.
 - Opening question texts: at most 200 characters.
 - Long text fields: at most 20,000 characters each.

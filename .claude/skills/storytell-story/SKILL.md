@@ -54,7 +54,7 @@ Before you show the draft, read it once as the user would:
 - Does each Character have a clearly different look, colour, voice and secret?
 - Do the Secrets unlock on Bond levels, so the story pays off slowly?
 - Does every Scene's move-on condition depend on what Rin does, never on time?
-- Are there at most 6 Endings? Does at least one let Rin keep her own life?
+- Are there at most 8 Endings? Does at least one let Rin keep her own life?
 
 Mixed Scenes, Sudden events and Endings are what the user asked for. Give them chases and fights, café or ordinary days, festivals, romance, and secrets.
 

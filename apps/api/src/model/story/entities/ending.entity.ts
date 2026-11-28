@@ -4,7 +4,7 @@ import type { Relation } from 'typeorm';
 import type { StoryEntity } from './story.entity.js';
 
 /** The most Endings one Story holds: each one not yet reached is a line in every judge call. */
-export const MAX_ENDINGS = 6;
+export const MAX_ENDINGS = 8;
 
 export interface EndingResponse {
     id: number;

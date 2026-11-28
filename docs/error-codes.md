@@ -87,7 +87,7 @@ nothing more: the request is gone. See `apps/api/src/api/chat/turn-response.ts`.
 | `404.003.026` | `SuddenEventNotFoundError` | No Sudden event with that id in this Story (`PATCH`/`DELETE /api/stories/:storyId/sudden-events/:eventId`). Nothing changes. |
 | `422.003.027` | `SuddenEventLimitError` | A ninth Sudden event on one Story. Nothing is added. |
 | `404.003.028` | `EndingNotFoundError` | No Ending with that id in this Story (`PATCH`/`DELETE /api/stories/:storyId/endings/:endingId`, `.scratch/endings/spec.md`). Nothing changes. |
-| `422.003.029` | `EndingLimitError` | A seventh Ending on one Story. Nothing is added. |
+| `422.003.029` | `EndingLimitError` | A ninth Ending on one Story. Nothing is added. |
 | `404.003.030` | `LoreSetNotFoundError` | No Lore set with that id for this Account when linking (`PUT /api/stories/:storyId/lore-sets`), or one this Story does not link when renaming it, deleting it or changing its entries (`…/lore-sets/:setId…`, `.scratch/shared-lore/spec.md`). Another Account's set answers the same. Nothing changes. |
 | `422.003.031` | `LoreSetLimitError` | A sixth Lore set linked to one Story, by linking or by making a new one. Nothing changes. |
 | `422.003.040` | `InvalidOpeningQuestionsError` | Opening questions (`PUT /api/stories/:storyId/opening-questions`, `.scratch/opening-questions/spec.md`) that break a rule: more than 8, a placeholder key that isn't a lowercase letter then a–z, 0–9 or `_` (30 at most), `user` or `char`, two with one key, or a blank question or default answer. The message says which; the whole list is refused and nothing changes. |

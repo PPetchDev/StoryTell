@@ -248,19 +248,19 @@ describe('Endings: authoring and play (HTTP)', () => {
         await t.http.delete(`/api/stories/${storyId}/endings/${ending.id + 1000}`).expect(404);
         await t.http.patch(`/api/stories/${storyId}/endings/${ending.id}`).send({ name: 5 }).expect(400);
 
-        for (let n = 2; n <= 6; n++) await t.http.post(`/api/stories/${storyId}/endings`).send({ name: `Ending ${n}` }).expect(201);
+        for (let n = 2; n <= 8; n++) await t.http.post(`/api/stories/${storyId}/endings`).send({ name: `Ending ${n}` }).expect(201);
         const full = await t.http.post(`/api/stories/${storyId}/endings`).send({}).expect(422);
-        expect(full.body.error).toMatchObject({ code: '422.003.029', message: 'A Story can have at most 6 Endings.' });
+        expect(full.body.error).toMatchObject({ code: '422.003.029', message: 'A Story can have at most 8 Endings.' });
 
         const copy = await t.http.post(`/api/stories/${storyId}/duplicate`).expect(201);
         expect((copy.body.endings as Ending[]).map(({ name, condition, epilogue }) => ({ name, condition, epilogue }))).toEqual([
             { name: 'The light returns', condition: 'The lamp is lit again.', epilogue: 'Tell of the first ship.' },
-            ...[2, 3, 4, 5, 6].map((n) => ({ name: `Ending ${n}`, condition: '', epilogue: '' })),
+            ...[2, 3, 4, 5, 6, 7, 8].map((n) => ({ name: `Ending ${n}`, condition: '', epilogue: '' })),
         ]);
         expect((copy.body.endings as Ending[]).every((copied) => copied.id !== ending.id)).toBe(true);
 
         const removed = await t.http.delete(`/api/stories/${storyId}/endings/${ending.id}`).expect(200);
-        expect((removed.body.endings as Ending[]).map((left) => left.name)).toEqual(['Ending 2', 'Ending 3', 'Ending 4', 'Ending 5', 'Ending 6']);
+        expect((removed.body.endings as Ending[]).map((left) => left.name)).toEqual(['Ending 2', 'Ending 3', 'Ending 4', 'Ending 5', 'Ending 6', 'Ending 7', 'Ending 8']);
     });
 
     it('a Story without Endings asks the Judge nothing in its first replies, and its Chats have none', async () => {
